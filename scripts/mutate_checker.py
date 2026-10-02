@@ -2,6 +2,13 @@
 
     uv run --frozen python scripts/mutate_checker.py          # run, print the survivors
     uv run --frozen python scripts/mutate_checker.py --write  # and write the record
+    uv run --frozen python scripts/mutate_checker.py --write --budget 100  # in parts
+
+A run is long (over two hours), so each mutant's result is kept as it comes in
+(``.mutants-progress.json``), with a fingerprint of everything a result depends on: the
+package, the tests, the scripts and the corpus. With ``--budget MINUTES`` a run starts no
+mutant after that time, keeps what it has and stops (exit 3); the next run takes up where it
+stopped. If anything in the fingerprint changed, every mutant is run again.
 
 The check (``src/label_docx/certify.py``) is what the proof rests on, so its tests must hold
 it, not merely run it. This script makes one small fault at a time in a copy of it: a comparison
@@ -29,6 +36,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,6 +46,9 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "src" / "label_docx" / "certify.py"
 RECORD = ROOT / "docs" / "checker-mutants.json"
+PROGRESS = ROOT / ".mutants-progress.json"
+# Exit status of a run stopped by its budget, with mutants left to run.
+UNFINISHED = 3
 TESTS = [
     "tests/test_certify.py",
     "tests/test_headers_comments.py",
@@ -103,7 +115,6 @@ EQUIVALENT: dict[tuple[str, str, str], str] = {
         "in them is refused either way"
     ),
     ("_Story.run", 'self.mark("note", (kind, self.story[1]))', "str:'note'"): _NOTE,
-    ("_Story.run", 'self.mark("note", (kind, int(child.get(_w("id"), ""))))', "str:'note'"): _NOTE,
     ("_Story.flush_run", "return", "statement"): (
         "an empty run then adds an empty segment, or no hidden characters: nothing either way"
     ),
@@ -205,6 +216,48 @@ EQUIVALENT: dict[tuple[str, str, str], str] = {
     ("EpiSource.certify", 'raise CertificationError("the ledger does not balance")', "statement"): (
         _LEDGER
     ),
+    ("<module>", "custom: bool = False", "bool"): (
+        "a segment's custom flag is read only on a note reference, which always sets it"
+    ),
+    (
+        "_Story.mark",
+        "def mark(self, kind: str, value: Any, custom: bool = False) -> None:",
+        "bool",
+    ): ("the custom flag is read only on a body's note reference, which always passes it"),
+    ("<module>", "in_table: bool = False", "bool"): (
+        "the one place a paragraph is made sets whether it is in a table"
+    ),
+    ("<module>", "section: int = 0", "int:0"): "the one place a paragraph is made sets its section",
+    (
+        "_Fonts.style_ids",
+        'style_id = None if kind == "character" else self.defaults.get(kind)',
+        "str:'character'",
+    ): "style_ids is asked only for paragraph and table styles: kind is never 'character'",
+    (
+        "_note_marks",
+        "section = sections[min(paragraph.section, len(sections) - 1)] if sections else None",
+        "binop",
+    ): (
+        "a paragraph's section is at most the number of sections closed before the last, "
+        "len(sections) - 1, so the bound never takes"
+    ),
+    (
+        "_note_marks",
+        'paragraph.section if value("numRestart", "continuous") == "eachSect" else None,',
+        "str:'continuous'",
+    ): "the default is only compared with 'eachSect', which 'Xontinuous' is not either",
+    (
+        "DocxSource.certify",
+        "for index, (label, theirs) in enumerate("
+        'zip(self.labels, value["paragraphs"], strict=True)):',
+        "bool",
+    ): _STRICT,
+    **{
+        ("_Numbering.label", f"{name} = self.{name}.setdefault(key, [None] * 9)", "int:9"): (
+            "a tenth place is never used: list levels are 0 to 8"
+        )
+        for name in ("values", "restarts", "showing")
+    },
 }
 
 _COMPARE = {
@@ -381,6 +434,36 @@ def _run(mutant: Mutant, package: Path) -> bool:
         return done.returncode != 0
 
 
+def fingerprint() -> str:
+    """SHA-256 of every file a mutant's result can depend on, by path and content."""
+    digest = hashlib.sha256()
+    for folder in ("src", "tests", "scripts", "corpus"):
+        for path in sorted((ROOT / folder).rglob("*")):
+            if path.is_file() and "__pycache__" not in path.parts:
+                digest.update(str(path.relative_to(ROOT)).encode() + b"\0")
+                digest.update(hashlib.sha256(path.read_bytes()).digest())
+    return digest.hexdigest()
+
+
+def _progress(key: str) -> dict[int, bool]:
+    """The results kept from earlier parts of a run with this fingerprint, by mutant index."""
+    try:
+        kept = json.loads(PROGRESS.read_text("utf-8"))
+    except OSError, ValueError:
+        return {}
+    if kept.get("fingerprint") != key:
+        return {}
+    return {int(index): bool(dead) for index, dead in kept["killed"].items()}
+
+
+def _keep(key: str, results: dict[int, bool]) -> None:
+    """Write the results so far, whole, by replacing the file."""
+    partial = PROGRESS.with_suffix(".tmp")
+    payload = {"fingerprint": key, "killed": {str(i): d for i, d in sorted(results.items())}}
+    partial.write_text(json.dumps(payload) + "\n", "utf-8")
+    partial.replace(PROGRESS)
+
+
 def _classify(survivors: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """The survivors with the reason each cannot matter, where one is recorded."""
     return [
@@ -413,6 +496,9 @@ def main() -> int:
         help="apply EQUIVALENT to the recorded run of this certify.py, without running it again",
     )
     parser.add_argument("--jobs", type=int, default=os.cpu_count() or 4)
+    parser.add_argument(
+        "--budget", type=float, help="minutes after which no mutant is started (then exit 3)"
+    )
     args = parser.parse_args()
     if args.reclassify:
         record = json.loads(RECORD.read_text("utf-8"))
@@ -421,16 +507,42 @@ def main() -> int:
         record["survivors"] = _classify(record["survivors"])
         RECORD.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", "utf-8")
         return _report(record["survivors"], record["killed"], record["mutants"])
+    deadline = None if args.budget is None else time.monotonic() + args.budget * 60
     lines = TARGET.read_text("utf-8").splitlines()
+    key = fingerprint()
     # The tests must pass on the check as it is; else every fault would look caught.
     unaltered = Mutant(-1, 0, "none", TARGET.read_text("utf-8"))
     if _run(unaltered, TARGET.parent):
         raise SystemExit("the tests fail on the check as it is: fix them before mutating it")
     every = mutants()
-    sys.stdout.write(f"{len(every)} mutants of {TARGET.relative_to(ROOT)}\n")
+    results = _progress(key)
+    sys.stdout.write(
+        f"{len(every)} mutants of {TARGET.relative_to(ROOT)}; {len(results)} kept from before\n"
+    )
+    sys.stdout.flush()
     package = TARGET.parent
+    lock = threading.Lock()
+
+    def run(mutant: Mutant) -> None:
+        if mutant.index in results or (deadline is not None and time.monotonic() > deadline):
+            return
+        dead = _run(mutant, package)
+        with lock:
+            results[mutant.index] = dead
+            _keep(key, results)
+            if len(results) % 50 == 0:
+                sys.stdout.write(f"  {len(results)} of {len(every)} run\n")
+                sys.stdout.flush()
+
     with concurrent.futures.ThreadPoolExecutor(args.jobs) as pool:
-        killed = list(pool.map(lambda m: _run(m, package), every))
+        list(pool.map(run, every))
+    if key != fingerprint():
+        raise SystemExit("files changed during the run: its results are not of one state")
+    left = len(every) - len(results)
+    if left:
+        sys.stdout.write(f"unfinished: {left} of {len(every)} mutants left; run again\n")
+        return UNFINISHED
+    killed = [results[mutant.index] for mutant in every]
     survivors = _classify(
         [
             {
@@ -454,6 +566,7 @@ def main() -> int:
         }
         RECORD.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", "utf-8")
         sys.stdout.write(f"wrote {RECORD.relative_to(ROOT)}\n")
+        PROGRESS.unlink(missing_ok=True)
     return _report(survivors, sum(killed), len(every))
 
 

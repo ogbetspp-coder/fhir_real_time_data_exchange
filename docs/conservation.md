@@ -139,6 +139,12 @@ Word's own answers to test cases. On the corpus and on 3,000 generated documents
 every rule (`scripts/fuzz_docx.py`), the two never disagreed. The certificate names the marks it
 checked (`marksChecked`). Highlight, shading, faint and raised text are held to Word alone.
 
+List labels and note marks are worked out twice in the same way. The check counts every list
+and every footnote and endnote by Word's rules, written apart from the reader's, and each
+paragraph's label and each note's mark must be the check's, or the read is not certified
+(R-36). The check's own labels and marks are also held directly to Word's recorded answers:
+388 labels and 84 note marks in 86 corpus documents, all Word's.
+
 ## Beyond the corpus: generated documents
 
 A corpus holds what authors happened to write. Generated documents explore what they could
@@ -162,7 +168,31 @@ write:
   - a restarted level takes the restarting list's override;
   - three restart settings Word draws in ways it does not document are refused.
   The next 30 generated documents: 15 agreed, 12 were refused, 3 differed. After the fixes, the
-  3 agree or are refused.
+  3 agree or are refused. Batches since, each with fresh documents:
+  - 30: 15 agreed, 15 were refused;
+  - 40: 35 agreed, 5 were refused;
+  - 60: 50 agreed, 9 were refused, 1 differed. Shrunk with Word as referee and put to Word in
+    107 variants, it showed one more rule: a level first reached through a deeper item shows
+    its definition's start, but counts on from its list's start override, which stays unused
+    (`override-implicit-continued`, `-reused`, `-levels`). Each document whose labels the fix
+    changed was put to Word again, and all 12 agree;
+  - 60 more: 56 agreed, 4 were refused, none differed;
+  - 60 more: 53 agreed, 6 were refused, 1 differed. Shrunk inside the document, it needed a
+    table: a level restarted by another list's paragraph takes that list's start override in
+    the same row, but not in a later row of the same table (`restart-source-cells`,
+    `restart-source-rows`). Word did not show a rule the reader could rely on. So the reader now
+    refuses such a level once any table row has ended since the restart. That is stricter than
+    Word: it also refuses two layouts where Word keeps the override. No reading changed; 9 of
+    580 earlier generated documents are now refused;
+  - 60 more, made with tables of several rows: 40 agreed, 18 were refused, 2 differed. Put to
+    Word in 18 variants, they showed two more ways a table row changes Word's count:
+    - a level that never restarts, counted after a higher paragraph and a row's end, is drawn
+      one less in some tables (`restart-never-rows`);
+    - a level counted on from another list's override through a deeper paragraph loses it in
+      some tables (`override-implicit-rows`).
+    Word showed no rule for which tables. So the reader refuses both once a row has ended. No
+    label changed in any generated document. 26 of 580 earlier ones are refused in all, and 32
+    of these 60. Real and template documents: no reading changed.
   - Every one the reader reads must be certified, key marks included (R-35).
   - Word's own judgment of them (`word_oracle.py compare`) runs in batches on a Mac with Word,
     since Word takes up to a minute a document.
@@ -222,13 +252,22 @@ The script now stops rather than record such a run.
 - every survivor must have its reason;
 - more than 90% of all faults must be killed outright.
 
-The current run made 1,091 faults. The check now also covers headers, footers and comments,
-works out the key marks, and reads the text a second time. The tests killed 1,046 of the faults
-(96%). The other 45 cannot change what the check does, and each is recorded with its reason:
-for example, the `xml` prefix, which can never name Word's namespace, or a length compared just
-before. None is unexplained.
+The current run made 1,480 faults. The check now also draws every list label and note mark
+on its own. The tests killed 1,423 of the faults (96%). The other 57 cannot change what the
+check does, and each is recorded with its reason: for example, the `xml` prefix, which can never
+name Word's namespace, a length compared just before, or a tenth place for list levels, which
+run 0 to 8. None is unexplained.
 
-The first run, before these tests were written, killed 629 of 766. The survivors showed what
+The first run of this check killed 1,309 of 1,480. Most survivors traced to one gap: the
+corpus tests held only the documents the check certified, so a check that wrongly refused a
+document went unnoticed. Every corpus document must now be read or refused exactly as locked.
+The rest needed tests of list settings no corpus document uses (a number after a space,
+legal numbering, Symbol bullets through a style, numbers past "z" or 3999). A few needed small
+changes to the check that left nothing to argue: dead code removed, and a placeholder mark
+dropped. A run now takes about 1.5 hours, so the script keeps each result as it comes and can
+resume (`--budget`). A run it resumes holds only results of the same code, tests and corpus.
+
+The very first run, of an earlier version of the check, killed 629 of 766. The survivors showed what
 was missing:
 
 - tests of rare cases (nested tables, East Asian and complex-script fonts, column breaks, `th`

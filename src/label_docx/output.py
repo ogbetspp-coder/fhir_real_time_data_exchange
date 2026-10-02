@@ -71,8 +71,9 @@ from label_docx.reader import (
 # 1.5.0 certifies with conservation-check/1.1.0, which leaves the reader no choice of reading;
 # 1.6.0 adds the headers, footers and comments, and each paragraph's comment marks, certified
 # by conservation-check/1.2.0; 1.7.0 certified by 1.3.0, which also works out the key marks;
-# 1.8.0 by 1.4.0, with Word's toggle and default-character-style rules.
-FORMAT_VERSION = "label-docx-json/1.8.0"
+# 1.8.0 by 1.4.0, with Word's toggle and default-character-style rules; 1.9.0 by 1.5.0, which
+# also works out the list labels and note marks.
+FORMAT_VERSION = "label-docx-json/1.9.0"
 
 type Json = str | int | bool | list[Json] | dict[str, Json] | None
 

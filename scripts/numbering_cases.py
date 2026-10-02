@@ -336,6 +336,18 @@ CASES: dict[str, Case] = {
         + num(1, 1),
         items((1, 0), (1, 1), (1, 1), (1, 0), (1, 1)),
     ),
+    "restart-never-rows": Case(
+        "lvlRestart 0 on level 1, counted after a level 0 paragraph and the end of a table row "
+        "(the reader refuses).",
+        abstract(1, lvl(0, text="%1"), lvl(1, text="%2", extra='<w:lvlRestart w:val="0"/>'))
+        + num(1, 1),
+        items((1, 1), (1, 0))
+        + "<w:tbl><w:tr><w:tc>"
+        + items()
+        + "<w:p/></w:tc></w:tr><w:tr><w:tc>"
+        + items((1, 1))
+        + "</w:tc></w:tr></w:tbl>",
+    ),
     "restart-after-first": Case(
         "lvlRestart 1 on level 2: it restarts after level 0 only.",
         abstract(
@@ -466,6 +478,32 @@ CASES: dict[str, Case] = {
         "A startOverride on level 0 of a list first used at level 1, nothing counted before.",
         SECTIONS + num(1, 1) + num(2, 1, start_at(0, 5)),
         items((2, 1), (2, 0), (1, 0)),
+    ),
+    "override-implicit-continued": Case(
+        "Level 0 first reached at level 1 by a list with a startOverride, then another list.",
+        SECTIONS + num(1, 1) + num(3, 1, start_at(0, 6)),
+        items((3, 1), (1, 1), (1, 0), (3, 0)),
+    ),
+    "override-implicit-reused": Case(
+        "Level 1 reached at level 2, after its list's startOverride was used.",
+        SECTIONS + num(1, 1) + num(3, 1, start_at(1, 6)),
+        items((3, 1), (1, 0), (3, 2), (1, 1), (3, 1)),
+    ),
+    "override-implicit-rows": Case(
+        "As override-implicit-continued, but the other list counts level 0 in a later row of a "
+        "table: Word takes the override here, not in other tables (the reader refuses).",
+        SECTIONS + num(1, 1) + num(3, 1, start_at(0, 6)),
+        items((3, 1))
+        + "<w:tbl><w:tr><w:tc>"
+        + items((3, 1))
+        + "</w:tc></w:tr><w:tr><w:tc>"
+        + items((1, 0))
+        + "</w:tc></w:tr></w:tbl>",
+    ),
+    "override-implicit-levels": Case(
+        "Levels 0 and 1, both with startOverrides, first reached at level 2.",
+        SECTIONS + num(1, 1) + num(3, 1, start_at(0, 6) + start_at(1, 4)),
+        items((3, 2), (1, 1), (1, 0), (3, 1)),
     ),
     "ancestor-two-levels": Case(
         "A level 2 item before levels 0 and 1 were counted, then levels 1 and 0.",
@@ -699,6 +737,28 @@ CASES: dict[str, Case] = {
         + num(1, 1, start_at(2, 2))
         + num(2, 1, start_at(0, 2)),
         items((1, 1), (2, 2), (2, 2)),
+    ),
+    "restart-source-cells": Case(
+        "List 1's level 1 paragraph restarts level 2, which list 3 counts next, in the next cell "
+        "of the same row: from list 1's override.",
+        SECTIONS + num(1, 1, start_at(2, 7)) + num(3, 1),
+        items((3, 0), (3, 2))
+        + "<w:tbl><w:tr><w:tc>"
+        + items((1, 1))
+        + "</w:tc><w:tc>"
+        + items((3, 2))
+        + "</w:tc></w:tr></w:tbl>",
+    ),
+    "restart-source-rows": Case(
+        "As restart-source-cells, but list 3 counts level 2 in the next row: not from list 1's "
+        "override (the reader refuses).",
+        SECTIONS + num(1, 1, start_at(2, 7)) + num(3, 1),
+        items((3, 0), (3, 2))
+        + "<w:tbl><w:tr><w:tc>"
+        + items((1, 1))
+        + "</w:tc></w:tr><w:tr><w:tc>"
+        + items((3, 2))
+        + "</w:tc></w:tr></w:tbl>",
     ),
     "emphasis-defaults-off": Case(
         "The document defaults turn the toggles on and styles of each kind turn them off: each "

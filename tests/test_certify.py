@@ -28,10 +28,12 @@ from label_docx.certify import (
     CertificationError,
     DocxSource,
     EpiSource,
+    _formatted,
     certify_docx,
     certify_epi,
 )
 from label_docx.output import canonical
+from label_docx.word import SUFFIXES, as_drawn
 from test_reader import W, docx
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
@@ -51,6 +53,10 @@ def _documents() -> list[Path]:
     )
 
 
+# What each corpus document reads as: its refusal's code, or "read".
+OUTCOMES: dict[Path, str] = {}
+
+
 def _read(path: Path) -> tuple[DocxSource | EpiSource, dict[str, Any]] | None:
     data = path.read_bytes()
     if path.suffix == ".docx":
@@ -59,10 +65,21 @@ def _read(path: Path) -> tuple[DocxSource | EpiSource, dict[str, Any]] | None:
     else:
         value = json.loads(epi_output.read(data)[0])
         source = None if "refusal" in value else EpiSource(data)
+    OUTCOMES[path] = value["refusal"]["code"] if "refusal" in value else "read"
     return None if source is None else (source, value)
 
 
 READ = [(p, r) for p in _documents() if (r := _read(p)) is not None]
+
+
+def test_every_corpus_document_is_read_or_refused_as_locked() -> None:
+    # A check that refuses what it should certify is caught here: the documents certified are
+    # exactly those locked as read (scripts/lock.py), and each refusal is the one locked.
+    locked: dict[Path, str] = {}
+    for record in CORPUS.glob("*/expected.json"):
+        for name, entry in json.loads(record.read_text("utf-8")).items():
+            locked[record.parent / name] = entry.get("refusal", "read")
+    assert locked == OUTCOMES
 
 
 def test_the_corpus_is_read_widely_enough_to_test_the_check() -> None:
@@ -334,6 +351,47 @@ def _change_a_mark(value: dict[str, Any], rng: random.Random) -> bool:
     return True
 
 
+def _change_a_label(value: dict[str, Any], rng: random.Random) -> bool:
+    # A list label drawn otherwise: another number, its suffix, or a label where none is drawn.
+    if "sections" in value:
+        return False
+    labelled = [p for p in value["paragraphs"] if p["numbering"] and p["numbering"]["text"]]
+    if labelled and rng.random() < 0.8:
+        numbering = rng.choice(labelled)["numbering"]
+        if rng.random() < 0.7:
+            numbering["text"] = numbering["text"] + "1"
+        else:
+            numbering["suffix"] = "space" if numbering["suffix"] != "space" else "tab"
+        return True
+    plain = [p for p in value["paragraphs"] if p["numbering"] is None]
+    if not plain:
+        return False
+    rng.choice(plain)["numbering"] = {"level": 0, "numId": 1, "suffix": "tab", "text": "1."}
+    return True
+
+
+def _change_a_note_mark(value: dict[str, Any], rng: random.Random) -> bool:
+    if "sections" in value:
+        return False
+    marked = [n for p in _paragraphs(value) for n in p["notes"]]
+    if not marked:
+        return False
+    note = rng.choice(marked)
+    note["mark"] = "9" if note["mark"] != "9" else "8"
+    return True
+
+
+def _change_a_notes_own_mark(value: dict[str, Any], rng: random.Random) -> bool:
+    if "sections" in value:
+        return False
+    notes = [n for kind in ("footnotes", "endnotes") for n in value[kind] if "mark" in n]
+    if not notes:
+        return False
+    note = rng.choice(notes)
+    note["mark"] = "9" if note["mark"] != "9" else "8"
+    return True
+
+
 CHANGES: list[Change] = [
     _drop_character,
     _add_character,
@@ -352,6 +410,9 @@ CHANGES: list[Change] = [
     _change_title,
     _hide_a_refusal,
     _change_a_mark,
+    _change_a_label,
+    _change_a_note_mark,
+    _change_a_notes_own_mark,
 ]
 
 
@@ -752,6 +813,7 @@ def _value(*paragraphs: str | dict[str, Any], **notes: list[dict[str, Any]]) -> 
     for paragraph in paragraphs:
         base: dict[str, Any] = {
             "comments": [],
+            "numbering": None,
             "marks": [],
             "pages": [],
             "notes": [],
@@ -840,12 +902,24 @@ def test_text_before_a_mark_in_the_same_run_stands_before_it() -> None:
         "id": 1,
         "mark": "1",
         "paragraphs": [
-            {"text": "n", "pages": [], "notes": [], "table": None, "comments": [], "marks": []}
+            {
+                "text": "n",
+                "pages": [],
+                "notes": [],
+                "table": None,
+                "comments": [],
+                "marks": [],
+                "numbering": None,
+            }
         ],
     }
-    marked = {"text": "ab", "pages": [2], "notes": [{"offset": 1, "kind": "footnote", "id": 1}]}
+    marked = {
+        "text": "ab",
+        "pages": [2],
+        "notes": [{"offset": 1, "kind": "footnote", "id": 1, "mark": "1"}],
+    }
     source.certify(_value(marked, footnotes=[note]))
-    moved = {**marked, "notes": [{"offset": 0, "kind": "footnote", "id": 1}]}
+    moved = {**marked, "notes": [{"offset": 0, "kind": "footnote", "id": 1, "mark": "1"}]}
     with pytest.raises(CertificationError):
         source.certify(_value(moved, footnotes=[note]))
     run_with_field = _p(
@@ -1359,3 +1433,328 @@ def test_the_key_marks_from_every_level_are_worked_out_alike() -> None:
     assert at(0, 1) == {"italic", "caps", "subscript", "underline"}
     assert at(0, 2) == {"italic", "caps", "subscript"}
     assert at(1, 0) == {"italic", "caps", "strike"}
+
+
+def test_the_checks_own_list_labels_and_note_marks_are_words() -> None:
+    # Held to Word's recorded answers directly, not only to the reader's: for every corpus
+    # document read, each label and note mark the check draws is the one Word drew.
+    read = {path: source for path, (source, _) in READ if isinstance(source, DocxSource)}
+    values = {path: value for path, (_, value) in READ}
+    checked = 0
+    for record in sorted(CORPUS.glob("*/word.json")):
+        answers = json.loads(record.read_text("utf-8"))
+        for name, word in sorted(answers["drawn"].items()):
+            source = read.get(record.parent / name)
+            if source is None:
+                continue
+            drawn = [
+                str(label["text"] or "") + SUFFIXES[str(label["suffix"] or "nothing")]
+                for label in source.labels
+                if label is not None and label["numId"]
+            ]
+            assert [d for d in drawn if d] == [as_drawn(w) for w in word], name
+            checked += 1
+        for name, word_marks in sorted(answers["notes"].items()):
+            source = read.get(record.parent / name)
+            if source is None:
+                continue
+            # Where each mark stands, in order, from the result; the mark itself from the check.
+            value = values[record.parent / name]
+            notes = [*value["footnotes"], *value["endnotes"]]
+            body = [(n["kind"], n["id"]) for p in value["paragraphs"] for n in p["notes"]]
+            echoes = [
+                (n["kind"], n["id"])
+                for note in notes
+                for p in note["paragraphs"]
+                for n in p["notes"]
+            ]
+            for where, places in (("body", body), ("notes", echoes)):
+                ours = [source.note_marks.get(place, "?") for place in places]
+                assert ours == word_marks[where], f"{name}: {where}"
+            checked += 1
+    assert checked >= 80
+
+
+# --- the check's own list labels and note marks, setting by setting ---------------------------
+
+_NUM = '<w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>'
+_ARIAL = '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr>'
+_SYMBOL = '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr>'
+
+
+def _level(index: int, text: str, fmt: str = "decimal", extra: str = "") -> str:
+    return (
+        f'<w:lvl w:ilvl="{index}"><w:start w:val="1"/><w:numFmt w:val="{fmt}"/>'
+        f'<w:lvlText w:val="{text}"/>{extra}</w:lvl>'
+    )
+
+
+def _list(*levels: str, key: int = 1) -> str:
+    return f'<w:abstractNum w:abstractNumId="{key}">{"".join(levels)}</w:abstractNum>'
+
+
+def _item(num_id: int, level: int, props: str = "") -> str:
+    numbered = f'<w:numPr><w:ilvl w:val="{level}"/><w:numId w:val="{num_id}"/></w:numPr>'
+    return f"<w:p><w:pPr>{props}{numbered}</w:pPr><w:r>{_ARIAL}<w:t>x</w:t></w:r></w:p>"
+
+
+def _labels_certified(data: bytes) -> list[tuple[int, str | None, str | None]]:
+    """The check's own labels, after the read is certified: reader and check agree on them."""
+    value = json.loads(output.read(data)[0])
+    assert "refusal" not in value, value.get("refusal")
+    labels = [label for label in DocxSource(data).labels if label is not None]
+    return [(int(str(x["numId"])), x["text"], x["suffix"]) for x in labels]  # type: ignore[misc]
+
+
+_SETTINGS = {
+    # An lvlRestart Word draws empty, on a level no paragraph draws, is never in the way.
+    "restart-on-a-level-not-drawn": (
+        _list(_level(0, "%1."), _level(1, "%2.", extra='<w:lvlRestart w:val="1"/>')),
+        [(1, "1.", "tab")],
+    ),
+    "suffix-space": (
+        _list(_level(0, "%1.", extra='<w:suff w:val="space"/>')),
+        [(1, "1.", "space")],
+    ),
+    "no-number-format": (
+        _list('<w:lvl w:ilvl="0"><w:start w:val="3"/><w:lvlText w:val="%1."/></w:lvl>'),
+        [(1, "3.", "tab")],
+    ),
+    "legal": (
+        _list(_level(0, "%1.", "upperRoman"), _level(1, "%1.%2", "upperRoman", "<w:isLgl/>")),
+        [(1, "I.", "tab"), (1, "1.1", "tab")],
+    ),
+    **{
+        f"text-null-{value}": (
+            _list(
+                '<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/>'
+                f'<w:lvlText w:val="%1." w:null="{value}"/></w:lvl>'
+            ),
+            [(1, "" if value != "0" else "1.", "tab")],
+        )
+        for value in ("1", "true", "on", "0")
+    },
+    **{
+        f"legacy-{value}": (
+            _list(_level(0, "%1.", extra=f'<w:legacy w:legacy="{value}"/>')),
+            [(1, "1.", "legacy" if value == "1" else "tab")],
+        )
+        for value in ("1", "0", "false", "off")
+    },
+}
+
+
+@pytest.mark.parametrize("name", sorted(_SETTINGS))
+def test_the_check_reads_every_setting_of_a_list_level(name: str) -> None:
+    numbering, expected = _SETTINGS[name]
+    items = "".join(_item(1, level) for level in range(len(expected)))
+    assert _labels_certified(docx(items, numbering=numbering + _NUM)) == expected
+
+
+def test_a_level_restarted_only_after_level_0_counts_on_after_level_1() -> None:
+    numbering = _list(
+        _level(0, "%1"), _level(1, "%2"), _level(2, "%3", extra='<w:lvlRestart w:val="1"/>')
+    )
+    items = "".join(_item(1, level) for level in (0, 1, 2, 1, 2))
+    labels = _labels_certified(docx(items, numbering=numbering + _NUM))
+    assert [text for _, text, _ in labels] == ["1", "1", "1", "2", "2"]
+
+
+_STYLED = {
+    # The list named by a paragraph style, the default paragraph style (also for a style that
+    # is not defined), and a table style inside its table; a default table style outside any
+    # table names none.
+    "paragraph-style": ('<w:pStyle w:val="L"/>', "paragraph", "L", "", [(1, "1.", "tab")]),
+    "default-style": ("", "paragraph", "N", ' w:default="1"', [(1, "1.", "tab")]),
+    "undefined-style": (
+        '<w:pStyle w:val="Nope"/>',
+        "paragraph",
+        "N",
+        ' w:default="1"',
+        [(1, "1.", "tab")],
+    ),
+    "table-style": ("", "table", "T", "", [(1, "1.", "tab")]),
+    "default-table-style": ("", "table", "T", ' w:default="1"', [(1, "1.", "tab")]),
+    "default-table-style-outside": ("", "table", "T", ' w:default="1"', []),
+}
+
+
+@pytest.mark.parametrize("name", sorted(_STYLED))
+def test_the_check_finds_a_list_through_styles_as_word_does(name: str) -> None:
+    props, kind, style, default, expected = _STYLED[name]
+    numbered = '<w:pPr><w:numPr><w:numId w:val="1"/></w:numPr></w:pPr>'
+    styles = (
+        f'<w:style w:type="{kind}"{default} w:styleId="{style}"><w:name w:val="{style}"/>'
+        f"{numbered}</w:style>"
+    )
+    paragraph = f"<w:p><w:pPr>{props}</w:pPr><w:r><w:t>x</w:t></w:r></w:p>"
+    if name == "table-style":
+        paragraph = (
+            f'<w:tbl><w:tblPr><w:tblStyle w:val="{style}"/></w:tblPr><w:tr><w:tc>{paragraph}'
+            "</w:tc></w:tr></w:tbl>"
+        )
+    elif name == "default-table-style":
+        paragraph = f"<w:tbl><w:tr><w:tc>{paragraph}</w:tc></w:tr></w:tbl>"
+    data = docx(paragraph, styles=styles, numbering=_list(_level(0, "%1.")) + _NUM)
+    assert _labels_certified(data) == expected
+
+
+@pytest.mark.parametrize("numbered", ['<w:ilvl w:val="1"/>', '<w:ilvl w:val="0"/><w:numId/>'])
+def test_a_paragraph_whose_numbering_names_no_list_is_in_none(numbered: str) -> None:
+    paragraph = f"<w:p><w:pPr><w:numPr>{numbered}</w:numPr></w:pPr><w:r><w:t>x</w:t></w:r></w:p>"
+    data = docx(paragraph, numbering=_list(_level(0, "%1.")) + _NUM)
+    assert [label[0] for label in _labels_certified(data)] == [0]
+
+
+@pytest.mark.parametrize("kind", ["paragraph", "table"])
+@pytest.mark.parametrize("default", [False, True], ids=["named", "default"])
+def test_a_bullet_in_symbol_through_a_paragraph_or_table_style(kind: str, default: bool) -> None:
+    flag = ' w:default="1"' if default else ""
+    styles = f'<w:style w:type="{kind}"{flag} w:styleId="S"><w:name w:val="S"/>{_SYMBOL}</w:style>'
+    named = '<w:pStyle w:val="S"/>' if kind == "paragraph" and not default else ""
+    item = _item(1, 0, named)
+    if kind == "table":
+        table = "" if default else '<w:tblPr><w:tblStyle w:val="S"/></w:tblPr>'
+        item = f"<w:tbl>{table}<w:tr><w:tc>{item}</w:tc></w:tr></w:tbl>"
+    data = docx(item, styles=styles, numbering=_list(_level(0, "\uf0b7", "bullet")) + _NUM)
+    assert _labels_certified(data) == [(1, "\u2022", "tab")]
+
+
+_REFUSED_LISTS = {
+    "custom-format": (
+        _list(
+            '<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal" w:format="001"/>'
+            '<w:lvlText w:val="%1"/></w:lvl>'
+        ),
+        [(1, 0)],
+    ),
+    "list-not-defined": (_list(_level(0, "%1.")), [(9, 0)]),
+    "level-only-in-an-override": (
+        _list(_level(0, "%1."))
+        + '<w:num w:numId="2"><w:abstractNumId w:val="1"/><w:lvlOverride w:ilvl="1">'
+        + _level(1, "-")
+        + "</w:lvlOverride></w:num>",
+        [(2, 1)],
+    ),
+    "list-without-definition": (_list(_level(0, "%1."), key=0) + '<w:num w:numId="1"/>', [(1, 0)]),
+    "level-not-defined": (_list(_level(0, "%1.")), [(1, 3)]),
+    "ancestor-not-defined": (_list(_level(1, "%2.")), [(1, 1)]),
+    "level-without-text": (
+        _list('<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/></w:lvl>'),
+        [(1, 0)],
+    ),
+    "label-shows-a-deeper-level": (_list(_level(0, "%2.")), [(1, 0)]),
+    "label-shows-a-level-never-counted": (_list(_level(0, "%2."), _level(1, "%2.")), [(1, 0)]),
+    "restart-after-the-level-above": (
+        _list(_level(0, "%1."), _level(1, "%2.", extra='<w:lvlRestart w:val="1"/>')),
+        [(1, 0), (1, 1)],
+    ),
+    "restart-on-level-0": (_list(_level(0, "%1.", extra='<w:lvlRestart w:val="1"/>')), [(1, 0)]),
+}
+
+
+@pytest.mark.parametrize("name", sorted(_REFUSED_LISTS))
+def test_the_check_draws_no_label_it_cannot_draw_as_word_does(name: str) -> None:
+    numbering, items = _REFUSED_LISTS[name]
+    nums = "" if name == "list-without-definition" else _NUM
+    data = docx("".join(_item(n, level) for n, level in items), numbering=numbering + nums)
+    with pytest.raises(CertificationError):
+        DocxSource(data)
+
+
+def test_the_check_refuses_a_numbering_style_naming_no_list_back() -> None:
+    path = CORPUS / "numbering-cases" / "numbering-style-link-one-way.docx"
+    with pytest.raises(CertificationError):
+        DocxSource(path.read_bytes())
+
+
+def _notes(*ids: int) -> str:
+    return "".join(
+        f'<w:footnote w:id="{i}"><w:p><w:r><w:t>note</w:t></w:r></w:p></w:footnote>' for i in ids
+    )
+
+
+def _reference(note: int, extra: str = "") -> str:
+    return f'<w:r><w:footnoteReference{extra} w:id="{note}"/></w:r>'
+
+
+@pytest.mark.parametrize("value", ["1", "true", "on"])
+def test_a_custom_note_mark_draws_no_number(value: str) -> None:
+    body = _p(
+        "<w:r><w:t>a</w:t></w:r>"
+        + _reference(1, f' w:customMarkFollows="{value}"')
+        + "<w:r><w:t>*</w:t></w:r>"
+    )
+    data = docx(body, footnotes=_notes(1))
+    assert "refusal" not in json.loads(output.read(data)[0])
+    assert DocxSource(data).note_marks == {("footnote", 1): None}
+
+
+def test_note_marks_take_each_sections_format_in_turn() -> None:
+    def closing(fmt: str) -> str:
+        return f'<w:sectPr><w:footnotePr><w:numFmt w:val="{fmt}"/></w:footnotePr></w:sectPr>'
+
+    body = (
+        f"<w:p><w:pPr>{closing('lowerRoman')}</w:pPr><w:r><w:t>a</w:t></w:r>{_reference(1)}</w:p>"
+        f"<w:p><w:pPr>{closing('upperLetter')}</w:pPr><w:r><w:t>b</w:t></w:r>{_reference(2)}</w:p>"
+        f"<w:p><w:r><w:t>c</w:t></w:r>{_reference(3)}</w:p>{closing('chicago')}"
+    )
+    data = docx(body, footnotes=_notes(1, 2, 3))
+    assert "refusal" not in json.loads(output.read(data)[0])
+    marks = DocxSource(data).note_marks
+    assert [marks[("footnote", n)] for n in (1, 2, 3)] == ["i", "B", "\u2021"]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        _p("<w:r><w:t>a</w:t></w:r>" + _reference(1) + _reference(1)),
+        _p("<w:r><w:t>a</w:t></w:r>" + _reference(1))
+        + '<w:sectPr><w:footnotePr><w:numRestart w:val="eachPage"/></w:footnotePr></w:sectPr>',
+    ],
+    ids=["referred-to-twice", "restart-each-page"],
+)
+def test_the_check_draws_no_note_mark_it_cannot_draw_as_word_does(body: str) -> None:
+    with pytest.raises(CertificationError):
+        DocxSource(docx(body, footnotes=_notes(1)))
+
+
+@pytest.mark.parametrize(
+    ("value", "fmt", "written"),
+    [
+        (3888, "upperRoman", "MMMDCCCLXXXVIII"),
+        (444, "lowerRoman", "cdxliv"),
+        (999, "upperRoman", "CMXCIX"),
+        (3999, "upperRoman", "MMMCMXCIX"),
+        (1, "upperRoman", "I"),
+        (26, "upperLetter", "Z"),
+        (27, "lowerLetter", "aa"),
+        (53, "upperLetter", "AAA"),
+        (780, "upperLetter", "Z" * 30),
+        (5, "chicago", "**"),
+        (7, "decimalZero", "07"),
+        (0, "decimal", "0"),
+        (12, "none", ""),
+    ],
+)
+def test_numbers_are_written_in_every_format_as_word_writes_them(
+    value: int, fmt: str, written: str
+) -> None:
+    assert _formatted(value, fmt) == written
+
+
+@pytest.mark.parametrize(
+    ("value", "fmt"),
+    [
+        (0, "upperRoman"),
+        (4000, "lowerRoman"),
+        (0, "upperLetter"),
+        (781, "lowerLetter"),
+        (0, "chicago"),
+        (-1, "decimal"),
+        (1, "ordinal"),
+    ],
+)
+def test_a_number_no_format_writes_is_never_written(value: int, fmt: str) -> None:
+    with pytest.raises(CertificationError):
+        _formatted(value, fmt)

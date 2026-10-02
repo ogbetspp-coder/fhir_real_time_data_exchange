@@ -62,7 +62,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT
 
-CHECKER_VERSION = "conservation-check/1.4.0"
+CHECKER_VERSION = "conservation-check/1.5.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -121,12 +121,21 @@ class _Segment:
     marker: tuple[str, Any] | None = None
     # The marks the check works out for the run's text (``CHECKED_MARKS``).
     kinds: frozenset[str] = frozenset()
+    # A note mark that is custom (customMarkFollows): Word draws no number for it.
+    custom: bool = False
 
 
 @dataclass
 class _Paragraph:
     segments: list[_Segment] = field(default_factory=list)
     table: tuple[int, int, int] | None = None
+    # What the list and note numbering need: the paragraph's properties, its style, its
+    # table's style, whether it is in a table, and its section (counted from 0).
+    properties: ET.Element | None = None
+    style: str | None = None
+    table_style: str | None = None
+    in_table: bool = False
+    section: int = 0
 
 
 # The marks the check works out itself and holds every result to; the others (highlight,
@@ -174,6 +183,8 @@ class _Fonts:
         self.kind: dict[str, str] = {}
         self.based: dict[str, str | None] = {}
         self.rpr: dict[str, ET.Element | None] = {}
+        self.ppr: dict[str, ET.Element | None] = {}
+        self.doc_ppr: ET.Element | None = None
         self.defaults: dict[str, str] = {}
         self.doc_rpr: ET.Element | None = None
         if styles is not None:
@@ -186,9 +197,11 @@ class _Fonts:
                 self.kind[style_id] = kind
                 self.based[style_id] = None if based is None else based.get(_w("val"))
                 self.rpr[style_id] = style.find(_w("rPr"))
+                self.ppr[style_id] = style.find(_w("pPr"))
                 if style.get(_w("default")) in ("1", "true", "on"):
                     self.defaults[kind] = style_id
             self.doc_rpr = styles.find(f"{_w('docDefaults')}/{_w('rPrDefault')}/{_w('rPr')}")
+            self.doc_ppr = styles.find(f"{_w('docDefaults')}/{_w('pPrDefault')}/{_w('pPr')}")
         self.theme: dict[str, str] = {}
         scheme = (
             None
@@ -200,6 +213,16 @@ class _Fonts:
             for child in group:
                 if _local(child.tag) in ("latin", "ea", "cs"):
                     self.theme[f"{prefix}:{_local(child.tag)}"] = child.get("typeface", "")
+
+    def style_ids(self, style_id: str | None, kind: str) -> list[str]:
+        """``style_id`` (or its kind's default, never for text) and its basedOn chain."""
+        if style_id is None or style_id not in self.kind:
+            style_id = None if kind == "character" else self.defaults.get(kind)
+        out: list[str] = []
+        while style_id is not None and style_id in self.kind and style_id not in out:
+            out.append(style_id)
+            style_id = self.based[style_id]
+        return out
 
     def chain(self, style_id: str | None, kind: str) -> list[ET.Element]:
         if style_id is None or style_id not in self.kind:
@@ -342,6 +365,7 @@ class _Story:
         self.fields: list[list[Any]] = []
         self.layout = 0
         self.tables = 0
+        self.section = 0
 
     # The block structure: paragraphs in document order, and the cell each stands in.
 
@@ -376,7 +400,16 @@ class _Story:
             raise CertificationError("a paragraph inside a paragraph")
         properties = element.find(_w("pPr"))
         style = None if properties is None else properties.find(_w("pStyle"))
-        here = _Paragraph(table=table)
+        here = _Paragraph(
+            table=table,
+            properties=properties,
+            style=None if style is None else style.get(_w("val")),
+            table_style=table_style,
+            in_table=table is not None,
+            section=self.section,
+        )
+        if properties is not None and properties.find(_w("sectPr")) is not None:
+            self.section += 1
         self.current = here
         self.paragraph_style = None if style is None else style.get(_w("val"))
         self.table_style = table_style
@@ -410,8 +443,8 @@ class _Story:
     def in_instruction(self) -> bool:
         return any(entry[0] for entry in self.fields)
 
-    def mark(self, kind: str, value: Any) -> None:
-        self.current.segments.append(_Segment(marker=(kind, value)))
+    def mark(self, kind: str, value: Any, custom: bool = False) -> None:
+        self.current.segments.append(_Segment(marker=(kind, value), custom=custom))
 
     def run(self, run: ET.Element) -> None:
         levels = self.fonts.levels(run, self.paragraph_style, self.table_style, self.in_table)
@@ -445,7 +478,8 @@ class _Story:
                         raise CertificationError(f"{local} outside a {kind}")
                     self.mark("note", (kind, self.story[1]))
                 else:
-                    self.mark("note", (kind, int(child.get(_w("id"), ""))))
+                    custom = child.get(_w("customMarkFollows")) in ("1", "true", "on")
+                    self.mark("note", (kind, int(child.get(_w("id"), ""))), custom)
                 continue
             if local == "fldChar":
                 self.flush_run(shown, hidden, kinds)
@@ -630,7 +664,7 @@ def _docx_parts(data: bytes) -> tuple[zipfile.ZipFile, str, dict[str, str]]:
         raise CertificationError("not one main document part")
     related = {
         kind: targets[0]
-        for kind in ("styles", "theme", "footnotes", "endnotes", "comments")
+        for kind in ("styles", "theme", "footnotes", "endnotes", "comments", "numbering")
         if (targets := _relations(archive, main[0], kind))
     }
     return archive, main[0], related
@@ -685,6 +719,299 @@ def _total(ledgers: list[_Ledger]) -> _Ledger:
         for name in total.__dataclass_fields__:
             setattr(total, name, getattr(total, name) + getattr(ledger, name))
     return total
+
+
+# --- list labels and note marks, worked out a second time --------------------------------------
+#
+# Word draws "4.8" or "b)" before a list item and "1" or "*" where a note is referred to; the
+# reader computes them, and so does this, on its own, by the rules Word answered in
+# corpus/numbering-cases (named in brackets). A result whose labels or note marks are not these
+# is not certified.
+
+_ROMAN_NUMERALS = (
+    (1000, "M"),
+    (900, "CM"),
+    (500, "D"),
+    (400, "CD"),
+    (100, "C"),
+    (90, "XC"),
+    (50, "L"),
+    (40, "XL"),
+    (10, "X"),
+    (9, "IX"),
+    (5, "V"),
+    (4, "IV"),
+    (1, "I"),
+)
+_NOTE_DEFAULTS = {"footnote": "decimal", "endnote": "lowerRoman"}
+_CHICAGO_SIGNS = ("*", "\u2020", "\u2021", "\u00a7")
+
+
+def _formatted(value: int, fmt: str) -> str:
+    """``value`` as Word writes it in the number format ``fmt``."""
+    if fmt == "none":
+        return ""
+    if fmt in ("decimal", "decimalZero") and value >= 0:
+        return f"{value:02d}" if fmt == "decimalZero" else str(value)
+    if fmt in ("upperRoman", "lowerRoman") and 1 <= value <= 3999:
+        numerals, rest = "", value
+        for amount, numeral in _ROMAN_NUMERALS:
+            count, rest = divmod(rest, amount)
+            numerals += numeral * count
+        return numerals if fmt == "upperRoman" else numerals.lower()
+    if fmt in ("upperLetter", "lowerLetter") and 1 <= value <= 780:
+        # a to z, then aa to zz: the letter repeated.
+        letters = chr(ord("A") + (value - 1) % 26) * ((value - 1) // 26 + 1)
+        return letters if fmt == "upperLetter" else letters.lower()
+    if fmt == "chicago" and value >= 1:
+        return _CHICAGO_SIGNS[(value - 1) % 4] * ((value - 1) // 4 + 1)
+    raise CertificationError(f"the number {value} in {fmt}")
+
+
+@dataclass
+class _ListLevel:
+    start: int | None
+    fmt: str
+    text: str | None
+    restart: int | None
+    legal: bool
+    suffix: str
+    rpr: ET.Element | None
+
+
+def _list_level(element: ET.Element) -> _ListLevel:
+    def value(name: str) -> str | None:
+        found = element.find(_w(name))
+        return None if found is None else found.get(_w("val"))
+
+    fmt_element = element.find(_w("numFmt"))
+    if fmt_element is not None and fmt_element.get(_w("format")) is not None:
+        raise CertificationError("a custom list number format")
+    text_element = element.find(_w("lvlText"))
+    text = None
+    if text_element is not None:
+        null = text_element.get(_w("null")) in ("1", "true", "on")
+        text = "" if null else text_element.get(_w("val"), "")
+    legacy = element.find(_w("legacy"))
+    suffix = value("suff") or "tab"
+    if legacy is not None and legacy.get(_w("legacy")) not in ("0", "false", "off"):
+        suffix = "legacy"
+    start, restart = value("start"), value("lvlRestart")
+    return _ListLevel(
+        start=None if start is None else int(start),
+        fmt=value("numFmt") or "decimal",
+        text=text,
+        restart=None if restart is None else int(restart),
+        legal=_on(element.find(_w("isLgl"))) is True,
+        suffix=suffix,
+        rpr=element.find(_w("rPr")),
+    )
+
+
+class _Numbering:
+    """The labels of a document's lists, counted in document order."""
+
+    def __init__(self, root: ET.Element | None, fonts: _Fonts) -> None:
+        self.fonts = fonts
+        self.abstracts: dict[int, tuple[dict[int, _ListLevel], str | None, str | None]] = {}
+        self.nums: dict[int, tuple[int, dict[int, int], dict[int, _ListLevel]]] = {}
+        for element in [] if root is None else root.findall(_w("abstractNum")):
+            levels = {
+                int(lvl.get(_w("ilvl"), "")): _list_level(lvl) for lvl in element.findall(_w("lvl"))
+            }
+            link = element.find(_w("numStyleLink"))
+            back = element.find(_w("styleLink"))
+            self.abstracts[int(element.get(_w("abstractNumId"), ""))] = (
+                levels,
+                None if link is None else link.get(_w("val")),
+                None if back is None else back.get(_w("val")),
+            )
+        for element in [] if root is None else root.findall(_w("num")):
+            abstract = element.find(_w("abstractNumId"))
+            if abstract is None:
+                # A list naming no abstractNum is as one not defined.
+                continue
+            starts: dict[int, int] = {}
+            looks: dict[int, _ListLevel] = {}
+            for override in element.findall(_w("lvlOverride")):
+                level = int(override.get(_w("ilvl"), ""))
+                start = override.find(_w("startOverride"))
+                if start is not None:
+                    starts[level] = int(start.get(_w("val"), ""))
+                if override.find(_w("lvl")) is not None:
+                    looks[level] = _list_level(override.find(_w("lvl")))  # type: ignore[arg-type]
+            key = int(abstract.get(_w("val"), ""))
+            self.nums[int(element.get(_w("numId"), ""))] = (key, starts, looks)
+        # Each abstractNum's counts, shared by its lists: the values, the startOverrides
+        # applied, where a restarted level restarts from, and what a level counted only through
+        # a deeper paragraph shows meanwhile.
+        self.values: dict[int, list[int | None]] = {}
+        self.applied: dict[int, set[tuple[int, int]]] = {}
+        self.restarts: dict[int, list[int | None]] = {}
+        self.showing: dict[int, list[int | None]] = {}
+
+    def levels(
+        self, num_id: int
+    ) -> tuple[int, dict[int, int], dict[int, _ListLevel], dict[int, _ListLevel]]:
+        """The abstractNum counting a list, its startOverrides, its levels, and their looks."""
+        if num_id not in self.nums or self.nums[num_id][0] not in self.abstracts:
+            raise CertificationError(f"numId {num_id} names no list")
+        key, starts, looks = self.nums[num_id]
+        levels, link, _ = self.abstracts[key]
+        if link is not None:
+            # A numbering style's list, which must name the style back [numbering-style-link].
+            style = self.fonts.ppr.get(link)
+            linked = None if style is None else style.find(f"{_w('numPr')}/{_w('numId')}")
+            target = None if linked is None else self.nums.get(int(linked.get(_w("val"), "")))
+            if target is None or self.abstracts.get(target[0], ({}, None, None))[2] != link:
+                raise CertificationError(f"numbering style {link} names no list back")
+            levels = self.abstracts[target[0]][0]
+        return key, starts, levels, {**levels, **looks}
+
+    def label(self, num_id: int, level: int, paragraph: _Paragraph) -> tuple[str, str]:
+        """The label Word draws for this list item, and what follows it."""
+        key, starts, base, looks = self.levels(num_id)
+        values = self.values.setdefault(key, [None] * 9)
+        applied = self.applied.setdefault(key, set())
+        restarts = self.restarts.setdefault(key, [None] * 9)
+        showing = self.showing.setdefault(key, [None] * 9)
+        for upper in range(level + 1):
+            rule = looks[upper].restart if upper in looks else None
+            # lvlRestart is 0 or names a level above the one directly above; Word draws a level
+            # whose lvlRestart names itself, a deeper one or the one directly above, empty
+            # [restart-level-above].
+            if rule is not None and rule != 0 and not 1 <= rule < upper:
+                raise CertificationError(f"lvlRestart {rule} on level {upper}")
+        for deeper in range(level + 1, 9):
+            rule = looks[deeper].restart if deeper in looks else None
+            # lvlRestart n restarts the level after a level up to n - 1, 0 never; a value
+            # naming no higher level restarts it after any [restart-never, restart-after-first].
+            # It restarts as this paragraph's list says [restart-source-override,
+            # restart-source-plain, restart-source-unused].
+            if rule is None or level < rule:
+                values[deeper] = None
+                restarts[deeper] = starts.get(deeper)
+                showing[deeper] = None
+        for higher in range(level):
+            # Not counted yet: it shows the abstractNum's start [ancestor-never-counted,
+            # override-implicit-ancestor] and counts on from this list's startOverride, which
+            # stays unused [override-implicit-continued, override-implicit-reused,
+            # override-implicit-levels].
+            if values[higher] is None:
+                if higher not in base:
+                    raise CertificationError(f"level {higher} of a list is not defined")
+                showing[higher] = base[higher].start or 0
+                values[higher] = starts[higher] if higher in starts else showing[higher]
+        showing[level] = None
+        if level in starts and (num_id, level) not in applied:
+            # A startOverride, the first time its list reaches the level [start-override-first].
+            applied.add((num_id, level))
+            values[level] = starts[level]
+        elif values[level] is not None:
+            values[level] = int(values[level]) + 1  # type: ignore[arg-type]
+        elif restarts[level] is not None:
+            values[level] = restarts[level]
+        elif level in base:
+            # Its abstractNum's start, never a level override's [level-override-first]; none, 0
+            # [missing-start].
+            values[level] = base[level].start or 0
+        else:
+            raise CertificationError(f"level {level} of a list is not defined")
+        look = looks.get(level)
+        if look is None or look.text is None:
+            raise CertificationError(f"level {level} of a list draws nothing defined")
+        out = ""
+        for piece in re.split(r"(%[1-9])", look.text):
+            if not re.fullmatch(r"%[1-9]", piece):
+                out += piece
+                continue
+            shown = int(piece[1]) - 1
+            source = looks.get(shown)
+            count = values[shown] if showing[shown] is None else showing[shown]
+            if source is None or count is None:
+                raise CertificationError(f"a list label shows level {shown}, never counted")
+            out += _formatted(count, "decimal" if look.legal else source.fmt)
+        # A bullet in the Symbol font: through the table, as the label's fonts say.
+        label_levels = [
+            x
+            for x in (
+                look.rpr,
+                None if paragraph.properties is None else paragraph.properties.find(_w("rPr")),
+                *self.fonts.chain(paragraph.style, "paragraph"),
+                *(self.fonts.chain(paragraph.table_style, "table") if paragraph.in_table else []),
+                self.fonts.doc_rpr,
+            )
+            if x is not None
+        ]
+        if self.fonts.symbol(label_levels):
+            out = _symbol_reading(out)
+        return out, look.suffix
+
+
+def _numbering_of(fonts: _Fonts, paragraph: _Paragraph) -> tuple[int, int] | None:
+    """A paragraph's (numId, ilvl): each from the nearest properties that set it, or None."""
+    sources = [
+        paragraph.properties,
+        *(fonts.ppr.get(i) for i in fonts.style_ids(paragraph.style, "paragraph")),
+        *(
+            fonts.ppr.get(i)
+            for i in (fonts.style_ids(paragraph.table_style, "table") if paragraph.in_table else [])
+        ),
+        fonts.doc_ppr,
+    ]
+    found: dict[str, int] = {}
+    for source in sources:
+        numbering = None if source is None else source.find(_w("numPr"))
+        for name in ("numId", "ilvl"):
+            element = None if numbering is None else numbering.find(_w(name))
+            if element is not None and name not in found:
+                found[name] = int(element.get(_w("val"), "0"))
+    if not found:
+        return None
+    return found.get("numId", 0), found.get("ilvl", 0)
+
+
+def _note_marks(
+    paragraphs: list[_Paragraph], sections: list[ET.Element | None]
+) -> dict[tuple[str, int], str | None]:
+    """The mark Word draws for every note the body refers to [notes-*].
+
+    A custom mark draws no number. Else the section's numStart plus the notes of its kind before
+    it, in the document or, where the section restarts them, in the section, in the section's
+    format; the settings part's are not Word's.
+    """
+    marks: dict[tuple[str, int], str | None] = {}
+    before: dict[tuple[str, int | None], int] = {}
+    for paragraph in paragraphs:
+        section = sections[min(paragraph.section, len(sections) - 1)] if sections else None
+        for segment in paragraph.segments:
+            if segment.marker is None or segment.marker[0] != "note":
+                continue
+            kind, note = segment.marker[1]
+            if (kind, note) in marks:
+                raise CertificationError(f"{kind} {note} referred to twice")
+            if segment.custom:
+                marks[(kind, note)] = None
+                continue
+            settings = None if section is None else section.find(_w(f"{kind}Pr"))
+
+            def value(name: str, default: str, settings: ET.Element | None = settings) -> str:
+                element = None if settings is None else settings.find(_w(name))
+                found = None if element is None else element.get(_w("val"))
+                return default if found is None else found
+
+            fmt = value("numFmt", _NOTE_DEFAULTS[kind])
+            if value("numRestart", "continuous") not in ("continuous", "eachSect"):
+                raise CertificationError(f"{kind} numbers that restart otherwise")
+            start = int(value("numStart", "1"))
+            scope = (
+                kind,
+                paragraph.section if value("numRestart", "continuous") == "eachSect" else None,
+            )
+            marks[(kind, note)] = _formatted(start + before.get(scope, 0), fmt)
+            before[(kind, None)] = before.get((kind, None), 0) + 1
+            before[(kind, paragraph.section)] = before.get((kind, paragraph.section), 0) + 1
+    return marks
 
 
 # --- the text read a second time, without an XML parser --------------------------------------
@@ -812,6 +1139,16 @@ class DocxSource:
             if body is None:
                 raise CertificationError("no body")
             self.body = self._part(body, None)
+            self.lists = _Numbering(parse.get(related.get("numbering", "")), self.fonts)
+            self.labels = [self._label(paragraph) for paragraph in self.body.paragraphs]
+            sections: list[ET.Element | None] = [
+                p.properties.find(_w("sectPr"))
+                for p in self.body.paragraphs
+                if p.properties is not None and p.properties.find(_w("sectPr")) is not None
+            ]
+            self.note_marks = _note_marks(
+                self.body.paragraphs, [*sections, body.find(_w("sectPr"))]
+            )
             self.notes: dict[str, dict[int, _Part]] = {}
             self.not_read: dict[str, int] = {}
             for kind in ("footnote", "endnote"):
@@ -877,6 +1214,17 @@ class DocxSource:
                     self.not_read[name] = size
             self.comments_part = comments_part
 
+    def _label(self, paragraph: _Paragraph) -> dict[str, Json] | None:
+        """The numbering a body paragraph's result must carry, label and suffix drawn here."""
+        found = _numbering_of(self.fonts, paragraph)
+        if found is None:
+            return None
+        num_id, level = found
+        if num_id == 0:
+            return {"level": level, "numId": 0, "suffix": None, "text": None}
+        text, suffix = self.lists.label(num_id, level, paragraph)
+        return {"level": level, "numId": num_id, "suffix": suffix, "text": text}
+
     def _part(self, element: ET.Element, story: tuple[str, int] | None) -> _Part:
         ledger = _Ledger()
         walk = _Story(self.fonts, ledger, story)
@@ -895,6 +1243,17 @@ class DocxSource:
         read = [self.body]
         refused: list[str] = []
         _paragraphs(self.body, value["paragraphs"], "paragraph")
+        for index, (label, theirs) in enumerate(zip(self.labels, value["paragraphs"], strict=True)):
+            if theirs["numbering"] != label:
+                raise CertificationError(f"paragraph {index + 1}: not the list label Word draws")
+        marked = [
+            (n["kind"], n["id"], n["mark"]) for p in _every_paragraph(value) for n in p["notes"]
+        ]
+        marked += [(k, n["id"], n["mark"]) for k in ("footnote", "endnote") for n in value[k + "s"]]
+        for kind, note_id, mark in marked:
+            # A note the body never refers to has no mark Word draws.
+            if (kind, note_id) not in self.note_marks or mark != self.note_marks[(kind, note_id)]:
+                raise CertificationError(f"{kind} {note_id}: not the mark Word draws")
         for kind, notes in self.notes.items():
             theirs_by_id = {n["id"]: n for n in value[kind + "s"]}
             if set(theirs_by_id) != set(notes) or len(theirs_by_id) != len(value[kind + "s"]):
@@ -968,6 +1327,14 @@ class DocxSource:
             if f"{self.comments_part}#{comment['id']}" not in refused:
                 out.append((part, theirs["paragraphs"]))
         return out
+
+
+def _every_paragraph(value: dict[str, Json]) -> list[dict[str, Json]]:
+    """Every paragraph of a .docx result: body, notes, headers, footers and comments."""
+    out = list(value["paragraphs"])
+    for kind in ("footnotes", "endnotes", "headers", "footers", "comments"):
+        out += [p for part in value[kind] for p in part["paragraphs"]]
+    return out
 
 
 def _paragraphs(part: _Part, theirs: list[dict[str, Json]], where: str) -> None:

@@ -27,6 +27,12 @@
       "bytes": 3457
     },
     {
+      "name": "lvlRestart 0 on level 1, counted after a level 0 paragraph and the end of a table row (the reader refuses).",
+      "file": "restart-never-rows.docx",
+      "sha256": "2c4f79dc2e195871516ea7cb35e1f29326a12a6821ff97dc0d3ed9fcaba938cf",
+      "bytes": 3306
+    },
+    {
       "name": "lvlRestart 1 on level 2: it restarts after level 0 only.",
       "file": "restart-after-first.docx",
       "sha256": "aa48a48f3a8dca6613701ef7af8c0c88c40c514dcb15fd6d358e4f2cfe5fabfe",
@@ -151,6 +157,30 @@
       "file": "override-implicit-ancestor.docx",
       "sha256": "e55961207231b8972fabbedfed9594e0eef2a7b2dce397c30e6d95ccbafd43e3",
       "bytes": 3439
+    },
+    {
+      "name": "Level 0 first reached at level 1 by a list with a startOverride, then another list.",
+      "file": "override-implicit-continued.docx",
+      "sha256": "a81b4c0bb973748a305cd0d93e0e2ed861e5cf34dc74803d806afb7b0a8d29d0",
+      "bytes": 3551
+    },
+    {
+      "name": "Level 1 reached at level 2, after its list's startOverride was used.",
+      "file": "override-implicit-reused.docx",
+      "sha256": "4753e9403efcb154918e0e636f493f10011da0cc69022e740b0c2e9d835c0679",
+      "bytes": 3663
+    },
+    {
+      "name": "As override-implicit-continued, but the other list counts level 0 in a later row of a table: Word takes the override here, not in other tables (the reader refuses).",
+      "file": "override-implicit-rows.docx",
+      "sha256": "09dfca802aaebe99194446a0867fff2fbb8df7732a0144304ce61edb92989f47",
+      "bytes": 3506
+    },
+    {
+      "name": "Levels 0 and 1, both with startOverrides, first reached at level 2.",
+      "file": "override-implicit-levels.docx",
+      "sha256": "1b52d3a2462dc552948cd4ca1553ec50818246c506c95c2133a17cdd9ebb83d0",
+      "bytes": 3621
     },
     {
       "name": "A level 2 item before levels 0 and 1 were counted, then levels 1 and 0.",
@@ -307,6 +337,18 @@
       "file": "restart-source-unused.docx",
       "sha256": "a7aca5dc84b209ef9871fee2566568fa4a5543ebf2d0fb20e8a3c278d6aa0ed2",
       "bytes": 3500
+    },
+    {
+      "name": "List 1's level 1 paragraph restarts level 2, which list 3 counts next, in the next cell of the same row: from list 1's override.",
+      "file": "restart-source-cells.docx",
+      "sha256": "db9a5a3f7ffdab87cf5b6d5a0ec23774db3d10719806ba41435afdac7bf2e821",
+      "bytes": 3605
+    },
+    {
+      "name": "As restart-source-cells, but list 3 counts level 2 in the next row: not from list 1's override (the reader refuses).",
+      "file": "restart-source-rows.docx",
+      "sha256": "79c6d917ed2518af2f9659a1d6227001f91295ff25799e2a4c841b6a14bb626b",
+      "bytes": 3618
     },
     {
       "name": "The document defaults turn the toggles on and styles of each kind turn them off: each kind that differs from the defaults turns them over.",

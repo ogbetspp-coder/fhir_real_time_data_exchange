@@ -259,7 +259,7 @@ downloads.
 
 ## How the claims are held
 
-`docs/requirements.md` lists the requirements (R-01 to R-35) with the tests that prove each; the
+`docs/requirements.md` lists the requirements (R-01 to R-36) with the tests that prove each; the
 table below is the short form.
 
 | Claim                                                            | Where                        |

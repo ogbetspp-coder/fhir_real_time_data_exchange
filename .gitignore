@@ -10,3 +10,5 @@ htmlcov/
 dist/
 .DS_Store
 .word-progress.json
+.mutants-progress.json
+.mutants-progress.tmp

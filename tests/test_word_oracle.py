@@ -40,6 +40,16 @@ REFUSED = {
     "numbering-cases/restart-level-above.docx": "unsupported-numbering",
     # A level that never restarts shown in a deeper label: Word draws it as a space.
     "numbering-cases/restart-never-shown-deeper.docx": "ambiguous-numbering",
+    # A level restarted by another list's paragraph, counted in a later row of the same table:
+    # Word does not take that list's override there, though it does in the same row.
+    "numbering-cases/restart-source-rows.docx": "ambiguous-numbering",
+    # A level that never restarts, counted after a higher paragraph and a table row's end: Word
+    # draws it one less than its count in some tables and not in others.
+    "numbering-cases/restart-never-rows.docx": "ambiguous-numbering",
+    # A level counted on from another list's override, taken through a deeper paragraph, after
+    # a table row's end: Word takes the override here, but not in other tables (a generated
+    # document, fuzz_docx seed 903 with tables of several rows).
+    "numbering-cases/override-implicit-rows.docx": "ambiguous-numbering",
     # A level with lvlRestart first counted by a deeper item: Word draws it otherwise later.
     "numbering-cases/restart-skipped-ancestor.docx": "ambiguous-numbering",
     # A REF to a bookmark that is not there: Word prints "Error! Reference source not found."

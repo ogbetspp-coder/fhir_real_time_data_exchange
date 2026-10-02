@@ -148,6 +148,30 @@
       "5.\t",
       "6.\t"
     ],
+    "override-implicit-continued.docx": [
+      "1.1\t",
+      "1.2\t",
+      "7.\t",
+      "6.\t"
+    ],
+    "override-implicit-levels.docx": [
+      "1.1.1\t",
+      "1.5\t",
+      "7.\t",
+      "7.4\t"
+    ],
+    "override-implicit-reused.docx": [
+      "1.6\t",
+      "2.\t",
+      "2.1.1\t",
+      "2.7\t",
+      "2.8\t"
+    ],
+    "override-implicit-rows.docx": [
+      "1.1\t",
+      "1.2\t",
+      "7.\t"
+    ],
     "override-restart-within.docx": [
       "1.\t",
       "1.5\t",
@@ -177,6 +201,11 @@
       "\t",
       "\t"
     ],
+    "restart-never-rows.docx": [
+      "1\t",
+      "2\t",
+      "1\t"
+    ],
     "restart-never-shown-deeper.docx": [
       "A)\t",
       "02)\t",
@@ -194,6 +223,12 @@
       "2.\t",
       "2.2.a.\t"
     ],
+    "restart-source-cells.docx": [
+      "1.\t",
+      "1.1.1\t",
+      "1.2\t",
+      "1.2.7\t"
+    ],
     "restart-source-override.docx": [
       "1)\t",
       "(08)\t",
@@ -203,6 +238,12 @@
       "E.\t",
       "II.vi.\t",
       "A.\t"
+    ],
+    "restart-source-rows.docx": [
+      "1.\t",
+      "1.1.1\t",
+      "1.2\t",
+      "1.2.1\t"
     ],
     "restart-source-unused.docx": [
       "A)\t",
@@ -1604,6 +1645,114 @@
         false
       ]
     },
+    "override-implicit-continued.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "override-implicit-levels.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "override-implicit-reused.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "override-implicit-rows.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
     "override-restart-within.docx": {
       "": [],
       "0": [
@@ -1733,6 +1882,27 @@
         false
       ]
     },
+    "restart-never-rows.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
     "restart-never-shown-deeper.docx": {
       "": [],
       "0": [
@@ -1808,6 +1978,33 @@
         false
       ]
     },
+    "restart-source-cells.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
     "restart-source-override.docx": {
       "": [],
       "0": [
@@ -1844,6 +2041,33 @@
         false
       ],
       "2": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "restart-source-rows.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
         false,
         false,
         false,
@@ -2460,16 +2684,23 @@
     "override-ancestor.docx": true,
     "override-deeper-level.docx": true,
     "override-implicit-ancestor.docx": true,
+    "override-implicit-continued.docx": true,
+    "override-implicit-levels.docx": true,
+    "override-implicit-reused.docx": true,
+    "override-implicit-rows.docx": true,
     "override-restart-within.docx": true,
     "override-return.docx": true,
     "plain-after-restart.docx": true,
     "restart-after-first.docx": true,
     "restart-level-above.docx": true,
+    "restart-never-rows.docx": true,
     "restart-never-shown-deeper.docx": true,
     "restart-never.docx": true,
     "restart-skipped-ancestor.docx": true,
+    "restart-source-cells.docx": true,
     "restart-source-override.docx": true,
     "restart-source-plain.docx": true,
+    "restart-source-rows.docx": true,
     "restart-source-unused.docx": true,
     "return-after-restart.docx": true,
     "shared-continue.docx": true,
@@ -2479,5 +2710,5 @@
     "style-tied-level-zero.docx": true,
     "two-definitions.docx": true
   },
-  "recorded": "2026-10-01"
+  "recorded": "2026-10-02"
 }

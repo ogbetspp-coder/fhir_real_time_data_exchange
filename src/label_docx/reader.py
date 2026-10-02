@@ -224,7 +224,7 @@ from dataclasses import dataclass, field, replace
 # above, or a level with lvlRestart counted first by a deeper one, is refused; 1.15.0 restarts
 # a level as the list whose paragraph restarted it says (its startOverride, else the start), and
 # refuses a level that never restarts shown in a deeper level's label.
-READER_VERSION = "docx-reader/1.15.0"
+READER_VERSION = "docx-reader/1.16.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -1504,6 +1504,8 @@ class _Context:
     # Bookmark starts (id, name, offset) and ends (id, offset) in the paragraph.
     bookmark_starts: tuple[tuple[str, str, int], ...] = ()
     bookmark_ends: tuple[tuple[str, int], ...] = ()
+    # How many table rows, in any table, ended before the paragraph in its story.
+    rows_ended: int = 0
 
 
 def _paragraph(
@@ -1736,6 +1738,16 @@ class _Counters:
     # For a level restarted by a higher one, the startOverride, for that level, of the list
     # whose paragraph restarted it (None: it has none, or the level was never restarted).
     restart_from: list[int | None] = field(default_factory=lambda: [None] * len(_LEVELS))
+    # For a level counted only through a deeper paragraph, the number it shows until a paragraph
+    # at the level counts it: its abstractNum's start, whatever its count (None: its count).
+    implied: list[int | None] = field(default_factory=lambda: [None] * len(_LEVELS))
+    # For a level counted only through a deeper paragraph, how many table rows had ended then.
+    implied_rows: list[int] = field(default_factory=lambda: [0] * len(_LEVELS))
+    # For a level restarted by a higher one, how many table rows had ended at the restart.
+    restart_rows: list[int] = field(default_factory=lambda: [0] * len(_LEVELS))
+    # For a level that never restarts, how many table rows had ended at the last paragraph of
+    # a higher level since the level was last counted (None: none since).
+    higher_rows: list[int | None] = field(default_factory=lambda: [None] * len(_LEVELS))
 
 
 def _refuse_numbering(detail: str) -> DocxRefusedError:
@@ -1860,7 +1872,7 @@ class _Lists:
                     "ambiguous-numbering", f"level {shown}, which never restarts, in a deeper label"
                 )
         counters = self.counters.setdefault(key, _Counters())
-        self._count(counters, numbering.num_id, num, level, base, levels)
+        self._count(counters, numbering.num_id, num, level, base, levels, context.rows_ended)
         text = self._draw(counters, level, levels, definition, context)
         return replace(numbering, text=text, suffix=definition.suffix)
 
@@ -1881,8 +1893,11 @@ class _Lists:
         level: int,
         base: dict[int, _Level],
         levels: dict[int, _Level],
+        rows: int,
     ) -> None:
         """Count a paragraph of list ``num_id`` at ``level``, as Word does.
+
+        ``rows`` is how many table rows have ended before the paragraph.
 
         Each rule is Word's answer to a case in corpus/numbering-cases, named in brackets.
         """
@@ -1892,16 +1907,22 @@ class _Lists:
             # lvlRestart n restarts the level after a paragraph at a level up to n - 1; 0 never.
             # A value that is not a higher level is ignored, and then any higher level restarts
             # [restart-never, restart-after-first].
+            if restart == 0:
+                counters.higher_rows[deeper] = rows
             if restart is None or level < restart or restart - 1 >= deeper:
                 counters.values[deeper] = None
                 counters.unknown[deeper] = False
+                counters.implied[deeper] = None
                 # It restarts as the list of this paragraph says, whichever list counts it
                 # next [restart-source-override, restart-source-plain, restart-source-unused].
                 counters.restart_from[deeper] = num.starts.get(deeper)
+                counters.restart_rows[deeper] = rows
         for higher in range(level):
-            # A higher level not counted yet counts as its abstractNum's start, not a list's
+            # A higher level not counted yet shows its abstractNum's start, not a list's
             # startOverride [ancestor-never-counted, ancestor-two-levels,
-            # override-implicit-ancestor].
+            # override-implicit-ancestor]; but it counts on from this paragraph's list's
+            # startOverride, if it has one, used up or not, and the override is not used up by it
+            # [override-implicit-continued, override-implicit-reused, override-implicit-levels].
             if counters.values[higher] is None and not counters.unknown[higher]:
                 if counters.restart_from[higher] is not None:
                     # Restarted to another list's startOverride, then counted first by a deeper
@@ -1919,6 +1940,31 @@ class _Lists:
                         f"level {higher}, which has lvlRestart, never counted",
                     )
                 self._base_start(counters, base, higher)
+                if not counters.unknown[higher]:
+                    counters.implied[higher] = counters.values[higher]
+                    counters.values[higher] = num.starts.get(higher, counters.values[higher])
+                    counters.implied_rows[higher] = rows
+        implied = counters.implied[level]
+        if (
+            implied is not None
+            and implied != counters.values[level]
+            and counters.implied_rows[level] != rows
+        ):
+            # Counting on from a list's startOverride taken through a deeper paragraph, after a
+            # table row ended: Word does in some tables, not in others [override-implicit-rows].
+            raise DocxRefusedError(
+                "ambiguous-numbering", f"level {level} counted from an override past a row"
+            )
+        counters.implied[level] = None
+        never = counters.higher_rows[level]
+        counters.higher_rows[level] = None
+        if never is not None and never != rows:
+            # A level that never restarts, counted after a higher paragraph and the end of a
+            # table row: Word draws it one less than its count in some tables and not in others
+            # [restart-never-rows].
+            raise DocxRefusedError(
+                "ambiguous-numbering", f"level {level}, which never restarts, past a row"
+            )
         current = counters.values[level]
         if level in num.starts and (num_id, level) not in counters.applied:
             # A startOverride sets the count the first time its list reaches the level, whatever
@@ -1933,6 +1979,13 @@ class _Lists:
             # plain-after-restart, level-override-shared].
             counters.values[level] = current + 1
         elif counters.restart_from[level] is not None:
+            if counters.restart_rows[level] != rows:
+                # Restarted by another list's paragraph, then counted after a table row ended:
+                # Word takes that list's startOverride after a table, but not in a later row of
+                # the same table [restart-source-rows]; the reader does not tell them apart.
+                raise DocxRefusedError(
+                    "ambiguous-numbering", f"level {level} restarted by another list, past a row"
+                )
             # Restarted by a paragraph of a list with a startOverride for this level: that
             # override, whichever list counts it now [override-restart-within,
             # restart-source-override, restart-source-unused].
@@ -1971,7 +2024,8 @@ class _Lists:
                 raise _refuse_numbering(source.unsupported)
             if definition.legal and source.format == "none":
                 raise _refuse_numbering("legal numbering of a level that shows no number")
-            value = counters.values[shown]
+            implied = counters.implied[shown]
+            value = counters.values[shown] if implied is None else implied
             if counters.unknown[shown] or value is None:
                 raise DocxRefusedError("ambiguous-numbering", f"the count of list level {shown}")
             pieces.append(_number(value, "decimal" if definition.legal else source.format))
@@ -2386,6 +2440,7 @@ class _Body:
         self.out: list[Paragraph] = []
         self.contexts: list[_Context] = []
         self.tables = 0
+        self.rows_ended = 0
         self.runs = runs
         # The sectPr closing each section so far; a paragraph holding one ends its section.
         self.sections: list[ET.Element] = []
@@ -2408,7 +2463,7 @@ class _Body:
                     len(self.sections),
                 )
                 self.out.append(paragraph)
-                self.contexts.append(context)
+                self.contexts.append(replace(context, rows_ended=self.rows_ended))
                 closing = child.find(f"{_w('pPr')}/{_w('sectPr')}")
                 if closing is not None:
                     self.sections.append(closing)
@@ -2454,6 +2509,7 @@ class _Body:
                 continued = merge is not None and merge.get(_w("val")) in (None, "continue")
                 if continued and any(p.text.strip() for p in self.out[start:]):
                     raise DocxRefusedError("unsupported-element", "text in a merged-away cell")
+            self.rows_ended += 1
 
 
 def _collect(element: ET.Element, wanted: str, out: list[ET.Element], silent: set[str]) -> None:
