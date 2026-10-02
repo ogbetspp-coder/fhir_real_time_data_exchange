@@ -1003,9 +1003,9 @@ def test_each_kind_of_style_and_the_defaults_give_the_font() -> None:
     # An unknown paragraph style is the default one.
     default = f'<w:style w:type="paragraph" w:default="1" w:styleId="D">{_SYMBOL}</w:style>'
     assert _mapped(docx(_plain('<w:pStyle w:val="Missing"/>'), styles=default))
-    # The default character style, and the document defaults.
+    # The document defaults; never the default character style, which Word does not apply.
     character = f'<w:style w:type="character" w:default="1" w:styleId="C">{_SYMBOL}</w:style>'
-    assert _mapped(docx(_plain(), styles=character))
+    assert not _mapped(docx(_plain(), styles=character))
     defaults = '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr>'
     assert _mapped(docx(_plain(), styles=_styles(defaults=defaults)))
     # A basedOn loop ends.
@@ -1354,8 +1354,8 @@ def test_the_key_marks_from_every_level_are_worked_out_alike() -> None:
             if m["start"] <= offset < m["end"] and m["kind"] in CHECKED_MARKS
         }
 
-    assert at(0, 0) == {"bold", "italic", "caps", "smallCaps", "dstrike", "superscript"}
-    # A run that names its character style does not take the default one's bold.
+    # The default character style's bold is never applied (Word does not apply it).
+    assert at(0, 0) == {"italic", "caps", "smallCaps", "dstrike", "superscript"}
     assert at(0, 1) == {"italic", "caps", "subscript", "underline"}
     assert at(0, 2) == {"italic", "caps", "subscript"}
-    assert at(1, 0) == {"bold", "italic", "caps", "strike"}
+    assert at(1, 0) == {"italic", "caps", "strike"}

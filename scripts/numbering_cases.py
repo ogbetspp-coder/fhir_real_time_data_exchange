@@ -242,6 +242,26 @@ TOGGLE_CASES: list[Toggles] = [
     Toggles(table=True, pst="PB", cst="CB"),
     Toggles(table=True, direct=TOGGLES_ON),
 ]
+DEFAULTS_OFF_STYLES = (
+    TOGGLE_STYLES
+    + _style("character", "COff", TOGGLES_OFF)
+    + _style("table", "TOff", TOGGLES_OFF)
+    + _style("paragraph", "POffChild", "", "POff")
+)
+
+
+def _defaults_paragraph(pst: str, cst: str, table: str = "") -> str:
+    props = f'<w:pStyle w:val="{pst}"/>' if pst else ""
+    rpr = f'<w:rPr><w:rStyle w:val="{cst}"/></w:rPr>' if cst else ""
+    paragraph = para(f"<w:r>{rpr}<w:t>x</w:t></w:r>", props=props)
+    if table:
+        paragraph = (
+            f'<w:tbl><w:tblPr><w:tblStyle w:val="{table}"/></w:tblPr><w:tr><w:tc>{paragraph}'
+            "</w:tc></w:tr></w:tbl>"
+        )
+    return paragraph
+
+
 TOGGLE_DEFAULT_CASES: list[Toggles] = [
     Toggles(),
     Toggles(pst="PB"),
@@ -632,6 +652,101 @@ CASES: dict[str, Case] = {
         "",
         "".join(_toggle_paragraph(*case) for case in TOGGLE_CASES),
         TOGGLE_STYLES,
+    ),
+    "restart-never-shown-deeper": Case(
+        "lvlRestart 0 on level 1, counted by list 1, then shown in list 2's level 2 label after "
+        "list 2's level 0 paragraph: Word draws it as a space.",
+        abstract(
+            1,
+            lvl(0, "decimalZero", "%1)", start=None),
+            lvl(1, "upperLetter", "%2)", '<w:lvlRestart w:val="0"/>'),
+            lvl(2, "upperLetter", "%1.%2.%3."),
+        )
+        + num(1, 1, start_at(2, 2))
+        + num(2, 1, start_at(0, 2)),
+        items((1, 1), (2, 0), (2, 2)),
+    ),
+    "restart-source-override": Case(
+        "List 1 overrides level 1's start with 8; its level 0 paragraph restarts level 1, which "
+        "list 2 counts next: from list 1's override.",
+        abstract(1, lvl(0, text="%1)"), lvl(1, "decimalZero", "(%2)", start=0))
+        + num(1, 1, start_at(1, 8))
+        + num(2, 1),
+        items((1, 0), (2, 1), (2, 1)),
+    ),
+    "restart-source-plain": Case(
+        "List 1 overrides level 2's start; list 2's paragraph restarts level 2, which list 1 "
+        "counts next: from the abstractNum's start.",
+        abstract(
+            1,
+            lvl(0, "upperRoman", "%1.", start=2),
+            lvl(1, "lowerRoman", "%1.%2.", start=5),
+            lvl(2, "upperLetter", "%3."),
+        )
+        + num(1, 1, start_at(2, 5))
+        + num(2, 1, start_at(0, 8)),
+        items((1, 2), (2, 1), (1, 2)),
+    ),
+    "restart-source-unused": Case(
+        "List 1 overrides level 2's start; its level 1 paragraph restarts level 2, never yet "
+        "counted, which list 2 counts first: from list 1's override.",
+        abstract(
+            1,
+            lvl(0, "decimalZero", "%1)", start=None),
+            lvl(1, "upperLetter", "%2)"),
+            lvl(2, "upperLetter", "%1.%2.%3."),
+        )
+        + num(1, 1, start_at(2, 2))
+        + num(2, 1, start_at(0, 2)),
+        items((1, 1), (2, 2), (2, 2)),
+    ),
+    "emphasis-defaults-off": Case(
+        "The document defaults turn the toggles on and styles of each kind turn them off: each "
+        "kind that differs from the defaults turns them over.",
+        "",
+        "".join(
+            _defaults_paragraph(*case)
+            for case in (
+                ("", "COff"),
+                ("POff", ""),
+                ("POff", "CB"),
+                ("PB", "COff"),
+                ("POff", "COff"),
+                ("POffChild", ""),
+                ("", "", "TOff"),
+                ("POff", "", "TOff"),
+                ("POff", "COff", "TOff"),
+                ("POff", "", "TB"),
+                ("", "CB", "TOff"),
+            )
+        ),
+        "<w:docDefaults><w:rPrDefault><w:rPr>" + TOGGLES_ON + "</w:rPr></w:rPrDefault>"
+        "</w:docDefaults>" + DEFAULTS_OFF_STYLES,
+    ),
+    "default-character-style": Case(
+        "A default character style that turns bold on: Word does not apply it to text.",
+        "",
+        para(words("plain"))
+        + para('<w:r><w:rPr><w:rStyle w:val="Missing"/></w:rPr><w:t>unknown style</w:t></w:r>'),
+        '<w:style w:type="character" w:default="1" w:styleId="DC"><w:name w:val="DC"/>'
+        "<w:rPr><w:b/></w:rPr></w:style>",
+    ),
+    "restart-level-above": Case(
+        "lvlRestart 1 on level 1, the level directly above written out: Word draws it empty.",
+        abstract(1, lvl(0, text="%1."), lvl(1, text="%1.%2.", extra='<w:lvlRestart w:val="1"/>'))
+        + num(1, 1),
+        items((1, 0), (1, 1), (1, 1)),
+    ),
+    "restart-skipped-ancestor": Case(
+        "lvlRestart 0 on level 1, first counted by a level 2 item: Word draws it otherwise.",
+        abstract(
+            1,
+            lvl(0, text="%1."),
+            lvl(1, text="%1.%2.", extra='<w:lvlRestart w:val="0"/>', start=3),
+            lvl(2, "lowerLetter", "%1.%2.%3."),
+        )
+        + num(1, 1),
+        items((1, 2), (1, 0), (1, 2)),
     ),
     "emphasis-defaults": Case(
         "The same toggles with the document defaults turning them on.",

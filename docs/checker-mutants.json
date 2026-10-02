@@ -1,97 +1,97 @@
 {
-  "killed": 1046,
-  "mutants": 1091,
+  "killed": 1047,
+  "mutants": 1094,
   "survivors": [
     {
       "code": "_XML_NS = \"http://www.w3.org/XML/1998/namespace\"",
       "equivalent": "the xml prefix can never name Word's namespace, the only one the tokenizer looks for",
       "function": "<module>",
       "kind": "str:'http://www.w3.org/XML/1998/namespace'",
-      "line": 688
+      "line": 692
     },
     {
       "code": "return False",
       "equivalent": "a function that ends without a return gives None, which is as false as False here",
       "function": "_refused",
       "kind": "statement",
-      "line": 988
+      "line": 992
     },
     {
       "code": "return None",
       "equivalent": "the function returns None at its end anyway",
       "function": "_Fonts.font",
       "kind": "statement",
-      "line": 295
+      "line": 299
     },
     {
       "code": "\"thead\",",
       "equivalent": "a row group is always met beside a table or a row, which end the paragraph; text directly in one is refused by the reader",
       "function": "<module>",
       "kind": "str:'thead'",
-      "line": 1013
+      "line": 1017
     },
     {
       "code": "\"tbody\",",
       "equivalent": "a row group is always met beside a table or a row, which end the paragraph; text directly in one is refused by the reader",
       "function": "<module>",
       "kind": "str:'tbody'",
-      "line": 1014
+      "line": 1018
     },
     {
       "code": "return None",
       "equivalent": "the function returns None at its end anyway",
       "function": "_Fonts.marks.nearest",
       "kind": "statement",
-      "line": 271
+      "line": 275
     },
     {
       "code": "return",
       "equivalent": "an empty run then adds an empty segment, or no hidden characters: nothing either way",
       "function": "_Story.flush_run",
       "kind": "statement",
-      "line": 539
+      "line": 543
     },
     {
       "code": "depth_of_capture = -1",
       "equivalent": "the depth is set whenever a capture begins, before it is read",
       "function": "_raw_texts",
       "kind": "int:1",
-      "line": 720
+      "line": 724
     },
     {
       "code": "raise CertificationError(\"the ledger does not balance\")",
       "equivalent": "the counts follow from the sequences, which are equal by then: the ledger is a second statement of the same fact, stated in the certificate",
       "function": "DocxSource.certify",
       "kind": "statement",
-      "line": 929
+      "line": 933
     },
     {
       "code": "self.pending = False",
       "equivalent": "the parser starts at the div, a block, which ends the (empty) paragraph and clears it",
       "function": "_Div.__init__",
       "kind": "bool",
-      "line": 1037
+      "line": 1041
     },
     {
       "code": "parsed.close()",
       "equivalent": "the div ends with its own end tag, so nothing is left buffered",
       "function": "EpiSource._section",
       "kind": "call",
-      "line": 1129
+      "line": 1133
     },
     {
       "code": "parsed.flush()",
       "equivalent": "the div's end tag, a block's, has ended the last paragraph",
       "function": "EpiSource._section",
       "kind": "call",
-      "line": 1130
+      "line": 1134
     },
     {
       "code": "raise CertificationError(\"the ledger does not balance\")",
       "equivalent": "the counts follow from the sequences, which are equal by then: the ledger is a second statement of the same fact, stated in the certificate",
       "function": "EpiSource.certify",
       "kind": "statement",
-      "line": 1200
+      "line": 1204
     },
     {
       "code": "return tag.rsplit(\"}\", 1)[-1]",
@@ -101,102 +101,116 @@
       "line": 89
     },
     {
+      "code": "found += self.chain(None if style is None else style.get(_w(\"val\")), \"character\")",
+      "equivalent": "a character style falls back to no default, as an unknown kind does: Word applies no default character style to text",
+      "function": "_Fonts.levels",
+      "kind": "str:'character'",
+      "line": 225
+    },
+    {
       "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
       "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
       "function": "_symbol_reading",
       "kind": "compare:0",
-      "line": 320
+      "line": 324
     },
     {
       "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
       "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
       "function": "_symbol_reading",
       "kind": "compare:1",
-      "line": 320
+      "line": 324
     },
     {
       "code": "continue",
       "equivalent": "a paragraph's properties are walked as a container instead: they hold no run, and text in them is refused either way",
       "function": "_Story.inline",
       "kind": "statement",
-      "line": 389
+      "line": 393
     },
     {
       "code": "scopes: list[dict[str, str]] = [{\"xml\": _XML_NS}]",
       "equivalent": "the xml prefix can never name Word's namespace, the only one the tokenizer looks for",
       "function": "_raw_texts",
       "kind": "str:'xml'",
-      "line": 717
+      "line": 721
     },
     {
       "code": "chunk = text[at:] if less < 0 else text[at:less]",
       "equivalent": "a '<' at the very start finds no capture open, so the chunk is never used there",
       "function": "_raw_texts",
       "kind": "compare:0",
-      "line": 724
+      "line": 728
     },
     {
       "code": "_paragraphs(self.body, value[\"paragraphs\"], \"paragraph\")",
       "equivalent": "the word only names the place in a refusal's detail",
       "function": "DocxSource.certify",
       "kind": "str:'paragraph'",
-      "line": 893
+      "line": 897
+    },
+    {
+      "code": "self.chain(None if style is None else style.get(_w(\"val\")), \"character\"),",
+      "equivalent": "a character style falls back to no default, as an unknown kind does: Word applies no default character style to text",
+      "function": "_Fonts.marks",
+      "kind": "str:'character'",
+      "line": 248
     },
     {
       "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
       "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
       "function": "_symbol_reading",
       "kind": "int:61440",
-      "line": 320
+      "line": 324
     },
     {
       "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
       "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
       "function": "_symbol_reading",
       "kind": "int:61695",
-      "line": 320
+      "line": 324
     },
     {
       "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
       "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
       "function": "_Story.token",
       "kind": "compare:0",
-      "line": 503
+      "line": 507
     },
     {
       "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
       "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
       "function": "_Story.token",
       "kind": "compare:1",
-      "line": 503
+      "line": 507
     },
     {
       "code": "chunk = text[at:] if less < 0 else text[at:less]",
       "equivalent": "a '<' at the very start finds no capture open, so the chunk is never used there",
       "function": "_raw_texts",
       "kind": "int:0",
-      "line": 724
+      "line": 728
     },
     {
       "code": "for (comment, part), theirs in zip(self.comments, value[\"comments\"], strict=True):",
       "equivalent": "the comments' metadata lists are compared just before, so the lengths are equal",
       "function": "DocxSource.certify",
       "kind": "bool",
-      "line": 917
+      "line": 921
     },
     {
       "code": "for (comment, part), theirs in zip(self.comments, value[\"comments\"], strict=True):",
       "equivalent": "called only after certify has compared the lengths",
       "function": "DocxSource._pairs",
       "kind": "bool",
-      "line": 963
+      "line": 967
     },
     {
       "code": "for index, (mine, paragraph) in enumerate(zip(part.paragraphs, theirs, strict=True)):",
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "_paragraphs",
       "kind": "bool",
-      "line": 975
+      "line": 979
     },
     {
       "code": "return element.get(_w(\"val\"), \"true\").lower() not in (\"0\", \"false\", \"off\")",
@@ -210,116 +224,116 @@
       "equivalent": "a paragraph's properties are walked as a container instead: they hold no run, and text in them is refused either way",
       "function": "_Story.inline",
       "kind": "str:'pPr'",
-      "line": 386
+      "line": 390
     },
     {
       "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
       "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
       "function": "_Story.token",
       "kind": "int:61440",
-      "line": 503
+      "line": 507
     },
     {
       "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
       "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
       "function": "_Story.token",
       "kind": "int:61695",
-      "line": 503
+      "line": 507
     },
     {
       "code": "for (name, _, part), story in zip(found, theirs, strict=True):",
       "equivalent": "the parts and their uses are compared just before, so the lengths are equal",
       "function": "DocxSource.certify",
       "kind": "bool",
-      "line": 907
+      "line": 911
     },
     {
       "code": "for (name, _, part), story in zip(found, value[kind + \"s\"], strict=True):",
       "equivalent": "called only after certify has compared the lengths",
       "function": "DocxSource._pairs",
       "kind": "bool",
-      "line": 960
+      "line": 964
     },
     {
       "code": "for index, (mine, theirs) in enumerate(zip(self.sections, value[\"sections\"], strict=True)):",
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "EpiSource.certify",
       "kind": "bool",
-      "line": 1191
+      "line": 1195
     },
     {
       "code": "self.mark(\"note\", (kind, self.story[1]))",
       "equivalent": "a marker's label is compared only with 'page'; any other is a note mark",
       "function": "_Story.run",
       "kind": "str:'note'",
-      "line": 442
+      "line": 446
     },
     {
       "code": "self.mark(\"note\", (kind, int(child.get(_w(\"id\"), \"\"))))",
       "equivalent": "a marker's label is compared only with 'page'; any other is a note mark",
       "function": "_Story.run",
       "kind": "str:'note'",
-      "line": 444
+      "line": 448
     },
     {
       "code": "zip(mine.sections, theirs[\"sections\"], strict=True)",
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "EpiSource.certify.section",
       "kind": "bool",
-      "line": 1176
+      "line": 1180
     },
     {
       "code": "if note.get(_w(\"type\"), \"normal\") in _NOTE_LAYOUT:",
       "equivalent": "the default only has to be outside the layout types, as 'Xormal' is",
       "function": "DocxSource.__init__",
       "kind": "str:'normal'",
-      "line": 817
+      "line": 821
     },
     {
       "code": "self.open_tables.append([self.tables, -1, -1])",
       "equivalent": "the cell count starts again at each row; only the row count's start matters, and its mutant is caught",
       "function": "_Div.handle_starttag",
       "kind": "int:1",
-      "line": 1064
+      "line": 1068
     },
     {
       "code": "at = next(i for i, (a, b) in enumerate(zip(shown, claimed, strict=True)) if set(a) != b)",
       "equivalent": "both lists have one entry per character of the text, which was compared just before",
       "function": "_match",
       "kind": "bool",
-      "line": 609
+      "line": 613
     },
     {
       "code": "end, quote = less + 1, \"\"",
       "equivalent": "a tag's first character is its name's, never '>' or a quote, so starting the scan one later finds the same end",
       "function": "_raw_texts",
       "kind": "int:1",
-      "line": 741
+      "line": 745
     },
     {
       "code": "if a != b",
       "equivalent": "where a difference is found only words the refusal",
       "function": "EpiSource.certify.section",
       "kind": "compare:0",
-      "line": 1158
+      "line": 1162
     },
     {
       "code": "self.ledger.symbol += sum(1 for a, b in zip(text, mapped, strict=True) if a != b)",
       "equivalent": "the Symbol table maps one character to one, so the two are the same length",
       "function": "_Story.token",
       "kind": "bool",
-      "line": 484
+      "line": 488
     },
     {
       "code": "name = body.split(None, 1)[0] if body.strip() else \"\"",
       "equivalent": "splitting once more leaves the first word, the name, the same",
       "function": "_raw_texts",
       "kind": "int:1",
-      "line": 758
+      "line": 762
     }
   ],
   "target": "src/label_docx/certify.py",
-  "targetSha256": "9280344e778198fb5e7018926b6d0f0293c5c307963893de50fcd6953d2499e6",
+  "targetSha256": "3016b8e6d4d68647fb6b2057ee4f1730ca91fbe9feaa24f3ad02ca4b6d739564",
   "tests": [
     "tests/test_certify.py",
     "tests/test_headers_comments.py",

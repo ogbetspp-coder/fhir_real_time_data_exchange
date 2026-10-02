@@ -1,11 +1,11 @@
 {
   "table-of-contents-stale.docx": {
-    "certificateSha256": "d9f86c2c30ea1c04cf83232aeaee6a5dc35fd0654ef0f0ef9ebdc0eff888eaae",
+    "certificateSha256": "a35d2bcdab00c05af4fe3edca875053a2da57e6b5ffd514c50397632f354dbe3",
     "paragraphsSha256": "6ee40b943e2f0084251f25fe38ed46bc223435414d63c5bc2a2002c92658bc0c",
     "sha256": "46415f5c5f5441fe1a614797a67c71cdc46bca7fd5410e7ae67c2176ecb9ba48"
   },
   "table-of-contents.docx": {
-    "certificateSha256": "2b9c9bbceef18737de8e393ae613fcee6be6e1690675d9f1e8085a620c8c36f1",
+    "certificateSha256": "175013eb83a3ee0a1bf877a99484adb46bc9c63d0ef195485d804a42aa3a4105",
     "paragraphsSha256": "a559868b5b6de112eeb6c34e2ff300a6d0be7ea85a5a0dc5a819806e59e138fe",
     "sha256": "d819dcff034ab633389ddb759dccc1b952c6e40874bd15f4fa5b5d70101db395"
   }

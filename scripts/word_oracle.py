@@ -27,8 +27,13 @@ def main() -> int:
     """Record a corpus set's answers, or compare files; 1 if the reader differs from Word."""
     parser = argparse.ArgumentParser(description="Hold the reader's list labels to Word's.")
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("record", help="write word.json for a corpus set").add_argument(
-        "folder", type=Path
+    recording = commands.add_parser("record", help="write word.json for a corpus set")
+    recording.add_argument("folder", type=Path)
+    recording.add_argument(
+        "--only",
+        nargs="+",
+        default=[],
+        help="ask Word about these files only, keeping the answers on record for the rest",
     )
     commands.add_parser("compare", help="compare files, writing nothing").add_argument(
         "files", type=Path, nargs="+"
@@ -45,6 +50,20 @@ def main() -> int:
     recorded: dict[str, dict[str, Any]] = (
         json.loads(progress.read_text("utf-8")) if progress and progress.exists() else {}
     )
+    if args.command == "record" and args.only:
+        kept = json.loads((args.folder / "word.json").read_text("utf-8"))
+        for name in kept["drawn"]:
+            if name not in args.only:
+                recorded.setdefault(
+                    name,
+                    {
+                        "drawn": kept["drawn"][name],
+                        "notes": kept["notes"].get(name),
+                        "fields": kept["fields"].get(name),
+                        "prints": kept["prints"][name],
+                        "emphasis": kept["emphasis"][name],
+                    },
+                )
     differs = False
     for path in paths:
         if not path.read_bytes().startswith(b"PK\x03\x04"):

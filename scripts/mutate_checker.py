@@ -53,6 +53,10 @@ _TABLE_EDGE = (
 _XML_LINE = '_XML_NS = "http://www.w3.org/XML/1998/namespace"'
 _XML_PREFIX = "the xml prefix can never name Word's namespace, the only one the tokenizer looks for"
 _FIRST_LESS = "a '<' at the very start finds no capture open, so the chunk is never used there"
+_NO_DEFAULT = (
+    "a character style falls back to no default, as an unknown kind does: Word applies no "
+    "default character style to text"
+)
 _STRICT = "the lengths are compared just before, so zip(strict=True) never raises"
 _LEDGER = (
     "the counts follow from the sequences, which are equal by then: the ledger is a second "
@@ -161,6 +165,16 @@ EQUIVALENT: dict[tuple[str, str, str], str] = {
         'for (name, _, part), story in zip(found, value[kind + "s"], strict=True):',
         "bool",
     ): "called only after certify has compared the lengths",
+    (
+        "_Fonts.levels",
+        'found += self.chain(None if style is None else style.get(_w("val")), "character")',
+        "str:'character'",
+    ): _NO_DEFAULT,
+    (
+        "_Fonts.marks",
+        'self.chain(None if style is None else style.get(_w("val")), "character"),',
+        "str:'character'",
+    ): _NO_DEFAULT,
     ("_Fonts.marks.nearest", "return None", "statement"): (
         "the function returns None at its end anyway"
     ),

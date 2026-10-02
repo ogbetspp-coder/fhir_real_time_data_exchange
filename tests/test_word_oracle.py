@@ -36,6 +36,12 @@ REFUSED = {
     # A custom-marked footnote whose text holds footnoteRef: Word draws there the number the
     # next footnote will take, which no reference shows.
     "numbering-cases/notes-custom-mark.docx": "ambiguous-numbering",
+    # lvlRestart naming the level directly above, written out: Word draws the level empty.
+    "numbering-cases/restart-level-above.docx": "unsupported-numbering",
+    # A level that never restarts shown in a deeper label: Word draws it as a space.
+    "numbering-cases/restart-never-shown-deeper.docx": "ambiguous-numbering",
+    # A level with lvlRestart first counted by a deeper item: Word draws it otherwise later.
+    "numbering-cases/restart-skipped-ancestor.docx": "ambiguous-numbering",
     # A REF to a bookmark that is not there: Word prints "Error! Reference source not found."
     "numbering-cases/fields-ref-missing.docx": "computed-field",
     # Captions stored as 7 and 7, which Word shows on screen and prints as 1 and 2.

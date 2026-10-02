@@ -607,12 +607,14 @@ def test_an_unknown_paragraph_style_falls_back_to_the_default_one() -> None:
     assert refusal(p(r("<w:t>x</w:t>"), '<w:pStyle w:val="Missing"/>'), default) == "hidden-text"
 
 
-def test_the_default_character_and_table_styles_apply() -> None:
+def test_the_default_table_style_applies_and_the_default_character_style_does_not() -> None:
+    # Word applies no default character style to text [default-character-style].
     character = (
         '<w:style w:type="character" w:default="1" w:styleId="Font">'
-        "<w:rPr><w:vanish/></w:rPr></w:style>"
+        "<w:rPr><w:vanish/><w:b/></w:rPr></w:style>"
     )
-    assert refusal(p(r("<w:t>x</w:t>")), character) == "hidden-text"
+    (paragraph,) = read_docx(docx(p(r("<w:t>x</w:t>")), character))
+    assert (paragraph.text, paragraph.marks) == ("x", ())
     table = (
         '<w:style w:type="table" w:default="1" w:styleId="Grid">'
         "<w:rPr><w:vanish/></w:rPr></w:style>"

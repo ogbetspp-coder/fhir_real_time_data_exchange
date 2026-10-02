@@ -285,6 +285,54 @@
       "bytes": 5944
     },
     {
+      "name": "lvlRestart 0 on level 1, counted by list 1, then shown in list 2's level 2 label after list 2's level 0 paragraph: Word draws it as a space.",
+      "file": "restart-never-shown-deeper.docx",
+      "sha256": "d15465eb5893330dbfaf21acbd2f2af068103f093067cac4c00031d5313bccb9",
+      "bytes": 3525
+    },
+    {
+      "name": "List 1 overrides level 1's start with 8; its level 0 paragraph restarts level 1, which list 2 counts next: from list 1's override.",
+      "file": "restart-source-override.docx",
+      "sha256": "25a23877dc276027b60b36f4a781364ff6cc0943915550c28772ec202a0d9096",
+      "bytes": 3340
+    },
+    {
+      "name": "List 1 overrides level 2's start; list 2's paragraph restarts level 2, which list 1 counts next: from the abstractNum's start.",
+      "file": "restart-source-plain.docx",
+      "sha256": "d3696855c4976fd5d1ecc74e21bbff19a7f7fb1d32c5acb75079424c1ae0ed09",
+      "bytes": 3515
+    },
+    {
+      "name": "List 1 overrides level 2's start; its level 1 paragraph restarts level 2, never yet counted, which list 2 counts first: from list 1's override.",
+      "file": "restart-source-unused.docx",
+      "sha256": "a7aca5dc84b209ef9871fee2566568fa4a5543ebf2d0fb20e8a3c278d6aa0ed2",
+      "bytes": 3500
+    },
+    {
+      "name": "The document defaults turn the toggles on and styles of each kind turn them off: each kind that differs from the defaults turns them over.",
+      "file": "emphasis-defaults-off.docx",
+      "sha256": "509d8f091ed179600ea38cd7a6ff0464e58f7c0285feec0f94eb62ad089877eb",
+      "bytes": 5531
+    },
+    {
+      "name": "A default character style that turns bold on: Word does not apply it to text.",
+      "file": "default-character-style.docx",
+      "sha256": "9ef22c4d6a40ebc08d59963ccaba61a03c0c17d1bfdfcd0a6eed8413ac32537b",
+      "bytes": 2829
+    },
+    {
+      "name": "lvlRestart 1 on level 1, the level directly above written out: Word draws it empty.",
+      "file": "restart-level-above.docx",
+      "sha256": "0c42ffa7643a5269c103e4293c63f456b0b3c892250773a166dc1765dcd58d25",
+      "bytes": 3238
+    },
+    {
+      "name": "lvlRestart 0 on level 1, first counted by a level 2 item: Word draws it otherwise.",
+      "file": "restart-skipped-ancestor.docx",
+      "sha256": "60f7bacef4f598dbf31714a1f89e32684820e53c9d5d58f067ca77090062d499",
+      "bytes": 3345
+    },
+    {
       "name": "The same toggles with the document defaults turning them on.",
       "file": "emphasis-defaults.docx",
       "sha256": "21c882458608d310f474348508cddaea519e01862017a6fd5d92ba24af8c7d68",

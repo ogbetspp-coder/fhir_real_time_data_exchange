@@ -218,8 +218,13 @@ from dataclasses import dataclass, field, replace
 # 1.11.0 reports bold and italic, and every toggle as Word shows it (two styles cancel); 1.12.0
 # reads only a whole package: every part, read or not, must be intact (its checksum), and the
 # parts together under a size cap; 1.13.0 reads headers, footers and comments, and where each
-# comment is anchored.
-READER_VERSION = "docx-reader/1.13.0"
+# comment is anchored; 1.14.0, from Word's answers on generated documents: each kind of style
+# whose bold, italic, caps or strike differs from the document defaults turns it over, the
+# default character style is not applied to text, and a lvlRestart naming the level directly
+# above, or a level with lvlRestart counted first by a deeper one, is refused; 1.15.0 restarts
+# a level as the list whose paragraph restarted it says (its startOverride, else the start), and
+# refuses a level that never restarts shown in a deeper level's label.
+READER_VERSION = "docx-reader/1.15.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -720,6 +725,12 @@ class _Styles:
     def resolve(self, style_id: str | None, kind: str) -> list[_Style]:
         return self.chain(self.effective(style_id, kind))
 
+    def resolve_named(self, style_id: str | None, kind: str) -> list[_Style]:
+        """The chain of ``style_id`` if it names a style there, else none (no default)."""
+        if style_id is None or style_id not in self.styles:
+            return []
+        return self.chain(self.effective(style_id, kind))
+
     def chain(self, style_id: str | None) -> list[_Style]:
         out: list[_Style] = []
         seen: set[str] = set()
@@ -881,7 +892,9 @@ class _Properties:
         # Each kind of style with its basedOn chain, nearest first: the character, paragraph and
         # (inside a table only; ``table_style`` is already resolved) table style.
         self.chains = [
-            [style.rpr for style in styles.resolve(run_style, "character")],
+            # A run naming no character style, or one not there, takes none: Word does not
+            # apply the default character style to text [default-character-style].
+            [style.rpr for style in styles.resolve_named(run_style, "character")],
             [style.rpr for style in styles.resolve(paragraph_style, "paragraph")],
             [style.rpr for style in styles.chain(table_style)],
         ]
@@ -905,17 +918,21 @@ class _Properties:
         """Whether Word shows a toggle property (bold, italic, caps, strike...) on this run.
 
         Word's rules, each its answer to a case in corpus/numbering-cases (emphasis-toggles,
-        emphasis-defaults): the run's own setting wins, on or off; otherwise each kind of style
-        (character, paragraph, table) gives the nearest setting in its basedOn chain, and the
-        kinds cancel in pairs (on with on is off, three on are on); the document defaults turn it
-        on whatever the styles give. A list label (``mark``) is read the cautious way.
+        emphasis-defaults, emphasis-defaults-off): the run's own setting wins, on or off;
+        otherwise it starts as the document defaults set it (off where they say nothing), and
+        each kind of style (character, paragraph, table) whose nearest setting in its basedOn
+        chain differs from that turns it over, so two such kinds cancel. With the defaults off,
+        each style that turns it on turns it over; with them on, each that turns it off. A list
+        label (``mark``) is read the cautious way.
         """
         if self.mark is not None:
             return self.toggle(name)
         direct = _on(self.direct.find(_w(name))) if self.direct is not None else None
         if direct is not None:
             return direct
-        shown = False
+        default = self.styles.default_rpr
+        shown = bool(default is not None and _on(default.find(_w(name))))
+        start = shown
         for chain in self.chains:
             setting = next(
                 (
@@ -923,11 +940,11 @@ class _Properties:
                     for rpr in chain
                     if rpr is not None and (v := _on(rpr.find(_w(name)))) is not None
                 ),
-                False,
+                None,
             )
-            shown ^= setting
-        default = self.styles.default_rpr
-        return shown or bool(default is not None and _on(default.find(_w(name))))
+            if setting is not None and setting != start:
+                shown = not shown
+        return shown
 
     def value(self, name: str, attribute: str = "val") -> str | None:
         for level in [self.direct, *self.inherited]:
@@ -1716,6 +1733,9 @@ class _Counters:
     unknown: list[bool] = field(default_factory=lambda: [False] * len(_LEVELS))
     # The (numId, level) pairs whose startOverride has been applied.
     applied: set[tuple[int, int]] = field(default_factory=set)
+    # For a level restarted by a higher one, the startOverride, for that level, of the list
+    # whose paragraph restarted it (None: it has none, or the level was never restarted).
+    restart_from: list[int | None] = field(default_factory=lambda: [None] * len(_LEVELS))
 
 
 def _refuse_numbering(detail: str) -> DocxRefusedError:
@@ -1824,6 +1844,21 @@ class _Lists:
         definition = levels.get(level)
         if definition is None:
             raise _refuse_numbering(f"level {level} of numId {numbering.num_id} is not defined")
+        for upper in range(level + 1):
+            restart = levels[upper].restart if upper in levels else None
+            if restart is not None and restart != 0 and restart >= upper + (upper == 0):
+                # Restarting after the level directly above, written out (Word never writes it,
+                # it is the default), or after itself or a deeper one: Word draws the level
+                # empty [restart-level-above].
+                raise _refuse_numbering(f"lvlRestart {restart} on level {upper}")
+        for shown in {int(n) - 1 for n in re.findall(r"%([1-9])", definition.text or "")}:
+            if shown != level and shown in levels and levels[shown].restart == 0:
+                # A level that never restarts, shown in a deeper level's label: Word draws its
+                # start, then one less after a higher paragraph, while it counts on
+                # [restart-skipped-ancestor, restart-never-shown-deeper].
+                raise DocxRefusedError(
+                    "ambiguous-numbering", f"level {shown}, which never restarts, in a deeper label"
+                )
         counters = self.counters.setdefault(key, _Counters())
         self._count(counters, numbering.num_id, num, level, base, levels)
         text = self._draw(counters, level, levels, definition, context)
@@ -1860,11 +1895,29 @@ class _Lists:
             if restart is None or level < restart or restart - 1 >= deeper:
                 counters.values[deeper] = None
                 counters.unknown[deeper] = False
+                # It restarts as the list of this paragraph says, whichever list counts it
+                # next [restart-source-override, restart-source-plain, restart-source-unused].
+                counters.restart_from[deeper] = num.starts.get(deeper)
         for higher in range(level):
             # A higher level not counted yet counts as its abstractNum's start, not a list's
             # startOverride [ancestor-never-counted, ancestor-two-levels,
             # override-implicit-ancestor].
             if counters.values[higher] is None and not counters.unknown[higher]:
+                if counters.restart_from[higher] is not None:
+                    # Restarted to another list's startOverride, then counted first by a deeper
+                    # level: Word's answer is not on record.
+                    raise DocxRefusedError(
+                        "ambiguous-numbering",
+                        f"level {higher}, restarted by another list, never counted",
+                    )
+                if levels.get(higher) is not None and levels[higher].restart is not None:
+                    # A higher level that restarts by its own lvlRestart, counted for the first
+                    # time by a deeper one: Word draws it otherwise than its start
+                    # [restart-skipped-ancestor].
+                    raise DocxRefusedError(
+                        "ambiguous-numbering",
+                        f"level {higher}, which has lvlRestart, never counted",
+                    )
                 self._base_start(counters, base, higher)
         current = counters.values[level]
         if level in num.starts and (num_id, level) not in counters.applied:
@@ -1879,10 +1932,11 @@ class _Lists:
             # Lists of one abstractNum share its count [shared-continue, return-after-restart,
             # plain-after-restart, level-override-shared].
             counters.values[level] = current + 1
-        elif level in num.starts:
-            # Restarted inside a list with a startOverride: its override again
-            # [override-restart-within].
-            counters.values[level] = num.starts[level]
+        elif counters.restart_from[level] is not None:
+            # Restarted by a paragraph of a list with a startOverride for this level: that
+            # override, whichever list counts it now [override-restart-within,
+            # restart-source-override, restart-source-unused].
+            counters.values[level] = counters.restart_from[level]
         else:
             # A level override's own w:start is not used [level-override-first,
             # level-override-start]; a level with no w:start starts at 0 [missing-start].

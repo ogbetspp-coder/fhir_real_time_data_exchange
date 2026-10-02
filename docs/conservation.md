@@ -153,7 +153,16 @@ write:
     difference.
   - 3,000 of them, with Chrome's answers, are held in the tests without a browser (R-33).
 - **Word.** `scripts/fuzz_docx.py` builds documents mixing style chains, toggles, lists and
-  notes.
+  notes. The first batch Word judged found rules the corpus never exercised. 8 of the first 11
+  documents differed: in bold and italic under document defaults, in the default character
+  style, and in list restarts shared between lists. Each was shrunk with Word as referee to a
+  minimal case and kept in `corpus/numbering-cases`:
+  - styles that differ from the defaults turn a toggle over;
+  - Word applies no default character style;
+  - a restarted level takes the restarting list's override;
+  - three restart settings Word draws in ways it does not document are refused.
+  The next 30 generated documents: 15 agreed, 12 were refused, 3 differed. After the fixes, the
+  3 agree or are refused.
   - Every one the reader reads must be certified, key marks included (R-35).
   - Word's own judgment of them (`word_oracle.py compare`) runs in batches on a Mac with Word,
     since Word takes up to a minute a document.

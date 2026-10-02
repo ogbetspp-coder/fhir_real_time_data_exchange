@@ -62,7 +62,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT
 
-CHECKER_VERSION = "conservation-check/1.3.0"
+CHECKER_VERSION = "conservation-check/1.4.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -203,7 +203,9 @@ class _Fonts:
 
     def chain(self, style_id: str | None, kind: str) -> list[ET.Element]:
         if style_id is None or style_id not in self.kind:
-            style_id = self.defaults.get(kind)
+            # No style named, or none there: the default one of the kind, except for text,
+            # which Word gives no default character style.
+            style_id = None if kind == "character" else self.defaults.get(kind)
         out: list[ET.Element] = []
         seen: set[str] = set()
         while style_id is not None and style_id in self.kind and style_id not in seen:
@@ -234,9 +236,9 @@ class _Fonts:
         """The marks of ``CHECKED_MARKS`` Word shows on the run, by Word's rules, worked out here.
 
         Toggles (bold, italic, capitals, small capitals, strike, double strike): the run's own
-        setting wins, on or off; else each kind of style (character, paragraph, table, each with
-        its ``basedOn`` chain) gives its nearest setting and the kinds cancel in pairs; the
-        document defaults then turn it on whatever the styles give. Superscript, subscript and
+        setting wins, on or off; else it starts as the document defaults set it, and each kind
+        of style (character, paragraph, table, each with its ``basedOn`` chain) whose nearest
+        setting differs from that turns it over. Superscript, subscript and
         underline: the nearest level that sets a value, the run first. Each rule is Word's answer
         to a case in ``corpus/numbering-cases``.
         """
@@ -253,12 +255,14 @@ class _Fonts:
             if direct is not None:
                 shown = direct
             else:
-                shown = False
+                default = self.doc_rpr is not None and bool(_on(self.doc_rpr.find(_w(name))))
+                shown = default
                 for chain in chains:
                     settings = (_on(rpr.find(_w(name))) for rpr in chain)
-                    shown ^= next((v for v in settings if v is not None), False)
-                if self.doc_rpr is not None and _on(self.doc_rpr.find(_w(name))):
-                    shown = True
+                    setting = next((v for v in settings if v is not None), None)
+                    # Each kind that differs from the document defaults turns it over.
+                    if setting is not None and setting != default:
+                        shown = not shown
             if shown:
                 kinds.add(kind)
         levels = [own, *(rpr for chain in chains for rpr in chain), self.doc_rpr]
