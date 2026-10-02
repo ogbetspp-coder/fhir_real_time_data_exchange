@@ -13,6 +13,7 @@ other than the document's does.
 from __future__ import annotations
 
 import copy
+import functools
 import hashlib
 import json
 import random
@@ -53,11 +54,24 @@ def _documents() -> list[Path]:
     )
 
 
-# What each corpus document reads as: its refusal's code, or "read".
-OUTCOMES: dict[Path, str] = {}
+def _locked() -> dict[Path, str]:
+    """Each corpus document's outcome as locked (scripts/lock.py): its refusal's code, or read."""
+    out: dict[Path, str] = {}
+    for record in sorted(CORPUS.glob("*/expected.json")):
+        for name, entry in json.loads(record.read_text("utf-8")).items():
+            out[record.parent / name] = entry.get("refusal", "read")
+    return out
 
 
-def _read(path: Path) -> tuple[DocxSource | EpiSource, dict[str, Any]] | None:
+LOCKED = _locked()
+# The documents locked as read. Each is read once, when a test first needs it, so a test that
+# needs one document does not wait for the corpus.
+READ = sorted(path for path, outcome in LOCKED.items() if outcome == "read")
+
+
+@functools.cache
+def _read(path: Path) -> tuple[DocxSource | EpiSource | None, dict[str, Any], str]:
+    """The source as the check reads it (None if refused), the result, and the outcome."""
     data = path.read_bytes()
     if path.suffix == ".docx":
         value = json.loads(output.read(data)[0])
@@ -65,34 +79,34 @@ def _read(path: Path) -> tuple[DocxSource | EpiSource, dict[str, Any]] | None:
     else:
         value = json.loads(epi_output.read(data)[0])
         source = None if "refusal" in value else EpiSource(data)
-    OUTCOMES[path] = value["refusal"]["code"] if "refusal" in value else "read"
-    return None if source is None else (source, value)
+    return source, value, value["refusal"]["code"] if "refusal" in value else "read"
 
 
-READ = [(p, r) for p in _documents() if (r := _read(p)) is not None]
+def _certified(path: Path) -> tuple[DocxSource | EpiSource, dict[str, Any]]:
+    """A document locked as read, read: its refusal now is a failure, never a skip."""
+    source, value, outcome = _read(path)
+    assert source is not None, f"{path.name} is locked as read but refused: {outcome}"
+    return source, value
 
 
 def test_every_corpus_document_is_read_or_refused_as_locked() -> None:
     # A check that refuses what it should certify is caught here: the documents certified are
-    # exactly those locked as read (scripts/lock.py), and each refusal is the one locked.
-    locked: dict[Path, str] = {}
-    for record in CORPUS.glob("*/expected.json"):
-        for name, entry in json.loads(record.read_text("utf-8")).items():
-            locked[record.parent / name] = entry.get("refusal", "read")
-    assert locked == OUTCOMES
+    # exactly those locked as read (scripts/lock.py), and each refusal is the one locked. The
+    # smallest first, and the first that differs fails the test, so a fault shows quickly.
+    documents = _documents()
+    assert set(documents) == set(LOCKED)
+    for path in sorted(documents, key=lambda p: (p.stat().st_size, p)):
+        assert _read(path)[2] == LOCKED[path], path.name
 
 
 def test_the_corpus_is_read_widely_enough_to_test_the_check() -> None:
-    kinds = {p.suffix for p, _ in READ}
-    assert kinds == {".docx", ".json"}
+    assert {p.suffix for p in READ} == {".docx", ".json"}
     assert len(READ) >= 180
 
 
-@pytest.mark.parametrize(("path", "read"), READ, ids=[p.name for p, _ in READ])
-def test_every_result_the_readers_make_is_certified(
-    path: Path, read: tuple[DocxSource | EpiSource, dict[str, Any]]
-) -> None:
-    source, value = read
+@pytest.mark.parametrize("path", READ, ids=[p.name for p in READ])
+def test_every_result_the_readers_make_is_certified(path: Path) -> None:
+    source, value = _certified(path)
     certificate = source.certify(value)
     if path.suffix == ".docx":
         source_count = sum(certificate["source"].values())
@@ -416,11 +430,9 @@ CHANGES: list[Change] = [
 ]
 
 
-@pytest.mark.parametrize(("path", "read"), READ, ids=[p.name for p, _ in READ])
-def test_every_change_to_a_result_is_refused(
-    path: Path, read: tuple[DocxSource | EpiSource, dict[str, Any]]
-) -> None:
-    source, value = read
+@pytest.mark.parametrize("path", READ, ids=[p.name for p in READ])
+def test_every_change_to_a_result_is_refused(path: Path) -> None:
+    source, value = _certified(path)
     rng = random.Random(path.name)
     tried = 0
     for change in CHANGES:
@@ -1438,8 +1450,8 @@ def test_the_key_marks_from_every_level_are_worked_out_alike() -> None:
 def test_the_checks_own_list_labels_and_note_marks_are_words() -> None:
     # Held to Word's recorded answers directly, not only to the reader's: for every corpus
     # document read, each label and note mark the check draws is the one Word drew.
-    read = {path: source for path, (source, _) in READ if isinstance(source, DocxSource)}
-    values = {path: value for path, (_, value) in READ}
+    read = {p: s for p in READ if p.suffix == ".docx" for s in [_certified(p)[0]]}
+    values = {p: _certified(p)[1] for p in read}
     checked = 0
     for record in sorted(CORPUS.glob("*/word.json")):
         answers = json.loads(record.read_text("utf-8"))

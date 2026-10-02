@@ -32,6 +32,7 @@ import copy
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -47,6 +48,8 @@ ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "src" / "label_docx" / "certify.py"
 RECORD = ROOT / "docs" / "checker-mutants.json"
 PROGRESS = ROOT / ".mutants-progress.json"
+# For each mutant, by function, code and kind, the test that last killed it: tried first.
+KILLERS = ROOT / ".mutants-killers.json"
 # Exit status of a run stopped by its budget, with mutants left to run.
 UNFINISHED = 3
 TESTS = [
@@ -413,25 +416,46 @@ def mutants() -> list[Mutant]:
     return out
 
 
-def _run(mutant: Mutant, package: Path) -> bool:
-    """Whether the tests kill ``mutant``: fail, error or hang."""
+def _pytest(tests: list[str], folder: str) -> subprocess.CompletedProcess[str] | None:
+    """Run ``tests`` on the package in ``folder``, stopping at the first failure; None: a hang."""
+    environment = {**os.environ, "PYTHONPATH": folder, "PYTHONDONTWRITEBYTECODE": "1"}
+    command = [sys.executable, "-m", "pytest", "-x", "-q", "-rf", "-p", "no:cacheprovider"]
+    try:
+        return subprocess.run(
+            [*command, *tests],
+            cwd=ROOT,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=300,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return None
+
+
+def _run(mutant: Mutant, package: Path, hint: str | None = None) -> tuple[bool, str | None]:
+    """Whether the tests kill ``mutant`` (fail, error or hang), and the test that failed.
+
+    ``hint``, the test that killed this mutant before, is run first, alone: if it fails, the
+    mutant is killed. Otherwise every test is run, as without a hint. So a hint only saves time:
+    a mutant survives only if every test passes.
+    """
     with tempfile.TemporaryDirectory() as folder:
         copied = Path(folder) / "label_docx"
         shutil.copytree(package, copied)
         (copied / "certify.py").write_text(mutant.source, "utf-8")
-        environment = {**os.environ, "PYTHONPATH": folder, "PYTHONDONTWRITEBYTECODE": "1"}
-        try:
-            done = subprocess.run(
-                [sys.executable, "-m", "pytest", "-x", "-q", "-p", "no:cacheprovider", *TESTS],
-                cwd=ROOT,
-                env=environment,
-                capture_output=True,
-                timeout=300,
-                check=False,
-            )
-        except subprocess.TimeoutExpired:
-            return True
-        return done.returncode != 0
+        if hint is not None:
+            done = _pytest([hint], folder)
+            # 1: a test failed. Anything else (passed, no such test now, a usage error) is not
+            # taken as a kill.
+            if done is None or done.returncode == 1:
+                return True, hint
+        done = _pytest(TESTS, folder)
+        if done is None:
+            return True, None
+        failed = re.search(r"^FAILED (\S+)", done.stdout, re.MULTILINE)
+        return done.returncode != 0, failed.group(1) if failed else None
 
 
 def fingerprint() -> str:
@@ -512,7 +536,7 @@ def main() -> int:
     key = fingerprint()
     # The tests must pass on the check as it is; else every fault would look caught.
     unaltered = Mutant(-1, 0, "none", TARGET.read_text("utf-8"))
-    if _run(unaltered, TARGET.parent):
+    if _run(unaltered, TARGET.parent)[0]:
         raise SystemExit("the tests fail on the check as it is: fix them before mutating it")
     every = mutants()
     results = _progress(key)
@@ -523,13 +547,22 @@ def main() -> int:
     package = TARGET.parent
     lock = threading.Lock()
 
+    try:
+        killers: dict[str, str] = json.loads(KILLERS.read_text("utf-8"))
+    except OSError, ValueError:
+        killers = {}
+
     def run(mutant: Mutant) -> None:
         if mutant.index in results or (deadline is not None and time.monotonic() > deadline):
             return
-        dead = _run(mutant, package)
+        name = "\0".join((mutant.function, lines[mutant.line - 1].strip(), mutant.kind))
+        dead, killer = _run(mutant, package, killers.get(name))
         with lock:
             results[mutant.index] = dead
             _keep(key, results)
+            if killer is not None:
+                killers[name] = killer
+                KILLERS.write_text(json.dumps(killers, sort_keys=True) + "\n", "utf-8")
             if len(results) % 50 == 0:
                 sys.stdout.write(f"  {len(results)} of {len(every)} run\n")
                 sys.stdout.flush()

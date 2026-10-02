@@ -193,6 +193,15 @@ write:
     Word showed no rule for which tables. So the reader refuses both once a row has ended. No
     label changed in any generated document. 26 of 580 earlier ones are refused in all, and 32
     of these 60. Real and template documents: no reading changed.
+
+  Word takes about half a minute a document, mostly to open and convert it rather than for its
+  size. So `--chapters 10` packs ten generated documents' worth into one, each chapter with its
+  own styles and lists. Each chapter is one the reader reads and the check certifies on its
+  own: a refused chapter would refuse the whole document and leave Word nothing to judge. Word
+  then judges about 25 times as many list items a minute, as exactly as before. Tables now have
+  up to four rows.
+  - 6 packed documents: all 6 agreed, 1,219 list items, in 4 minutes;
+  - 30 packed documents: all 30 agreed, 5,805 list items, in 16 minutes.
   - Every one the reader reads must be certified, key marks included (R-35).
   - Word's own judgment of them (`word_oracle.py compare`) runs in batches on a Mac with Word,
     since Word takes up to a minute a document.
@@ -264,8 +273,15 @@ document went unnoticed. Every corpus document must now be read or refused exact
 The rest needed tests of list settings no corpus document uses (a number after a space,
 legal numbering, Symbol bullets through a style, numbers past "z" or 3999). A few needed small
 changes to the check that left nothing to argue: dead code removed, and a placeholder mark
-dropped. A run now takes about 1.5 hours, so the script keeps each result as it comes and can
-resume (`--budget`). A run it resumes holds only results of the same code, tests and corpus.
+dropped.
+
+A run must not cost so much that it is put off. Every fault was once run against every test,
+about 70 minutes. Now each result is kept as it comes, so a run can resume (`--budget`). A
+resumed run holds only results of the same code, tests and corpus. The test that last killed a
+fault is also tried first, alone. A fault survives only if every test passes, so a hint can
+save time but never a fault. Each corpus document is now read when a test first needs it, not
+all of them before any test runs. A run now takes about 20 minutes. Runs with and without
+these changes gave the same verdict on every one of the 1,480 faults.
 
 The very first run, of an earlier version of the check, killed 629 of 766. The survivors showed what
 was missing:

@@ -1,6 +1,7 @@
 """Generate .docx documents at random, for Microsoft Word to judge the reader on (macOS, Word).
 
     uv run --frozen python scripts/fuzz_docx.py --documents 40 --seed 1 FOLDER
+    uv run --frozen python scripts/fuzz_docx.py --documents 6 --chapters 10 --seed 1 FOLDER
     uv run --frozen python scripts/word_oracle.py compare FOLDER/*.docx
 
 The numbering cases (``scripts/numbering_cases.py``) put one question each to Word; these mix
@@ -9,34 +10,50 @@ Word's answers and nothing else: paragraph and character styles in ``basedOn`` c
 style and the document defaults, each switching bold, italic, capitals and strike on or off;
 direct formatting over them; lists of one to three definitions with random formats, level
 texts, starts, restarts and overrides, shared between lists; and footnotes numbered by the
-section's format and start. ``word_oracle.py compare`` then holds the reader to Word on every
-document: its list labels, note marks, emphasis and print. A document the reader reads
-otherwise than Word is a fault in the reader, made again from its seed and number.
+section's format and start. Tables have one to four rows, as table rows change how Word
+counts. ``word_oracle.py compare`` then holds the reader to Word on every document: its list
+labels, note marks, emphasis and print. A document the reader reads otherwise than Word is a
+fault in the reader, made again from its seed and number.
+
+Word takes about half a minute a document, most of it for the document rather than its size,
+so ``--chapters N`` puts N generated documents' worth in one: each chapter with its own styles
+and lists, under shared document defaults and footnotes. Word judges the whole document as
+exactly as a small one.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import random
 import sys
 from pathlib import Path
 
+from label_docx import output
 from numbering_cases import Case, abstract, lvl, notes, num, package, para, words
 
 TOGGLES = ("b", "i", "caps", "smallCaps", "strike", "dstrike")
 FORMATS = ("decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman", "decimalZero")
 NOTE_FORMATS = ("decimal", "lowerRoman", "upperRoman", "lowerLetter", "upperLetter", "chicago")
+# Chapters drawn, at most, for one the reader reads.
+_TRIES = 200
 WORDS = ("Store", "below", "25", "C", "Take", "one", "tablet", "daily", "with", "water")
 
 
 class Document:
     """One generated document."""
 
-    def __init__(self, rng: random.Random) -> None:
+    def __init__(
+        self, rng: random.Random, chapter: int = 0, notes: list[int] | None = None
+    ) -> None:
         self.rng = rng
-        self.paragraph_styles = [f"P{i}" for i in range(rng.randint(1, 4))]
-        self.character_styles = [f"C{i}" for i in range(rng.randint(1, 3))]
-        self.notes = 0
+        # A chapter's styles, table style and list ids are its own (chapter 0's as before).
+        self.prefix = f"K{chapter}" if chapter else ""
+        self.base = 10 * chapter
+        self.paragraph_styles = [f"{self.prefix}P{i}" for i in range(rng.randint(1, 4))]
+        self.character_styles = [f"{self.prefix}C{i}" for i in range(rng.randint(1, 3))]
+        # The notes so far, in every chapter: one count, as one document has.
+        self.counter = [0] if notes is None else notes
 
     def toggles(self, capitals: bool = True) -> str:
         """A random setting, on or off, of some of the toggles.
@@ -61,11 +78,15 @@ class Document:
             out += f'<w:u w:val="{self.rng.choice(["single", "double", "none"])}"/>'
         return out
 
-    def styles(self) -> str:
-        """Document defaults, paragraph and character styles in chains, and a table style."""
-        rng = self.rng
+    def defaults(self) -> str:
+        """The document defaults."""
         defaults = f"<w:rPrDefault><w:rPr>{self.toggles(capitals=False)}</w:rPr></w:rPrDefault>"
-        out = f"<w:docDefaults>{defaults}</w:docDefaults>"
+        return f"<w:docDefaults>{defaults}</w:docDefaults>"
+
+    def styles(self) -> str:
+        """Paragraph and character styles in chains, and a table style."""
+        rng = self.rng
+        out = ""
         kinds = (("paragraph", self.paragraph_styles), ("character", self.character_styles))
         for kind, names in kinds:
             for index, name in enumerate(names):
@@ -78,14 +99,15 @@ class Document:
                     f'<w:name w:val="{name}"/>{based}'
                     f"<w:rPr>{self.toggles(capitals=kind == 'character')}</w:rPr></w:style>"
                 )
+        name = f"{self.prefix}T"
         out += (
-            '<w:style w:type="table" w:styleId="T"><w:name w:val="T"/>'
+            f'<w:style w:type="table" w:styleId="{name}"><w:name w:val="{name}"/>'
             f"<w:rPr>{self.toggles(capitals=False)}</w:rPr></w:style>"
         )
         return out
 
-    def numbering(self) -> tuple[str, list[int]]:
-        """One to three list definitions, and the lists naming them."""
+    def numbering(self) -> tuple[str, str, list[int]]:
+        """One to three list definitions, the lists naming them, and their ids."""
         rng = self.rng
         abstracts = ""
         count = rng.randint(1, 3)
@@ -105,7 +127,7 @@ class Document:
                     [None, 0, 1, 1, 1, 2, 5] if fmt.startswith("decimal") else [1, 1, 2, 5]
                 )
                 levels.append(lvl(level, fmt, rng.choice(texts), extra, start))
-            abstracts += abstract(key, *levels)
+            abstracts += abstract(self.base + key, *levels)
         nums = ""
         ids = []
         for key in range(1, rng.randint(2, 4) + 1):
@@ -117,9 +139,9 @@ class Document:
                     f'<w:lvlOverride w:ilvl="{level}"><w:startOverride w:val="{value}"/>'
                     "</w:lvlOverride>"
                 )
-            nums += num(key, rng.randint(1, count), override)
-            ids.append(key)
-        return abstracts + nums, ids
+            nums += num(self.base + key, self.base + rng.randint(1, count), override)
+            ids.append(self.base + key)
+        return abstracts, nums, ids
 
     def run(self) -> str:
         """A run: a character style and direct toggles, maybe a footnote reference."""
@@ -130,8 +152,9 @@ class Document:
         properties = style + self.toggles()
         text = " ".join(rng.choice(WORDS) for _ in range(rng.randint(1, 3)))
         if rng.random() < 0.08:
-            self.notes += 1
-            return words(text) + f'<w:r><w:footnoteReference w:id="{self.notes}"/></w:r>'
+            self.counter[0] += 1
+            reference = f'<w:r><w:footnoteReference w:id="{self.counter[0]}"/></w:r>'
+            return words(text) + reference
         prefix = f"<w:rPr>{properties}</w:rPr>" if properties else ""
         return f'<w:r>{prefix}<w:t xml:space="preserve">{text} </w:t></w:r>'
 
@@ -164,38 +187,74 @@ class Document:
         return para(*(self.run() for _ in range(rng.randint(1, 3))), props=props)
 
     def body(self, numbers: list[int]) -> str:
-        """Paragraphs, some in one-row tables in the table style."""
+        """Paragraphs, some in tables of one to four rows in the table style."""
         rng = self.rng
         out = ""
         for _ in range(rng.randint(12, 30)):
-            if rng.random() < 0.1:
+            if rng.random() < 0.15:
                 count = rng.randint(1, 2)
-                cells = "".join(f"<w:tc>{self.paragraph(numbers)}</w:tc>" for _ in range(count))
-                table = '<w:tblPr><w:tblStyle w:val="T"/></w:tblPr>'
-                out += f"<w:tbl>{table}<w:tr>{cells}</w:tr></w:tbl>"
+                rows = ""
+                for _ in range(rng.randint(1, 4)):
+                    cells = "".join(
+                        "<w:tc>"
+                        + "".join(self.paragraph(numbers) for _ in range(rng.randint(1, 2)))
+                        + "</w:tc>"
+                        for _ in range(count)
+                    )
+                    rows += f"<w:tr>{cells}</w:tr>"
+                table = f'<w:tblPr><w:tblStyle w:val="{self.prefix}T"/></w:tblPr>'
+                out += f"<w:tbl>{table}{rows}</w:tbl>"
             else:
                 out += self.paragraph(numbers)
         return out
 
-    def case(self) -> Case:
-        """The document as a numbering case, for ``package``."""
-        numbering, numbers = self.numbering()
-        styles = self.styles()
-        body = self.body(numbers)
-        fmt = self.rng.choice(NOTE_FORMATS)
-        start = self.rng.randint(1, 4)
-        final = (
-            f'<w:sectPr><w:footnotePr><w:numFmt w:val="{fmt}"/><w:numStart w:val="{start}"/>'
-            "</w:footnotePr></w:sectPr>"
-        )
-        footnotes = notes("footnote", *range(1, self.notes + 1)) if self.notes else ""
-        return Case("generated", numbering, body, styles, footnotes=footnotes, final=final)
+
+def _certified(case: Case) -> bool:
+    """Whether the reader reads ``case`` and the check certifies it."""
+    return "refusal" not in json.loads(output.read(package(case))[0])
 
 
-def documents(seed: int, count: int) -> list[bytes]:
-    """``count`` documents, the same ones for the same seed."""
+def generated(rng: random.Random, chapters: int = 1) -> Case:
+    """One document of ``chapters`` chapters, as a numbering case for ``package``.
+
+    With more than one chapter, each is one the reader reads and the check certifies on its
+    own: one refused would refuse the whole document, and Word would have nothing to judge.
+    """
+    counter = [0]
+    styles = Document(rng, 0, counter).defaults()
+    fmt = rng.choice(NOTE_FORMATS)
+    start = rng.randint(1, 4)
+    final = (
+        f'<w:sectPr><w:footnotePr><w:numFmt w:val="{fmt}"/><w:numStart w:val="{start}"/>'
+        "</w:footnotePr></w:sectPr>"
+    )
+    abstracts = nums = body = ""
+    for chapter in range(chapters):
+        for _ in range(_TRIES):
+            before = counter[0]
+            part = Document(rng, chapter, counter)
+            definitions, lists, numbers = part.numbering()
+            own_styles = part.styles()
+            # An empty paragraph between chapters, so no table runs on into the next.
+            own_body = ("<w:p/>" if chapter else "") + part.body(numbers)
+            own_notes = notes("footnote", *range(before + 1, counter[0] + 1))
+            alone = Case("chapter", definitions + lists, own_body, styles + own_styles, own_notes)
+            if chapters == 1 or _certified(alone._replace(final=final)):
+                break
+            counter[0] = before
+        else:
+            raise SystemExit(f"no chapter the reader reads in {_TRIES} tries")
+        abstracts, nums = abstracts + definitions, nums + lists
+        styles += own_styles
+        body += own_body
+    footnotes = notes("footnote", *range(1, counter[0] + 1)) if counter[0] else ""
+    return Case("generated", abstracts + nums, body, styles, footnotes=footnotes, final=final)
+
+
+def documents(seed: int, count: int, chapters: int = 1) -> list[bytes]:
+    """``count`` documents of ``chapters`` chapters, the same ones for the same seed."""
     rng = random.Random(seed)
-    return [package(Document(rng).case()) for _ in range(count)]
+    return [package(generated(rng, chapters)) for _ in range(count)]
 
 
 def main() -> int:
@@ -204,9 +263,10 @@ def main() -> int:
     parser.add_argument("folder", type=Path)
     parser.add_argument("--documents", type=int, default=20)
     parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--chapters", type=int, default=1, help="generated documents in each")
     args = parser.parse_args()
     args.folder.mkdir(parents=True, exist_ok=True)
-    for index, data in enumerate(documents(args.seed, args.documents)):
+    for index, data in enumerate(documents(args.seed, args.documents, args.chapters)):
         (args.folder / f"generated-{args.seed}-{index:03d}.docx").write_bytes(data)
     sys.stdout.write(f"wrote {args.documents} documents to {args.folder}\n")
     return 0
