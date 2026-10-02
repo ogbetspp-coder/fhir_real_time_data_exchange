@@ -80,7 +80,7 @@ class Document:
                 )
         out += (
             '<w:style w:type="table" w:styleId="T"><w:name w:val="T"/>'
-            f"<w:rPr>{self.toggles()}</w:rPr></w:style>"
+            f"<w:rPr>{self.toggles(capitals=False)}</w:rPr></w:style>"
         )
         return out
 
@@ -98,7 +98,8 @@ class Document:
                     texts.append(".".join(f"%{n + 1}" for n in range(level + 1)) + ".")
                 extra = ""
                 if level and rng.random() < 0.2:
-                    extra = f'<w:lvlRestart w:val="{rng.randint(0, level)}"/>'
+                    # What Word writes: never (0), or after a level above the one directly above.
+                    extra = f'<w:lvlRestart w:val="{rng.randint(0, level - 1)}"/>'
                 # 0 only in decimal: in letters or roman the reader refuses it.
                 start = rng.choice(
                     [None, 0, 1, 1, 1, 2, 5] if fmt.startswith("decimal") else [1, 1, 2, 5]
@@ -134,6 +135,21 @@ class Document:
         prefix = f"<w:rPr>{properties}</w:rPr>" if properties else ""
         return f'<w:r>{prefix}<w:t xml:space="preserve">{text} </w:t></w:r>'
 
+    def level(self) -> int:
+        """The next list level: mostly one step from the last, as authors write lists."""
+        last = getattr(self, "_last", 0)
+        roll = self.rng.random()
+        if roll < 0.1:
+            nxt = self.rng.randint(0, 2)
+        elif roll < 0.45:
+            nxt = min(last + 1, 2)
+        elif roll < 0.75:
+            nxt = last
+        else:
+            nxt = max(last - 1, 0)
+        self._last = nxt
+        return nxt
+
     def paragraph(self, numbers: list[int]) -> str:
         """A paragraph, maybe styled, maybe in a list."""
         rng = self.rng
@@ -142,7 +158,7 @@ class Document:
             props += f'<w:pStyle w:val="{rng.choice(self.paragraph_styles)}"/>'
         if rng.random() < 0.6:
             props += (
-                f'<w:numPr><w:ilvl w:val="{rng.randint(0, 2)}"/>'
+                f'<w:numPr><w:ilvl w:val="{self.level()}"/>'
                 f'<w:numId w:val="{rng.choice(numbers)}"/></w:numPr>'
             )
         return para(*(self.run() for _ in range(rng.randint(1, 3))), props=props)
