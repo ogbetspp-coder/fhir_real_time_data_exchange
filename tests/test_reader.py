@@ -702,12 +702,12 @@ def test_a_theme_font_the_theme_does_not_define_is_refused() -> None:
 
 
 def test_a_font_the_font_table_declares_symbol_encoded_is_refused() -> None:
-    fonts = '<w:font w:name="Monotype Sorts"><w:charset w:val="02"/></w:font>'
-    run = r("<w:t>n</w:t>", '<w:rFonts w:ascii="Monotype Sorts" w:hAnsi="Monotype Sorts"/>')
+    fonts = '<w:font w:name="Acme Pi"><w:charset w:val="02"/></w:font>'
+    run = r("<w:t>n</w:t>", '<w:rFonts w:ascii="Acme Pi" w:hAnsi="Acme Pi"/>')
     with pytest.raises(DocxRefusedError) as caught:
         read_docx(docx(p(run), fonts=fonts))
     assert caught.value.code == "symbol-font"
-    plain = '<w:font w:name="Monotype Sorts"><w:charset w:val="00"/></w:font>'
+    plain = '<w:font w:name="Acme Pi"><w:charset w:val="00"/></w:font>'
     assert read_docx(docx(p(run), fonts=plain))[0].text == "n"
 
 
@@ -1064,19 +1064,22 @@ def test_a_style_defined_twice_is_refused() -> None:
     assert refusal(p(r("<w:t>x</w:t>"), '<w:pStyle w:val="S"/>'), styles) == "invalid-package"
 
 
-def test_numbering_from_the_paragraph_defaults_or_a_table_style_is_reported() -> None:
+def test_numbering_from_the_paragraph_defaults_is_read_and_from_a_table_style_refused() -> None:
+    # Word draws "1." for a list set in the paragraph defaults.
     numbered = '<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="4"/></w:numPr></w:pPr>'
     defaults = f"<w:docDefaults><w:pPrDefault>{numbered}</w:pPrDefault></w:docDefaults>"
     paragraph = read_docx(docx(p(r("<w:t>x</w:t>")), defaults, numbering=NUMBERING))[0]
     assert paragraph.numbering == Numbering(4, 0, "1.", "tab")
+    # A table style's list is not on record, nor one that covers the defaults' list.
     table_style = f'<w:style w:type="table" w:styleId="T">{numbered}</w:style>'
     table = (
         '<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr><w:tr><w:tc>'
         + p(r("<w:t>x</w:t>"))
         + "</w:tc></w:tr></w:tbl>"
     )
-    labelled = read_docx(docx(table, table_style, numbering=NUMBERING))[0]
-    assert labelled.numbering == Numbering(4, 0, "1.", "tab")
+    assert refusal(table, table_style, NUMBERING) == "unsupported-numbering"
+    level = table_style.replace('<w:numId w:val="4"/>', "").replace('"0"', '"1"')
+    assert refusal(table, defaults + level, NUMBERING) == "unsupported-numbering"
 
 
 def test_fields_in_a_document_that_updates_them_on_open_are_refused() -> None:
@@ -1977,3 +1980,278 @@ def test_document_defaults_turn_a_toggle_on_whatever_the_styles_give() -> None:
     assert "bold" in {m.kind for m in read_docx(docx(cancelled, styles))[0].marks}
     off = p(r("<w:t>x</w:t>", '<w:b w:val="0"/>'))
     assert "bold" not in {m.kind for m in read_docx(docx(off, styles))[0].marks}
+
+
+# --- lists, styles and fonts held to Word or refused (docx-reader audit) ------------------------
+
+MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+
+
+def _plus(data: bytes, name: str, content: str, kind: str | None = None) -> bytes:
+    """``data`` with part ``name`` added or replaced, and related from the document as ``kind``."""
+    out = io.BytesIO()
+    rels = "word/_rels/document.xml.rels"
+    with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(out, "w") as target:
+        for info in source.infolist():
+            if info.filename == rels and kind is not None:
+                extra = RELATIONSHIP.format(kind=kind, target=name.removeprefix("word/"))
+                text = source.read(info).decode().replace("</Relationships>", extra + "</")
+                target.writestr(info, text + "Relationships>")
+            elif info.filename != name:
+                target.writestr(info, source.read(info))
+        target.writestr(name, content)
+    return out.getvalue()
+
+
+def _wrapped(inner: str) -> str:
+    """``inner`` in alternate content, the same in both branches."""
+    return (
+        f'<mc:AlternateContent xmlns:mc="{MC}"><mc:Choice Requires="w14">{inner}</mc:Choice>'
+        f"<mc:Fallback>{inner}</mc:Fallback></mc:AlternateContent>"
+    )
+
+
+_STYLED_X = p(r("<w:t>a</w:t>"), '<w:pStyle w:val="S"/>')
+
+
+@pytest.mark.parametrize(
+    ("body", "styles", "numbering"),
+    [
+        # A style's vanish, Symbol font or list, wrapped: Word applies a branch, a reader of the
+        # plain form applies neither.
+        (
+            _STYLED_X,
+            f'<w:style w:styleId="S"><w:rPr>{_wrapped("<w:vanish/>")}</w:rPr></w:style>',
+            None,
+        ),
+        (
+            _STYLED_X,
+            '<w:style w:styleId="S"><w:rPr>'
+            + _wrapped('<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/>')
+            + "</w:rPr></w:style>",
+            None,
+        ),
+        (
+            _STYLED_X,
+            '<w:style w:styleId="S"><w:pPr>'
+            + _wrapped('<w:numPr><w:numId w:val="1"/></w:numPr>')
+            + "</w:pPr></w:style>",
+            abstract(1, lvl(0)) + num(1, 1),
+        ),
+        (
+            li(1),
+            None,
+            abstract(1, lvl(0)) + num(1, 1, _wrapped(override(0, '<w:startOverride w:val="5"/>'))),
+        ),
+        # In a list level, but not one of its own children.
+        (
+            li(1),
+            None,
+            abstract(1, lvl(0, extra=f"<w:rPr>{_wrapped('<w:caps/>')}</w:rPr>")) + num(1, 1),
+        ),
+    ],
+    ids=["style-vanish", "style-symbol", "style-list", "start-override", "level-properties"],
+)
+def test_alternate_content_in_styles_or_lists_is_refused(
+    body: str, styles: str | None, numbering: str | None
+) -> None:
+    assert refusal(body, styles, numbering) == "unsupported-element"
+
+
+@pytest.mark.parametrize(
+    ("name", "kind", "content"),
+    [
+        (
+            "word/settings.xml",
+            "settings",
+            f'<w:settings xmlns:w="{W}">{_wrapped("<w:updateFields/>")}</w:settings>',
+        ),
+        (
+            "word/fontTable.xml",
+            "fontTable",
+            f'<w:fonts xmlns:w="{W}">{_wrapped("<w:font w:name='x'/>")}</w:fonts>',
+        ),
+        (
+            "word/theme/theme1.xml",
+            "theme",
+            f'<a:theme xmlns:a="{A}">{_wrapped("<a:themeElements/>")}</a:theme>',
+        ),
+    ],
+    ids=["settings", "font-table", "theme"],
+)
+def test_alternate_content_in_settings_fonts_or_theme_is_refused(
+    name: str, kind: str, content: str
+) -> None:
+    with pytest.raises(DocxRefusedError) as caught:
+        read_docx(_plus(docx(p(r("<w:t>a</w:t>"))), name, content, kind))
+    assert caught.value.code == "unsupported-element"
+
+
+@pytest.mark.parametrize("attribute", ["ProcessContent", "MustUnderstand"])
+def test_markup_compatibility_processing_is_refused(attribute: str) -> None:
+    body = f'<w:p mc:{attribute}="w"><w:r><w:t>a</w:t></w:r></w:p>'
+    assert refusal(body) == "unsupported-element"
+    styles = f'<w:style w:styleId="S" mc:{attribute}="w"/>'.replace(
+        "<w:style ", f'<w:style xmlns:mc="{MC}" '
+    )
+    assert refusal(p(r("<w:t>a</w:t>")), styles) == "unsupported-element"
+
+
+HIDDEN_CHARACTER = (
+    '<w:style w:type="character" w:styleId="Hid"><w:rPr><w:vanish/></w:rPr></w:style>'
+)
+
+
+@pytest.mark.parametrize(
+    ("body", "numbering"),
+    [
+        # Hidden by the mark's character style; and hidden, under a level that says visible.
+        (li(1, props='<w:rPr><w:rStyle w:val="Hid"/></w:rPr>'), SECTIONS),
+        (
+            li(1, props="<w:rPr><w:vanish/></w:rPr>"),
+            abstract(1, lvl(0, extra='<w:rPr><w:vanish w:val="0"/></w:rPr>')) + num(1, 1),
+        ),
+    ],
+    ids=["mark-character-style", "level-visible"],
+)
+def test_a_numbered_paragraph_whose_mark_is_hidden_is_refused(body: str, numbering: str) -> None:
+    assert refusal(body, HIDDEN_CHARACTER, numbering) == "ambiguous-numbering"
+
+
+def test_a_negative_lvl_restart_is_refused() -> None:
+    # corpus/numbering-cases restart-never-shown-deeper with -1 for 0.
+    shown_deeper = (
+        abstract(
+            1,
+            lvl(0, "decimalZero", "%1)", start=None),
+            lvl(1, "upperLetter", "%2)", '<w:lvlRestart w:val="-1"/>'),
+            lvl(2, "upperLetter", "%1.%2.%3."),
+        )
+        + num(1, 1, override(2, '<w:startOverride w:val="2"/>'))
+        + num(2, 1, override(0, '<w:startOverride w:val="2"/>'))
+    )
+    assert refusal(li(1, 1) + li(2) + li(2, 2), numbering=shown_deeper) == "unsupported-numbering"
+    # List 1's level 1 never restarts by -1; list 2 draws level 1 in a look of its own.
+    across = (
+        abstract(1, lvl(0), lvl(1, text="%2", extra='<w:lvlRestart w:val="-1"/>'))
+        + num(1, 1)
+        + num(2, 1, override(1, lvl(1, text="%2")))
+    )
+    assert refusal(li(2, 1) + li(1) + li(2, 1), numbering=across) == "unsupported-numbering"
+
+
+@pytest.mark.parametrize("name", ["symbol", "SYMBOL", "SymbolMT", "Symbol MT", "Sym bol"])
+def test_the_symbol_font_by_another_spelling_is_refused(name: str) -> None:
+    run = r("<w:t>a</w:t>", f'<w:rFonts w:ascii="{name}" w:hAnsi="{name}"/>')
+    assert refusal(p(run)) == "symbol-font"
+    assert refusal(p(r(f'<w:sym w:font="{name}" w:char="F061"/>'))) == "unmapped-symbol"
+
+
+MARK_STYLES = (
+    '<w:style w:type="character" w:styleId="Sym"><w:rPr>'
+    '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr></w:style>'
+    '<w:style w:type="character" w:styleId="Caps"><w:rPr><w:caps/></w:rPr></w:style>'
+)
+
+
+def test_the_paragraph_marks_character_style_draws_the_label() -> None:
+    # Word: the mark's character style Sym draws the label in Symbol; Caps in capitals.
+    letters = abstract(1, lvl(0, "lowerLetter", "%1)")) + num(1, 1)
+    symbol = li(1, props='<w:rPr><w:rStyle w:val="Sym"/></w:rPr>')
+    assert labels(symbol, letters, MARK_STYLES) == ["\u03b1)"]
+    caps = li(1, props='<w:rPr><w:rStyle w:val="Caps"/></w:rPr>')
+    assert refusal(caps, MARK_STYLES, letters) == "unsupported-numbering"
+
+
+def test_legal_numbering_keeps_a_decimal_zero_level() -> None:
+    # Word: "1.01" for a decimalZero level under isLgl.
+    numbering = abstract(
+        1, lvl(0, text="%1."), lvl(1, "decimalZero", "%1.%2", extra="<w:isLgl/>")
+    ) + num(1, 1)
+    assert labels(li(1) + li(1, 1), numbering) == ["1.", "1.01"]
+
+
+def test_a_based_on_naming_a_style_of_another_kind() -> None:
+    # Word ignores a paragraph style's basedOn that names a character style: plain "a".
+    character = (
+        '<w:style w:type="character" w:styleId="C"><w:rPr><w:b/>'
+        '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr></w:style>'
+    )
+    styles = (
+        character + '<w:style w:type="paragraph" w:styleId="S"><w:basedOn w:val="C"/></w:style>'
+    )
+    (paragraph,) = read_docx(docx(_STYLED_X, styles))
+    assert (paragraph.text, paragraph.marks) == ("a", ())
+    # Any other kind of style under another: what Word does is not on record.
+    numbering_style = (
+        '<w:style w:type="numbering" w:styleId="N"><w:pPr><w:numPr><w:numId w:val="1"/>'
+        "</w:numPr></w:pPr></w:style>"
+    )
+    based = (
+        numbering_style
+        + '<w:style w:type="paragraph" w:styleId="S"><w:basedOn w:val="N"/></w:style>'
+    )
+    assert refusal(_STYLED_X, based, abstract(1, lvl(0)) + num(1, 1)) == "unsupported-element"
+    bold = '<w:style w:type="paragraph" w:styleId="Q"><w:rPr><w:b/></w:rPr></w:style>'
+    run = p(r("<w:t>a</w:t>", '<w:rStyle w:val="D"/>'))
+    under = bold + '<w:style w:type="character" w:styleId="D"><w:basedOn w:val="Q"/></w:style>'
+    assert refusal(run, under) == "unsupported-element"
+
+
+def test_a_list_level_text_past_the_bound_is_refused() -> None:
+    assert labels(li(1), abstract(1, lvl(0, text="x" * 255)) + num(1, 1)) == ["x" * 255]
+    assert refusal(li(1), numbering=abstract(1, lvl(0, text="x" * 256)) + num(1, 1)) == (
+        "unsupported-numbering"
+    )
+
+
+@pytest.mark.parametrize("start", [7, 9])
+def test_note_symbols_past_those_word_drew_are_refused(start: int) -> None:
+    rules = f'<w:numFmt w:val="chicago"/><w:numStart w:val="{start}"/>'
+    body = p(ref(1)) + f"<w:sectPr><w:footnotePr>{rules}</w:footnotePr></w:sectPr>"
+    with pytest.raises(DocxRefusedError) as caught:
+        read(body, fnote(1))
+    assert caught.value.code == "unsupported-numbering"
+    six = rules.replace(f'"{start}"', '"6"')
+    body = p(ref(1)) + f"<w:sectPr><w:footnotePr>{six}</w:footnotePr></w:sectPr>"
+    assert read(body, fnote(1)).footnotes[0].mark == "††"
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/x/numbering",
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/numbering",
+    ],
+)
+def test_a_relationship_of_a_type_word_does_not_write_is_refused(kind: str) -> None:
+    data = docx(li(1), numbering=abstract(1, lvl(0)) + num(1, 1))
+    with zipfile.ZipFile(io.BytesIO(data)) as package:
+        rels = package.read("word/_rels/document.xml.rels").decode()
+    standard = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering"
+    changed = _plus(data, "word/_rels/document.xml.rels", rels.replace(standard, kind))
+    with pytest.raises(DocxRefusedError) as caught:
+        read_docx(changed)
+    assert caught.value.code == "invalid-package"
+
+
+@pytest.mark.parametrize(
+    ("fonts", "name"),
+    [
+        # A font Word replaces by a symbol font when it is missing.
+        ('<w:font w:name="Foo"><w:altName w:val="Symbol"/></w:font>', "Foo"),
+        ('<w:font w:name="Foo"><w:altName w:val="Wingdings"/></w:font>', "Foo"),
+        # A font the document embeds, whose glyphs may be any.
+        ('<w:font w:name="Foo"><w:embedRegular r:id="x" xmlns:r="urn:r"/></w:font>', "Foo"),
+        ('<w:font w:name="Symbol"><w:embedRegular r:id="x" xmlns:r="urn:r"/></w:font>', "Symbol"),
+        # Symbol-encoded by its code pages, or by name with no font table entry.
+        ('<w:font w:name="Foo"><w:sig w:csb0="80000001"/></w:font>', "Foo"),
+        ("", "Monotype Sorts"),
+        ("", "Bookshelf Symbol 7"),
+    ],
+)
+def test_a_font_word_may_draw_as_symbols_is_refused(fonts: str, name: str) -> None:
+    run = p(r("<w:t>a</w:t>", f'<w:rFonts w:ascii="{name}" w:hAnsi="{name}"/>'))
+    with pytest.raises(DocxRefusedError) as caught:
+        read_docx(docx(run, fonts=fonts))
+    assert caught.value.code == "symbol-font"

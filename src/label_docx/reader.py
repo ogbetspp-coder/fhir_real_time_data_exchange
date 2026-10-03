@@ -33,10 +33,10 @@ What a paragraph carries:
   ``_Properties.shown``). Other appearance (other colours, font size, borders) is not reported.
 - ``mark_hidden``: the paragraph mark is hidden (``vanish`` or ``specVanish``, directly or
   through the paragraph's styles), so Word shows this paragraph run on into the next one.
-- ``numbering``: the list the paragraph belongs to, directly or through its style, and the list
-  label Word draws before it (``Numbering.text``, with ``suffix`` naming what separates it from
-  the paragraph). The label is computed, not stored, so it is never put into ``text``; see
-  "List labels" below.
+- ``numbering``: the list the paragraph belongs to, directly, through its style or the paragraph
+  defaults (Word draws a list set there), and the list label Word draws before it
+  (``Numbering.text``, with ``suffix`` naming what separates it from the paragraph). The label is
+  computed, not stored, so it is never put into ``text``; see "List labels" below.
 - ``table``: ``(table, row, cell)`` counted from zero in document order, else ``None``. A nested
   table's paragraphs carry the outermost cell; cells are counted as ``<w:tc>`` elements, not
   grid columns.
@@ -46,27 +46,30 @@ What a paragraph carries:
   stands in ``text``, which note it refers to, and the mark Word draws there. Like a list label,
   the mark is computed and never put into ``text``; see "Notes" below.
 
-Styles. Run properties are looked up on the run, then its character style, its paragraph
-style, its table style (inside a table only) and the document defaults, each style with its
-``basedOn`` chain. An absent or unknown style id falls back to the document's default style of
-that kind (the last one marked default), as Word does; a reference to a style of another kind
-is refused. Paragraph shading and right-to-left are looked up the same way through the
-paragraph properties. The reader does not apply a table style's conditional formatting
+Styles. Run properties are looked up on the run, then its character style, its paragraph style, its
+table style (inside a table only) and the document defaults, each style with its ``basedOn`` chain.
+An absent or unknown style id falls back to the document's default style of that kind (the last one
+marked default), as Word does; a reference to a style of another kind is refused. A paragraph style
+based on a character style takes nothing from it, as Word draws it; any other ``basedOn`` naming a
+style of another kind is refused. Paragraph shading and right-to-left are looked up the same way
+through the paragraph properties. The reader does not apply a table style's conditional formatting
 (``tblStylePr`` for the first row, banded rows and so on), so it refuses a table whose style's
 conditional formatting could change what it produces, and reads one whose conditional formatting
 sets only what it cannot change: properties the reader does not report (bold, italic, spacing,
-borders, cell shading) and fonts, sizes and colours that are ordinary text. Under such
-formatting, Symbol text is refused, since a conditional font could replace the Symbol font.
+borders, cell shading) and fonts, sizes and colours that are ordinary text. Under such formatting,
+Symbol text is refused, since a conditional font could replace the Symbol font.
 
-Symbol fonts. A run whose effective ``ascii`` and ``hAnsi`` fonts (set directly, by a style, by
-the document defaults or through the theme) are both Symbol, with no complex-script or
-right-to-left property and no font hint other than ``default`` (which sends ambiguous characters
+Symbol fonts. A run whose effective ``ascii`` and ``hAnsi`` fonts (set directly, by a style, by the
+document defaults or through the theme) are both Symbol, by that exact name, with no complex-script
+or right-to-left property and no font hint other than ``default`` (which sends ambiguous characters
 to the ``hAnsi`` font, Symbol here), has every character mapped through ``SYMBOL_FONT``; a
 character the table does not hold is refused. ``<w:sym>`` in the Symbol font is mapped the same
 way. Any other run with Symbol in one of its four font slots is refused, because Word picks the
 font per character and the reader cannot be sure which characters it draws in Symbol. A dingbat
-font (Wingdings, Webdings, Zapf Dingbats, Marlett, MT Extra), or any font the document's font
-table declares symbol-encoded (charset 02), is refused.
+font (Wingdings, Webdings, Zapf Dingbats, Marlett, MT Extra, Monotype Sorts), another spelling of
+Symbol ("SymbolMT", "symbol", "Bookshelf Symbol 7": Word's answer is not on record), or any font
+the document's font table declares symbol-encoded (charset 02, or the symbol code page in
+``csb0``), embeds, or replaces when missing by a symbol or dingbat font (``altName``), is refused.
 
 Fields keep their stored result and drop their instruction, however deeply nested, so ``DOCPROPERTY
 ... MERGEFORMAT`` never reaches the text. Fields whose stored result is what Word shows and prints
@@ -103,30 +106,31 @@ in ``corpus/numbering-cases`` (``word.json``; ``tests/test_word_oracle.py``). A 
 which must name the style back (``styleLink``). Counters belong to the ``abstractNum`` the
 ``w:num`` names: every list naming it shares them, so a second list continues the first. A
 paragraph at level ``L`` restarts every deeper level (``lvlRestart`` 0 never restarts it;
-``lvlRestart`` ``n`` restarts it only after a level up to ``n - 1``), counts every higher level
-not yet counted as that level's start, and counts its own level: its list's ``startOverride``
-the first time that list reaches the level, else one more than the shared count, else (after a
-restart) the list's ``startOverride`` or the ``abstractNum`` level's ``w:start``, 0 when there is
-none. ``lvlText`` is copied, with ``%1`` to ``%9`` replaced by the counter of that level in that
-level's format (all decimal under ``isLgl``): decimal, decimalZero, upper and lower roman (1 to
-3999), upper and lower letter (a to z, then aa, bb...), or none; a bullet level's text is its
-bullet. The label is drawn in the level's run properties over the paragraph mark's, so its fonts
-are placed as a run's are: a Symbol bullet (U+F0B7) is mapped to "•", a Wingdings bullet through
-``WINGDINGS_BULLETS`` (U+F0A7 to "▪"), and a bullet in any other dingbat font is refused.
-``suffix`` is ``tab``, ``space`` or ``nothing`` (``w:suff``), or ``legacy`` for a Word 6 level,
-where the gap is layout and not a character.
+``lvlRestart`` ``n`` restarts it only after a level up to ``n - 1``), counts every higher level not
+yet counted as that level's start, and counts its own level: its list's ``startOverride`` the first
+time that list reaches the level, else one more than the shared count, else (after a restart) the
+list's ``startOverride`` or the ``abstractNum`` level's ``w:start``, 0 when there is none.
+``lvlText`` is copied, with ``%1`` to ``%9`` replaced by the counter of that level in that level's
+format (under ``isLgl`` all decimal, but decimalZero, which keeps its zero): decimal, decimalZero,
+upper and lower roman (1 to 3999), upper and lower letter (a to z, then aa, bb...), or none; a
+bullet level's text is its bullet. The label is drawn in the level's run properties over the
+paragraph mark's (with the mark's character style), so its fonts are placed as a run's are: a
+Symbol bullet (U+F0B7) is mapped to "•", a Wingdings bullet through ``WINGDINGS_BULLETS`` (U+F0A7
+to "▪"), and a bullet in any other dingbat font is refused. ``suffix`` is ``tab``, ``space`` or
+``nothing`` (``w:suff``), or ``legacy`` for a Word 6 level, where the gap is layout and not a
+character.
 
-Notes. ``read_document`` returns the footnotes and endnotes with the body, each note's
-paragraphs read by every rule above, in the order the body refers to them; ``read_docx``
-returns the body alone. A note's mark is its section's ``numStart`` plus the number of notes of
-its kind before it, in the document or, where the section restarts them (``numRestart``
-``eachSect``), in the section; it is drawn in the section's format: decimal, roman, letters, or
-symbols (``chicago``: *, †, ‡, §, then each doubled...). The section's ``footnotePr`` and
-``endnotePr`` decide this; Word ignores the settings part's. Footnotes default to decimal,
-endnotes to lower roman, and each kind counts apart. A note with a custom mark takes no number;
-its mark is the stored text that follows the reference. Every rule is Word's answer to a case in
-``corpus/numbering-cases``, held by ``tests/test_word_oracle.py``. Every note must be referred
-to exactly once, and every reference must name a note.
+Notes. ``read_document`` returns the footnotes and endnotes with the body, each note's paragraphs
+read by every rule above, in the order the body refers to them; ``read_docx`` returns the body
+alone. A note's mark is its section's ``numStart`` plus the number of notes of its kind before it,
+in the document or, where the section restarts them (``numRestart`` ``eachSect``), in the section;
+it is drawn in the section's format: decimal, roman, letters, or symbols (``chicago``: *, †, ‡, §,
+then each doubled, as far as ††, Word's answers). The section's ``footnotePr`` and ``endnotePr``
+decide this; Word ignores the settings part's. Footnotes default to decimal, endnotes to lower
+roman, and each kind counts apart. A note with a custom mark takes no number; its mark is the
+stored text that follows the reference. Every rule is Word's answer to a case in
+``corpus/numbering-cases``, held by ``tests/test_word_oracle.py``. Every note must be referred to
+exactly once, and every reference must name a note.
 
 What it refuses (``DocxRefusedError.code``):
 
@@ -153,12 +157,16 @@ What it refuses (``DocxRefusedError.code``):
 - ``unsupported-element``: anything that can carry text and is not read above, and any element
   the reader does not know: text boxes, a note mark in a field code or inside a note, a note's
   echo of its mark outside that note, embedded objects, charts and other non-picture drawings,
-  alternate content, math, ``altChunk``, form fields,
+  alternate content, math, ``altChunk``, form fields, alternate content in the styles, theme,
+  font table, settings or lists (but a list level's own child), content marked for markup
+  compatibility processing (``mc:ProcessContent``, ``mc:MustUnderstand``) in any part,
   content controls bound to data (in any namespace), VML that is not a picture, conditional
-  table formatting that could change the text, text in a vertically merged-away cell, and a
-  style reference that names a style of another kind.
+  table formatting that could change the text, text in a vertically merged-away cell, a
+  style reference that names a style of another kind, and a ``basedOn`` that does (but a
+  paragraph style's on a character style).
 - ``invalid-package``: not a readable .docx (a PDF or a Word 97-2003 document is named as one),
-  no main document relationship, a part name that
+  no main document relationship, a relationship to a part the reader reads of a type other
+  than the one Word writes (one only ending in its kind), a part name that
   occurs twice (ignoring case), a related part that is missing or duplicated, a part that
   cannot be read (bad checksum, truncated, encrypted), any part damaged, read or not, parts over
   ``MAX_PACKAGE_BYTES`` together, an XML part, read or not, that is not UTF-8 or declares
@@ -175,9 +183,11 @@ What it refuses (``DocxRefusedError.code``):
   level holding anything else the reader does not know (alternate content, say), a ``%n`` for a
   deeper level, a bullet level that shows a counter, a number past a format's range, a label in
   capitals or small capitals with letters in it, a numbering-style link the reader cannot
-  follow (no ``styleLink`` back, or to a list with overrides), a list in a note, or a note
-  number format other than those above.
-- ``ambiguous-numbering``: a label drawn hidden (the paragraph mark or the level is hidden) or a
+  follow (no ``styleLink`` back, or to a list with overrides), a list in a note, a negative
+  ``lvlRestart``, a ``lvlText`` over ``MAX_LEVEL_TEXT`` characters, a list (or its level) set
+  by a table style, a note number format other than those above, or a note symbol past ††.
+- ``ambiguous-numbering``: a label drawn hidden (the paragraph mark is hidden at any level, its
+  character style included, whatever the list level says, or the level is hidden) or a
   numbered paragraph run on after a hidden paragraph mark, for which Word's list API reports a
   label but not whether or where it is drawn; a label that shows a level whose start the
   reader cannot find (only a ``lvlOverride`` defines it); note numbers that restart on each page,
@@ -216,6 +226,9 @@ MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
 PR = "http://schemas.openxmlformats.org/package/2006/relationships"
 R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 XML_SPACE = "{http://www.w3.org/XML/1998/namespace}space"
+# The relationship types Word writes for the parts the reader reads, each this and the kind.
+_RELATIONSHIPS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
+_PROCESSING = {f"{{{MC}}}ProcessContent", f"{{{MC}}}MustUnderstand"}
 PICTURE_URI = "http://schemas.openxmlformats.org/drawingml/2006/picture"
 WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
 OBJECT = "\ufffc"
@@ -290,7 +303,10 @@ WINGDINGS_BULLETS: dict[int, str] = {
     0xA7: "\u25aa"  # BLACK SMALL SQUARE (w-1167), Word's default third-level bullet
 }
 
-_DINGBAT_FONTS = ("wingdings", "webdings", "dingbat", "marlett", "mtextra")
+# Fonts drawn as symbols, by a part of their name (lower case, no spaces): any spelling of
+# Symbol but the exact one, and symbol-encoded fonts Word ships (Bookshelf Symbol 7, Monotype
+# Sorts...), refused even where no font table declares them.
+_DINGBAT_FONTS = ("wingdings", "webdings", "dingbat", "marlett", "mtextra", "symbol", "sorts")
 
 _TRACKED = {
     _w(name)
@@ -642,6 +658,10 @@ class _Package:
             element, depth = stack.pop()
             if depth > MAX_DEPTH:
                 raise DocxRefusedError("invalid-package", f"{name} nests over {MAX_DEPTH} deep")
+            if not _PROCESSING.isdisjoint(element.keys()):
+                # Content a consumer must process or understand by rules the reader does not
+                # apply (ECMA-376 Part 3).
+                raise DocxRefusedError("unsupported-element", f"{name}: markup compatibility")
             stack.extend((child, depth + 1) for child in element)
         self.parsed[name] = root
         return root
@@ -657,8 +677,15 @@ class _Package:
 
     @staticmethod
     def _is(rel: ET.Element, kind: str) -> bool:
-        """Whether ``rel`` is an internal relationship whose type ends in ``kind``."""
-        return rel.get("TargetMode") != "External" and rel.get("Type", "").endswith("/" + kind)
+        """Whether ``rel`` is an internal ``kind`` relationship, of the type Word writes.
+
+        A type that only ends in ``kind`` (another namespace, Strict's) is refused: what Word
+        does with it is not on record.
+        """
+        found = rel.get("Type", "")
+        if found.endswith("/" + kind) and found != _RELATIONSHIPS + kind:
+            raise DocxRefusedError("invalid-package", f"a relationship of type {found!r}")
+        return rel.get("TargetMode") != "External" and found == _RELATIONSHIPS + kind
 
     def target(self, source: str, relationship: str | None, kind: str) -> str:
         """The part ``source``'s relationship ``relationship`` names; refused unless a ``kind``."""
@@ -704,7 +731,10 @@ class _Styles:
     defaults: dict[str, str] = field(default_factory=dict)
     theme_fonts: dict[str, str] = field(default_factory=dict)
     has_theme: bool = False
-    # Fonts the font table declares symbol-encoded (charset 02), other than Symbol itself.
+    # Fonts, by lower-case name, the font table says Word may draw as symbols: declared
+    # symbol-encoded (charset 02, or the symbol code page in csb0) other than Symbol and
+    # Wingdings, embedded (its glyphs may be any), or replaced when missing (altName) by a
+    # symbol or dingbat font.
     symbol_encoded: set[str] = field(default_factory=set)
 
     def theme_font(self, theme: str) -> str:
@@ -739,6 +769,11 @@ class _Styles:
         return self.resolve(style_id, kind) if style_id in self.styles else []
 
     def chain(self, style_id: str | None) -> list[_Style]:
+        """``style_id``'s style and those its ``basedOn`` names in turn.
+
+        A paragraph style based on a character style takes nothing from it, as Word draws it
+        [Word's answer, 2026-10]; any other ``basedOn`` naming a style of another kind is refused.
+        """
         out: list[_Style] = []
         seen: set[str] = set()
         while style_id is not None and style_id not in seen and style_id in self.styles:
@@ -746,6 +781,13 @@ class _Styles:
             style = self.styles[style_id]
             out.append(style)
             style_id = style.based_on
+            based = self.styles.get(style_id) if style_id is not None else None
+            if based is not None and based.kind != style.kind:
+                if (style.kind, based.kind) != ("paragraph", "character"):
+                    raise DocxRefusedError(
+                        "unsupported-element", f"a {style.kind} style based on a {based.kind} one"
+                    )
+                break
         return out
 
 
@@ -755,8 +797,17 @@ def _styles(root: ET.Element | None, theme: ET.Element | None, fonts: ET.Element
         for entry in fonts.findall(_w("font")):
             charset = entry.find(_w("charset"))
             name = entry.get(_w("name"), "")
-            encoded = charset is not None and charset.get(_w("val"), "").upper() == "02"
-            if encoded and _font_class(name) != "symbol":
+            pages = entry.find(_w("sig"))
+            csb0 = "" if pages is None else pages.get(_w("csb0"), "")
+            encoded = (charset is not None and charset.get(_w("val"), "").upper() == "02") or (
+                re.fullmatch(r"[0-9A-Fa-f]{1,8}", csb0) is not None and int(csb0, 16) >> 31 == 1
+            )
+            substitute = entry.find(_w("altName"))
+            if (
+                (encoded and _font_class(name) == "text")
+                or any(child.tag.startswith(_w("embed")) for child in entry)
+                or (substitute is not None and _font_class(substitute.get(_w("val"))) != "text")
+            ):
                 styles.symbol_encoded.add(name.lower())
     if theme is not None:
         styles.has_theme = True
@@ -906,7 +957,15 @@ class _Properties:
             [style.rpr for style in styles.chain(table_style)],
         ]
         self.mark = mark
-        levels: list[ET.Element | None] = [mark, *(rpr for chain in self.chains for rpr in chain)]
+        # The mark's own character style, as for a run: Word draws the label in it (Sym gives
+        # Symbol, Caps capitals) [Word's answer, 2026-10].
+        marked = None if mark is None else mark.find(_w("rStyle"))
+        mark_style = None if marked is None else marked.get(_w("val"))
+        levels: list[ET.Element | None] = [
+            mark,
+            *(style.rpr for style in styles.resolve_named(mark_style, "character")),
+            *(rpr for chain in self.chains for rpr in chain),
+        ]
         levels.append(styles.default_rpr)
         self.inherited = [level for level in levels if level is not None]
 
@@ -997,21 +1056,21 @@ _THEME_ATTRIBUTE = {
 def _font_class(name: str | None) -> str:
     if name is None:
         return "text"
-    key = name.lower().replace(" ", "")
-    if key in ("symbol", "symbolmt"):
+    # Each exactly: another spelling ("SymbolMT", "symbol") is refused below, not guessed.
+    if name == "Symbol":
         return "symbol"
-    if name == "Wingdings":  # exactly: another spelling is refused below, not guessed
+    if name == "Wingdings":
         return "wingdings"
+    key = name.lower().replace(" ", "")
     if any(part in key for part in _DINGBAT_FONTS):
         return "dingbat"
     return "text"
 
 
 def _font_kind(styles: _Styles, name: str | None) -> str:
-    font = _font_class(name)
-    if font == "text" and name is not None and name.lower() in styles.symbol_encoded:
+    if name is not None and name.lower() in styles.symbol_encoded:
         return "dingbat"
-    return font
+    return _font_class(name)
 
 
 def _in_symbol(styles: _Styles, properties: _Properties, table_style: str | None) -> bool:
@@ -1447,7 +1506,7 @@ class _ParagraphReader:
         if tag == _w("softHyphen"):
             return "\u00ad"
         if tag == _w("sym"):
-            if _font_class(child.get(_w("font"))) != "symbol":
+            if _font_kind(self.styles, child.get(_w("font"))) != "symbol":
                 raise DocxRefusedError("unmapped-symbol", f"w:sym in {child.get(_w('font'))!r}")
             char = child.get(_w("char"), "")
             if not re.fullmatch(r"[0-9A-Fa-f]{1,4}", char):
@@ -1668,13 +1727,17 @@ def _paragraph(
     if reader.layout:
         raise DocxRefusedError("unbalanced-field", "a page number runs past its paragraph")
     # The paragraph's properties, then its style's, its table style's and the defaults.
+    table_levels = [s.ppr for s in styles.chain(table_style) if s.ppr is not None]
     levels = [
         ppr,
         *(s.ppr for s in styles.resolve(style, "paragraph")),
-        *(s.ppr for s in styles.chain(table_style)),
+        *table_levels,
         styles.default_ppr,
     ]
     numbering = _numbering(levels)
+    if numbering != _numbering([level for level in levels if level not in table_levels]):
+        # A list, or its level, from the table style: what Word draws is not on record.
+        raise _refuse_numbering("a list from a table style")
     context = _Context(
         style=styles.effective(style, "paragraph"),
         table_style=table_style,
@@ -1756,6 +1819,9 @@ _LEVEL_CHILDREN = {
     )
 }
 _PLACEHOLDER = re.compile(r"(%[1-9])")
+# The longest lvlText drawn: a label is rebuilt for every list item, and Word's answer for a
+# longer one is not on record.
+MAX_LEVEL_TEXT = 255
 _ROMAN = (
     (1000, "M"),
     (900, "CM"),
@@ -1805,6 +1871,8 @@ def _level(element: ET.Element) -> _Level:
     if text_element is not None:
         null = text_element.get(_w("null")) in ("1", "true", "on")
         text = "" if null else text_element.get(_w("val"), "")
+        if len(text) > MAX_LEVEL_TEXT:
+            unsupported = unsupported or f"a list level text over {MAX_LEVEL_TEXT} characters"
     legacy = element.find(_w("legacy"))
     suffix = value("suff") or "tab"
     if legacy is not None and legacy.get(_w("legacy")) not in ("0", "false", "off"):
@@ -1981,10 +2049,12 @@ class _Lists:
             raise _refuse_numbering(f"level {level} of numId {numbering.num_id} is not defined")
         for upper in range(level + 1):
             restart = levels[upper].restart if upper in levels else None
-            if restart is not None and restart != 0 and restart >= upper + (upper == 0):
+            if restart is not None and (
+                restart < 0 or (restart != 0 and restart >= upper + (upper == 0))
+            ):
                 # Restarting after the level directly above, written out (Word never writes it,
                 # it is the default), or after itself or a deeper one: Word draws the level
-                # empty [restart-level-above].
+                # empty [restart-level-above]. A negative one is not on record.
                 raise _refuse_numbering(f"lvlRestart {restart} on level {upper}")
         for shown in {int(n) - 1 for n in re.findall(r"%([1-9])", definition.text or "")}:
             if shown != level and shown in levels and levels[shown].restart == 0:
@@ -2027,6 +2097,9 @@ class _Lists:
         for deeper in range(level + 1, len(_LEVELS)):
             definition = levels.get(deeper)
             restart = definition.restart if definition is not None else None
+            if restart is not None and restart < 0:
+                # Whether it restarts the level is not on record.
+                raise _refuse_numbering(f"lvlRestart {restart} on level {deeper}")
             # lvlRestart n restarts the level after a paragraph at a level up to n - 1; 0 never.
             # A value that is not a higher level is ignored, and then any higher level restarts
             # [restart-never, restart-after-first].
@@ -2151,7 +2224,10 @@ class _Lists:
             value = counters.values[shown] if implied is None else implied
             if counters.unknown[shown] or value is None:
                 raise DocxRefusedError("ambiguous-numbering", f"the count of list level {shown}")
-            pieces.append(_number(value, "decimal" if definition.legal else source.format))
+            # isLgl draws every level in decimal, but a decimalZero one keeps its zero ("1.01",
+            # Word's answer, 2026-10).
+            legal = definition.legal and source.format != "decimalZero"
+            pieces.append(_number(value, "decimal" if legal else source.format))
         properties = _Properties(
             self.styles, definition.rpr, context.style, context.table_style, context.mark
         )
@@ -2207,6 +2283,10 @@ def _labelled(
             # Word runs this paragraph on after the previous one; where it draws the label, if
             # it draws one, is not documented.
             raise DocxRefusedError("ambiguous-numbering", "a list item run on after a hidden mark")
+        elif paragraph.mark_hidden:
+            # Its mark is hidden, by any level, whatever the list level says: whether Word draws
+            # the label is not documented.
+            raise DocxRefusedError("ambiguous-numbering", "a list item whose mark is hidden")
         else:
             out.append(replace(paragraph, numbering=lists.label(numbering, context)))
         hidden_before = paragraph.mark_hidden
@@ -2260,7 +2340,8 @@ def _note_mark(value: int, fmt: str) -> str:
         raise _refuse_numbering(f"the note number format {fmt}")
     if fmt != "chicago":
         return _number(value, fmt)
-    if value < 1:
+    if not 1 <= value <= 6:
+        # Word's answers go to the sixth (††) [notes-chicago, notes-section-chicago].
         raise _refuse_numbering(f"the note number {value} in symbols")
     # *, †, ‡, §, then each doubled, then tripled...
     return _CHICAGO[(value - 1) % 4] * ((value - 1) // 4 + 1)
@@ -2689,6 +2770,20 @@ def read_document(data: bytes) -> Document:
             # A tracked change to a style or a list gives the document two texts (``tracked``).
             if definitions is not None and any(e.tag in _TRACKED for e in definitions.iter()):
                 raise DocxRefusedError("tracked-change", f"in {_local(definitions.tag)}")
+        for definitions in parts[:5]:
+            # Alternate content in the styles, theme, fonts, settings or lists: Word applies one
+            # branch, which the reader would not. Only a list level's own child is left to the
+            # level, which a paragraph cannot draw (``_level``).
+            if definitions is None:
+                continue
+            levels = set(definitions.iter(_w("lvl")))
+            if any(
+                element not in levels and any(c.tag == _ALTERNATE for c in element)
+                for element in definitions.iter()
+            ):
+                raise DocxRefusedError(
+                    "unsupported-element", f"AlternateContent in {_local(definitions.tag)}"
+                )
         styles = _styles(*parts[:3])
         if parts[3] is not None:
             styles.update_fields = bool(_on(parts[3].find(_w("updateFields"))))

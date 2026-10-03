@@ -240,7 +240,14 @@ class _Fonts:
         out: list[str] = []
         while style_id is not None and style_id in self.kind and style_id not in out:
             out.append(style_id)
-            style_id = self.based[style_id]
+            base = self.based[style_id]
+            if base in self.kind and self.kind[base] != self.kind[style_id]:
+                # Word takes nothing from a character style a paragraph style is based on;
+                # any other pair is not on record.
+                if (self.kind[style_id], self.kind[base]) != ("paragraph", "character"):
+                    raise CertificationError(f"style {style_id} is based on another kind")
+                break
+            style_id = base
         return out
 
     def chain(self, style_id: str | None, kind: str) -> list[ET.Element]:
@@ -344,15 +351,18 @@ class _Fonts:
         return slots["ascii"]
 
     @staticmethod
-    def hidden(levels: list[ET.Element], own: ET.Element | None) -> bool:
-        direct = None if own is None else _on(own.find(_w("vanish")))
+    def hidden(levels: list[ET.Element], own: ET.Element | None, name: str = "vanish") -> bool:
+        direct = None if own is None else _on(own.find(_w(name)))
         if direct is not None:
             return direct
-        return any(_on(level.find(_w("vanish"))) for level in levels)
+        return any(_on(level.find(_w(name))) for level in levels)
 
 
 def _is_symbol(name: str | None) -> bool:
-    return name is not None and name.lower().replace(" ", "") in ("symbol", "symbolmt")
+    """Whether a font is Symbol, by its exact name; another spelling of it is not on record."""
+    if name is not None and name != "Symbol" and "symbol" in name.lower().replace(" ", ""):
+        raise CertificationError(f"the font {name!r}")
+    return name == "Symbol"
 
 
 def _symbol_reading(text: str) -> str:
@@ -592,6 +602,8 @@ class _Story:
         if local == "softHyphen":
             return "\u00ad"
         if local == "sym":
+            if child.get(_w("font")) != "Symbol":
+                raise CertificationError(f"a w:sym in {child.get(_w('font'))!r}")
             code = int(child.get(_w("char"), "0"), 16)
             low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code
             if low not in SYMBOL_FONT:
@@ -739,13 +751,23 @@ def _relation(archive: zipfile.ZipFile, source: str, relationship: str | None, k
     for rel in ET.fromstring(archive.read(name)).iter(f"{{{_RELS}}}Relationship"):
         if rel.get("Id") != relationship:
             continue
-        if rel.get("TargetMode") == "External" or not rel.get("Type", "").endswith("/" + kind):
+        if rel.get("TargetMode") == "External" or not _typed(rel, kind):
             raise CertificationError(f"{relationship} is not a {kind} part")
         target = rel.get("Target", "")
         return posixpath.normpath(
             target[1:] if target.startswith("/") else posixpath.join(folder, target)
         )
     raise CertificationError(f"no relationship {relationship}")
+
+
+def _typed(rel: ET.Element, kind: str) -> bool:
+    """Whether ``rel`` is of the type Word writes for ``kind``; one that only ends so is refused."""
+    found = rel.get("Type", "")
+    if found == f"http://schemas.openxmlformats.org/officeDocument/2006/relationships/{kind}":
+        return True
+    if found.rsplit("/", 1)[-1] == kind:
+        raise CertificationError(f"a relationship of type {found!r}")
+    return False
 
 
 def _relations(archive: zipfile.ZipFile, source: str, kind: str) -> list[str]:
@@ -755,7 +777,7 @@ def _relations(archive: zipfile.ZipFile, source: str, kind: str) -> list[str]:
         return []
     out = []
     for rel in ET.fromstring(archive.read(name)).iter(f"{{{_RELS}}}Relationship"):
-        if rel.get("TargetMode") == "External" or not rel.get("Type", "").endswith("/" + kind):
+        if rel.get("TargetMode") == "External" or not _typed(rel, kind):
             continue
         target = rel.get("Target", "")
         out.append(
@@ -825,7 +847,7 @@ def _formatted(value: int, fmt: str) -> str:
         # a to z, then aa to zz: the letter repeated.
         letters = chr(ord("A") + (value - 1) % 26) * ((value - 1) // 26 + 1)
         return letters if fmt == "upperLetter" else letters.lower()
-    if fmt == "chicago" and value >= 1:
+    if fmt == "chicago" and 1 <= value <= 6:  # as far as Word drew them [notes-chicago]
         return _CHICAGO_SIGNS[(value - 1) % 4] * ((value - 1) // 4 + 1)
     raise CertificationError(f"the number {value} in {fmt}")
 
@@ -950,6 +972,8 @@ class _Numbering:
             # naming no higher level restarts it after any [restart-never, restart-after-first].
             # It restarts as this paragraph's list says [restart-source-override,
             # restart-source-plain, restart-source-unused].
+            if rule is not None and rule < 0:
+                raise CertificationError(f"lvlRestart {rule} on level {deeper}")
             if rule is None or level < rule:
                 values[deeper] = None
                 restarts[deeper] = starts.get(deeper)
@@ -982,6 +1006,8 @@ class _Numbering:
         look = looks.get(level)
         if look is None or look.text is None:
             raise CertificationError(f"level {level} of a list draws nothing defined")
+        if len(look.text) > 255:
+            raise CertificationError(f"level {level} of a list has a text past 255 characters")
         out = ""
         for piece in re.split(r"(%[1-9])", look.text):
             if not re.fullmatch(r"%[1-9]", piece):
@@ -992,13 +1018,20 @@ class _Numbering:
             count = values[shown] if showing[shown] is None else showing[shown]
             if source is None or count is None:
                 raise CertificationError(f"a list label shows level {shown}, never counted")
-            out += _formatted(count, "decimal" if look.legal else source.fmt)
-        # A bullet in the Symbol font: through the table, as the label's fonts say.
-        label_levels = [
+            # isLgl writes decimal, but keeps a decimalZero level's zero [Word's answer].
+            legal = look.legal and source.fmt != "decimalZero"
+            out += _formatted(count, "decimal" if legal else source.fmt)
+        # The paragraph mark's properties, with its character style, as a run's; a label over a
+        # hidden mark is not on record.
+        mark = None if paragraph.properties is None else paragraph.properties.find(_w("rPr"))
+        mark_style = None if mark is None else mark.find(_w("rStyle"))
+        mark_levels = [
             x
             for x in (
-                look.rpr,
-                None if paragraph.properties is None else paragraph.properties.find(_w("rPr")),
+                mark,
+                *self.fonts.chain(
+                    None if mark_style is None else mark_style.get(_w("val")), "character"
+                ),
                 *self.fonts.chain(paragraph.style, "paragraph"),
                 *(
                     self.fonts.chain(paragraph.table_style, "table")
@@ -1009,6 +1042,12 @@ class _Numbering:
             )
             if x is not None
         ]
+        if self.fonts.hidden(mark_levels, mark) or self.fonts.hidden(
+            mark_levels, mark, "specVanish"
+        ):
+            raise CertificationError("a list label over a hidden paragraph mark")
+        # A bullet in the Symbol font: through the table, as the label's fonts say.
+        label_levels = mark_levels if look.rpr is None else [look.rpr, *mark_levels]
         if self.fonts.symbol(label_levels):
             out = _symbol_reading(out)
         elif self.fonts.wingdings(label_levels):
@@ -1018,29 +1057,34 @@ class _Numbering:
 
 def _numbering_of(fonts: _Fonts, paragraph: _Paragraph) -> tuple[int, int] | None:
     """A paragraph's (numId, ilvl): each from the nearest properties that set it, or None."""
-    sources = [
+    own = [
         paragraph.properties,
         *(fonts.ppr.get(i) for i in fonts.style_ids(paragraph.style, "paragraph")),
-        *(
-            fonts.ppr.get(i)
-            for i in (
-                fonts.style_ids(paragraph.table_style, "table")
-                if paragraph.table is not None
-                else []
-            )
-        ),
-        fonts.doc_ppr,
     ]
-    found: dict[str, int] = {}
-    for source in sources:
-        numbering = None if source is None else source.find(_w("numPr"))
-        for name in ("numId", "ilvl"):
-            element = None if numbering is None else numbering.find(_w(name))
-            if element is not None and name not in found:
-                found[name] = int(element.get(_w("val"), "0"))
-    if not found:
-        return None
-    return found.get("numId", 0), found.get("ilvl", 0)
+    table = [
+        fonts.ppr.get(i)
+        for i in (
+            fonts.style_ids(paragraph.table_style, "table") if paragraph.table is not None else []
+        )
+    ]
+
+    def nearest(sources: list[ET.Element | None]) -> tuple[int, int] | None:
+        found: dict[str, int] = {}
+        for source in sources:
+            numbering = None if source is None else source.find(_w("numPr"))
+            for name in ("numId", "ilvl"):
+                element = None if numbering is None else numbering.find(_w(name))
+                if element is not None and name not in found:
+                    found[name] = int(element.get(_w("val"), "0"))
+        if not found:
+            return None
+        return found.get("numId", 0), found.get("ilvl", 0)
+
+    found = nearest([*own, *table, fonts.doc_ppr])
+    if found != nearest([*own, fonts.doc_ppr]):
+        # The list, or its level, set by the table style: Word's answer is not on record.
+        raise CertificationError("a list from a table style")
+    return found
 
 
 def _note_marks(
@@ -1187,6 +1231,9 @@ def _parse(archive: zipfile.ZipFile, name: str) -> ET.Element:
     """A part parsed, its text read twice, by Python's XML parser and by ``_raw_texts``."""
     data = archive.read(name)
     root = ET.fromstring(data)
+    for node in root.iter():
+        if any(_local(key) in ("ProcessContent", "MustUnderstand") for key in node.attrib):
+            raise CertificationError(f"{name}: markup compatibility to process")
     parsed = [
         (_local(node.tag), node.text or "")
         for node in root.iter()
@@ -1208,6 +1255,15 @@ class DocxSource:
         archive, main, related = _docx_parts(data)
         with archive:
             parse = {name: _parse(archive, name) for name in {main, *related.values()}}
+            for kind in ("styles", "theme", "numbering"):
+                root = parse.get(related.get(kind, ""))
+                for node in [] if root is None else root.iter():
+                    # Alternate content Word resolves, which this check does not; a list level's
+                    # own is the level's, never drawn.
+                    if _local(node.tag) != "lvl" and any(
+                        _local(c.tag) == "AlternateContent" for c in node
+                    ):
+                        raise CertificationError(f"alternate content in the {kind}")
             self.fonts = _Fonts(
                 parse.get(related.get("styles", "")), parse.get(related.get("theme", ""))
             )

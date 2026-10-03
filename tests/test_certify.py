@@ -1173,9 +1173,14 @@ def test_a_table_style_gives_its_font_inside_its_table_only() -> None:
     DocxSource(docx(body, styles=named)).certify(_value({"text": "\u2265", "table": [0, 0, 0]}))
 
 
-@pytest.mark.parametrize("name", ["Symbol", "symbol", "SymbolMT", "Symbol MT"])
-def test_the_symbol_font_by_any_of_its_names(name: str) -> None:
-    assert _mapped(docx(_plain(run_properties=f'<w:rFonts w:ascii="{name}" w:hAnsi="{name}"/>')))
+@pytest.mark.parametrize("name", ["symbol", "SymbolMT", "Symbol MT", "Sym bol"])
+def test_the_symbol_font_by_its_exact_name_only(name: str) -> None:
+    assert _mapped(docx(_plain(run_properties='<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/>')))
+    # Another spelling, for a run or a w:sym, is not on record: never read either way.
+    with pytest.raises(CertificationError):
+        DocxSource(docx(_plain(run_properties=f'<w:rFonts w:ascii="{name}" w:hAnsi="{name}"/>')))
+    with pytest.raises(CertificationError):
+        DocxSource(docx(_p(f'<w:r><w:sym w:font="{name}" w:char="F061"/></w:r>')))
 
 
 def test_symbol_text_stored_in_the_private_range_is_mapped() -> None:
@@ -1610,6 +1615,12 @@ _SETTINGS = {
         _list(_level(0, "%1.", "upperRoman"), _level(1, "%1.%2", "upperRoman", "<w:isLgl/>")),
         [(1, "I.", "tab"), (1, "1.1", "tab")],
     ),
+    # Word keeps a decimalZero level's zero under isLgl.
+    "legal-decimal-zero": (
+        _list(_level(0, "%1."), _level(1, "%1.%2", "decimalZero", "<w:isLgl/>")),
+        [(1, "1.", "tab"), (1, "1.01", "tab")],
+    ),
+    "text-of-255": (_list(_level(0, "x" * 255)), [(1, "x" * 255, "tab")]),
     **{
         f"text-null-{value}": (
             _list(
@@ -1659,8 +1670,9 @@ _STYLED = {
         ' w:default="1"',
         [(1, "1.", "tab")],
     ),
-    "table-style": ("", "table", "T", "", [(1, "1.", "tab")]),
-    "default-table-style": ("", "table", "T", ' w:default="1"', [(1, "1.", "tab")]),
+    # A table style's list is not on record: never drawn.
+    "table-style": ("", "table", "T", "", None),
+    "default-table-style": ("", "table", "T", ' w:default="1"', None),
     "default-table-style-outside": ("", "table", "T", ' w:default="1"', []),
 }
 
@@ -1682,7 +1694,11 @@ def test_the_check_finds_a_list_through_styles_as_word_does(name: str) -> None:
     elif name == "default-table-style":
         paragraph = f"<w:tbl><w:tr><w:tc>{paragraph}</w:tc></w:tr></w:tbl>"
     data = docx(paragraph, styles=styles, numbering=_list(_level(0, "%1.")) + _NUM)
-    assert _labels_certified(data) == expected
+    if expected is None:
+        with pytest.raises(CertificationError):
+            DocxSource(data)
+    else:
+        assert _labels_certified(data) == expected
 
 
 @pytest.mark.parametrize("numbered", ['<w:ilvl w:val="1"/>', '<w:ilvl w:val="0"/><w:numId/>'])
@@ -1706,7 +1722,7 @@ def test_a_bullet_in_symbol_through_a_paragraph_or_table_style(kind: str, defaul
     assert _labels_certified(data) == [(1, "\u2022", "tab")]
 
 
-_REFUSED_LISTS = {
+_REFUSED_LISTS: dict[str, tuple[str, list[tuple[Any, ...]]]] = {
     "custom-format": (
         _list(
             '<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal" w:format="001"/>'
@@ -1736,6 +1752,17 @@ _REFUSED_LISTS = {
         [(1, 0), (1, 1)],
     ),
     "restart-on-level-0": (_list(_level(0, "%1.", extra='<w:lvlRestart w:val="1"/>')), [(1, 0)]),
+    "negative-restart-deeper": (
+        _list(_level(0, "%1."), _level(1, "%2.", extra='<w:lvlRestart w:val="-1"/>')),
+        [(1, 0)],
+    ),
+    "text-past-255": (_list(_level(0, "x" * 256)), [(1, 0)]),
+    "hidden-mark": (_list(_level(0, "%1.")), [(1, 0, "<w:rPr><w:vanish/></w:rPr>")]),
+    "special-hidden-mark": (_list(_level(0, "%1.")), [(1, 0, "<w:rPr><w:specVanish/></w:rPr>")]),
+    "hidden-mark-visible-level": (
+        _list(_level(0, "%1.", extra='<w:rPr><w:vanish w:val="0"/></w:rPr>')),
+        [(1, 0, "<w:rPr><w:vanish/></w:rPr>")],
+    ),
 }
 
 
@@ -1743,7 +1770,7 @@ _REFUSED_LISTS = {
 def test_the_check_draws_no_label_it_cannot_draw_as_word_does(name: str) -> None:
     numbering, items = _REFUSED_LISTS[name]
     nums = "" if name == "list-without-definition" else _NUM
-    data = docx("".join(_item(n, level) for n, level in items), numbering=numbering + nums)
+    data = docx("".join(_item(*item) for item in items), numbering=numbering + nums)
     with pytest.raises(CertificationError):
         DocxSource(data)
 
@@ -1818,6 +1845,7 @@ def test_the_check_draws_no_note_mark_it_cannot_draw_as_word_does(body: str) -> 
         (53, "upperLetter", "AAA"),
         (780, "upperLetter", "Z" * 30),
         (5, "chicago", "**"),
+        (6, "chicago", "\u2020\u2020"),
         (7, "decimalZero", "07"),
         (0, "decimal", "0"),
         (12, "none", ""),
@@ -1837,6 +1865,7 @@ def test_numbers_are_written_in_every_format_as_word_writes_them(
         (0, "upperLetter"),
         (781, "lowerLetter"),
         (0, "chicago"),
+        (7, "chicago"),
         (-1, "decimal"),
         (1, "ordinal"),
     ],
@@ -1864,3 +1893,89 @@ def test_a_wingdings_bullet_is_drawn_through_its_closed_table_and_only_so() -> N
     ):
         with pytest.raises(CertificationError):
             _ = DocxSource(docx(_item(1, 0), numbering=numbering)).labels
+
+
+_MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+
+
+def _wrapped(inner: str) -> str:
+    return (
+        f'<mc:AlternateContent xmlns:mc="{_MC}"><mc:Choice Requires="w14">{inner}</mc:Choice>'
+        f"<mc:Fallback>{inner}</mc:Fallback></mc:AlternateContent>"
+    )
+
+
+def test_alternate_content_and_compatibility_processing_are_never_resolved() -> None:
+    vanish = _wrapped("<w:vanish/>")
+    hidden = (
+        f'<w:style w:type="paragraph" w:default="1" w:styleId="D"><w:rPr>{vanish}</w:rPr></w:style>'
+    )
+    with pytest.raises(CertificationError):
+        DocxSource(docx(_plain(), styles=hidden))
+    started = _list(_level(0, "%1.")) + _NUM.replace(
+        "</w:num>",
+        _wrapped('<w:lvlOverride w:ilvl="0"><w:startOverride w:val="5"/></w:lvlOverride>')
+        + "</w:num>",
+    )
+    with pytest.raises(CertificationError):
+        DocxSource(docx(_item(1, 0), numbering=started))
+    themed = docx(_plain(), minor_font="Calibri")
+    theme = f'<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">{_wrapped("<a:themeElements/>")}</a:theme>'
+    with pytest.raises(CertificationError):
+        DocxSource(_with_part(themed, "word/theme/theme1.xml", theme))
+    for attribute in ("ProcessContent", "MustUnderstand"):
+        with pytest.raises(CertificationError):
+            DocxSource(docx(f'<w:p mc:{attribute}="w"><w:r><w:t>a</w:t></w:r></w:p>'))
+    # A list level's own alternate content is the level's, and a level no paragraph draws.
+    unused = _list(_level(0, "%1."), _level(1, "%2.", extra=_wrapped("<w:isLgl/>"))) + _NUM
+    assert _labels_certified(docx(_item(1, 0), numbering=unused)) == [(1, "1.", "tab")]
+
+
+def test_a_label_takes_the_paragraph_marks_character_style() -> None:
+    styles = (
+        '<w:style w:type="character" w:styleId="Sym"><w:rPr>'
+        '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr></w:style>'
+    )
+    letters = _list(_level(0, "%1)", "lowerLetter")) + _NUM
+    data = docx(
+        _item(1, 0, '<w:rPr><w:rStyle w:val="Sym"/></w:rPr>'), styles=styles, numbering=letters
+    )
+    assert _labels_certified(data) == [(1, "\u03b1)", "tab")]
+
+
+def test_a_based_on_naming_another_kind_of_style() -> None:
+    # Word takes nothing from a character style a paragraph style is based on.
+    styles = (
+        f'<w:style w:type="character" w:styleId="C">{_SYMBOL}</w:style>'
+        '<w:style w:type="paragraph" w:styleId="P"><w:basedOn w:val="C"/></w:style>'
+    )
+    assert not _mapped(docx(_plain('<w:pStyle w:val="P"/>'), styles=styles))
+    # A character style based on a paragraph style is not on record.
+    under = (
+        f'<w:style w:type="paragraph" w:styleId="Q">{_SYMBOL}</w:style>'
+        '<w:style w:type="character" w:styleId="D"><w:basedOn w:val="Q"/></w:style>'
+    )
+    with pytest.raises(CertificationError):
+        DocxSource(docx(_plain(run_properties='<w:rStyle w:val="D"/>'), styles=under))
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/x/styles",
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/styles",
+    ],
+)
+def test_a_relationship_of_a_type_word_does_not_write_is_never_followed(kind: str) -> None:
+    data = docx(
+        _plain(),
+        styles=f'<w:style w:type="paragraph" w:default="1" w:styleId="D">{_SYMBOL}</w:style>',
+    )
+    standard = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"
+    import io
+    import zipfile
+
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        rels = archive.read("word/_rels/document.xml.rels").decode()
+    with pytest.raises(CertificationError):
+        DocxSource(_with_part(data, "word/_rels/document.xml.rels", rels.replace(standard, kind)))
