@@ -4118,7 +4118,7 @@
     }
   },
   "fields": {},
-  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text",
+  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text",
   "notes": {},
   "prints": {
     "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": true,
@@ -4126,5 +4126,199 @@
     "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx": true,
     "qrd-product-information-template-version-104_en.docx": true
   },
-  "recorded": "2026-09-30"
+  "recorded": "2026-10-02",
+  "stories": {
+    "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "qrd-product-information-template-version-104_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "\u00151\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\u00151\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    }
+  }
 }

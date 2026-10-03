@@ -2347,6 +2347,30 @@
         false,
         false
       ],
+      "133": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "157": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "159": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "161": [
+        true,
+        false,
+        false,
+        false
+      ],
       "164": [
         false,
         false,
@@ -2359,8 +2383,50 @@
         false,
         false
       ],
+      "168": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "170": [
+        false,
+        false,
+        false,
+        false
+      ],
       "172": [
         false,
+        false,
+        false,
+        false
+      ],
+      "173": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "175": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "23": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "25": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "27": [
+        true,
         false,
         false,
         false
@@ -2383,6 +2449,24 @@
         false,
         false
       ],
+      "33": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "35": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "37": [
+        false,
+        false,
+        false,
+        false
+      ],
       "38": [
         false,
         false,
@@ -2390,6 +2474,36 @@
         false
       ],
       "40": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "41": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "43": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "45": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "47": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "49": [
         false,
         false,
         false,
@@ -2407,7 +2521,37 @@
         false,
         false
       ],
+      "53": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "55": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "57": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "59": [
+        false,
+        false,
+        false,
+        false
+      ],
       "60": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "61": [
         false,
         false,
         false,
@@ -2419,8 +2563,38 @@
         false,
         false
       ],
+      "63": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "67": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "91": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "93": [
+        true,
+        false,
+        false,
+        false
+      ],
       "96": [
         true,
+        false,
+        false,
+        false
+      ],
+      "97": [
+        false,
         false,
         false,
         false
@@ -3535,7 +3709,31 @@
         false,
         false
       ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "103": [
+        true,
+        false,
+        false,
+        false
+      ],
       "104": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "105": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "107": [
         false,
         false,
         false,
@@ -3547,13 +3745,31 @@
         false,
         false
       ],
+      "109": [
+        false,
+        false,
+        false,
+        false
+      ],
       "110": [
         false,
         false,
         false,
         false
       ],
+      "111": [
+        false,
+        false,
+        false,
+        false
+      ],
       "112": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "113": [
         false,
         false,
         false,
@@ -3571,13 +3787,31 @@
         false,
         false
       ],
+      "117": [
+        false,
+        false,
+        false,
+        false
+      ],
       "118": [
         false,
         false,
         false,
         false
       ],
+      "120": [
+        true,
+        false,
+        false,
+        false
+      ],
       "121": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "122": [
         false,
         false,
         false,
@@ -3589,7 +3823,25 @@
         false,
         false
       ],
+      "126": [
+        false,
+        false,
+        false,
+        false
+      ],
       "127": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "128": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "130": [
         false,
         false,
         false,
@@ -3601,7 +3853,19 @@
         false,
         false
       ],
+      "133": [
+        true,
+        false,
+        false,
+        false
+      ],
       "134": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "135": [
         false,
         false,
         false,
@@ -3613,13 +3877,37 @@
         false,
         false
       ],
+      "137": [
+        false,
+        false,
+        false,
+        false
+      ],
       "138": [
         false,
         false,
         false,
         false
       ],
+      "139": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "141": [
+        true,
+        false,
+        false,
+        false
+      ],
       "142": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "143": [
         false,
         false,
         false,
@@ -3631,7 +3919,19 @@
         false,
         false
       ],
+      "145": [
+        false,
+        false,
+        false,
+        false
+      ],
       "146": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "147": [
         false,
         false,
         false,
@@ -3643,7 +3943,25 @@
         false,
         false
       ],
+      "150": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "152": [
+        true,
+        false,
+        false,
+        false
+      ],
       "153": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "154": [
         false,
         false,
         false,
@@ -3655,7 +3973,19 @@
         false,
         false
       ],
+      "156": [
+        false,
+        false,
+        false,
+        false
+      ],
       "157": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "158": [
         false,
         false,
         false,
@@ -3667,13 +3997,37 @@
         false,
         false
       ],
+      "161": [
+        false,
+        false,
+        false,
+        false
+      ],
       "162": [
         false,
         false,
         false,
         false
       ],
+      "163": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "165": [
+        true,
+        false,
+        false,
+        false
+      ],
       "166": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "167": [
         false,
         false,
         false,
@@ -3685,7 +4039,19 @@
         false,
         false
       ],
+      "169": [
+        false,
+        false,
+        false,
+        false
+      ],
       "170": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "171": [
         false,
         false,
         false,
@@ -3697,7 +4063,19 @@
         false,
         false
       ],
+      "174": [
+        true,
+        false,
+        false,
+        false
+      ],
       "175": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "176": [
         false,
         false,
         false,
@@ -3715,7 +4093,19 @@
         false,
         false
       ],
+      "180": [
+        false,
+        false,
+        false,
+        false
+      ],
       "181": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "182": [
         false,
         false,
         false,
@@ -3727,7 +4117,25 @@
         false,
         false
       ],
+      "184": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "187": [
+        true,
+        false,
+        false,
+        false
+      ],
       "188": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "189": [
         false,
         false,
         false,
@@ -3739,8 +4147,20 @@
         false,
         false
       ],
+      "193": [
+        true,
+        false,
+        false,
+        false
+      ],
       "194": [
         false,
+        false,
+        false,
+        false
+      ],
+      "196": [
+        true,
         false,
         false,
         false
@@ -3769,13 +4189,31 @@
         false,
         false
       ],
+      "200": [
+        false,
+        false,
+        false,
+        false
+      ],
       "201": [
         false,
         false,
         false,
         false
       ],
+      "202": [
+        false,
+        false,
+        false,
+        false
+      ],
       "203": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "204": [
         false,
         false,
         false,
@@ -3793,7 +4231,19 @@
         false,
         false
       ],
+      "207": [
+        false,
+        false,
+        false,
+        false
+      ],
       "208": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "209": [
         false,
         false,
         false,
@@ -3805,13 +4255,31 @@
         false,
         false
       ],
+      "215": [
+        false,
+        false,
+        false,
+        false
+      ],
       "216": [
         false,
         false,
         false,
         false
       ],
+      "217": [
+        false,
+        false,
+        false,
+        false
+      ],
       "218": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "219": [
         false,
         false,
         false,
@@ -3835,7 +4303,19 @@
         false,
         false
       ],
+      "223": [
+        false,
+        false,
+        false,
+        false
+      ],
       "224": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "225": [
         false,
         false,
         false,
@@ -3847,8 +4327,20 @@
         false,
         false
       ],
+      "227": [
+        false,
+        false,
+        false,
+        false
+      ],
       "229": [
         true,
+        false,
+        false,
+        false
+      ],
+      "230": [
+        false,
         false,
         false,
         false
@@ -3859,7 +4351,19 @@
         false,
         false
       ],
+      "232": [
+        false,
+        false,
+        false,
+        false
+      ],
       "233": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "234": [
         false,
         false,
         false,
@@ -3877,7 +4381,19 @@
         false,
         false
       ],
+      "238": [
+        false,
+        false,
+        false,
+        false
+      ],
       "239": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "240": [
         false,
         false,
         false,
@@ -3889,7 +4405,19 @@
         false,
         false
       ],
+      "243": [
+        true,
+        false,
+        false,
+        false
+      ],
       "244": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "245": [
         false,
         false,
         false,
@@ -3901,7 +4429,37 @@
         false,
         false
       ],
+      "247": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "249": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "25": [
+        false,
+        false,
+        false,
+        false
+      ],
       "250": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "251": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "253": [
         false,
         false,
         false,
@@ -3913,7 +4471,25 @@
         false,
         false
       ],
+      "255": [
+        false,
+        false,
+        false,
+        false
+      ],
       "26": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "262": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "27": [
         false,
         false,
         false,
@@ -3925,13 +4501,31 @@
         false,
         false
       ],
+      "29": [
+        false,
+        false,
+        false,
+        false
+      ],
       "30": [
         false,
         false,
         false,
         false
       ],
+      "31": [
+        false,
+        false,
+        false,
+        false
+      ],
       "32": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "33": [
         false,
         false,
         false,
@@ -3949,7 +4543,19 @@
         false,
         false
       ],
+      "37": [
+        false,
+        false,
+        false,
+        false
+      ],
       "38": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "39": [
         false,
         false,
         false,
@@ -3961,7 +4567,25 @@
         false,
         false
       ],
+      "41": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "43": [
+        false,
+        false,
+        false,
+        false
+      ],
       "44": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "45": [
         false,
         false,
         false,
@@ -3973,13 +4597,31 @@
         false,
         false
       ],
+      "47": [
+        false,
+        false,
+        false,
+        false
+      ],
       "48": [
         false,
         false,
         false,
         false
       ],
+      "49": [
+        true,
+        false,
+        false,
+        false
+      ],
       "50": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "51": [
         false,
         false,
         false,
@@ -3991,13 +4633,31 @@
         false,
         false
       ],
+      "56": [
+        true,
+        false,
+        false,
+        false
+      ],
       "57": [
         false,
         false,
         false,
         false
       ],
+      "58": [
+        false,
+        false,
+        false,
+        false
+      ],
       "59": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "60": [
         false,
         false,
         false,
@@ -4015,7 +4675,25 @@
         false,
         false
       ],
+      "66": [
+        false,
+        false,
+        false,
+        false
+      ],
       "67": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "68": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "70": [
         false,
         false,
         false,
@@ -4027,13 +4705,37 @@
         false,
         false
       ],
+      "72": [
+        false,
+        false,
+        false,
+        false
+      ],
       "74": [
         true,
         false,
         false,
         false
       ],
+      "75": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "77": [
+        false,
+        false,
+        false,
+        false
+      ],
       "78": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "79": [
         false,
         false,
         false,
@@ -4045,7 +4747,25 @@
         false,
         false
       ],
+      "81": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "83": [
+        true,
+        false,
+        false,
+        false
+      ],
       "84": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "85": [
         false,
         false,
         false,
@@ -4057,7 +4777,19 @@
         false,
         false
       ],
+      "87": [
+        false,
+        false,
+        false,
+        false
+      ],
       "88": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "89": [
         false,
         false,
         false,
@@ -4069,7 +4801,19 @@
         false,
         false
       ],
+      "92": [
+        true,
+        false,
+        false,
+        false
+      ],
       "93": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "94": [
         false,
         false,
         false,
@@ -4077,6 +4821,18 @@
       ],
       "95": [
         false,
+        false,
+        false,
+        false
+      ],
+      "96": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "98": [
+        true,
         false,
         false,
         false
@@ -4741,7 +5497,7 @@
       ]
     }
   },
-  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text",
+  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text",
   "notes": {
     "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products-cover-page_en.docx": {
       "body": [
@@ -4780,5 +5536,899 @@
     "qrd-product-information-template-version-104_es.docx": true,
     "qrd-psur-annex-iv-template_en.docx": true
   },
-  "recorded": "2026-10-02"
+  "recorded": "2026-10-02",
+  "stories": {
+    "atmp-product-information-template-version-11_bg.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "1\n\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "atmp-product-information-template-version-11_el.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "1\n\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "atmp-product-information-template-version-11_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "1\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "mutual-recognition-decentralised-referral-product-information-template-version-42_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "\u00151\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\u00151\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "mutual-recognition-decentralised-referral-product-information-template-version-42_et.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "\u00151\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\u00151\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "psusa-nationally-authorised-products-template_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "1\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "1\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "qrd-annex-iv-conditional-positive-template_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "1\n\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "qrd-annex-iv-exceptional-circumstances-positive-template_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "1\n\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "qrd-annex-iv-standard-positive-template_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "1\n\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "qrd-annex-related-article-127a-template_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "1\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "1\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "qrd-annex-template_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "1/1\n",
+          [
+            "1",
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "qrd-annex-template_es.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "1/1\n",
+          [
+            "1",
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics-cover-page_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "/\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\n\u0007\n\u0007Official address  Domenico Scarlattilaan 6  \u25cf  1083 HS Amsterdam  \u25cf  The Netherlands\n\u0007\n An agency of the European Union      /\n\u0007\n\u0007Address for visits and deliveries  Refer to www.ema.europa.eu/how-to-find-us \n\u0007\n\u0007\n\u0007Send us a question Go to www.ema.europa.eu/contact \n\u0007Telephone +31 (0)88 781 6000\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007\u00a9 European Medicines Agency, 2026. Reproduction is authorised provided the source is acknowledged.\n\u0007\n\u0007\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics-cover-page_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "\n\n\u0007\n\u0007Appendix II to the QRD templates for human medicinal products \n\u0007\n\u0007\n\u0007EMA/295934/2018 \n\u0007Page 1/1\u0007\u0007\n\n",
+          [
+            "1",
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "/\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "#v.7 Changes since last revision: Revision of cover page and terminology in EN (006), CZ (006), EL (008, 029), FI (016), FR (007-033), HR (010), IT (001-006), LT (006, 008), LV (006, 021), MT (025, 028), NO (007-030), SK (006, 008, 013, 025, 030), SL (007, 026, 027) \n\n\n\u0007\n\u0007Domenico Scarlattilaan 6 \u25cf 1083 HS Amsterdam \u25cf The Netherlands\n\n\u0007An agency of the European Union  \n\u0007/\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007Telephone\n\u0007+44 (0)88 781 6000\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007Send a question via our website www.ema.europa.eu/contact\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007\u00a9 European Medicines Agency, 2026. Reproduction is authorised provided the source is acknowledged.\n\u0007\n\u0007\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products-cover-page_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "/\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\n\u0007\n\u0007Official address  Domenico Scarlattilaan 6  \u25cf  1083 HS Amsterdam  \u25cf  The Netherlands\n\u0007\n An agency of the European Union      /\n\u0007\n\u0007Address for visits and deliveries  Refer to www.ema.europa.eu/how-to-find-us \n\u0007\n\u0007\n\u0007Send us a question Go to www.ema.europa.eu/contact \n\u0007Telephone +31 (0)88 781 6000\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007\u00a9 European Medicines Agency, 2026. Reproduction is authorised provided the source is acknowledged.\n\u0007\n\u0007\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "qrd-appendix-v-adverse-drug-reaction-reporting-details_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "\n\u0007\n\u0007 \n\u0007\n\u0007\n\u0007EMA/67830/2013 \n\u0007Page 1/2\u0007\u0007\n",
+          [
+            "1",
+            "2"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "/\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\n\u0007\n\u0007Official address  Domenico Scarlattilaan 6  \u25cf  1083 HS Amsterdam  \u25cf  The Netherlands\n\u0007An agency of the European Union  \n\u0007/\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007Address for visits and deliveries  Refer to www.ema.europa.eu/how-to-find-us \n\u0007\n\u0007Send us a question  Go to www.ema.europa.eu/contact \n\u0007Telephone +31 (0)88 781 6000\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007\n\u0007\u00a9 European Medicines Agency, 2026. Reproduction is authorised provided the source is acknowledged.\n\u0007\n\u0007\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "qrd-product-information-template-version-104_es.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "\u00151\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\u00151\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "qrd-psur-annex-iv-template_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "1\n\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n\u0007\n\u0007\n\u0007\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    }
+  }
 }

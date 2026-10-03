@@ -131,6 +131,77 @@ on run argv
 end run
 """
 
+# Every header and footer Word has for each section and type, unless linked to the previous
+# section's, with the results of its page-number fields; and every comment, author and text.
+STORIES = """
+on resultOf(g)
+  tell application "Microsoft Word"
+    set rr to result range of g
+    return content of rr
+  end tell
+end resultOf
+
+on pageResults(r)
+  set pageNumbers to {}
+  tell application "Microsoft Word"
+    repeat with f in (get fields of r)
+      set g to contents of f
+      set fieldKind to field type of g
+      if fieldKind is in {field page, field num pages, field section pages, field page ref} then ¬
+        set end of pageNumbers to my resultOf(g)
+    end repeat
+  end tell
+  set AppleScript's text item delimiters to (character id 29)
+  set pagesJoined to pageNumbers as text
+  set AppleScript's text item delimiters to ""
+  return pagesJoined
+end pageResults
+
+on run argv
+  set target to (POSIX file (item 1 of argv)) as string
+  set out to ""
+  set unit to (character id 31)
+  set record_ to (character id 30)
+  with timeout of 600 seconds
+    tell application "Microsoft Word"
+      open file name target
+      repeat 600 times
+        try
+          if (name of every document) contains {item 2 of argv} then exit repeat
+        end try
+        delay 0.1
+      end repeat
+      set d to document (item 2 of argv)
+      set kinds to {header footer primary, header footer first page, header footer even pages}
+      set names to {"default", "first", "even"}
+      repeat with s from 1 to (count of sections of d)
+        repeat with i from 1 to 3
+          set h to get header (section s of d) index (item i of kinds)
+          if (s is 1 or not (link to previous of h)) then
+            set r to text object of h
+            set out to out & "header" & unit & (s - 1) & unit & (item i of names) & unit ¬
+              & (content of r) & unit & my pageResults(r) & record_
+          end if
+          set h to get footer (section s of d) index (item i of kinds)
+          if (s is 1 or not (link to previous of h)) then
+            set r to text object of h
+            set out to out & "footer" & unit & (s - 1) & unit & (item i of names) & unit ¬
+              & (content of r) & unit & my pageResults(r) & record_
+          end if
+        end repeat
+      end repeat
+      repeat with c in (get Word comments of d)
+        set g to contents of c
+        set out to out & "comment" & unit & (author of g) & unit ¬
+          & (content of (comment text of g)) & record_
+      end repeat
+      close document (item 2 of argv) saving no
+    end tell
+  end timeout
+  return out
+end run
+"""
+
 SUFFIXES = {"tab": "\t", "legacy": "\t", "space": " ", "nothing": ""}
 
 # The document saved as text.
@@ -507,12 +578,9 @@ on run argv
         delay 0.1
       end repeat
       set d to document (item 2 of argv)
-      -- Every paragraph of a document up to 600; about 150, evenly spaced, of a longer one,
-      -- since each takes Word several requests.
+      -- Every paragraph, however long the document: none is left unmeasured.
       set total to count of paragraphs of d
-      set stepBy to 1
-      if total > 600 then set stepBy to (total div 150) + 1
-      repeat with i from 1 to total by stepBy
+      repeat with i from 1 to total
         set r to text object of paragraph i of d
         set t to content of r
         if t starts with "@@Q" then
@@ -704,14 +772,123 @@ def verdict(word: list[str], reader: list[str] | str) -> str:
     return "agrees"
 
 
+def _has_stories(path: Path) -> bool:
+    """Whether the document names a header, footer or comments part."""
+    with zipfile.ZipFile(path) as source:
+        names = source.namelist()
+        rels = (
+            source.read("word/_rels/document.xml.rels")
+            if "word/_rels/document.xml.rels" in names
+            else b""
+        )
+    return any(f'/{kind}"'.encode() in rels for kind in ("header", "footer", "comments"))
+
+
+def word_stories(path: Path) -> dict[str, list[list[Any]]] | None:
+    """Word's headers, footers and comments; None if the document has none of them.
+
+    Headers and footers are (kind, section, type, text, page-number results), comments (author,
+    text). A header or footer is listed for each section and type unless Word links it to the
+    previous section's; the first section's are always listed.
+    """
+    if not _has_stories(path):
+        return None
+    CONTAINER.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=CONTAINER) as folder:
+        copy = Path(folder) / path.name
+        shutil.copyfile(path, copy)
+        done = _osascript(
+            ["osascript", "-", str(copy), path.name],
+            input=STORIES,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+    if done.returncode != 0:
+        raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
+    stories: list[list[Any]] = []
+    comments: list[list[Any]] = []
+    for entry in done.stdout.rstrip("\n").split("\x1e"):
+        if not entry:
+            continue
+        fields = entry.split("\x1f")
+        if fields[0] == "comment":
+            comments.append([fields[1], fields[2]])
+        else:
+            pages = fields[4].split(SEPARATOR) if fields[4] else []
+            stories.append([fields[0], int(fields[1]), fields[2], fields[3], pages])
+    return {"stories": stories, "comments": comments}
+
+
+def _shown(text: str) -> list[str]:
+    """Word's text of a story as its paragraphs, empty ones and table cell marks left out."""
+    return [
+        piece.replace("\x07", "")
+        for piece in re.split(r"[\r\n]", text)
+        if piece.replace("\x07", "")
+    ]
+
+
+def story_verdict(word: dict[str, list[list[Any]]], path: Path) -> str:
+    """Whether the reader's headers, footers and comments are Word's.
+
+    Each header or footer a section names must be, paragraph by paragraph, the one Word has for
+    that section and type, with Word's page numbers where the reader sets them aside. A part the
+    reader refuses on its own is not compared. The comments must be Word's, author and text.
+    """
+    try:
+        document = read_document(path.read_bytes())
+    except DocxRefusedError as refused:
+        return f"reader refuses: {refused.code}"
+    shown = {
+        (kind, section, type_): (text, pages)
+        for kind, section, type_, text, pages in word["stories"]
+    }
+    for story in (*document.headers, *document.footers):
+        if story.refusal is not None:
+            continue
+        for section, type_ in story.uses:
+            answer = shown.get((story.kind, section, type_))
+            if answer is None:
+                return f"differs: Word has no {story.kind} {type_} in section {section + 1}"
+            text, pages = answer
+            mine: list[str] = []
+            left = list(pages)
+            for paragraph in story.paragraphs:
+                # Word's text shows an inline picture as "/", where the reader writes one U+FFFC
+                # (the conservation check holds each to a picture in the source).
+                filled = paragraph.text.replace("\ufffc", "/")
+                numbers = [left.pop(0) if left else "?" for _ in paragraph.pages]
+                for offset, number in sorted(
+                    zip(paragraph.pages, numbers, strict=True), reverse=True
+                ):
+                    filled = filled[:offset] + number + filled[offset:]
+                if filled:
+                    mine.append(filled)
+            if mine != _shown(text) or left:
+                return f"differs in the {story.kind} {type_} of section {section + 1}"
+    theirs = sorted((author, "".join(_shown(text))) for author, text in word["comments"])
+    readers = sorted(
+        (comment.author or "", "".join(p.text for p in comment.paragraphs))
+        for comment in document.comments
+        if comment.refusal is None
+    )
+    unread = any(comment.refusal is not None for comment in document.comments)
+    if not unread and readers != theirs:
+        return "differs in the comments"
+    return "agrees"
+
+
 def ask(path: Path) -> dict[str, Any]:
-    """Word's answers for a .docx: labels, note marks, fields, print, emphasis."""
+    """Word's answers for a .docx: labels, note marks, fields, print, emphasis, stories."""
     return {
         "drawn": word_labels(path),
         "notes": word_note_marks(path),
         "fields": word_fields(path),
         "prints": word_prints_what_it_shows(path),
         "emphasis": word_emphasis(path),
+        "stories": word_stories(path),
     }
 
 
@@ -732,6 +909,8 @@ def judge(path: Path, answers: dict[str, Any]) -> str:
     if answers["fields"] is not None and result in ("agrees", "reader refuses: stale-field"):
         # A refusal for a stale field is the right answer for the labels too.
         result = field_verdict(answers["fields"], path)
+    if answers.get("stories") is not None and result == "agrees":
+        result = story_verdict(answers["stories"], path)
     return result
 
 

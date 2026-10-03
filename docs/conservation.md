@@ -245,6 +245,15 @@ applications themselves:
   with Word when the service runs with `--word on`. A result Word shows otherwise is never
   served (R-31, `tests/test_word_verify.py`). Word's rules are not published, so this is evidence by
   example, the strongest available, not a proof.
+- **A Word document's headers, footers and comments**: held to Word the same way (R-37). Each
+  header and footer a section names must be the text Word has for that section and type. The
+  page numbers Word shows go where the reader sets them aside. Word's "/" for an inline picture
+  goes where the reader writes one character, a character the check holds to a picture in the
+  source. Each comment's author and text must be Word's. All 22 corpus documents with any of
+  them agree, but one the reader refuses whole. Four of EMA's templates first showed a
+  difference: the EMA logo in a first-page header, which Word's text shows as "/". Emphasis is
+  now measured on every paragraph, however long the document: a long template had been
+  measured on a sample.
 - **An ePI's list numbers and bullets**: the reader draws each item's marker by the
   browser's rules, and every one is held to the marker Chrome draws, read from its
   accessibility tree: for every corpus ePI, and for every ePI ingested where Chrome is

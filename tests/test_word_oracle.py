@@ -17,12 +17,14 @@ from typing import Any
 import pytest
 
 from label_docx.word import (
+    _has_stories,
     emphasis_verdict,
     field_verdict,
     note_verdict,
     print_verdict,
     reader_labels,
     reader_note_marks,
+    story_verdict,
     verdict,
 )
 
@@ -204,6 +206,37 @@ def test_the_reader_marks_bold_italic_caps_and_strike_as_word_shows_them(
 ) -> None:
     key = f"{path.parent.name}/{path.name}"
     result = emphasis_verdict(word, path)
+    if key in REFUSED:
+        assert result == f"reader refuses: {REFUSED[key]}"
+    else:
+        assert result == "agrees"
+
+
+def _story_cases() -> list[tuple[Path, dict[str, list[list[Any]]]]]:
+    out: list[tuple[Path, dict[str, list[list[Any]]]]] = []
+    for record in RECORDS:
+        stories = _record(record).get("stories", {})
+        out += [(record.parent / name, word) for name, word in sorted(stories.items())]
+    return out
+
+
+def test_words_headers_footers_and_comments_are_on_record_for_every_document_with_them() -> None:
+    on_record = {path for path, _ in _story_cases()}
+    having = {
+        path for record in RECORDS for path in record.parent.glob("*.docx") if _has_stories(path)
+    }
+    assert on_record == having
+    assert len(on_record) >= 20
+
+
+@pytest.mark.parametrize(
+    ("path", "word"), _story_cases(), ids=lambda value: getattr(value, "stem", "")
+)
+def test_the_reader_reads_headers_footers_and_comments_as_word_shows_them(
+    path: Path, word: dict[str, list[list[Any]]]
+) -> None:
+    key = f"{path.parent.name}/{path.name}"
+    result = story_verdict(word, path)
     if key in REFUSED:
         assert result == f"reader refuses: {REFUSED[key]}"
     else:

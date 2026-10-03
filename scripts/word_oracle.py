@@ -57,6 +57,7 @@ def main() -> int:
     field_answers: dict[str, dict[str, list[str]]] = {}
     print_answers: dict[str, bool] = {}
     emphasis_answers: dict[str, dict[str, list[bool]]] = {}
+    story_answers: dict[str, dict[str, list[list[Any]]]] = {}
     # A recording keeps each file's answers as it goes, so one stopped part way resumes there.
     progress = args.folder / ".word-progress.json" if args.command == "record" else None
     recorded: dict[str, dict[str, Any]] = (
@@ -74,6 +75,7 @@ def main() -> int:
                         "fields": kept["fields"].get(name),
                         "prints": kept["prints"][name],
                         "emphasis": kept["emphasis"][name],
+                        "stories": kept.get("stories", {}).get(name),
                     },
                 )
     differs = False
@@ -103,6 +105,8 @@ def main() -> int:
         emphasis_answers[path.name] = kept["emphasis"]
         if kept["fields"] is not None:
             field_answers[path.name] = kept["fields"]
+        if kept.get("stories") is not None:
+            story_answers[path.name] = kept["stories"]
         result = judge(path, kept)
         differs = differs or result.startswith("differs")
         sys.stdout.write(f"{path.name}: {result}\n")
@@ -117,7 +121,10 @@ def main() -> int:
                 "saved as text, what Word wrote between markers around each mark; fields: the "
                 "text between markers around each, as shown and after saving as PDF; prints: the "
                 "whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, "
-                "italic, caps and strike of each body paragraph's text"
+                "italic, caps and strike of each body paragraph's text, between and in field "
+                "results; stories: each section's headers and footers by type (unless linked to "
+                "the previous section's) with their page-number fields' results, and each "
+                "comment's author and text"
             ),
             "recorded": datetime.date.today().isoformat(),
             "drawn": answers,
@@ -125,6 +132,7 @@ def main() -> int:
             "fields": field_answers,
             "prints": print_answers,
             "emphasis": emphasis_answers,
+            "stories": story_answers,
         }
         target = args.folder / "word.json"
         target.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", "utf-8")
