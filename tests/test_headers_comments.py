@@ -73,7 +73,8 @@ def test_headers_and_footers_are_read_once_each_with_their_uses() -> None:
             f"<w:sectPr>{reference('header', 'h1')}{reference('footer', 'f1')}</w:sectPr>",
         )
         + p(r("<w:t>Two</w:t>"))
-        + f"<w:sectPr>{reference('header', 'h1')}{reference('header', 'h2', 'first')}</w:sectPr>"
+        + f"<w:sectPr>{reference('header', 'h1')}{reference('header', 'h2', 'first')}"
+        + "<w:titlePg/></w:sectPr>"
     )
     parts = {
         "header1.xml": header(p(r("<w:t>Product name</w:t>"))),
@@ -391,3 +392,92 @@ def test_the_check_never_places_a_mark_hidden_or_in_a_field_code(
     # The same mark shown and outside the code is placed.
     shown = p(r("<w:t>a</w:t>") + r(mark))
     DocxSource(_commented(shown) if comment else docx(shown, footnotes=_NOTE))
+
+
+def test_two_relationships_under_one_id_are_refused_by_the_reader_and_the_check() -> None:
+    # Which header Word shows for a repeated Id is not on record; OPC Ids are unique.
+    body = p(r("<w:t>x</w:t>")) + f"<w:sectPr>{reference('header', 'h1')}</w:sectPr>"
+    parts = {
+        "header1.xml": header(p(r("<w:t>Store below 25 C</w:t>"))),
+        "header2.xml": header(p(r("<w:t>Store below 2 C</w:t>"))),
+    }
+    data = _document(
+        body, parts, [("h1", "header", "header1.xml"), ("h1", "header", "header2.xml")]
+    )
+    with pytest.raises(DocxRefusedError) as caught:
+        read_document(data)
+    assert caught.value.code == "invalid-package"
+    with pytest.raises(CertificationError):
+        DocxSource(data)
+
+
+def _three_headers(section: str, settings: str | None = None) -> bytes:
+    body = p(r("<w:t>x</w:t>")) + f"<w:sectPr>{section}</w:sectPr>"
+    parts = {
+        "header1.xml": header(p(r("<w:t>Product 10 mg</w:t>"))),
+        "header2.xml": header(p(r("<w:t>Old product 5 mg</w:t>"))),
+        "header3.xml": header(p(r("<w:t>DRAFT</w:t>"))),
+    }
+    rels = [
+        ("h1", "header", "header1.xml"),
+        ("h2", "header", "header2.xml"),
+        ("h3", "header", "header3.xml"),
+    ]
+    if settings is not None:
+        parts["settings.xml"] = header(settings, "settings")
+        rels.append(("s", "settings", "settings.xml"))
+    return _document(body, parts, rels)
+
+
+REFERENCES = reference("header", "h1") + reference("header", "h2", "first")
+REFERENCES += reference("header", "h3", "even")
+
+
+@pytest.mark.parametrize("off", ["", '<w:titlePg w:val="0"/>'])
+def test_a_first_or_even_header_word_never_shows_is_refused_on_its_own(off: str) -> None:
+    # Without titlePg and evenAndOddHeaders Word prints the default header on every page.
+    # Word's case: three pages, each header's printed text, with and without the switches.
+    data = _three_headers(REFERENCES + off, "")
+    refusals = [(h.part, h.refusal and h.refusal[0]) for h in read_document(data).headers]
+    assert refusals == [
+        ("word/header1.xml", None),
+        ("word/header2.xml", "unread-content"),
+        ("word/header3.xml", "unread-content"),
+    ]
+    value = json.loads(output.read(data)[0])
+    assert value["refusedParts"] == 2
+    # With both switches on, each is shown and read.
+    shown = _three_headers(REFERENCES + "<w:titlePg/>", "<w:evenAndOddHeaders/>")
+    assert all(h.refusal is None for h in read_document(shown).headers)
+
+
+def test_two_references_of_one_type_in_a_section_are_refused() -> None:
+    twice = reference("header", "h1") + reference("header", "h2")
+    with pytest.raises(DocxRefusedError) as caught:
+        read_document(_three_headers(twice))
+    assert caught.value.code == "invalid-package"
+    with pytest.raises(CertificationError):
+        DocxSource(_three_headers(twice))
+
+
+def test_a_first_header_a_later_section_takes_and_shows_is_read() -> None:
+    # Section 1 names no first header and turns its first page on: it takes section 0's.
+    body = (
+        p(r("<w:t>x</w:t>"), f"<w:sectPr>{REFERENCES}</w:sectPr>")
+        + p(r("<w:t>y</w:t>"))
+        + "<w:sectPr><w:titlePg/></w:sectPr>"
+    )
+    data = _document(
+        body,
+        {
+            "header1.xml": header(p(r("<w:t>a</w:t>"))),
+            "header2.xml": header(p(r("<w:t>b</w:t>"))),
+            "header3.xml": header(p(r("<w:t>c</w:t>"))),
+        },
+        [
+            ("h1", "header", "header1.xml"),
+            ("h2", "header", "header2.xml"),
+            ("h3", "header", "header3.xml"),
+        ],
+    )
+    assert [h.refusal is None for h in read_document(data).headers] == [True, True, False]

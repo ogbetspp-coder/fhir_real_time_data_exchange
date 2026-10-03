@@ -56,8 +56,13 @@ from a change is held to Word (``corpus/tracked-cases``).
 
 Beyond the text, the check works out on its own, by Word's rules written apart from the
 reader's, the key marks (``CHECKED_MARKS``), every list label and every note mark; the result's
-must be the check's. Other marks are held to Word and Chrome themselves
-(``tests/test_word_oracle.py``, ``tests/test_browser_oracle.py``). It shares one thing with the
+must be the check's. An ePI's other marks are held to Chrome (``tests/test_browser_oracle.py``);
+a .docx's (highlight, shading, faint, raised text, right-to-left) to nothing but the reader's
+tests. Where Word's key marks are not on record the check refuses on its own, as the reader
+does: a table style's bold or italic for a part of the table its look may turn on, over text;
+complex script (right-to-left, ``cs``, ``bdo``/``dir``, or Hebrew, Arabic, Indic... text) whose
+``b`` and ``bCs``, or ``i`` and ``iCs``, differ; text hidden by some level and shown by Word's
+toggle rule; and anything in a cell merged into the one above. It shares one thing with the
 reader: the Symbol table (``SYMBOL_FONT``), 49 code points held to Word, and the closed table of
 Wingdings bullets (``WINGDINGS_BULLETS``).
 """
@@ -156,8 +161,9 @@ class _Paragraph:
     section: int = 0
 
 
-# The marks the check works out itself and holds every result to; the others (highlight,
-# shading, faint, raised text, right-to-left) are held to Word (tests/test_word_oracle.py).
+# The marks the check works out itself and holds every result to. The others (highlight,
+# shading, faint, raised text, right-to-left) are held by nothing but the reader's own tests:
+# the Word oracle reads bold, italic, capitals and strike only (tests/test_word_oracle.py).
 _CHECKED_TOGGLES = {
     "b": "bold",
     "i": "italic",
@@ -205,6 +211,8 @@ class _Fonts:
         self.doc_ppr: ET.Element | None = None
         self.defaults: dict[str, str] = {}
         self.doc_rpr: ET.Element | None = None
+        # Per table style, the parts (firstRow...) whose conditional formatting sets emphasis.
+        self.emphasis: dict[str, set[str]] = {}
         if styles is not None:
             for style in styles.findall(_w("style")):
                 style_id = style.get(_w("styleId"))
@@ -216,6 +224,14 @@ class _Fonts:
                 self.based[style_id] = None if based is None else based.get(_w("val"))
                 self.rpr[style_id] = style.find(_w("rPr"))
                 self.ppr[style_id] = style.find(_w("pPr"))
+                self.emphasis[style_id] = {
+                    part.get(_w("type"), "")
+                    for part in style.findall(_w("tblStylePr"))
+                    if any(
+                        _local(c.tag) in ("b", "bCs", "i", "iCs")
+                        for c in part.iterfind(_w("rPr") + "/*")
+                    )
+                }
                 if style.get(_w("default")) in ("1", "true", "on"):
                     self.defaults[kind] = style_id
             self.doc_rpr = styles.find(f"{_w('docDefaults')}/{_w('rPrDefault')}/{_w('rPr')}")
@@ -282,28 +298,8 @@ class _Fonts:
         to a case in ``corpus/numbering-cases``.
         """
         own = run.find(_w("rPr"))
-        style = None if own is None else own.find(_w("rStyle"))
-        chains = [
-            self.chain(None if style is None else style.get(_w("val")), "character"),
-            self.chain(paragraph_style, "paragraph"),
-            self.chain(table_style, "table") if in_table else [],
-        ]
-        kinds: set[str] = set()
-        for name, kind in _CHECKED_TOGGLES.items():
-            direct = None if own is None else _on(own.find(_w(name)))
-            if direct is not None:
-                shown = direct
-            else:
-                default = self.doc_rpr is not None and bool(_on(self.doc_rpr.find(_w(name))))
-                shown = default
-                for chain in chains:
-                    settings = (_on(rpr.find(_w(name))) for rpr in chain)
-                    setting = next((v for v in settings if v is not None), None)
-                    # Each kind that differs from the document defaults turns it over.
-                    if setting is not None and setting != default:
-                        shown = not shown
-            if shown:
-                kinds.add(kind)
+        chains = self.chains(run, paragraph_style, table_style, in_table)
+        kinds = {kind for name, kind in _CHECKED_TOGGLES.items() if self.toggled(run, chains, name)}
         levels = [own, *(rpr for chain in chains for rpr in chain), self.doc_rpr]
 
         def nearest(name: str) -> str | None:
@@ -319,6 +315,34 @@ class _Fonts:
         if nearest("u") not in (None, "none"):
             kinds.add("underline")
         return frozenset(kinds)
+
+    def chains(
+        self, run: ET.Element, paragraph_style: str | None, table_style: str | None, in_table: bool
+    ) -> list[list[ET.Element]]:
+        """The run's character, paragraph and (in a table) table style chains, nearest first."""
+        own = run.find(_w("rPr"))
+        style = None if own is None else own.find(_w("rStyle"))
+        return [
+            self.chain(None if style is None else style.get(_w("val")), "character"),
+            self.chain(paragraph_style, "paragraph"),
+            self.chain(table_style, "table") if in_table else [],
+        ]
+
+    def toggled(self, run: ET.Element, chains: list[list[ET.Element]], name: str) -> bool:
+        """Whether Word shows the toggle ``name`` on ``run`` (see ``marks``)."""
+        own = run.find(_w("rPr"))
+        direct = None if own is None else _on(own.find(_w(name)))
+        if direct is not None:
+            return direct
+        default = self.doc_rpr is not None and bool(_on(self.doc_rpr.find(_w(name))))
+        shown = default
+        for chain in chains:
+            settings = (_on(rpr.find(_w(name))) for rpr in chain)
+            setting = next((v for v in settings if v is not None), None)
+            # Each kind that differs from the document defaults turns it over.
+            if setting is not None and setting != default:
+                shown = not shown
+        return shown
 
     def font(self, levels: list[ET.Element], slot: str) -> str | None:
         for level in levels:
@@ -357,6 +381,18 @@ class _Fonts:
         if direct is not None:
             return direct
         return any(_on(level.find(_w(name))) for level in levels)
+
+
+def _drawn_complex(character: str) -> bool:
+    """Whether Word draws the character as complex script whatever its run says."""
+    code = ord(character)
+    return (
+        0x0590 <= code <= 0x0DFF
+        or 0x0E00 <= code <= 0x109F
+        or 0x1780 <= code <= 0x17FF
+        or 0xFB1D <= code <= 0xFDFF
+        or 0xFE70 <= code <= 0xFEFF
+    )
 
 
 def _is_symbol(name: str | None) -> bool:
@@ -432,6 +468,10 @@ class _Story:
         self.layout = 0
         self.tables = 0
         self.section = 0
+        # How deep in bdo and dir elements the walk is, and whether the current run's two
+        # emphasis settings (b and bCs, i and iCs) differ where it is drawn as complex script.
+        self.bidi = 0
+        self.unsure: tuple[bool, bool] = (False, False)
 
     # The block structure: paragraphs in document order, and the cell each stands in.
 
@@ -455,9 +495,34 @@ class _Story:
         style = element.find(f"{_w('tblPr')}/{_w('tblStyle')}")
         own = None if style is None else style.get(_w("val"))
         rows = _owned(element, _w("tr"), _w("tbl"))
+        emphasis = set().union(
+            *(self.fonts.emphasis[i] for i in self.fonts.style_ids(own, "table"))
+        )
+        looks = _looks(element, rows) if emphasis else set()
         for row_index, row in enumerate(rows):
-            for cell_index, cell in enumerate(_owned(row, _w("tc"), _w("tr"))):
+            cells = _owned(row, _w("tc"), _w("tr"))
+            for cell_index, cell in enumerate(cells):
+                before = len(self.paragraphs)
                 self.blocks(cell, outer or (index, row_index, cell_index), own)
+                texted = any(s.text for p in self.paragraphs[before:] for s in p.segments)
+                where = _where(
+                    row, row_index == 0, row_index == len(rows) - 1, cell_index, len(cells)
+                )
+                # A part this check does not know counts as on, everywhere.
+                if texted and any(
+                    (part in looks and part in where) or part not in _ALL_PARTS for part in emphasis
+                ):
+                    # Word puts the style's bold or italic for that part on the text there.
+                    raise CertificationError("conditional emphasis over text in a table")
+                merge = cell.find(f"{_w('tcPr')}/{_w('vMerge')}")
+                if merge is None or merge.get(_w("val"), "continue") != "continue":
+                    continue
+                # Word draws nothing of a cell merged into the one above: a character, a
+                # mark or a list label there would be one it does not show.
+                for paragraph in self.paragraphs[before:]:
+                    numbered = _numbering_of(self.fonts, paragraph)
+                    if paragraph.segments or (numbered is not None and numbered[0] != 0):
+                        raise CertificationError("content in a merged-away cell")
 
     def paragraph(
         self, element: ET.Element, table: tuple[int, int, int] | None, table_style: str | None
@@ -502,6 +567,11 @@ class _Story:
                     self.inline(child)
             elif local == "t":
                 raise CertificationError("text outside a run")
+            elif child.tag in (_w("bdo"), _w("dir")):
+                # Text in a bidirectional embedding or override is drawn as complex script.
+                self.bidi += 1
+                self.inline(child)
+                self.bidi -= 1
             else:
                 self.inline(child)
 
@@ -516,8 +586,20 @@ class _Story:
         in_table = here.table is not None
         levels = self.fonts.levels(run, here.style, here.table_style, in_table)
         symbol = self.fonts.symbol(levels)
-        hidden = self.fonts.hidden(levels, run.find(_w("rPr")))
+        hidden: bool | None = self.fonts.hidden(levels, run.find(_w("rPr")))
+        chains = self.fonts.chains(run, here.style, here.table_style, in_table)
+        if hidden and not self.fonts.toggled(run, chains, "vanish"):
+            hidden = None  # hidden by any level, shown by Word's toggle rule: not on record
         kinds = self.fonts.marks(run, here.style, here.table_style, in_table)
+        # Word draws complex script with bCs and iCs, and b and i are what this check reads.
+        forced = bool(self.bidi) or any(
+            _on(level.find(_w(name))) for level in levels for name in ("rtl", "cs")
+        )
+        differ = any(
+            self.fonts.toggled(run, chains, name) != self.fonts.toggled(run, chains, name + "Cs")
+            for name in ("b", "i")
+        )
+        self.unsure = (forced, differ)
         shown: list[str] = []
         for child in run:
             local = _local(child.tag)
@@ -626,6 +708,8 @@ class _Story:
             inner = [n for n in child.iter() if n is not child]
             if any(_local(n.tag) in texts for n in inner):
                 raise CertificationError(f"text inside a {local}")
+            if local == "pict" and any(n.tag.startswith(f"{{{W}}}") for n in inner):
+                raise CertificationError("run content inside a VML picture")
             if local == "AlternateContent" and any(
                 n.tag.startswith(f"{{{W}}}") and _local(n.tag) not in ("drawing", "pict")
                 for n in inner
@@ -653,10 +737,15 @@ class _Story:
         else:
             raise CertificationError(f"a field character {kind!r} out of place")
 
-    def flush_run(self, shown: list[str], hidden: bool, kinds: frozenset[str]) -> None:
+    def flush_run(self, shown: list[str], hidden: bool | None, kinds: frozenset[str]) -> None:
         text = "".join(shown)
         if not text:
             return
+        if hidden is None:
+            raise CertificationError("text whose hiding Word's toggle rule cancels")
+        forced, differ = self.unsure
+        if differ and (forced or any(_drawn_complex(c) for c in text)):
+            raise CertificationError("complex script whose two emphasis settings differ")
         if hidden:
             if text.strip():
                 # Hidden text Word does not show: the reader refuses it, never reads it.
@@ -664,6 +753,75 @@ class _Story:
             self.ledger.hidden += len(text)
             return
         self.current.segments.append(_Segment(text=text, kinds=kinds))
+
+
+_ALL_PARTS = (
+    "wholeTable",
+    "firstRow",
+    "lastRow",
+    "firstCol",
+    "lastCol",
+    "band1Horz",
+    "band2Horz",
+    "band1Vert",
+    "band2Vert",
+    "nwCell",
+    "neCell",
+    "swCell",
+    "seCell",
+)
+
+
+def _looks(table: ET.Element, rows: list[ET.Element]) -> set[str]:
+    """Every conditional part any look of the table (its own, each row's) may turn on.
+
+    Without a look of its own, all. Corners always; banding unless every look turns it off.
+    """
+    own = table.find(f"{_w('tblPr')}/{_w('tblLook')}")
+    if own is None:
+        return set(_ALL_PARTS)
+    out = {"wholeTable", "nwCell", "neCell", "swCell", "seCell"}
+    flags = (
+        ("firstRow", 0x20, ["firstRow"], False),
+        ("lastRow", 0x40, ["lastRow"], False),
+        ("firstColumn", 0x80, ["firstCol"], False),
+        ("lastColumn", 0x100, ["lastCol"], False),
+        ("noHBand", 0x200, ["band1Horz", "band2Horz"], True),
+        ("noVBand", 0x400, ["band1Vert", "band2Vert"], True),
+    )
+    for look in [own, *(r.find(f"{_w('tblPrEx')}/{_w('tblLook')}") for r in rows)]:
+        if look is None:
+            continue
+        raw = look.get(_w("val"))
+        if raw is not None and not re.fullmatch(r"[0-9A-Fa-f]{1,4}", raw):
+            raise CertificationError(f"a table look {raw!r}")
+        value = None if raw is None else int(raw, 16)
+        for attribute, bit, parts, negative in flags:
+            said = [] if value is None else [value & bit != 0]
+            stated = look.get(_w(attribute))
+            if stated is not None:
+                said.append(stated.lower() not in ("0", "false", "off"))
+            # A part is on where any says so; banding where any does not turn it off.
+            if (negative and not (said and all(said))) or (not negative and any(said)):
+                out.update(parts)
+    return out
+
+
+def _where(row: ET.Element, first: bool, last: bool, cell: int, cells: int) -> set[str]:
+    """The conditional parts a cell may stand in.
+
+    A header row is a first row too, and a row whose grid starts or ends early has every cell
+    first and last.
+    """
+    header = row.find(f"{_w('trPr')}/{_w('tblHeader')}") is not None
+    early = any(row.find(f"{_w('trPr')}/{_w(n)}") is not None for n in ("gridBefore", "gridAfter"))
+    top, bottom = first or header, last
+    left, right = cell == 0 or early, cell == cells - 1 or early
+    out = {"wholeTable", "band1Horz", "band2Horz", "band1Vert", "band2Vert"}
+    out |= {name for name, inside in (("firstRow", top), ("lastRow", bottom), ("firstCol", left),
+            ("lastCol", right), ("nwCell", top and left), ("neCell", top and right),
+            ("swCell", bottom and left), ("seCell", bottom and right)) if inside}  # fmt: skip
+    return out
 
 
 def _owned(element: ET.Element, wanted: str, stop: str) -> list[ET.Element]:
@@ -783,7 +941,10 @@ def _relation(archive: zipfile.ZipFile, source: str, relationship: str | None, k
     """The part ``source``'s relationship ``relationship`` names, which must be a ``kind``."""
     folder, base = posixpath.split(source)
     name = posixpath.join(folder, "_rels", base + ".rels")
-    for rel in ET.fromstring(archive.read(name)).iter(f"{{{_RELS}}}Relationship"):
+    rels = list(ET.fromstring(archive.read(name)).iter(f"{{{_RELS}}}Relationship"))
+    if [rel.get("Id") for rel in rels].count(relationship) > 1:
+        raise CertificationError(f"two relationships {relationship}")
+    for rel in rels:
         if rel.get("Id") != relationship:
             continue
         if rel.get("TargetMode") == "External" or not _typed(rel, kind):
@@ -1336,6 +1497,13 @@ class DocxSource:
                 "footer": [],
             }
             for section, properties in enumerate(parse[main].iter(_w("sectPr"))):
+                named = [
+                    (_local(c.tag), c.get(_w("type"), "default"))
+                    for c in properties
+                    if c.tag in (_w("headerReference"), _w("footerReference"))
+                ]
+                if len(set(named)) != len(named):
+                    raise CertificationError(f"section {section} names one type of header twice")
                 for reference in properties:
                     story_kind = next(
                         (k for k in self.stories if reference.tag == _w(f"{k}Reference")), None
@@ -1638,6 +1806,8 @@ def _run_tokens(
                 table(child, dropped, mine)
                 continue
             if child.tag == _w("tr") and gone_row(child):
+                if carried:
+                    raise CertificationError("a joined paragraph meets a row the view drops")
                 continue  # a row of a nested table the view drops goes whole too
             if element.tag == _w("r") and child.tag != _w("rPr"):
                 if not dropped:
