@@ -1125,6 +1125,11 @@ def story_verdict(word: dict[str, list[list[Any]]], path: Path) -> str:
     return "agrees"
 
 
+# What Word shows at a page place: a number in digits or roman numerals, or nothing (a hidden
+# page field with no result). Words such as PAGEREF \p's "above" are not a page number.
+_PAGE_NUMBER = "(?:[0-9]+|[ivxlcdm]+|[IVXLCDM]+)?"
+
+
 def text_verdict(word: list[str], path: Path) -> str:
     """Whether the reader's body text is the text Word shows, paragraph by paragraph.
 
@@ -1166,7 +1171,7 @@ def text_verdict(word: list[str], path: Path) -> str:
     for index, ours in enumerate(mine):
         # Each character the Symbol table could have given is a group: it or Word's "(".
         pattern = "".join(
-            r"\w*"
+            _PAGE_NUMBER
             if c == "\x00"
             else f"({re.escape(c)}|\\()"
             if c in symbols and c != "("

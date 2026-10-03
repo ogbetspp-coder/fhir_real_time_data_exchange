@@ -83,6 +83,7 @@ W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
 _OBJECT = "\ufffc"
 _LAYOUT_CODES = {"PAGEREF", "PAGE", "NUMPAGES", "SECTIONPAGES"}
+_PAGE_FORMATS = {"MERGEFORMAT", "CHARFORMAT", "ARABIC"}
 _NOTE_LAYOUT = {"separator", "continuationSeparator", "continuationNotice"}
 # Run children that hold no text and stand for none.
 _RUN_SILENT = {"rPr", "lastRenderedPageBreak"}
@@ -478,8 +479,11 @@ class _Story:
             if child.tag == _w("r"):
                 self.run(child)
             elif child.tag == _w("fldSimple"):
-                code = _code(child.get(_w("instr"), ""))
-                if code in _LAYOUT_CODES and not self.layout and not self.in_instruction():
+                if (
+                    not self.in_instruction()
+                    and _page_field(child.get(_w("instr"), ""))
+                    and not self.layout
+                ):
                     self.mark("page", None)
                     self.layout += 1
                     self.inline(child)
@@ -514,6 +518,10 @@ class _Story:
                 if self.story is None or self.story[0] != "comment":
                     raise CertificationError("annotationRef outside a comment")
                 continue
+            marked = local == "commentReference" or local in _NOTE_MARKS
+            if marked and (hidden or self.in_instruction()):
+                # Word draws no mark there, or what it draws is not on record.
+                raise CertificationError(f"a {local} hidden or in a field's code")
             if local == "commentReference":
                 if self.story is not None and self.story[0] == "comment":
                     raise CertificationError("a comment's mark in a comment")
@@ -618,11 +626,11 @@ class _Story:
         kind = child.get(_w("fldCharType"))
         if kind == "begin":
             self.fields.append([True, [], False])
-        elif kind == "separate" and self.fields:
+        elif kind == "separate" and self.fields and self.fields[-1][0]:
             entry = self.fields[-1]
             nested = any(e[0] for e in self.fields[:-1])
             entry[0] = False
-            if not nested and _code("".join(entry[1])) in _LAYOUT_CODES and not self.layout:
+            if not nested and _page_field("".join(entry[1])) and not self.layout:
                 self.mark("page", None)
                 self.layout += 1
                 entry[2] = True
@@ -668,9 +676,26 @@ def _owned(element: ET.Element, wanted: str, stop: str) -> list[ET.Element]:
     return out
 
 
-def _code(instruction: str) -> str | None:
+def _page_field(instruction: str) -> bool:
+    r"""Whether a field is a page number; one with a switch Word has not answered is refused.
+
+    Word draws the page for PAGEREF with ``\h`` and for ``\*`` MERGEFORMAT, CHARFORMAT or
+    Arabic; ``\p`` shows "above" or "below", ``\#`` a picture's text, other formats words.
+    """
     words = instruction.split()
-    return words[0].upper() if words else None
+    code = words[0].upper() if words else None
+    if code not in _LAYOUT_CODES:
+        return False
+    rest = [word for word in words[1:] if not (code == "PAGEREF" and word == "\\h")]
+    if code == "PAGEREF":
+        if not rest or rest[0].startswith("\\"):
+            raise CertificationError("a PAGEREF without its bookmark")
+        rest = rest[1:]
+    while rest:
+        if rest[:1] != ["\\*"] or len(rest) < 2 or rest[1].upper() not in _PAGE_FORMATS:
+            raise CertificationError(f"a {code} field with a switch Word has not answered")
+        rest = rest[2:]
+    return True
 
 
 # --- .docx: matching the result -----------------------------------------------------------
