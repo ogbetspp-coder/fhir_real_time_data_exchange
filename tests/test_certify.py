@@ -30,6 +30,7 @@ from label_docx.certify import (
     DocxSource,
     EpiSource,
     _formatted,
+    _unescape,
     certify_docx,
     certify_epi,
 )
@@ -1314,7 +1315,7 @@ def _epi(*divs: str, entries: list[dict[str, Any]] | None = None, text: str | No
     bundle = {
         "resourceType": "Bundle",
         "type": "document",
-        "entry": [*(entries or []), {"resource": composition}],
+        "entry": [{"resource": composition}, *(entries or [])],
     }
     return json.dumps(bundle).encode()
 
@@ -1362,7 +1363,7 @@ def test_every_block_element_ends_a_paragraph() -> None:
     EpiSource(data).certify(value)
 
 
-def test_the_composition_is_found_among_the_entries_and_other_narratives_are_listed() -> None:
+def test_the_composition_is_the_first_entry_and_other_narratives_are_listed() -> None:
     other = {"resource": {"resourceType": "Organization", "text": {"div": "<div>EMA</div>"}}}
     data = _epi(
         "<p>a</p>", entries=[{"resource": "not a resource"}, other], text="<div>summary</div>"
@@ -2092,3 +2093,30 @@ def test_conditional_emphasis_over_text_in_a_part_the_table_turns_on_is_never_ce
             DocxSource(table(look, text))
     DocxSource(table('<w:tblLook w:val="0000"/>', text))
     DocxSource(table('<w:tblLook w:val="04A0"/>', ""))
+
+
+def test_the_check_reads_the_bundle_strictly_and_on_its_own() -> None:
+    # S34, S35: one reading of each name, no NaN, the first entry's Composition; S71: a long
+    # character reference reads as the reader reads it, and nesting is counted without recursion.
+    data = _epi("<p>a</p>")
+    value = json.loads(epi_output.read(data)[0])
+    EpiSource(data).certify(value)
+    text = data.decode()
+    repeated = text.replace('"title": "T"', '"title": "T", "title": "U"', 1)
+    patient = {"resource": {"resourceType": "Patient"}}
+    moved = json.loads(text)
+    moved["entry"].insert(0, patient)
+    for bad in (repeated, text[:-1] + ', "x": NaN}', json.dumps(moved)):
+        with pytest.raises(CertificationError):
+            EpiSource(bad.encode())
+    long = _epi("<p>x&#" + "0" * 4300 + "65;y</p>")
+    value = json.loads(epi_output.read(long)[0])
+    assert value["sections"][0]["paragraphs"][0]["text"] == "xAy"
+    assert "certificate" in value
+    assert _unescape("&#" + "0" * 4300 + "65;") == "A"
+    deep = json.loads(text)
+    nested: list[Any] = []
+    for _ in range(5000):
+        nested = [nested]
+    deep["x"] = nested
+    assert EpiSource(json.dumps(deep).encode()).narratives == 0

@@ -1340,7 +1340,9 @@ def _unescape(text: str) -> str:
         if found.group(1):
             return _PREDEFINED[found.group(1)]
         if found.group(2) or found.group(3):
-            return chr(int(found.group(2) or found.group(3), 10 if found.group(2) else 16))
+            # Leading zeros stripped: Python reads no more than 4300 decimal digits.
+            digits = (found.group(2) or found.group(3)).lstrip("0") or "0"
+            return chr(int(digits, 10 if found.group(2) else 16))
         raise CertificationError("an '&' that is not a reference")
 
     return _REFERENCE.sub(one, text)
@@ -2013,7 +2015,9 @@ class EpiSource:
     """An ePI's sections, read once by the standard library's HTML parser, to hold results to."""
 
     def __init__(self, data: bytes) -> None:
-        bundle = json.loads(data.decode("utf-8"))
+        bundle = json.loads(
+            data.decode("utf-8"), object_pairs_hook=_one_value, parse_constant=_no_constant
+        )
         compositions = [
             e["resource"]
             for e in bundle["entry"]
@@ -2021,17 +2025,18 @@ class EpiSource:
         ]
         if len(compositions) != 1:
             raise CertificationError("not one Composition with sections")
+        if bundle["entry"][0].get("resource") is not compositions[0]:
+            raise CertificationError("the Composition is not the first entry")
         self.sections = [self._section(raw) for raw in compositions[0]["section"]]
-        self.narratives = sum(
-            1 for path, _ in _strings(bundle, ()) if path[-1:] == ("div",) and "section" not in path
-        )
+        self.narratives = _narratives(bundle)
 
     def _section(self, raw: dict[str, Json]) -> _EpiSection:
         div = raw.get("text", {}).get("div")
         parsed = None
         if isinstance(div, str):
             parsed = _Div()
-            parsed.feed(div)
+            # html.unescape reads no more than 4300 decimal digits: leading zeros go first.
+            parsed.feed(re.sub(r"&#0+(?=[0-9])", "&#", div))
             parsed.close()
             parsed.flush()
         return _EpiSection(
@@ -2127,9 +2132,26 @@ def certify_epi(data: bytes, value: dict[str, Json]) -> dict[str, Json]:
     return EpiSource(data).certify(value)
 
 
-def _strings(value: Json, path: tuple[str, ...]) -> list[tuple[tuple[str, ...], str]]:
-    if isinstance(value, dict):
-        return [s for key, item in value.items() for s in _strings(item, (*path, key))]
-    if isinstance(value, list):
-        return [s for item in value for s in _strings(item, path)]
-    return [(path, value)] if isinstance(value, str) else []
+def _one_value(pairs: list[tuple[str, Json]]) -> dict[str, Json]:
+    if len({name for name, _ in pairs}) != len(pairs):
+        raise CertificationError("a name repeated in an object")
+    return dict(pairs)
+
+
+def _no_constant(constant: str) -> None:
+    raise CertificationError(f"{constant} is not JSON")
+
+
+def _narratives(bundle: Json) -> int:
+    """The strings named ``div`` outside any ``section``, counted without recursion."""
+    count = 0
+    stack: list[tuple[Json, str | None, bool]] = [(bundle, None, False)]
+    while stack:
+        value, name, in_section = stack.pop()
+        if isinstance(value, dict):
+            stack += [(item, key, in_section or key == "section") for key, item in value.items()]
+        elif isinstance(value, list):
+            stack += [(item, name, in_section) for item in value]
+        elif isinstance(value, str) and name == "div" and not in_section:
+            count += 1
+    return count
