@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from label_docx.word import ask, judge, word_updated, word_version
+from label_docx.word import ask, is_tracked, judge, judge_tracked, word_updated, word_version
 
 
 def main() -> int:
@@ -87,6 +87,17 @@ def main() -> int:
             if args.command == "record":
                 raise SystemExit(f"{path.name}: not a .docx")
             sys.stdout.write(f"{path.name}: not a .docx; not sent to Word\n")
+            continue
+        if args.command == "compare" and is_tracked(path):
+            # Two texts: each view held to Word's, and Word's held to what Word shows.
+            try:
+                result = judge_tracked(path)
+            except SystemExit as failed:
+                sys.stdout.write(f"{failed}\n")
+                continue
+            differs = differs or result.startswith("differs")
+            sys.stdout.write(f"{path.name}: tracked changes, {result}\n")
+            sys.stdout.flush()
             continue
         try:
             kept = recorded[path.name] if path.name in recorded else ask(path)

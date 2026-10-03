@@ -23,7 +23,11 @@ normalises, trims or repairs.
 - **Nothing passed over.** Every run in the main document part is read exactly once, run content
   stands only inside runs, and there is no character data outside `<w:t>` and `<w:instrText>`.
   A document where any of that fails is refused (`stray-text`, `unread-content`).
-- **Refuses rather than guesses.** Tracked changes, hidden text, fields Word recomputes (PAGE,
+- **Tracked changes read as two texts, never one.** A document with tracked changes is read
+  with every change accepted and with every change rejected (the original), each certified,
+  with the list of changes (who, when, what kind). The result has no text of its own: the caller
+  names the view it takes, so a proposal never becomes "the label" unnoticed.
+- **Refuses rather than guesses.** Hidden text, fields Word recomputes (PAGE,
   DATE, IF...), text boxes, footnote references, embedded objects, math, dingbat fonts, unmapped
   symbols, conditional table formatting and more are refused with a code. The full list is the
   module docstring of [`src/label_docx/reader.py`](src/label_docx/reader.py).
@@ -67,7 +71,9 @@ except DocxRefusedError as refused:
 {"format":"label-docx-json/1.1.0","paragraphs":[{"markHidden":false,"marks":[{"end":5,"kind":"superscript","start":4}],"numbering":{"level":1,"numId":2,"suffix":"tab","text":"4.8"},"style":"Heading2","table":null,"text":"x 109/l"}],"reader":"docx-reader/1.3.0","source":{"bytes":18342,"sha256":"…"}}
 ```
 
-or, refused, `"refusal":{"code":"tracked-change","detail":"ins"}` in place of `paragraphs`.
+or, refused, `"refusal":{"code":"hidden-text","detail":"…"}` in place of `paragraphs`. A document
+with tracked changes has `"tracked":{"accepted":{…},"original":{…},"changes":[…]}` in place of
+`paragraphs` (each view holds `paragraphs`, notes, headers, footers and comments, as above).
 
 - `marks[].start`/`end` count **Unicode code points** of `text` (not UTF-16 units, not bytes).
 - `table` is `[table, row, cell]` counted from zero in document order; a nested table's
@@ -252,14 +258,18 @@ downloads.
   shows nothing there and prints a number).
 - **Word 97-2003 documents (.doc)** are refused, including under a .docx name: EMA's site
   serves one. Save them as .docx in Word first.
-- **Documents with tracked changes** are refused, not resolved. Accept or reject all changes in
-  Word first; which text is "the label" is a decision the reader will not make.
+- **Documents with tracked changes** are read as both views, accepted and original, and never
+  as one: which text is "the label" is a decision the reader will not make. Inserted and
+  deleted text, moves, inserted and deleted paragraph marks, and changed run and paragraph
+  formatting are undone; other tracked changes (table cells, section and table properties,
+  numbering) are refused (`tracked-change`), as is a deleted paragraph mark before a table or
+  at the end of a section.
 - **Font size, colour, font and alignment** are not reported (faint text aside: white, tiny or
   squeezed text is marked).
 
 ## How the claims are held
 
-`docs/requirements.md` lists the requirements (R-01 to R-38) with the tests that prove each; the
+`docs/requirements.md` lists the requirements (R-01 to R-39) with the tests that prove each; the
 table below is the short form.
 
 | Claim                                                            | Where                        |

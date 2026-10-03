@@ -131,7 +131,8 @@ to exactly once, and every reference must name a note.
 What it refuses (``DocxRefusedError.code``):
 
 - ``tracked-change``: any revision anywhere in the body, including changed formatting and
-  deleted paragraph marks. Such a document has more than one text.
+  deleted paragraph marks. Such a document has more than one text: ``tracked`` makes the two
+  views, each then read by these rules, and refuses what it cannot undo.
 - ``hidden-text``: a run with text, or a note mark, that is hidden, directly or at any level of
   the style hierarchy (hiding is treated as a fact as soon as any level asserts it, unless the
   run itself says it is visible).
@@ -224,8 +225,9 @@ from dataclasses import dataclass, field, replace
 # default character style is not applied to text, and a lvlRestart naming the level directly
 # above, or a level with lvlRestart counted first by a deeper one, is refused; 1.15.0 restarts
 # a level as the list whose paragraph restarted it says (its startOverride, else the start), and
-# refuses a level that never restarts shown in a deeper level's label.
-READER_VERSION = "docx-reader/1.17.1"
+# refuses a level that never restarts shown in a deeper level's label; 1.18.0 reads a document with
+# tracked changes as two, every change accepted and every one rejected (``tracked``).
+READER_VERSION = "docx-reader/1.18.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -2784,3 +2786,229 @@ def _check_accounted(document: ET.Element, runs: set[ET.Element]) -> None:
             for child in element:
                 if child.tag in _RUN_CONTENT:
                     raise DocxRefusedError("unread-content", f"{_local(child.tag)} outside a run")
+
+
+# --- tracked changes -----------------------------------------------------------------------
+
+# The changes each view keeps; it drops the other two.
+_VIEW_KEEPS = {"accepted": ("ins", "moveTo"), "original": ("del", "moveFrom")}
+_CHANGES = ("ins", "del", "moveFrom", "moveTo")
+# Elements whose children are runs: a change there wraps runs (a paragraph mark's change is a
+# marker in the mark's properties instead).
+_RUN_HOLDERS = {
+    _w(name)
+    for name in (
+        "p",
+        "hyperlink",
+        "smartTag",
+        "customXml",
+        "sdtContent",
+        "fldSimple",
+        "dir",
+        "bdo",
+        *_CHANGES,
+    )
+}
+_MOVE_RANGES = {
+    _w(name)
+    for name in ("moveFromRangeStart", "moveFromRangeEnd", "moveToRangeStart", "moveToRangeEnd")
+}
+
+
+@dataclass(frozen=True)
+class Change:
+    """One tracked change as stored: the part it is in, what it is, and its id, author, date.
+
+    ``kind`` is ``insert``, ``delete``, ``move-from`` or ``move-to`` (runs), the same with
+    ``-paragraph-mark`` (a paragraph's end, so two paragraphs are one in the other view),
+    ``format`` (a run's properties) or ``format-paragraph`` (a paragraph's).
+    """
+
+    part: str
+    kind: str
+    id: str | None
+    author: str | None
+    date: str | None
+
+
+_CHANGE_KINDS = {"ins": "insert", "del": "delete", "moveFrom": "move-from", "moveTo": "move-to"}
+
+
+def tracked(data: bytes) -> tuple[bytes, bytes, tuple[Change, ...]]:
+    """A .docx with tracked changes as its two views (accepted, original) and the changes.
+
+    The views are .docx without tracked changes, every change accepted and every one rejected,
+    each the package with only its revised parts written again; the changes are in the order
+    stored, each once (a run split in two holds its change twice). A run change is kept (its
+    runs stand in its place; a deletion's ``delText`` is ``t`` again) or dropped whole; a move's
+    range markers go. A paragraph mark a view drops joins the paragraph to the next one, which
+    keeps its own properties, as the mark that ends it does. Changed run and paragraph
+    properties are the current ones in the accepted view and the stored former ones in the
+    original. A change holding part of a field, and a view with any other revision left, are
+    refused. Each rule is Word's answer to a case in ``corpus/tracked-cases``.
+    """
+    package = _Package(data)
+    with package.zip:
+        entries = [(info, package.zip.read(info)) for info in package.zip.infolist()]
+        views: dict[str, list[tuple[zipfile.ZipInfo, bytes]]] = {"accepted": [], "original": []}
+        changes: list[Change] = []
+        for info, raw in entries:
+            root = package.part(info.filename) if info.filename.endswith(".xml") else None
+            revised = root is not None and any(
+                e.tag in _TRACKED or e.tag in _MOVE_RANGES for e in root.iter()
+            )
+            if root is not None and revised:
+                # A run split in two carries its change twice: the same change, listed once.
+                for change in _changes(info.filename, root):
+                    if change not in changes:
+                        changes.append(change)
+            for view, kept in views.items():
+                if root is None or not revised:
+                    kept.append((info, raw))
+                    continue
+                copy = ET.fromstring(_decode(info.filename, raw))
+                _view(copy, view)
+                left = next((e for e in copy.iter() if e.tag in _TRACKED), None)
+                if left is not None:
+                    raise DocxRefusedError(
+                        "tracked-change", f"{_local(left.tag)} in {info.filename}"
+                    )
+                text = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+                kept.append((info, (text + ET.tostring(copy, encoding="unicode")).encode()))
+    out: list[bytes] = []
+    for view in ("accepted", "original"):
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            for info, raw in views[view]:
+                # The stored dates, so the same document always gives the same views.
+                entry = zipfile.ZipInfo(info.filename, info.date_time)
+                archive.writestr(entry, raw, zipfile.ZIP_DEFLATED)
+        out.append(buffer.getvalue())
+    return out[0], out[1], tuple(changes)
+
+
+def _changes(part: str, root: ET.Element) -> list[Change]:
+    found: list[Change] = []
+
+    def visit(element: ET.Element, parent: ET.Element | None) -> None:
+        name = _local(element.tag)
+        kind = None
+        if element.tag.startswith(f"{{{W}}}") and name in _CHANGE_KINDS:
+            kind = _CHANGE_KINDS[name]
+            if parent is not None and parent.tag == _w("rPr"):
+                kind += "-paragraph-mark"
+        elif element.tag == _w("rPrChange"):
+            kind = "format"
+        elif element.tag == _w("pPrChange"):
+            kind = "format-paragraph"
+        if kind is not None:
+            found.append(
+                Change(
+                    part,
+                    kind,
+                    element.get(_w("id")),
+                    element.get(_w("author")),
+                    element.get(_w("date")),
+                )
+            )
+        for child in element:
+            visit(child, element)
+
+    visit(root, None)
+    return found
+
+
+def _view(element: ET.Element, view: str) -> None:
+    """``element`` as the view has it, changed in place."""
+    keep = {_w(name) for name in _VIEW_KEEPS[view]}
+    drop = {_w(name) for name in _CHANGES} - keep
+    children: list[ET.Element] = []
+    for child in element:
+        if child.tag in _MOVE_RANGES:
+            continue
+        if element.tag in _RUN_HOLDERS and child.tag in keep | drop:
+            _whole_fields(child)
+        if element.tag in _RUN_HOLDERS and child.tag in drop:
+            continue
+        _view(child, view)
+        if element.tag in _RUN_HOLDERS and child.tag in keep:
+            if view == "original":
+                for node in child.iter():
+                    if node.tag == _w("delText"):
+                        node.tag = _w("t")
+                    elif node.tag == _w("delInstrText"):
+                        node.tag = _w("instrText")
+            children.extend(child)
+        else:
+            children.append(child)
+    former = element.find(_w("rPrChange")) if element.tag == _w("rPr") else None
+    if former is not None:
+        if view == "original":
+            # A paragraph mark's own changes stay: they are not its properties.
+            markers = [c for c in children if c.tag in {_w(n) for n in _CHANGES}]
+            stored = former.find(_w("rPr"))
+            children = markers + ([] if stored is None else list(stored))
+        else:
+            children = [c for c in children if c is not former]
+    former = element.find(_w("pPrChange")) if element.tag == _w("pPr") else None
+    if former is not None:
+        if view == "original":
+            own = [c for c in children if c.tag in (_w("rPr"), _w("sectPr"))]
+            stored = former.find(_w("pPr"))
+            children = ([] if stored is None else list(stored)) + own
+        else:
+            children = [c for c in children if c is not former]
+    if element.tag == _w("pPr"):
+        mark = next((c for c in children if c.tag == _w("rPr")), None)
+        if mark is not None:
+            # The mark's changes this view keeps are no longer changes; one it drops stays as
+            # the sign that the paragraph joins the next (_join).
+            for marker in [c for c in mark if c.tag in keep]:
+                mark.remove(marker)
+    element[:] = children
+    _join(element, drop)
+
+
+def _whole_fields(change: ET.Element) -> None:
+    """Refuse a change that holds part of a field: its begin, separator or end alone.
+
+    Word accepts a deleted separator by removing the field's result with it (corpus/
+    tracked-cases), not by what the change holds; only whole fields are taken or left.
+    """
+    depth = 0
+    for node in change.iter(_w("fldChar")):
+        kind = node.get(_w("fldCharType"))
+        if kind == "begin":
+            depth += 1
+        elif depth == 0 or kind not in ("separate", "end"):
+            raise DocxRefusedError("tracked-change", f"a change holds part of a field ({kind})")
+        elif kind == "end":
+            depth -= 1
+    if depth:
+        raise DocxRefusedError("tracked-change", "a change holds part of a field (begin)")
+
+
+def _join(element: ET.Element, drop: set[str]) -> None:
+    """Join each paragraph whose mark the view drops to the paragraph after it."""
+    children = list(element)
+    out: list[ET.Element] = []
+    carried: list[ET.Element] = []
+    for index, child in enumerate(children):
+        if child.tag == _w("p") and carried:
+            properties = child.find(_w("pPr"))
+            at = 1 if properties is not None and child[0] is properties else 0
+            child[at:at] = carried
+            carried = []
+        mark = child.find(f"{_w('pPr')}/{_w('rPr')}") if child.tag == _w("p") else None
+        if mark is not None and any(c.tag in drop for c in mark):
+            following = children[index + 1] if index + 1 < len(children) else None
+            if following is None or following.tag != _w("p"):
+                raise DocxRefusedError(
+                    "tracked-change", "a paragraph mark joins what is not a paragraph"
+                )
+            if child.find(f"{_w('pPr')}/{_w('sectPr')}") is not None:
+                raise DocxRefusedError("tracked-change", "a section's last paragraph mark")
+            carried = [c for c in child if c.tag != _w("pPr")]
+            continue
+        out.append(child)
+    element[:] = out

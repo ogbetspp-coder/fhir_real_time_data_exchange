@@ -231,10 +231,13 @@ def _receipt(document: str, result: bytes, value: dict[str, Json], reading: Kind
 
     The outcome is ``read``, ``refused``, or ``read-in-part``: an ePI with sections, or a .docx
     with headers, footers or comments, the reader refused on their own. Those hold no text, and
-    their refusals say why.
+    their refusals say why. A .docx with tracked changes says how many (``trackedChanges``).
     """
     outcome = "refused" if "refusal" in value else "read"
-    if value.get("refusedSections") or value.get("refusedParts"):
+    found = value.get("tracked")
+    tracked: dict[str, Any] = found if isinstance(found, dict) else {}
+    views = [tracked[v] for v in ("accepted", "original") if v in tracked]
+    if value.get("refusedSections") or any(v.get("refusedParts") for v in (value, *views)):
         outcome = "read-in-part"
     receipt: dict[str, Json] = {
         "document": document,
@@ -245,6 +248,9 @@ def _receipt(document: str, result: bytes, value: dict[str, Json], reading: Kind
     }
     if "refusal" in value:
         receipt["refusal"] = value["refusal"]
+    if "tracked" in value:
+        # Two texts, accepted and original: which one is the label is the reader's caller's call.
+        receipt["trackedChanges"] = len(tracked["changes"])
     if "certificate" in value:
         # The independent check's account of the read: what the source held, what the output
         # holds, and what was set aside and why.

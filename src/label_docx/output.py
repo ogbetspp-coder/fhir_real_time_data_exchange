@@ -39,6 +39,21 @@ whitespace), with the parts holding text the reader does not read. The check fou
 character of the output in the source, in order, and every source character in the output or
 set aside; a read it cannot account for is refused as ``uncertified``.
 
+A document with tracked changes::
+
+    {"certificate": {"views": {...}, "accepted": {...}, "original": {...}}, "format": ...,
+     "reader": ..., "source": {...},
+     "tracked": {"accepted": {...}, "original": {...}, "changes": [...]}}
+
+``tracked.accepted`` is the document with every change accepted, ``tracked.original`` with every
+change rejected, each with ``paragraphs``, the notes, headers, footers, comments and
+``refusedParts`` as a read above; there is no ``paragraphs`` outside them, so the caller names
+the view it takes. ``changes`` lists each change as stored: ``part``, ``kind`` (``insert``,
+``delete``, ``move-from``, ``move-to``, each also with ``-paragraph-mark``, ``format``,
+``format-paragraph``), ``id``, ``author`` and ``date`` (null where absent). Each view is
+certified as a read is; ``certificate.views`` is the check's account of the views themselves
+(``certify_tracked``).
+
 A refusal::
 
     {"format": ..., "reader": ..., "refusal": {"code": ..., "detail": ...}, "source": {...}}
@@ -53,15 +68,17 @@ import hashlib
 import json
 from collections.abc import Callable
 
-from label_docx.certify import DocxSource
+from label_docx.certify import DocxSource, certify_tracked
 from label_docx.reader import (
     READER_VERSION,
     Comment,
+    Document,
     DocxRefusedError,
     Note,
     Paragraph,
     Story,
     read_document,
+    tracked,
 )
 
 # The version of the shape above. A change to this file changes its hash in versions.lock.json.
@@ -72,8 +89,9 @@ from label_docx.reader import (
 # 1.6.0 adds the headers, footers and comments, and each paragraph's comment marks, certified
 # by conservation-check/1.2.0; 1.7.0 certified by 1.3.0, which also works out the key marks;
 # 1.8.0 by 1.4.0, with Word's toggle and default-character-style rules; 1.9.0 by 1.5.0, which
-# also works out the list labels and note marks.
-FORMAT_VERSION = "label-docx-json/1.9.1"
+# also works out the list labels and note marks; 1.10.0 reads a document with tracked changes as
+# ``tracked``: both views and the changes, each view certified, and the views by 1.6.0.
+FORMAT_VERSION = "label-docx-json/1.10.0"
 
 type Json = str | int | bool | list[Json] | dict[str, Json] | None
 
@@ -165,18 +183,60 @@ def read(data: bytes) -> tuple[bytes, bool]:
     try:
         document = read_document(data)
     except DocxRefusedError as refused:
+        if refused.code == "tracked-change":
+            return _tracked(data, envelope)
         envelope["refusal"] = {"code": refused.code, "detail": refused.detail}
         return canonical(envelope), False
-    envelope["paragraphs"] = paragraphs(list(document.body))
-    envelope["footnotes"] = notes(document.footnotes)
-    envelope["endnotes"] = notes(document.endnotes)
-    envelope["headers"] = stories(document.headers)
-    envelope["footers"] = stories(document.footers)
-    envelope["comments"] = comments(document.comments)
-    envelope["refusedParts"] = sum(
-        1 for item in (*document.headers, *document.footers, *document.comments) if item.refusal
-    )
+    parts: tuple[Story | Comment, ...] = (*document.headers, *document.footers, *document.comments)
+    if any(item.refusal is not None and item.refusal[0] == "tracked-change" for item in parts):
+        return _tracked(data, envelope)
+    envelope.update(content(document))
     return certified(envelope, lambda: DocxSource(data).certify(envelope))
+
+
+def content(document: Document) -> dict[str, Json]:
+    """A document's text as JSON: paragraphs, notes, headers, footers and comments."""
+    return {
+        "paragraphs": paragraphs(list(document.body)),
+        "footnotes": notes(document.footnotes),
+        "endnotes": notes(document.endnotes),
+        "headers": stories(document.headers),
+        "footers": stories(document.footers),
+        "comments": comments(document.comments),
+        "refusedParts": sum(
+            1 for item in (*document.headers, *document.footers, *document.comments) if item.refusal
+        ),
+    }
+
+
+def _tracked(data: bytes, envelope: dict[str, Json]) -> tuple[bytes, bool]:
+    """A document with tracked changes: both its views, read and certified, and the changes."""
+    try:
+        accepted, original, changes = tracked(data)
+        views = {"accepted": accepted, "original": original}
+        texts: dict[str, dict[str, Json]] = {}
+        for view, view_data in views.items():
+            try:
+                texts[view] = content(read_document(view_data))
+            except DocxRefusedError as refused:
+                raise DocxRefusedError(refused.code, f"{view} view: {refused.detail}") from refused
+    except DocxRefusedError as refused:
+        envelope["refusal"] = {"code": refused.code, "detail": refused.detail}
+        return canonical(envelope), False
+    envelope["tracked"] = {
+        "changes": [
+            {"author": c.author, "date": c.date, "id": c.id, "kind": c.kind, "part": c.part}
+            for c in changes
+        ],
+        **texts,
+    }
+    return certified(
+        envelope,
+        lambda: {
+            "views": certify_tracked(data, views),
+            **{v: DocxSource(views[v]).certify(texts[v]) for v in views},
+        },
+    )
 
 
 def certified(

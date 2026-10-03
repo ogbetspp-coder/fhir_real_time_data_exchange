@@ -9,7 +9,8 @@ locked to other code; ``tests/test_locks.py`` refuses that until the version is 
 already in the lock is never re-locked to other code: bump it instead.
 
 ``corpus/*/expected.json`` records, for every .docx in the corpus, its SHA-256 and the SHA-256 of
-its canonical paragraphs (or its refusal code), and for every ePI its SHA-256, the SHA-256 of its
+its canonical paragraphs (or its refusal code; or, with tracked changes, of its views and changes),
+and for every ePI its SHA-256, the SHA-256 of its
 canonical sections and how many sections the reader refused (or the document's refusal code);
 for each certified read, the SHA-256 of its certificate, so every count in it is held too.
 A change to what the reader produces for any of them fails the tests until this script is run
@@ -100,6 +101,13 @@ def expected(folder: Path) -> dict[str, dict[str, str]]:
     for path in sorted(folder.glob("*.docx")):
         data = path.read_bytes()
         entry = {"sha256": hashlib.sha256(data).hexdigest()}
+        result = output.read(data)[0]
+        tracked = json.loads(result).get("tracked")
+        if tracked is not None:
+            # Two texts: both views and the changes, held whole.
+            entry["trackedSha256"] = hashlib.sha256(canonical(tracked)).hexdigest()
+            out[path.name] = entry | _certificate(result)
+            continue
         try:
             body = canonical(output.paragraphs(read_docx(data)))
             entry["paragraphsSha256"] = hashlib.sha256(body).hexdigest()

@@ -59,7 +59,10 @@ def _locked() -> dict[Path, str]:
     out: dict[Path, str] = {}
     for record in sorted(CORPUS.glob("*/expected.json")):
         for name, entry in json.loads(record.read_text("utf-8")).items():
-            out[record.parent / name] = entry.get("refusal", "read")
+            # A document with tracked changes is two reads, certified in tests/test_tracked.py.
+            out[record.parent / name] = entry.get(
+                "refusal", "tracked" if "trackedSha256" in entry else "read"
+            )
     return out
 
 
@@ -75,6 +78,8 @@ def _read(path: Path) -> tuple[DocxSource | EpiSource | None, dict[str, Any], st
     data = path.read_bytes()
     if path.suffix == ".docx":
         value = json.loads(output.read(data)[0])
+        if "tracked" in value:
+            return None, value, "tracked"
         source: DocxSource | EpiSource | None = None if "refusal" in value else DocxSource(data)
     else:
         value = json.loads(epi_output.read(data)[0])
@@ -1450,7 +1455,13 @@ def test_the_key_marks_from_every_level_are_worked_out_alike() -> None:
 def test_the_checks_own_list_labels_and_note_marks_are_words() -> None:
     # Held to Word's recorded answers directly, not only to the reader's: for every corpus
     # document read, each label and note mark the check draws is the one Word drew.
-    read = {p: s for p in READ if p.suffix == ".docx" for s in [_certified(p)[0]]}
+    read = {
+        p: s
+        for p in READ
+        if p.suffix == ".docx"
+        for s in [_certified(p)[0]]
+        if isinstance(s, DocxSource)
+    }
     values = {p: _certified(p)[1] for p in read}
     checked = 0
     for record in sorted(CORPUS.glob("*/word.json")):
@@ -1515,7 +1526,7 @@ def _labels_certified(data: bytes) -> list[tuple[int, str | None, str | None]]:
     value = json.loads(output.read(data)[0])
     assert "refusal" not in value, value.get("refusal")
     labels = [label for label in DocxSource(data).labels if label is not None]
-    return [(int(str(x["numId"])), x["text"], x["suffix"]) for x in labels]  # type: ignore[misc]
+    return [(int(str(x["numId"])), x["text"], x["suffix"]) for x in labels]
 
 
 _SETTINGS = {

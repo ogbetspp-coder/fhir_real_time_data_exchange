@@ -266,6 +266,37 @@ checked that very document and agrees (R-32). Every answer it then gives has bee
 that document, to the application that displays it. Without them, every answer is still
 certified (R-24), and the marks above are cross-checked.
 
+## Tracked changes: two texts, each proved
+
+A document with tracked changes holds two texts: every change accepted, and every change
+rejected (the original). The reader never picks one (R-39). It writes each as a package of its
+own, reads both by every rule above, and certifies each against its own package. That proves
+each view's text is the view package's, but the views are the reader's own making, so they are
+held to the source twice more:
+
+- **By the check, on its own.** `certify_tracked` walks the source again with its own rules: a
+  run's content belongs to a view unless a change the view drops wraps it; a paragraph whose
+  mark the view drops joins the next one. Each view must hold exactly that, token by token and
+  paragraph by paragraph. No revision may be left in any part of either view, and every part
+  without revisions must be the source's, byte for byte. A view swapped for the other, a
+  character changed, a paragraph split where it was joined, a revision left behind, or an
+  untouched part rewritten is caught (`tests/test_tracked.py`).
+- **By Word.** For each case in `corpus/tracked-cases`, Word accepted every change and saved
+  the document, then rejected every change and saved it; the reader must read its own view
+  exactly as it reads Word's file: text, marks, list labels, note marks, headers, footers and
+  comments. This is where the rules come from: a joined paragraph keeps the next one's
+  properties, a list counts without the items a view drops, a changed font is the former font
+  in the original ("50 μg", not "50 mg"). On a Mac with Word, `--word on` does the same for
+  every document ingested, and also holds Word's files to what Word shows.
+
+Word-made tracked edits on seven EMA templates (43 documents, 1,839 changes: insertions,
+deletions, joined and split paragraphs, bold and style changes): 38 agree view for view; 5 are
+refused, 3 of them because Word's own view is one the reader refuses too, 2 for the cases
+below.
+What the reader cannot undo exactly is refused (`tracked-change`): a change holding only part
+of a field (Word then drops the whole field result), a paragraph mark joined to a table, and
+changes to tables, sections and numbering definitions.
+
 ## What it does not cover
 
 The proof covers the text, not how it is interpreted. The interpretation is held to the
@@ -289,7 +320,9 @@ applications themselves:
   them aside. A page break, which Word's text shows like a section break, may join two of
   Word's pieces only as often as the source has a page break inside a paragraph. A Symbol
   character shows as "(": there the reader's character must be one of the Symbol table's, as
-  many times as the body has Symbol characters; which one, the check holds to the table. Built
+  many times as the body has Symbol characters; which one, the check holds to the table. Text
+typed in the Symbol font shows as its stored code (U+F000 plus the code) and is mapped through
+the same table, as list bullets are. Built
   alterations of each kind are caught: a letter, a word, a paragraph dropped or swapped, a
   space made non-breaking, a digit shown as a symbol, a paragraph split without a break. Every
   corpus document read agrees. Four EMA templates first showed differences, all in Word's
@@ -336,11 +369,13 @@ The script now stops rather than record such a run.
 - every survivor must have its reason;
 - more than 90% of all faults must be killed outright.
 
-The current run made 1,480 faults. The check now also draws every list label and note mark
-on its own. The tests killed 1,423 of the faults (96%). The other 57 cannot change what the
-check does, and each is recorded with its reason: for example, the `xml` prefix, which can never
+The current run made 1,569 faults. The check now also draws every list label and note mark
+on its own, and holds the views of a tracked document to their source. The tests killed 1,511
+of the faults (96%). The other 58 cannot change what the check does, and each is recorded with its reason: for example, the `xml` prefix, which can never
 name Word's namespace, a length compared just before, or a tenth place for list levels, which
-run 0 to 8. None is unexplained.
+run 0 to 8. None is unexplained. The first run with the tracked-change check left 38 faults in it alive:
+no test left each kind of revision behind in a view, changed an unrevised part, held a picture
+part, or counted the elements; each now has one.
 
 The first run of this check killed 1,309 of 1,480. Most survivors traced to one gap: the
 corpus tests held only the documents the check certified, so a check that wrongly refused a

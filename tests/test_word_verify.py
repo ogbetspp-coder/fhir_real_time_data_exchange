@@ -103,3 +103,6 @@ def test_word_itself_agrees_with_a_reading() -> None:  # pragma: no cover - need
     assert verdict["verdict"] == "agrees"
     assert verdict["differs"] == []
     assert verdict["application"].startswith("Microsoft Word")
+    # A document with tracked changes: each view held to the one Word makes, and Word's to Word.
+    tracked = (CORPUS / "tracked-cases" / "format-symbol-font.docx").read_bytes()
+    assert word.verify_docx(tracked, {"tracked": {}})["verdict"] == "agrees"

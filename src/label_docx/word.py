@@ -56,6 +56,7 @@ from __future__ import annotations
 
 import io
 import itertools
+import json
 import plistlib
 import re
 import shutil
@@ -68,7 +69,15 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from label_docx.reader import SYMBOL_FONT, DocxRefusedError, Paragraph, read_document, read_docx
+from label_docx.output import content, read
+from label_docx.reader import (
+    SYMBOL_FONT,
+    DocxRefusedError,
+    Paragraph,
+    read_document,
+    read_docx,
+    tracked,
+)
 
 WORD = Path("/Applications/Microsoft Word.app")
 
@@ -125,6 +134,31 @@ on run argv
       repeat with f in (get fields of document (item 2 of argv))
         update field f
       end repeat
+      save document (item 2 of argv)
+      close document (item 2 of argv) saving no
+    end tell
+  end timeout
+end run
+"""
+
+# The document with every tracked change accepted (item 3 "accept") or rejected, saved in place.
+VIEW = """
+on run argv
+  set target to (POSIX file (item 1 of argv)) as string
+  with timeout of 300 seconds
+    tell application "Microsoft Word"
+      open file name target
+      repeat 600 times
+        try
+          if (name of every document) contains {item 2 of argv} then exit repeat
+        end try
+        delay 0.1
+      end repeat
+      if (item 3 of argv) is "accept" then
+        accept all revisions document (item 2 of argv)
+      else
+        reject all revisions document (item 2 of argv)
+      end if
       save document (item 2 of argv)
       close document (item 2 of argv) saving no
     end tell
@@ -358,6 +392,86 @@ def word_updated(path: Path) -> bytes:
         if done.returncode != 0:
             raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
         return copy.read_bytes()
+
+
+def word_views(path: Path) -> dict[str, bytes]:
+    """``path`` as Word saves it with every tracked change accepted, and with every one rejected.
+
+    Keyed as the reader's views are: ``accepted`` and ``original``.
+    """
+    CONTAINER.mkdir(parents=True, exist_ok=True)
+    out: dict[str, bytes] = {}
+    for view, verb in (("accepted", "accept"), ("original", "reject")):
+        with tempfile.TemporaryDirectory(dir=CONTAINER) as folder:
+            copy = Path(folder) / path.name
+            shutil.copyfile(path, copy)
+            done = _osascript(["osascript", "-", str(copy), path.name, verb], VIEW)
+            if done.returncode != 0:
+                raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
+            out[view] = copy.read_bytes()
+    return out
+
+
+def tracked_verdict(path: Path, word: dict[str, bytes]) -> str:
+    """Whether the reader reads each view of ``path`` as it reads Word's (``word_views``).
+
+    The reader's view is held to Word's file whole: every paragraph, note, header, footer and
+    comment, with its text, marks, list labels and note marks, all but the names of the header
+    and footer parts, which Word gives its own when it saves. A view the reader refuses is
+    ``reader refuses``; the reader may refuse where Word goes on, never read otherwise.
+    """
+    try:
+        accepted, original, _ = tracked(path.read_bytes())
+        mine = {
+            "accepted": _unnamed(content(read_document(accepted))),
+            "original": _unnamed(content(read_document(original))),
+        }
+    except DocxRefusedError as refused:
+        return f"reader refuses: {refused.code}"
+    for view in ("accepted", "original"):
+        try:
+            theirs = _unnamed(content(read_document(word[view])))
+        except DocxRefusedError as refused:
+            return f"differs: the reader reads its {view} view, and refuses Word's ({refused.code})"
+        if mine[view] != theirs:
+            where = next(
+                (key for key in sorted(theirs) if mine[view].get(key) != theirs[key]), "the result"
+            )
+            return f"differs: {view} view, {where}"
+    return "agrees"
+
+
+def _unnamed(value: dict[str, Any]) -> dict[str, Any]:
+    """A document's text with its header and footer parts' names left out."""
+    return value | {
+        kind: [{k: v for k, v in story.items() if k != "part"} for story in value[kind]]
+        for kind in ("headers", "footers")
+    }
+
+
+def judge_tracked(path: Path) -> str:
+    """The verdict on a document with tracked changes, view by view.
+
+    Each view the reader makes must be the one it makes of Word's file (``tracked_verdict``),
+    and Word's file must be read as Word shows it (``judge``).
+    """
+    word = word_views(path)
+    outcome = tracked_verdict(path, word)
+    for view, data in word.items():
+        if outcome != "agrees":
+            break
+        with tempfile.TemporaryDirectory() as folder:
+            shown = Path(folder) / path.name
+            shown.write_bytes(data)
+            verdict = judge(shown, ask(shown))
+        if verdict != "agrees":
+            outcome = f"{verdict} (Word's {view} view)"
+    return outcome
+
+
+def is_tracked(path: Path) -> bool:
+    """Whether the reader reads ``path`` as a document with tracked changes."""
+    return "tracked" in json.loads(read(path.read_bytes())[0])
 
 
 def word_text_and_labels(path: Path) -> tuple[list[str], list[str]]:
@@ -894,7 +1008,8 @@ def text_verdict(word: list[str], path: Path) -> str:
 
     Word's text has its own codes for some characters, mapped here: U+001E for a no-break
     hyphen (the reader's U+2011), U+001F for a soft hyphen (U+00AD), U+0002 where a note is
-    referred to (the reader's notes), "/" for an inline picture (U+FFFC). Text in capitals shows
+    referred to (the reader's notes), "/" for an inline picture (U+FFFC), and text in the Symbol
+    font as its stored code (U+F000 plus the code, mapped by ``as_drawn``). Text in capitals shows
     as capitals, so the reader's caps marks are applied. A page number shows as Word draws it,
     where the reader sets it aside. A Symbol character (w:sym) shows as "(": there the reader's
     character must be one of the Symbol table's, and as many as the body has w:sym elements;
@@ -918,6 +1033,9 @@ def text_verdict(word: list[str], path: Path) -> str:
     parts: list[tuple[str, bool]] = []
     for piece in word:
         shown = piece.replace("\x1e", "\u2011").replace("\x1f", "\u00ad").replace("\x0b", "\n")
+        # Text in the Symbol font shows as its stored code (U+F000 plus the code), as a bullet
+        # does; the reader refuses that code anywhere else, so mapping it hides nothing.
+        shown = as_drawn(shown)
         for number, part in enumerate(shown.split("\x0c")):
             if part:
                 parts.append((part, number > 0))
@@ -1008,18 +1126,19 @@ def judge(path: Path, answers: dict[str, Any]) -> str:
     return result
 
 
-def verify_docx(data: bytes, result: dict[str, Any]) -> dict[str, Any]:  # noqa: ARG001
+def verify_docx(data: bytes, result: dict[str, Any]) -> dict[str, Any]:
     """Word's verdict on a .docx's reading, for the store (``Store(word=...)``).
 
     The reading judged is the reader's of these bytes, which is ``result`` (the store keeps a
-    result only under the bytes' SHA-256 and the reader's version). ``differs`` lists where
+    result only under the bytes' SHA-256 and the reader's version); a document with tracked
+    changes is judged view by view (``judge_tracked``). ``differs`` lists where
     Word shows otherwise; a Word that fails is a ``WordError``, and nothing is recorded.
     """
     with tempfile.TemporaryDirectory() as folder:
         path = Path(folder) / "document.docx"
         path.write_bytes(data)
         try:
-            outcome = judge(path, ask(path))
+            outcome = judge_tracked(path) if "tracked" in result else judge(path, ask(path))
             application = word_version()
         except SystemExit as failed:
             raise WordError(str(failed)) from failed

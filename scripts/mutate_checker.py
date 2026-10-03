@@ -55,6 +55,7 @@ UNFINISHED = 3
 TESTS = [
     "tests/test_certify.py",
     "tests/test_headers_comments.py",
+    "tests/test_tracked.py",
     "tests/test_generated_docx.py",
     "tests/test_robustness.py",
     "tests/test_output.py",
@@ -89,6 +90,15 @@ _SYMBOL_COUNT = "self.ledger.symbol += sum(1 for a, b in zip(text, mapped, stric
 # Mutants that cannot change what the check does, by function, line and mutation, each with the
 # reason. A survivor not listed here fails the run.
 EQUIVALENT: dict[tuple[str, str, str], str] = {
+    ("_run_tokens.walk", "continue", "statement"): (
+        "a paragraph holds no paragraph and run content no run the walk reads: walking either"
+        " again only adds to a list outside any paragraph, which is never read"
+    ),
+    (
+        "_run_tokens.walk",
+        'gone = dropped or (child.tag in {_w(d) for d in drops} and element.tag != _w("rPr"))',
+        "str:'rPr'",
+    ): "a paragraph mark's change markers are empty: dropping one drops no content",
     ("_local", 'return tag.rsplit("}", 1)[-1]', "int:1"): (
         "an element's tag holds one '}', after its namespace"
     ),

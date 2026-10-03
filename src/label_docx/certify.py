@@ -42,6 +42,14 @@ HTML parser, not the reader's XML parser): every character of text, in order, wi
 collapsible whitespace drawn as at most one space (as CSS lays it out), ``br`` as U+000A and
 ``img`` as U+FFFC.
 
+A document with tracked changes is read as two views, every change accepted and every one
+rejected, each a package of its own that the reader reads and this check certifies as above.
+The views themselves are held to the source by ``certify_tracked``, again with its own walk: in
+each part with revisions, every run's content is kept or dropped by the change around it, in
+order, and a paragraph is joined to the next exactly where the view drops its mark; no revision
+is left in any part, and every other part is the source's, byte for byte. Formatting the views
+take from a change (``rPrChange``, ``pPrChange``) is held to Word.
+
 What it does not check: the marks, list labels and note marks, which are interpretations of
 the formatting and are held to Word and Chrome themselves (``tests/test_word_oracle.py``,
 ``tests/test_browser_oracle.py``). It shares one thing with the reader: the Symbol table
@@ -62,7 +70,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT
 
-CHECKER_VERSION = "conservation-check/1.5.0"
+CHECKER_VERSION = "conservation-check/1.6.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -1363,6 +1371,134 @@ def certify_docx(data: bytes, value: dict[str, Json]) -> dict[str, Json]:
 def _text_size(root: ET.Element) -> int:
     """Characters in every text element (``w:t``, DrawingML ``a:t``...) under ``root``."""
     return sum(len(node.text or "") for node in root.iter() if _local(node.tag) == "t")
+
+
+# --- tracked changes ----------------------------------------------------------------------
+
+# The changes a view drops whole; it keeps the others' content as content.
+_VIEW_DROPS = {"accepted": ("del", "moveFrom"), "original": ("ins", "moveTo")}
+# Every element that records a revision. None may remain in a view, in any part.
+_REVISIONS = {
+    _w(name)
+    for name in (
+        "ins",
+        "del",
+        "moveFrom",
+        "moveTo",
+        "delText",
+        "delInstrText",
+        "moveFromRangeStart",
+        "moveFromRangeEnd",
+        "moveToRangeStart",
+        "moveToRangeEnd",
+        "rPrChange",
+        "pPrChange",
+        "sectPrChange",
+        "tblPrChange",
+        "tblPrExChange",
+        "tblGridChange",
+        "trPrChange",
+        "tcPrChange",
+        "numberingChange",
+        "cellIns",
+        "cellDel",
+        "cellMerge",
+        "customXmlInsRangeStart",
+        "customXmlInsRangeEnd",
+        "customXmlDelRangeStart",
+        "customXmlDelRangeEnd",
+        "customXmlMoveFromRangeStart",
+        "customXmlMoveFromRangeEnd",
+        "customXmlMoveToRangeStart",
+        "customXmlMoveToRangeEnd",
+    )
+}
+_SAME_AS = {"delText": "t", "delInstrText": "instrText"}
+
+
+def _run_tokens(
+    root: ET.Element, drops: tuple[str, ...]
+) -> tuple[list[list[tuple[Json, ...]]], int]:
+    """Each paragraph's run content in order, as the view must hold it, and the paragraphs joined.
+
+    A paragraph whose mark the view drops is joined to the next: its tokens open the next
+    one's. Content inside a change the view drops is left out; a deleted text is a text. Run
+    properties are not content: changed formatting is held to Word.
+    """
+    paragraphs: list[list[tuple[Json, ...]]] = []
+    carried: list[tuple[Json, ...]] = []
+    joins = 0
+
+    def walk(element: ET.Element, dropped: bool, mine: list[tuple[Json, ...]]) -> None:
+        nonlocal carried, joins
+        for child in element:
+            local = _local(child.tag)
+            if child.tag == _w("p"):
+                own: list[tuple[Json, ...]] = carried
+                carried = []
+                walk(child, dropped, own)
+                mark = child.find(f"{_w('pPr')}/{_w('rPr')}")
+                if mark is not None and any(c.tag in {_w(d) for d in drops} for c in mark):
+                    carried = own
+                    joins += 1
+                else:
+                    paragraphs.append(own)
+                continue
+            if element.tag == _w("r") and child.tag != _w("rPr"):
+                if not dropped:
+                    mine.append(
+                        (_SAME_AS.get(local, local), child.text or "", sorted(child.attrib.items()))
+                    )
+                continue
+            gone = dropped or (child.tag in {_w(d) for d in drops} and element.tag != _w("rPr"))
+            walk(child, gone, mine)
+
+    walk(root, False, [])
+    if carried:
+        raise CertificationError("a joined paragraph has no paragraph after it")
+    return paragraphs, joins
+
+
+def certify_tracked(source: bytes, views: dict[str, bytes]) -> dict[str, Json]:
+    """The account of a document's two views, or ``CertificationError``.
+
+    Each view must be the source package with only the parts holding revisions written again,
+    with no revision left anywhere, and each part's paragraphs must hold the source's run
+    content as the view keeps it: every token, in order, with paragraphs joined only where the
+    view drops a paragraph mark, and to the paragraph after.
+    """
+    out: dict[str, Json] = {"checker": CHECKER_VERSION}
+    with zipfile.ZipFile(io.BytesIO(source)) as original:
+        names = original.namelist()
+        for view, data in views.items():
+            characters = elements = joined = 0
+            with zipfile.ZipFile(io.BytesIO(data)) as copy:
+                if copy.namelist() != names:
+                    raise CertificationError(f"the {view} view's parts are not the document's")
+                for name in names:
+                    before, after = original.read(name), copy.read(name)
+                    if not name.endswith(".xml"):
+                        if before != after:
+                            raise CertificationError(f"{view} view: {name} is changed")
+                        continue
+                    source_root, view_root = ET.fromstring(before), ET.fromstring(after)
+                    if any(e.tag in _REVISIONS for e in view_root.iter()):
+                        raise CertificationError(f"{view} view: a revision is left in {name}")
+                    if not any(e.tag in _REVISIONS for e in source_root.iter()):
+                        if before != after:
+                            raise CertificationError(f"{view} view: {name} is changed")
+                        continue
+                    expected, joins = _run_tokens(source_root, _VIEW_DROPS[view])
+                    if _run_tokens(view_root, ())[0] != expected:
+                        raise CertificationError(f"{view} view: {name} does not hold its content")
+                    joined += joins
+                    tokens = [token for p in expected for token in p]
+                    # Counted so that a run split in two counts the same: its characters, and
+                    # the run content that is not text (tabs, breaks, symbols, field marks...).
+                    characters += sum(len(str(token[1])) for token in tokens)
+                    elements += sum(1 for token in tokens if token[0] not in ("t", "instrText"))
+            out[view] = {"characters": characters, "elements": elements, "paragraphsJoined": joined}
+    return out
 
 
 # --- ePI ------------------------------------------------------------------------------------
