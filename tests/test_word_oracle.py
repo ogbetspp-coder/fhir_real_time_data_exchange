@@ -25,6 +25,7 @@ from label_docx.word import (
     reader_labels,
     reader_note_marks,
     story_verdict,
+    text_verdict,
     verdict,
 )
 
@@ -237,6 +238,31 @@ def test_the_reader_reads_headers_footers_and_comments_as_word_shows_them(
 ) -> None:
     key = f"{path.parent.name}/{path.name}"
     result = story_verdict(word, path)
+    if key in REFUSED:
+        assert result == f"reader refuses: {REFUSED[key]}"
+    else:
+        assert result == "agrees"
+
+
+def _text_cases() -> list[tuple[Path, list[str]]]:
+    out: list[tuple[Path, list[str]]] = []
+    for record in RECORDS:
+        texts = _record(record).get("text", {})
+        out += [(record.parent / name, word) for name, word in sorted(texts.items())]
+    return out
+
+
+def test_words_text_is_on_record_for_every_corpus_document() -> None:
+    on_record = {path for path, _ in _text_cases()}
+    assert on_record == {path for record in RECORDS for path in record.parent.glob("*.docx")}
+
+
+@pytest.mark.parametrize(
+    ("path", "word"), _text_cases(), ids=lambda value: getattr(value, "stem", "")
+)
+def test_the_reader_reads_the_body_text_word_shows(path: Path, word: list[str]) -> None:
+    key = f"{path.parent.name}/{path.name}"
+    result = text_verdict(word, path)
     if key in REFUSED:
         assert result == f"reader refuses: {REFUSED[key]}"
     else:

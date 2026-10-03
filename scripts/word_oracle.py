@@ -58,6 +58,7 @@ def main() -> int:
     print_answers: dict[str, bool] = {}
     emphasis_answers: dict[str, dict[str, list[bool]]] = {}
     story_answers: dict[str, dict[str, list[list[Any]]]] = {}
+    text_answers: dict[str, list[str]] = {}
     # A recording keeps each file's answers as it goes, so one stopped part way resumes there.
     progress = args.folder / ".word-progress.json" if args.command == "record" else None
     recorded: dict[str, dict[str, Any]] = (
@@ -76,6 +77,7 @@ def main() -> int:
                         "prints": kept["prints"][name],
                         "emphasis": kept["emphasis"][name],
                         "stories": kept.get("stories", {}).get(name),
+                        "text": kept.get("text", {}).get(name),
                     },
                 )
     differs = False
@@ -107,6 +109,8 @@ def main() -> int:
             field_answers[path.name] = kept["fields"]
         if kept.get("stories") is not None:
             story_answers[path.name] = kept["stories"]
+        if kept.get("text") is not None:
+            text_answers[path.name] = kept["text"]
         result = judge(path, kept)
         differs = differs or result.startswith("differs")
         sys.stdout.write(f"{path.name}: {result}\n")
@@ -117,7 +121,8 @@ def main() -> int:
         record = {
             "application": word_version(),
             "method": (
-                "list labels: convert numbers to text, what each list item gained; note marks: "
+                "list labels: convert numbers to text, what each list item gained; text: the "
+                "body's text as Word shows it, paragraph by paragraph; note marks: "
                 "saved as text, what Word wrote between markers around each mark; fields: the "
                 "text between markers around each, as shown and after saving as PDF; prints: the "
                 "whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, "
@@ -133,6 +138,7 @@ def main() -> int:
             "prints": print_answers,
             "emphasis": emphasis_answers,
             "stories": story_answers,
+            "text": text_answers,
         }
         target = args.folder / "word.json"
         target.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", "utf-8")

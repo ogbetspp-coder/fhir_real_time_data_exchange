@@ -2451,7 +2451,7 @@
       ]
     }
   },
-  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text",
+  "method": "list labels: convert numbers to text, what each list item gained; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text",
   "notes": {
     "fields-noteref-stale.docx": {
       "body": [
@@ -2710,5 +2710,444 @@
     "style-tied-level-zero.docx": true,
     "two-definitions.docx": true
   },
-  "recorded": "2026-10-02"
+  "recorded": "2026-10-03",
+  "stories": {},
+  "text": {
+    "ancestor-never-counted.docx": [
+      "item 1",
+      "item 2",
+      "item 3",
+      "item 4"
+    ],
+    "ancestor-two-levels.docx": [
+      "item 1",
+      "item 2",
+      "item 3",
+      "item 4",
+      "item 5"
+    ],
+    "bullets.docx": [
+      "item 1",
+      "item 2",
+      "item 3"
+    ],
+    "default-character-style.docx": [
+      "plain",
+      "unknown style"
+    ],
+    "emphasis-defaults-off.docx": [
+      "x",
+      "x",
+      "x",
+      "x",
+      "X",
+      "x",
+      "x",
+      "X",
+      "x",
+      "x",
+      "x"
+    ],
+    "emphasis-defaults.docx": [
+      "X",
+      "X",
+      "X",
+      "X",
+      "X",
+      "x",
+      "X"
+    ],
+    "emphasis-toggles.docx": [
+      "x",
+      "X",
+      "x",
+      "X",
+      "X",
+      "x",
+      "X",
+      "x",
+      "x",
+      "X",
+      "X",
+      "x",
+      "X",
+      "X",
+      "X",
+      "x",
+      "X",
+      "x",
+      "x",
+      "X",
+      "X"
+    ],
+    "fields-chapter-captions.docx": [
+      "Intro",
+      "Table 1-1",
+      "Next",
+      "Table 2-1",
+      "Next",
+      "Next"
+    ],
+    "fields-chapter-dotted.docx": [
+      "A",
+      "A.1",
+      "1",
+      "1.1"
+    ],
+    "fields-chapter-reset-level-2.docx": [
+      "A",
+      "A.1",
+      "Table 1",
+      "Table 2",
+      "B",
+      "Table 1",
+      "B.1",
+      "Table 1"
+    ],
+    "fields-chapter-reset.docx": [
+      "Intro",
+      "Table 1",
+      "Table 2",
+      "Sub",
+      "Table 3",
+      "Next",
+      "Table 1"
+    ],
+    "fields-heading-by-name.docx": [
+      "Table 1",
+      "custom outline 0",
+      "Table 2",
+      "named heading 1",
+      "Table 1",
+      "named heading 1"
+    ],
+    "fields-noteref-stale.docx": [
+      "a\u0002",
+      "see note 7"
+    ],
+    "fields-noteref.docx": [
+      "a\u0002",
+      "b\u0002",
+      "see note 2"
+    ],
+    "fields-ref-caption.docx": [
+      "Table 1",
+      "Table 2",
+      "See Table 2."
+    ],
+    "fields-ref-missing.docx": [
+      "old text"
+    ],
+    "fields-ref-stale.docx": [
+      "below 25 C",
+      "below 30 C"
+    ],
+    "fields-ref.docx": [
+      "Store below 25 C.",
+      "Keep it below 25 C"
+    ],
+    "fields-seq-formats.docx": [
+      "Table 1",
+      "Table II",
+      "Table iii",
+      "Table D",
+      "Table e",
+      "Table 6"
+    ],
+    "fields-seq-identifiers.docx": [
+      "Table 1",
+      "Figure 1",
+      "Table 2",
+      "Figure 2"
+    ],
+    "fields-seq-switches.docx": [
+      "Table 1",
+      "Table 5",
+      "Table 5",
+      "Table 6",
+      "Table ",
+      "Table 8"
+    ],
+    "fields-seq.docx": [
+      "Table 1",
+      "Table 2",
+      "Table 3"
+    ],
+    "fields-stale.docx": [
+      "Table 7",
+      "Table 7"
+    ],
+    "fields-stored.docx": [
+      "a stored title",
+      "the agency's page"
+    ],
+    "fields-styleref-forward.docx": [
+      "Late",
+      "Late"
+    ],
+    "formats.docx": [
+      "item 1",
+      "item 2",
+      "item 3",
+      "item 4",
+      "item 5",
+      "item 6",
+      "item 7",
+      "item 8",
+      "item 9",
+      "item 10"
+    ],
+    "legal.docx": [
+      "item 1",
+      "item 2"
+    ],
+    "level-override-first.docx": [
+      "item 1",
+      "item 2",
+      "item 3"
+    ],
+    "level-override-shared.docx": [
+      "item 1",
+      "item 2",
+      "item 3",
+      "item 4"
+    ],
+    "level-override-start.docx": [
+      "item 1",
+      "item 2",
+      "item 3",
+      "item 4"
+    ],
+    "level-override.docx": [
+      "item 1",
+      "item 2"
+    ],
+    "missing-start.docx": [
+      "item 1",
+      "item 2"
+    ],
+    "multilevel.docx": [
+      "item 1",
+      "item 2",
+      "item 3",
+      "item 4",
+      "item 5",
+      "item 6",
+      "item 7"
+    ],
+    "notes-chicago.docx": [
+      "a\u0002\u0002\u0002\u0002\u0002\u0002"
+    ],
+    "notes-continuous.docx": [
+      "a\u0002",
+      "b\u0002 c\u0002"
+    ],
+    "notes-custom-mark.docx": [
+      "a\u0002",
+      "b\u2020",
+      "c\u0002"
+    ],
+    "notes-document-format.docx": [
+      "a\u0002",
+      "b\u0002"
+    ],
+    "notes-each-section.docx": [
+      "a\u0002",
+      "b\u0002\fc\u0002",
+      "d\u0002"
+    ],
+    "notes-endnotes.docx": [
+      "a\u0002",
+      "b\u0002"
+    ],
+    "notes-in-table.docx": [
+      "a\u0002",
+      "b\u0002"
+    ],
+    "notes-mixed.docx": [
+      "a\u0002\u0002\u0002"
+    ],
+    "notes-section-chicago.docx": [
+      "a\u0002\u0002\u0002\u0002\u0002\u0002"
+    ],
+    "notes-section-format.docx": [
+      "a\u0002",
+      "b\u0002\fc\u0002"
+    ],
+    "notes-section-rules.docx": [
+      "a\u0002",
+      "b\u0002"
+    ],
+    "notes-section-start-continuous.docx": [
+      "a\u0002",
+      "b\u0002\fc\u0002"
+    ],
+    "notes-start-format.docx": [
+      "a\u0002",
+      "b\u0002"
+    ],
+    "numbering-style-link-one-way.docx": [
+      "item 1",
+      "item 2",
+      "item 3"
+    ],
+    "numbering-style-link.docx": [
+      "item 1",
+      "item 2",
+      "item 3"
+    ],
+    "override-ancestor.docx": [
+      "item 1",
+      "item 2",
+      "item 3",
+      "item 4"
+    ],
+    "override-deeper-level.docx": [
+      "item 1",
+      "item 2",
+      "item 3",
+      "item 4"
+    ],
+    "override-implicit-ancestor.docx": [
+      "item 1",
+      "item 2",
+      "item 3"
+    ],
+    "override-implicit-continued.docx": [
+      "item 1",
+      "item 2",
+      "item 3",
+      "item 4"
+    ],
+    "override-implicit-levels.docx": [
+      "item 1",
+      "item 2",
+      "item 3",
+      "item 4"
+    ],
+    "override-implicit-reused.docx": [
+      "item 1",
+      "item 2",
+      "item 3",
+      "item 4",
+      "item 5"
+    ],
+    "override-implicit-rows.docx": [
+      "item 1",
+      "item 1",
+      "item 1"
+    ],
+    "override-restart-within.docx": [
+      "item 1",
+      "item 2",
+      "item 3",
+      "item 4"
+    ],
+    "override-return.docx": [
+      "item 1",
+      "item 2",
+      "item 3",
+      "item 4"
+    ],
+    "plain-after-restart.docx": [
+      "item 1",
+      "item 2"
+    ],
+    "restart-after-first.docx": [
+      "item 1",
+      "item 2",
+      "item 3",
+      "item 4",
+      "item 5",
+      "item 6"
+    ],
+    "restart-level-above.docx": [
+      "item 1",
+      "item 2",
+      "item 3"
+    ],
+    "restart-never-rows.docx": [
+      "item 1",
+      "item 2",
+      "item 1"
+    ],
+    "restart-never-shown-deeper.docx": [
+      "item 1",
+      "item 2",
+      "item 3"
+    ],
+    "restart-never.docx": [
+      "item 1",
+      "item 2",
+      "item 3",
+      "item 4",
+      "item 5"
+    ],
+    "restart-skipped-ancestor.docx": [
+      "item 1",
+      "item 2",
+      "item 3"
+    ],
+    "restart-source-cells.docx": [
+      "item 1",
+      "item 2",
+      "item 1",
+      "item 1"
+    ],
+    "restart-source-override.docx": [
+      "item 1",
+      "item 2",
+      "item 3"
+    ],
+    "restart-source-plain.docx": [
+      "item 1",
+      "item 2",
+      "item 3"
+    ],
+    "restart-source-rows.docx": [
+      "item 1",
+      "item 2",
+      "item 1",
+      "item 1"
+    ],
+    "restart-source-unused.docx": [
+      "item 1",
+      "item 2",
+      "item 3"
+    ],
+    "return-after-restart.docx": [
+      "item 1",
+      "item 2",
+      "item 3"
+    ],
+    "shared-continue.docx": [
+      "item 1",
+      "item 2",
+      "item 3"
+    ],
+    "start-override-first.docx": [
+      "item 1",
+      "item 2"
+    ],
+    "start-override-restart.docx": [
+      "item 1",
+      "item 2",
+      "item 3",
+      "item 4"
+    ],
+    "style-tied-deeper-level.docx": [
+      "item 1",
+      "styled",
+      "styled"
+    ],
+    "style-tied-level-zero.docx": [
+      "styled",
+      "styled"
+    ],
+    "two-definitions.docx": [
+      "item 1",
+      "item 2",
+      "item 3"
+    ]
+  }
 }

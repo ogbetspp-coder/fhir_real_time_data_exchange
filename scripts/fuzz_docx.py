@@ -57,7 +57,41 @@ HEADINGS = (
     '<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/></w:style>'
     '<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/></w:style>'
 )
-WORDS = ("Store", "below", "25", "C", "Take", "one", "tablet", "daily", "with", "water")
+WORDS = (
+    "Store",
+    "below",
+    "25",
+    "C",
+    "Take",
+    "one",
+    "tablet",
+    "daily",
+    "with",
+    "water",
+    # What labels hold besides English: other scripts, accents, units and signs.
+    "\u0394\u03b9\u03b1\u03c4\u03b7\u03c1\u03b5\u03af\u03c4\u03b5",
+    "\u0422\u0430\u0431\u043b\u0435\u0442\u043a\u0430",
+    "\u010desky",
+    "\u00e9t\u00e9",
+    "5\u00a0\u00b5g",
+    "\u2264",
+    "\u00b1",
+    "37\u00a0\u00b0C",
+    "\u00ae",
+    "\u2122",
+    "\u00bd",
+)
+# Elements that stand for a character, as labels hold them: no-break and soft hyphens, a tab,
+# a line break, and Symbol characters (greater or equal, plus-minus, micro).
+SPECIALS = (
+    "<w:r><w:noBreakHyphen/></w:r>",
+    "<w:r><w:softHyphen/></w:r>",
+    "<w:r><w:tab/></w:r>",
+    "<w:r><w:br/></w:r>",
+    '<w:r><w:sym w:font="Symbol" w:char="F0B3"/></w:r>',
+    '<w:r><w:sym w:font="Symbol" w:char="F0B1"/></w:r>',
+    '<w:r><w:sym w:font="Symbol" w:char="F06D"/></w:r>',
+)
 
 
 class Document:
@@ -292,7 +326,10 @@ class Document:
                 f'<w:numPr><w:ilvl w:val="{self.level()}"/>'
                 f'<w:numId w:val="{rng.choice(numbers)}"/></w:numPr>'
             )
-        return para(*(self.run() for _ in range(rng.randint(1, 3))), props=props)
+        pieces = [self.run() for _ in range(rng.randint(1, 3))]
+        if rng.random() < 0.15:
+            pieces.insert(rng.randint(0, len(pieces)), rng.choice(SPECIALS))
+        return para(*pieces, props=props)
 
     def body(self, numbers: list[int]) -> str:
         """Paragraphs, some in tables of one to four rows in the table style."""

@@ -368,7 +368,27 @@ def word_updated(path: Path) -> bytes:
 
 def word_labels(path: Path) -> list[str]:
     """What Word draws before each of ``path``'s list items, in document order."""
-    stored, _, drawn = _ask_word(path).rstrip("\n").partition(SEPARATOR)
+    return _labels(path, _ask_word(path))
+
+
+def word_text_and_labels(path: Path) -> tuple[list[str], list[str]]:
+    """Word's body text, paragraph by paragraph (``word_text``), and its list labels."""
+    answer = _ask_word(path)
+    return _paragraphs_shown(answer.partition(SEPARATOR)[0]), _labels(path, answer)
+
+
+def _paragraphs_shown(stored: str) -> list[str]:
+    """Word's text of the body as its paragraphs, empty ones left out.
+
+    A paragraph ends at a paragraph mark or a cell's end mark. U+000C is kept: Word's text shows
+    both a section break, which ends a paragraph, and a page break, which does not, as it.
+    """
+    return [piece for piece in re.split(r"[\r\n\x07]", stored) if piece]
+
+
+def _labels(path: Path, answer: str) -> list[str]:
+    """The labels Word drew: what each paragraph gained when its numbers became text."""
+    stored, _, drawn = answer.rstrip("\n").partition(SEPARATOR)
     # osascript turns Word's paragraph marks into line feeds; a manual line break stays U+000B.
     # The two texts can end in different numbers of empty lines, which are no paragraph's. Word
     # adds no paragraph, so the rest pair line for line; matching them by content instead goes
@@ -889,10 +909,96 @@ def story_verdict(word: dict[str, list[list[Any]]], path: Path) -> str:
     return "agrees"
 
 
+def text_verdict(word: list[str], path: Path) -> str:
+    """Whether the reader's body text is the text Word shows, paragraph by paragraph.
+
+    Word's text has its own codes for some characters, mapped here: U+001E for a no-break
+    hyphen (the reader's U+2011), U+001F for a soft hyphen (U+00AD), U+0002 where a note is
+    referred to (the reader's notes), "/" for an inline picture (U+FFFC). Text in capitals shows
+    as capitals, so the reader's caps marks are applied. A page number shows as Word draws it,
+    where the reader sets it aside. A Symbol character (w:sym) shows as "(": there the reader's
+    character must be one of the Symbol table's, and as many as the body has w:sym elements;
+    which one it is, the conservation check holds to the table.
+    """
+    try:
+        paragraphs = read_docx(path.read_bytes())
+    except DocxRefusedError as refused:
+        return f"reader refuses: {refused.code}"
+    mine: list[str] = []
+    for paragraph in paragraphs:
+        text = paragraph.text
+        for mark in paragraph.marks:
+            if mark.kind == "caps":
+                text = text[: mark.start] + text[mark.start : mark.end].upper() + text[mark.end :]
+        inserts = [(note.offset, "\x02") for note in paragraph.notes]
+        inserts += [(offset, "\x00") for offset in paragraph.pages]
+        for offset, code in sorted(inserts, reverse=True):
+            text = text[:offset] + code + text[offset:]
+        if text:
+            mine.append(text.replace("\ufffc", "/"))
+    # Word's pieces between U+000C, each with whether it may join the one before: within one
+    # paragraph of Word's text, U+000C is a section break or a page break.
+    parts: list[tuple[str, bool]] = []
+    for piece in word:
+        shown = piece.replace("\x1e", "\u2011").replace("\x1f", "\u00ad").replace("\x0b", "\n")
+        for number, part in enumerate(shown.split("\x0c")):
+            if part:
+                parts.append((part, number > 0))
+    symbols = set(SYMBOL_FONT.values())
+    stood_for = joined = at = 0
+    for index, ours in enumerate(mine):
+        # Each character the Symbol table could have given is a group: it or Word's "(".
+        pattern = "".join(
+            r"\w*"
+            if c == "\x00"
+            else f"({re.escape(c)}|\\()"
+            if c in symbols and c != "("
+            else re.escape(c)
+            for c in ours
+        )
+        found = None
+        if at < len(parts):
+            shown, count = parts[at][0], 1
+            found = re.fullmatch(pattern, shown)
+            # A page break the reader sets aside: the paragraph runs on in Word's next piece.
+            while found is None and at + count < len(parts) and parts[at + count][1]:
+                shown += parts[at + count][0]
+                count += 1
+                found = re.fullmatch(pattern, shown)
+        if found is None:
+            return f"differs in paragraph {index + 1} of those with text"
+        stood_for += sum(1 for group in found.groups() if group == "(")
+        joined += count - 1
+        at += count
+    if at != len(parts):
+        return f"differs: Word shows {len(parts) - at} more paragraphs with text"
+    with zipfile.ZipFile(path) as source:
+        body = source.read("word/document.xml").decode("utf-8")
+    # The body's Symbol characters that are not "(" itself: each must be one Word shows as "(".
+    written = 0
+    for code in re.findall(r"<w:sym\b[^>]*\bw:char=\"([0-9A-Fa-f]+)\"", body):
+        value = int(code, 16)
+        written += SYMBOL_FONT.get(value - 0xF000 if value >= 0xF000 else value) != "("
+    if stood_for != written:
+        return f"differs: Word shows {stood_for} characters as symbols, the body has {written}"
+    # The page breaks inside a paragraph, with text before and after them in it: as many as the
+    # places a paragraph of the reader's runs on in Word's next piece.
+    breaks = 0
+    for paragraph in re.findall(r"<w:p\b.*?</w:p>", body, re.DOTALL):
+        pieces = re.split(r"<w:br\b[^>]*\bw:type=\"page\"[^>]*/>", paragraph)
+        texts = [bool(re.search(r"<w:t(?:\s[^>]*)?>[^<]+</w:t>", piece)) for piece in pieces]
+        breaks += sum(1 for k in range(1, len(pieces)) if any(texts[:k]) and any(texts[k:]))
+    if joined != breaks:
+        return f"differs: the reader runs on {joined} paragraphs Word ends; {breaks} page breaks"
+    return "agrees"
+
+
 def ask(path: Path) -> dict[str, Any]:
-    """Word's answers for a .docx: labels, note marks, fields, print, emphasis, stories."""
+    """Word's answers for a .docx: labels, text, note marks, fields, print, emphasis, stories."""
+    text, drawn = word_text_and_labels(path)
     return {
-        "drawn": word_labels(path),
+        "drawn": drawn,
+        "text": text,
         "notes": word_note_marks(path),
         "fields": word_fields(path),
         "prints": word_prints_what_it_shows(path),
@@ -909,6 +1015,8 @@ def judge(path: Path, answers: dict[str, Any]) -> str:
     the ones before agree.
     """
     result = verdict(answers["drawn"], reader_labels(path))
+    if answers.get("text") is not None and result == "agrees":
+        result = text_verdict(answers["text"], path)
     if answers["notes"] is not None and result == "agrees":
         result = note_verdict(answers["notes"], reader_note_marks(path))
     if result == "agrees":

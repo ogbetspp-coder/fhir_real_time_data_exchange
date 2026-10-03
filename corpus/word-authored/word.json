@@ -129,11 +129,36 @@
     }
   },
   "fields": {},
-  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text",
+  "method": "list labels: convert numbers to text, what each list item gained; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text",
   "notes": {},
   "prints": {
     "table-of-contents-stale.docx": true,
     "table-of-contents.docx": true
   },
-  "recorded": "2026-10-02"
+  "recorded": "2026-10-02",
+  "stories": {},
+  "text": {
+    "table-of-contents-stale.docx": [
+      "1\tDescription\t9",
+      "1.1\tComposition\t9",
+      "2\tStability\t9",
+      "Description and composition",
+      "Film-coated tablets of 10 mg.",
+      "Composition",
+      "Each tablet contains 10 mg of the active substance.",
+      "Stability",
+      "Store below 25 C."
+    ],
+    "table-of-contents.docx": [
+      "1\tDescription and composition\t1",
+      "1.1\tComposition\t1",
+      "2\tStability\t1",
+      "Description and composition",
+      "Film-coated tablets of 10 mg.",
+      "Composition",
+      "Each tablet contains 10 mg of the active substance.",
+      "Stability",
+      "Store below 25 C."
+    ]
+  }
 }

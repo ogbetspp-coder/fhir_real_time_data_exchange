@@ -261,6 +261,19 @@ applications themselves:
   with Word when the service runs with `--word on`. A result Word shows otherwise is never
   served (R-31, `tests/test_word_verify.py`). Word's rules are not published, so this is evidence by
   example, the strongest available, not a proof.
+- **A Word document's body text, as Word shows it**: the conservation check proves every
+  character of the source's text is in the result. Word is now also asked what it *shows*,
+  paragraph by paragraph, and the reader's text must be that (R-38). Word's own codes are
+  mapped: no-break and soft hyphens, line breaks, note references, and "/" for an inline
+  picture. The reader's capitals marks are applied, and page numbers go where the reader sets
+  them aside. A page break, which Word's text shows like a section break, may join two of
+  Word's pieces only as often as the source has a page break inside a paragraph. A Symbol
+  character shows as "(": there the reader's character must be one of the Symbol table's, as
+  many times as the body has Symbol characters; which one, the check holds to the table. Built
+  alterations of each kind are caught: a letter, a word, a paragraph dropped or swapped, a
+  space made non-breaking, a digit shown as a symbol, a paragraph split without a break. Every
+  corpus document read agrees. Four EMA templates first showed differences, all in Word's
+  codes rather than the reader: line breaks, and one page break inside a paragraph.
 - **A Word document's headers, footers and comments**: held to Word the same way (R-37). Each
   header and footer a section names must be the text Word has for that section and type. The
   page numbers Word shows go where the reader sets them aside. Word's "/" for an inline picture
