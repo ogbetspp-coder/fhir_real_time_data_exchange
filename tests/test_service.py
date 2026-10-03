@@ -12,6 +12,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 from wsgiref.simple_server import WSGIServer, make_server
 
 import pytest
@@ -19,7 +20,14 @@ import pytest
 from label_docx import documents, epi_output, output
 from label_docx.cli import service_main
 from label_docx.output import canonical, read
-from label_docx.service import Service, _QuietHandler, _ThreadingServer, check_environment, health
+from label_docx.service import (
+    Service,
+    _hosts,
+    _QuietHandler,
+    _ThreadingServer,
+    check_environment,
+    health,
+)
 from label_docx.store import Checker, Store, StoreError
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
@@ -497,3 +505,74 @@ def test_the_receipt_carries_the_certificate_of_the_read(tmp_path: Path) -> None
         assert receipt["certificate"]["output"]["characters"] > 0
     refused = json.loads(Store(tmp_path).ingest(REFUSED).receipt)
     assert "certificate" not in refused
+
+
+def test_a_loopback_address_however_spelled_answers_only_its_own_hosts(tmp_path: Path) -> None:
+    for spelling in ("127.1", "127.0.0.1", "localhost"):
+        assert _hosts(spelling, 8080) == frozenset({"127.0.0.1:8080", "localhost:8080"})
+    service = Service(Store(tmp_path), hosts=_hosts("127.1", 8080))
+    assert _call(service, "GET", "/v1/health", host="evil.test:8080")[0].startswith("421")
+    assert _call(service, "GET", "/v1/health", host="localhost:8080")[0] == "200 OK"
+
+
+def test_a_verdict_of_another_verifier_is_not_reused_nor_served_as_agreement(
+    tmp_path: Path,
+) -> None:
+    asked: list[str] = []
+
+    def agrees(_data: bytes, _result: dict[str, object]) -> dict[str, object]:
+        asked.append("asked")
+        return {"application": "Word 1.0", "differs": []}
+
+    document = Store(tmp_path, word=Checker(lambda: "Word 1.0", agrees, "v1")).ingest(TEMPLATE)
+    store = Store(tmp_path, word=Checker(lambda: "Word 1.0", agrees, "v2"))
+    service = Service(store, require=frozenset({"docx"}))
+    path = f"/v1/documents/{document.document}"
+    # Agreement from the verifier as it was is not agreement from the verifier as it is.
+    assert _call(service, "GET", path)[0] == "409 Conflict"
+    store.ingest(TEMPLATE)
+    assert len(asked) == 2
+    assert _call(service, "GET", path)[0] == "200 OK"
+    kept = [json.loads(p.read_bytes()) for p in tmp_path.rglob("word/*.json")]
+    assert sorted(v["verifier"] for v in kept) == ["v1", "v2"]
+    store.verify(document.document)
+
+
+@pytest.mark.parametrize(
+    "answers",
+    [
+        [{"differs": []}, {"differs": [{"where": "paragraph 2"}]}],
+        [{"differs": [], "note": "one"}, {"differs": [], "note": "two"}],
+    ],
+)
+def test_two_answers_at_once_are_both_kept_and_a_difference_is_never_served(
+    tmp_path: Path, answers: list[dict[str, Any]]
+) -> None:
+    both_asked = threading.Barrier(2)
+    lock = threading.Lock()
+    left = list(answers)
+
+    def verify(_data: bytes, _result: dict[str, object]) -> dict[str, object]:
+        both_asked.wait(timeout=60)
+        with lock:
+            return {"application": "Word 1.0", **left.pop(0)}
+
+    store = Store(tmp_path, word=Checker(lambda: "Word 1.0", verify, "v1"))
+    outcomes: list[bytes | None] = []
+    threads = [
+        threading.Thread(target=lambda: outcomes.append(store.ingest(TEMPLATE).verification))
+        for _ in range(2)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    # Each ingestion reports its own answer; both are kept; and the result is not served.
+    own = [canonical({"application": "Word 1.0", "verifier": "v1", **a}) for a in answers]
+    assert sorted(v or b"" for v in outcomes) == sorted(own)
+    document = hashlib.sha256(TEMPLATE).hexdigest()
+    assert len(store.verifications(document)) == 2
+    assert store.disagreement(document) is not None
+    service = Service(store, require=frozenset({"docx"}))
+    assert _call(service, "GET", f"/v1/documents/{document}")[0] == "409 Conflict"
+    store.verify(document)

@@ -54,11 +54,15 @@ faint, and ``u``, ``a``
 with an ``href``, ``text-decoration: underline`` and a bottom border on an inline element as
 underline (an underline turns a sign into another: "<" underlined is drawn "≤", and "1" with an
 underlined "a" reads "1ª"), and a border on another side of an inline element as border (drawn as a
-bar beside or over the text). Bold and italic are marked as a browser computes them: the font
-weight carried down from the parent (``b`` and ``strong`` bolder than it, ``th`` and ``h1`` to
-``h6`` bold, then ``font-weight``; ``bolder`` and ``lighter`` as CSS Fonts 4 steps them) drawn bold
-at 600 and above, and ``em``, ``i`` and ``font-style: italic`` or ``oblique`` as italic. Layout is
-not reported, except the layout that draws other text, which refuses (below).
+bar beside or over the text). A line is drawn in its own colour (a decoration in the colour of the
+element that declares it, a border in its border colour) and is marked only where it can be seen
+on the background under it, by the faint rule; one that cannot be seen refuses. Bold and italic
+are marked as a browser computes them: the font weight carried down from the parent (``b`` and
+``strong`` bolder than it, ``th`` and ``h1`` to ``h6`` bold, then ``font-weight``; ``bolder`` and
+``lighter`` as CSS Fonts 4 steps them) drawn bold at 600 and above (a numeric weight from 501 to
+599, which a family's bold face may draw, refuses), and ``em``, ``i`` and ``font-style: italic``
+or ``oblique`` as italic. Layout is not reported, except the layout that draws other text, which
+refuses (below).
 
 What refuses a section (``SectionRefusal.code``):
 
@@ -104,23 +108,34 @@ block's top or bottom, vertical padding on inline text and any padding on it ove
 border on it wider than a hairline, a height outside table parts and pictures, a line height below
 12pt, 100% or 1em, a font above 14pt); a font outside a closed list of Unicode text fonts (a symbol
 font draws other glyphs); a border value on inline text a browser would not accept whole, or one
-inherited from the parent; a shift other than ``position: relative`` with exactly one of ``top`` and
-``bottom`` on an inline element other than ``sup`` and ``sub``, without ``vertical-align``, by at
-most 6pt (``top`` or ``bottom`` alone included; a background on or inside a shifted element, which
-is painted over the text around it; a shift inside another, or inside a ``sup``, ``sub`` or
-``vertical-align``, and one of a point or more around one, since each is bounded only on its own); a
-colour or background keyword a browser drops (``color: none``, ``background-color: auto``), which
-leaves the declaration before it in force; a style CSS would split otherwise than the reader (a
-quote outside a font family name or inside a quoted one, a comment, an escape, a bracket outside
-``rgb()``, a character outside ASCII letters, digits, whitespace and ``# % ! . , : ; ' " ( ) -``);
-and a margin or indent with a value a browser drops (the wrong number of values, ``text-indent:
-auto``).
+inherited from the parent; a shift other than ``position: relative`` with exactly one of ``top``
+and ``bottom`` on an inline element other than ``sup`` and ``sub``, without ``vertical-align``,
+by at most 6pt (``top`` or ``bottom`` alone included; a background on or inside a shifted element,
+which is painted over the text around it; a shift inside another, or inside a ``sup``, ``sub``
+or ``vertical-align``, and one of a point or more around one, since each is bounded only on its
+own); a colour or background keyword a browser drops (``color: none``, ``background-color:
+auto``), which leaves the declaration before it in force; a style CSS would split otherwise than
+the reader (a quote outside a font family name or inside a quoted one, a comment, an escape, a
+bracket outside ``rgb()``, a character outside ASCII letters, digits, whitespace and
+``# % ! . , : ; ' " ( ) -``); a margin or indent with a value a browser drops (the wrong
+number of values, ``text-indent: auto``); a decoration line or an inline border drawn in a colour
+that cannot be seen on the background under it, or a border colour with alpha; ``vertical-align``
+``top``, ``middle`` or ``bottom`` on inline text, which moves it with no mark; a ``width`` other
+than ``auto`` outside ``table``, ``td``, ``th`` and ``img`` (text overflows a narrow box and its
+background); text drawn left of the block box that paints a background other than the one around
+it (margins and indent summed as above; in a table cell, left of the cell); a list item whose
+marker would be faint (the item's colour on the background outside it, or a size under 2pt); and
+a font weight from 501 to 599. As ``unsupported-element``: a block inside an inline element, which
+the inline's background, raise, shift and border do not reach as the reader would carry them.
 
-What refuses the document (``EpiRefusedError``, code ``invalid-bundle``): not UTF-8 JSON (or JSON
-with an integer longer than Python's digit limit), a lone surrogate anywhere in it, not a document
-Bundle, not the shape of one (a section, code, text, div or entry of the wrong JSON type), not
-exactly one entry with sections, a resource with sections that is not a Composition, a section
-without a title, or nesting too deep to read.
+What refuses the document (``EpiRefusedError``): not UTF-8 JSON (or JSON with an integer longer
+than Python's digit limit, a name repeated in an object, ``NaN`` or ``Infinity``), a lone surrogate
+anywhere in it, not a document Bundle, not the shape of one (a section, code, text, div or entry
+of the wrong JSON type), not exactly one entry with sections, a resource with sections that is not
+a Composition or not the first entry's, a section without a title, or arrays and objects nested
+more than 100 deep (``invalid-bundle``); and a section's or the Composition's title holding a
+character a div refuses (other than whitespace), with that character's code. A title is otherwise
+served as written, a raw FHIR string: its whitespace is not collapsed.
 """
 
 from __future__ import annotations
@@ -513,6 +528,8 @@ def _border_colour(token: str) -> bool:
 def _valid_border(part: str, token: str) -> bool:
     if part == "style":
         return token in _BORDER_STYLES
+    if part == "color":
+        return _border_colour(token)
     return _WIDTH.fullmatch(token) is not None
 
 
@@ -530,7 +547,7 @@ def _importance_ordered(style: str) -> list[tuple[str, str]]:
     return normal + important
 
 
-def _inline_borders(style: str) -> set[str]:
+def _inline_borders(style: str, builder: _Builder) -> set[str]:
     """The marks a style's borders ask for on an inline element, read as a browser cascades them.
 
     A side is drawn when its style is neither none nor hidden (the initial style is none) and
@@ -539,10 +556,13 @@ def _inline_borders(style: str) -> set[str]:
     mg", "1⋮5"), which is its own mark, ``border``. A border image is drawn whatever the style,
     on every side. A border value the reader cannot parse whole (a function such as ``var()``, a
     token that is no width, style or colour, the wrong number of values) refuses the section: a
-    browser would drop it or read it otherwise, and neither can be told here.
+    browser would drop it or read it otherwise, and neither can be told here. A side drawn in a
+    colour that cannot be seen on the background under it (``_faint``; the colour is the text's
+    unless one is given) refuses, and so does one drawn in a colour with alpha.
     """
     styles = dict.fromkeys(_SIDES, "none")
     widths = dict.fromkeys(_SIDES, "medium")
+    colours = dict.fromkeys(_SIDES, "currentcolor")
     kinds: set[str] = set()
     for name, value in _importance_ordered(style):
         if not name.startswith("border") or name in ("border-collapse", "border-spacing"):
@@ -577,35 +597,42 @@ def _inline_borders(style: str) -> set[str]:
                     styles[target] = "none"
                 if part in ("width", ""):
                     widths[target] = "medium"
+                if part in ("color", ""):
+                    colours[target] = "currentcolor"
             continue
-        if part in ("style", "width"):
+        if part in ("style", "width", "color"):
             count_ok = len(tokens) == 1 if side in _SIDES else 1 <= len(tokens) <= 4
             if not count_ok or not all(_valid_border(part, token) for token in tokens):
                 raise _RefusedError("unsupported-style", f"{name}: {value}")
             per = {side: tokens[0]} if side in _SIDES else _per_side(tokens)
             for target in targets:
-                (styles if part == "style" else widths)[target] = per[target]
+                {"style": styles, "width": widths, "color": colours}[part][target] = per[target]
         elif not part:
             # The shorthand: at most one width, style and colour, in any order; missing ones
             # reset to the initial values.
             found_style = [t for t in tokens if t in _BORDER_STYLES]
             found_width = [t for t in tokens if _WIDTH.fullmatch(t)]
-            colours = [t for t in tokens if t not in found_style and t not in found_width]
+            found_colour = [t for t in tokens if t not in found_style and t not in found_width]
             if (
                 not tokens
                 or len(found_style) > 1
                 or len(found_width) > 1
-                or len(colours) > 1
-                or not all(_border_colour(t) for t in colours)
+                or len(found_colour) > 1
+                or not all(_border_colour(t) for t in found_colour)
             ):
                 raise _RefusedError("unsupported-style", f"{name}: {value}")
             for target in targets:
                 styles[target] = found_style[0] if found_style else "none"
                 widths[target] = found_width[0] if found_width else "medium"
-        # Colour neither draws nor removes a border.
+                colours[target] = found_colour[0] if found_colour else "currentcolor"
     for side in _SIDES:
         if styles[side] in ("none", "hidden") or _zero_width(widths[side]):
             continue
+        # A border is drawn in its colour over the element's background (``currentcolor``, the
+        # initial colour, is the text's); one that cannot be seen there is no line to mark.
+        colour = builder.colour if colours[side] == "currentcolor" else _colour(colours[side])
+        if _faint(colour, builder.backdrop):
+            raise _RefusedError("unsupported-style", f"border-{side} in a colour not seen")
         # A border wider than a hairline paints a band over the lines and words around the text
         # (an empty span with a 24pt white border blanks the line above it).
         width = 0.75 if widths[side] == "thin" else _length_points(widths[side])
@@ -783,8 +810,10 @@ def _paint(style: str, builder: _Builder) -> bool:
     return False
 
 
-def _paint_element(style: str, builder: _Builder, name: str) -> None:
+def _paint_element(style: str, builder: _Builder, name: str) -> bool:
     """``_paint`` for an element, and the refusals that depend on the elements around it.
+
+    Whether the element paints a background.
 
     As T4: a shifted box is painted over the text around it, so a background on or inside one is
     refused; and a shift is bounded only on its own, so one inside another shift or inside a
@@ -810,6 +839,15 @@ def _paint_element(style: str, builder: _Builder, name: str) -> None:
     builder.raised = builder.raised or aligned
     if painted and builder.shifted:
         raise _RefusedError("unsupported-style", f"{name}: a background on a shifted element")
+    return painted
+
+
+def _faint(colour: str | None, backdrop: str | None) -> bool:
+    """Whether a colour cannot be told from the background under it (None: black, the page)."""
+    if colour == "transparent":
+        return True
+    under = _rgb(backdrop, (0xFF, 0xFF, 0xFF))
+    return _contrast(_rgb(colour, (0, 0, 0)), under) < _FAINT_CONTRAST
 
 
 def _colour_kinds(builder: _Builder) -> set[str]:
@@ -821,11 +859,7 @@ def _colour_kinds(builder: _Builder) -> set[str]:
     kinds: set[str] = set()
     if backdrop is not None and backdrop not in _WHITE and not _light(backdrop):
         kinds.add(f"shading-{backdrop}")
-    if builder.colour == "transparent":
-        return kinds | {_FAINT_COLOUR}
-    text = _rgb(builder.colour, (0, 0, 0))
-    under = _rgb(backdrop, (0xFF, 0xFF, 0xFF))
-    if _contrast(text, under) < _FAINT_CONTRAST:
+    if _faint(builder.colour, backdrop):
         return kinds | {_FAINT_COLOUR}
     colour = builder.colour
     if colour is None or colour in _BLACK or _dark(colour):
@@ -892,7 +926,11 @@ def _font(style: str, builder: _Builder, name: str) -> None:
                 builder.weight = _bolder(parent)
             elif value == "lighter":
                 builder.weight = _lighter(parent)
-            elif value.isdigit() and 1 <= int(value) <= 1000:
+            elif re.fullmatch(r"[0-9]{1,4}", value) and 1 <= int(value) <= 1000:
+                if 500 < int(value) < _BOLD_WEIGHT:
+                    # Drawn bold where the family's next face is bold (a 700 face for 550):
+                    # the face Chrome picks is not on record.
+                    raise _RefusedError("unsupported-style", f"font-weight: {value}")
                 builder.weight = int(value)
             else:
                 raise _RefusedError("unsupported-style", f"font-weight: {value}")
@@ -918,7 +956,33 @@ _TINY_POINTS: Final = 2.0
 
 # --- paragraphs -----------------------------------------------------------------------------
 
-_PaintState = tuple[str | None, str | None, bool, bool, bool, int, bool, float]
+
+def _check_character(character: str) -> None:
+    """Refuse a character a browser does not show as itself (or the reader's U+FFFC)."""
+    if character == OBJECT:
+        raise _RefusedError("reserved-character", "U+FFFC stands for a picture")
+    if character == _SOFT_HYPHEN:
+        # Where the line may break: kept in the text, as a browser keeps it (and as the Word
+        # reader reads ``w:softHyphen``).
+        return
+    category = unicodedata.category(character)
+    if category in ("Cf", "Cc") or is_default_ignorable(ord(character)):
+        # Zero-width characters and bidirectional controls: a browser hides them or reorders the
+        # text around them, and so any code point Unicode says to ignore (a variation selector,
+        # a Hangul filler). A control (U+007F, a C1 control; XML admits no other) it draws as a
+        # blank or a box.
+        raise _RefusedError("format-character", f"U+{ord(character):04X}")
+    if category == "Co":
+        # What a private-use code point shows is the font's choice: a Symbol font's U+F0B3 is
+        # drawn "≥", another font draws a box.
+        raise _RefusedError("private-use-character", f"U+{ord(character):04X}")
+    if category == "Cn":
+        raise _RefusedError("unassigned-character", f"U+{ord(character):04X}")
+
+
+_PaintState = tuple[
+    str | None, str | None, bool, bool, bool, int, bool, float, tuple[str | None, ...], float | None
+]
 
 
 @dataclass
@@ -950,6 +1014,8 @@ class _Builder:
     open_li: bool = False
     open_a: bool = False
     open_h: bool = False
+    # The element being walked is inside an inline element (``_INLINE``).
+    in_inline: bool = False
     cell: Any = None
     # The text's colour and the background painted under it, in ``_colour``'s spelling (None:
     # black text, the white page), and whether an element above is shifted (``_shift``) or
@@ -964,6 +1030,11 @@ class _Builder:
     italic: bool = False
     # The text's size in points, as a browser computes it (16px, 12pt, by default).
     size: float = 12.0
+    # The colours of the decoration lines (underline, line-through) the text inherits.
+    decorations: tuple[str | None, ...] = ()
+    # The left edge (as ``left``) of the block box that paints the background under the text;
+    # None where the page or an inline element paints it.
+    backdrop_left: float | None = None
 
     def paint_state(self) -> _PaintState:
         """What an element's colour, background, shift and font set, to restore after it."""
@@ -976,6 +1047,8 @@ class _Builder:
             self.weight,
             self.italic,
             self.size,
+            self.decorations,
+            self.backdrop_left,
         )
 
     def restore_paint(self, state: _PaintState) -> None:
@@ -988,6 +1061,8 @@ class _Builder:
             self.weight,
             self.italic,
             self.size,
+            self.decorations,
+            self.backdrop_left,
         ) = state
 
     def text(self, text: str, marks: frozenset[str]) -> None:
@@ -996,26 +1071,7 @@ class _Builder:
                 if self.characters and self.characters[-1] != "\n" and self.pending is None:
                     self.pending = marks
                 continue
-            if character == OBJECT:
-                raise _RefusedError("reserved-character", "U+FFFC stands for a picture")
-            category = unicodedata.category(character)
-            if character == _SOFT_HYPHEN:
-                # Where the line may break: kept in the text, as a browser keeps it (and as the
-                # Word reader reads ``w:softHyphen``).
-                self._emit(character, marks)
-                continue
-            if category in ("Cf", "Cc") or is_default_ignorable(ord(character)):
-                # Soft hyphens, zero-width characters and bidirectional controls: a browser
-                # hides them or reorders the text around them, and so any code point Unicode
-                # says to ignore (a variation selector, a Hangul filler). A control (U+007F, a
-                # C1 control; XML admits no other) it draws as a blank or a box.
-                raise _RefusedError("format-character", f"U+{ord(character):04X}")
-            if category == "Co":
-                # What a private-use code point shows is the font's choice: a Symbol font's
-                # U+F0B3 is drawn "≥", another font draws a box.
-                raise _RefusedError("private-use-character", f"U+{ord(character):04X}")
-            if category == "Cn":
-                raise _RefusedError("unassigned-character", f"U+{ord(character):04X}")
+            _check_character(character)
             self._emit(character, marks)
 
     def _emit(self, character: str, marks: frozenset[str]) -> None:
@@ -1082,6 +1138,8 @@ def _local(element: ET.Element) -> str:
 
 # The elements a height is layout on: table parts, and a picture, whose size it sets.
 _SIZED: Final = frozenset({"table", "thead", "tbody", "tfoot", "tr", "td", "th", "img"})
+# The elements a width is layout on: a table and its cells grow to hold their text; a picture.
+_WIDE: Final = frozenset({"table", "td", "th", "img"})
 
 
 def _length_points(value: str) -> float | None:
@@ -1147,6 +1205,9 @@ def _refuse_overprint(name: str, style: str) -> None:
                 raise _RefusedError("unsupported-style", f"{name} {key}: {value}")
         elif key in ("height", "max-height") and name not in _SIZED and value != "auto":
             raise _RefusedError("unsupported-style", f"{name} {key}: {value}")
+        elif key == "width" and name not in _WIDE and value != "auto":
+            # A narrower box paints its background narrower than the text that overflows it.
+            raise _RefusedError("unsupported-style", f"{name} {key}: {value}")
         elif key == "line-height" and value != "normal":
             relative = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?|\.[0-9]+)(%|em)?", value)
             if relative is not None:
@@ -1178,6 +1239,13 @@ def _check_attributes(element: ET.Element, name: str) -> set[str]:
     style = element.get("style", "")
     _refuse_overprint(name, style)
     _style(style)
+    if name in _INLINE and dict(_importance_ordered(style)).get("vertical-align") in (
+        "top",
+        "middle",
+        "bottom",
+    ):
+        # Raised or lowered against the line, with no mark: "10" and a raised "9" read "109".
+        raise _RefusedError("unsupported-style", f"{name}: vertical-align against the line")
     return _shift(name, style)
 
 
@@ -1228,36 +1296,56 @@ def _left_offsets(style: str) -> tuple[float, float | None]:
 def _walk(element: ET.Element, builder: _Builder, marks: frozenset[str], depth: int) -> None:
     builder.nesting += 1
     saved_left, saved_indent = builder.left, builder.indent
-    saved_open = builder.open_p, builder.open_li, builder.open_a, builder.open_h
+    saved_open = builder.open_p, builder.open_li, builder.open_a, builder.open_h, builder.in_inline
     saved_paint = builder.paint_state()
     try:
         _walk_element(element, builder, marks, depth)
     finally:
         builder.nesting -= 1
         builder.left, builder.indent = saved_left, saved_indent
-        builder.open_p, builder.open_li, builder.open_a, builder.open_h = saved_open
+        (builder.open_p, builder.open_li, builder.open_a, builder.open_h, builder.in_inline) = (
+            saved_open
+        )
         builder.restore_paint(saved_paint)
 
 
-def _enter_block(name: str, style: str, builder: _Builder) -> None:
+def _repaints(builder: _Builder, outside: str | None) -> bool:
+    """Whether the background now under the text differs from ``outside``, the one around it.
+
+    White on the white page (or on white) is the same paint: text beyond it lies on the same.
+    """
+    page = (None, "white", "#ffffff")
+    return builder.backdrop != outside and not (builder.backdrop in page and outside in page)
+
+
+def _enter_block(name: str, style: str, builder: _Builder, painted: bool) -> None:
     """Carry the block's left offset down; refuse text drawn left of its container's start.
 
     A table cell's content starts at the cell, so a cell starts again from zero, or from the
     table's own offset when that is negative (a block that overflows its cell is a stated
     residual). Each declaration alone is also bounded by an inch
     (``_on_page``); here the sum is: nested margins, and an indent inherited from a parent, add up.
+    Text left of the block box that paints the background under it (``painted``, a background
+    other than the one around it, or one around it; in a cell, the cell's start) is drawn on
+    what lies outside, and refuses.
     """
     if name in ("td", "th"):
         builder.left, builder.indent = min(0.0, builder.left), builder.part_indent
+        if builder.backdrop_left is not None:
+            builder.backdrop_left = builder.left
     margin, indent = _left_offsets(style)
     # A cell's margin does not apply (a table part never reaches here but through its cell).
     if name not in ("td", "th"):
         builder.left += margin
     if indent is not None:
         builder.indent = indent
+    if painted:
+        builder.backdrop_left = builder.left
     first_line = builder.left + min(0.0, builder.indent or 0.0)
     if min(builder.left, first_line) < _OFF_PAGE_BOUND_POINTS:
         raise _RefusedError("unsupported-style", f"{name} drawn left of its container's start")
+    if builder.backdrop_left is not None and min(builder.left, first_line) < builder.backdrop_left:
+        raise _RefusedError("unsupported-style", f"{name} drawn left of its background")
 
 
 def _walk_element(
@@ -1314,24 +1402,38 @@ def _walk_element(
         and not k.startswith(("color-", "shading-"))
     }
     kinds = inherited | _check_attributes(element, name)
-    around = builder.colour
-    if name == "a" and element.get("href") is not None:
-        # A browser draws a link in its link colour (blue) unless the link's own style says
-        # otherwise; the colour of the text around it is not inherited.
-        builder.colour = _LINK_COLOUR
-    _paint_element(element.get("style", ""), builder, name)
     declared_colour = dict(_importance_ordered(element.get("style", ""))).get("color")
-    if declared_colour in ("inherit", "currentcolor"):
-        # For the colour itself both mean the colour of the text around it, link or not.
-        builder.colour = around
+    if (
+        name == "a"
+        and element.get("href") is not None
+        and (declared_colour not in ("inherit", "currentcolor"))
+    ):
+        # A browser draws a link in its link colour (blue) unless the link's own style says
+        # otherwise; the colour of the text around it is not inherited. ``inherit`` and
+        # ``currentcolor`` keep the colour around it, before a background takes it.
+        builder.colour = _LINK_COLOUR
+    outside = builder.backdrop
+    painted = _paint_element(element.get("style", ""), builder, name) and _repaints(
+        builder, outside
+    )
+    if name == "li" and (_faint(builder.colour, outside) or builder.size < _TINY_POINTS):
+        # The marker takes the item's colour and size, outside its box (on what lies there).
+        raise _RefusedError("unsupported-style", "a list marker drawn faint")
     kinds |= _colour_kinds(builder) | _font_kinds(builder)
-    kinds |= _own_lines(name, element)
+    own_lines = _own_lines(name, element)
+    _decorate(builder, own_lines)
+    kinds |= own_lines
     if name in _INLINE:
-        kinds |= _inline_borders(element.get("style", ""))
+        kinds |= _inline_borders(element.get("style", ""), builder)
     here = frozenset(kinds)
     if name in _BLOCKS:
-        _enter_block(name, element.get("style", ""), builder)
+        _enter_block(name, element.get("style", ""), builder, painted)
+        if builder.in_inline:
+            # A block breaks the inline around it: its background, raise, shift and borders
+            # do not reach the block as the reader carries them down.
+            raise _RefusedError("unsupported-element", f"{name} inside an inline element")
     elif name in _INLINE:
+        builder.in_inline = True
         _, own = _left_offsets(element.get("style", ""))
         if own is not None:
             builder.indent = own
@@ -1490,6 +1592,18 @@ def _own_lines(name: str, element: ET.Element) -> set[str]:
     return kinds
 
 
+def _decorate(builder: _Builder, own: set[str]) -> None:
+    """Carry the element's own decoration lines down; refuse one that cannot be seen.
+
+    A line is drawn in the colour of the element that declares it, across the text of everything
+    inside, over each background there (``_faint``, as for text).
+    """
+    if own & {"underline", "strike"}:
+        builder.decorations = (*builder.decorations, builder.colour)
+    if any(_faint(colour, builder.backdrop) for colour in builder.decorations):
+        raise _RefusedError("unsupported-style", "a decoration line in a colour not seen")
+
+
 def _table(element: ET.Element, builder: _Builder, marks: frozenset[str], depth: int) -> None:
     # A row group and a row stand between the table and each cell: they count toward the bound.
     builder.nesting += 2
@@ -1530,7 +1644,11 @@ def _table_rows(element: ET.Element, builder: _Builder, marks: frozenset[str], d
         # A row group's and a row's colour and background reach their cells' text.
         table_paint = builder.paint_state()
         if part_name != "tr":
-            _paint_element(part.get("style", ""), builder, part_name)
+            outside = builder.backdrop
+            painted = _paint_element(part.get("style", ""), builder, part_name)
+            if painted and _repaints(builder, outside):
+                builder.backdrop_left = 0.0  # bounded at each cell's start (``_enter_block``)
+            _decorate(builder, _own_lines(part_name, part))
         part_paint = builder.paint_state()
         for row in rows:
             if _local(row) != "tr":
@@ -1539,7 +1657,11 @@ def _table_rows(element: ET.Element, builder: _Builder, marks: frozenset[str], d
                 set(marks) | part_marks | _check_attributes(row, "tr") | _own_lines("tr", row)
             )
             builder.restore_paint(part_paint)
-            _paint_element(row.get("style", ""), builder, "tr")
+            outside = builder.backdrop
+            painted = _paint_element(row.get("style", ""), builder, "tr")
+            if painted and _repaints(builder, outside):
+                builder.backdrop_left = 0.0  # bounded at each cell's start (``_enter_block``)
+            _decorate(builder, _own_lines("tr", row))
             _, own = _left_offsets(row.get("style", "") if row is not part else "")
             builder.part_indent = own if own is not None else part_indent
             _no_stray_text(row.text)
@@ -1561,8 +1683,36 @@ def _table_rows(element: ET.Element, builder: _Builder, marks: frozenset[str], d
 
 _HTML_OTHERWISE = re.compile(
     r"<\?|<!--|xmlns:|</br\b|&#0*(12[89]|1[3-5][0-9]);|&#[xX]0*[89][0-9a-fA-F];"
-    r"|<(?!(?:br|hr|img)[\s/>])[A-Za-z][^\s/>]*(?:\s+[^\s=/>]+\s*=\s*(?:\"[^\"]*\"|'[^']*'))*\s*/>"
 )
+# A run a tag name cannot leave, and what may follow a name up to "/>" (quoted attributes).
+_NAME_RUN = re.compile(r"[^\s/>]+")
+_SELF_CLOSING_TAIL = re.compile(r"(?:\s+[^\s=/>]+\s*=\s*(?:\"[^\"]*\"|'[^']*'))*\s*/>")
+
+
+def _html_otherwise(div: str) -> bool:
+    """Markup an HTML parser reads otherwise: ``_HTML_OTHERWISE``, or a self-closing element.
+
+    A self-closing element other than ``br``, ``hr`` and ``img``: "<", a letter, a name up to
+    whitespace, "/" or ">", quoted attributes, "/>". Every "<" in one run of name characters
+    has its name end where the run ends, so the attributes are matched once per run, not once
+    per "<" (a regular expression scanned "<a<a<a..." in quadratic time).
+    """
+    if _HTML_OTHERWISE.search(div):
+        return True
+    for run in _NAME_RUN.finditer(div):
+        text = run.group()
+        names = (
+            text[at + 1 :] if len(text) - at <= 4 else None
+            for at in range(len(text) - 1)
+            if text[at] == "<" and text[at + 1].isascii() and text[at + 1].isalpha()
+        )
+        if any(name not in ("br", "hr", "img") for name in names) and (
+            _SELF_CLOSING_TAIL.match(div, run.end())
+        ):
+            return True
+    return False
+
+
 _BARE_LESS_THAN = re.compile(r"<(?![A-Za-z/!?])")
 
 
@@ -1583,7 +1733,7 @@ def read_div(div: str) -> tuple[tuple[Paragraph, ...], SectionRefusal | None, tu
     if "<![cdata[" in lowered:
         # An XML parser reads CDATA as text; an HTML parser reads it as a comment.
         return (), SectionRefusal("malformed-xhtml", "a CDATA section"), ()
-    if _HTML_OTHERWISE.search(div):
+    if _html_otherwise(div):
         return (), SectionRefusal("malformed-xhtml", "markup an HTML parser reads otherwise"), ()
     notes: tuple[str, ...] = ()
     bare = len(_BARE_LESS_THAN.findall(div))
@@ -1612,10 +1762,27 @@ def read_div(div: str) -> tuple[tuple[Paragraph, ...], SectionRefusal | None, tu
 # --- the Bundle ------------------------------------------------------------------------------
 
 
+def _title(title: str, where: str) -> str:
+    """A title as written, or ``EpiRefusedError`` for a character a div would refuse.
+
+    A title is served whatever the section's refusal, so a character the reader refuses in a
+    div (other than whitespace) refuses the document, with the code it has there.
+    """
+    for character in title:
+        if character not in _COLLAPSIBLE:
+            try:
+                _check_character(character)
+            except _RefusedError as refused:
+                code, detail = refused.refusal.code, refused.refusal.detail
+                raise EpiRefusedError(code, f"{detail} in {where}") from None
+    return title
+
+
 def _section(raw: dict[str, Any]) -> Section:
     title = raw.get("title")
     if not isinstance(title, str):
         raise EpiRefusedError("invalid-bundle", "a section without a title")
+    _title(title, "a section title")
     codings = raw.get("code", {}).get("coding", [])
     code = codings[0].get("code") if codings else None
     if code is not None and not isinstance(code, str):
@@ -1646,11 +1813,39 @@ def read_epi(data: bytes) -> Document:
         raise EpiRefusedError("invalid-bundle", "not the shape of a document Bundle") from error
 
 
-def _read_epi(data: bytes) -> Document:
+# How deep a Bundle's arrays and objects may nest (the pinned ePIs reach 17): the JSON parser
+# recurses, and how deep it can go depends on the thread's stack.
+_JSON_DEPTH: Final = 100
+_JSON_STRING = re.compile(r'"[^"\\]*(?:\\.[^"\\]*)*"', re.S)
+
+
+def _one_reading(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    if len({name for name, _ in pairs}) != len(pairs):
+        # Two values for one name: JSON leaves which one counts undefined, FHIR forbids it.
+        raise ValueError("a name repeated in an object")
+    return dict(pairs)
+
+
+def _not_a_number(constant: str) -> None:
+    raise ValueError(f"{constant} is not JSON")
+
+
+def load_bundle(data: bytes) -> dict[str, Any]:
+    """The document Bundle in ``data``, parsed strictly, or ``EpiRefusedError``."""
     try:
-        bundle = json.loads(data.decode("utf-8"))
-    except (UnicodeDecodeError, ValueError) as error:
-        # ValueError: not JSON, or an integer past Python's digit limit.
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise EpiRefusedError("invalid-bundle", "not UTF-8 JSON Python can read") from error
+    depth = 0
+    for bracket in re.sub(r"[^\[\]{}]", "", _JSON_STRING.sub("", text)):
+        depth += 1 if bracket in "[{" else -1
+        if depth > _JSON_DEPTH:
+            raise EpiRefusedError("invalid-bundle", "nested too deeply to read")
+    try:
+        bundle = json.loads(text, object_pairs_hook=_one_reading, parse_constant=_not_a_number)
+    except ValueError as error:
+        # Not JSON, a name repeated in an object, NaN or Infinity, or an integer past Python's
+        # digit limit.
         raise EpiRefusedError("invalid-bundle", "not UTF-8 JSON Python can read") from error
     try:
         # A lone surrogate escape ("\\ud800") decodes to a string no UTF-8 writer can write.
@@ -1661,14 +1856,27 @@ def _read_epi(data: bytes) -> Document:
         raise EpiRefusedError("invalid-bundle", "not a Bundle")
     if bundle.get("type") != "document":
         raise EpiRefusedError("invalid-bundle", "not a document Bundle")
+    return bundle
+
+
+def composition_of(bundle: dict[str, Any]) -> dict[str, Any]:
+    """The resource with sections: the only one, and the first entry's (FHIR's bdl-11)."""
+    entries = bundle.get("entry", [])
     compositions = [
         entry["resource"]
-        for entry in bundle.get("entry", [])
+        for entry in entries
         if isinstance(entry.get("resource"), dict) and "section" in entry["resource"]
     ]
     if len(compositions) != 1:
         raise EpiRefusedError("invalid-bundle", f"{len(compositions)} resources with sections")
-    composition = compositions[0]
+    if entries[0].get("resource") is not compositions[0]:
+        raise EpiRefusedError("invalid-bundle", "the resource with sections is not the first")
+    composition: dict[str, Any] = compositions[0]
+    return composition
+
+
+def _read_epi(data: bytes) -> Document:
+    composition = composition_of(load_bundle(data))
     quirks: list[str] = []
     kind = composition.get("resourceType")
     if kind == 0:
@@ -1684,6 +1892,7 @@ def _read_epi(data: bytes) -> Document:
     for name, value in (("title", title), ("date", date), ("type", document_type)):
         if value is not None and not isinstance(value, str):
             raise EpiRefusedError("invalid-bundle", f"a Composition {name} that is not a string")
+    _title(title, "the Composition's title")
     return Document(
         title=title,
         date=date,

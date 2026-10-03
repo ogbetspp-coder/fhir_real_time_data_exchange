@@ -16,7 +16,7 @@ from typing import Any
 
 import pytest
 
-from label_docx import browser, epi_output
+from label_docx import browser, epi, epi_output
 from label_docx.service import Service
 from label_docx.store import Checker, Store
 from test_service import _call
@@ -171,3 +171,99 @@ def test_strict_service_serves_no_read_its_application_has_not_checked(tmp_path:
     )
     _, _, body = _call(checked, "POST", "/v1/documents", EPI)
     assert _call(checked, "GET", f"/v1/documents/{json.loads(body)['document']}")[0] == "200 OK"
+
+
+@pytest.mark.parametrize("span", [(-1, 1), (1, 1), (2, 1), (0, 3), ("0", 1), (True, 2)])
+def test_a_mark_that_is_no_span_of_its_text_is_never_compared(span: tuple[Any, Any]) -> None:
+    def lines(start: Any, end: Any) -> list[browser.Line]:
+        mark = {"kind": "bold", "start": start, "end": end}
+        return browser.result_lines([{"text": "ab", "marks": [mark]}])
+
+    assert lines(0, 2) != lines(1, 2)
+    with pytest.raises(ValueError, match="no span"):
+        lines(*span)
+
+
+# --- the oracle's own rules, on facts as the page reports them (sweep 2) -----------------------
+
+
+def _facts(**changes: Any) -> dict[str, Any]:
+    plain: dict[str, Any] = {
+        "weight": "400",
+        "style": "normal",
+        "color": "rgb(0, 0, 0)",
+        "size": "16px",
+        "decorations": [],
+        "background": None,
+        "align": [],
+        "shift": 0,
+        "borders": [],
+    }
+    return {**plain, **changes}
+
+
+def test_the_oracle_marks_only_the_lines_that_can_be_seen() -> None:
+    # S9: a line is drawn in its own colour, over the background under it.
+    white, black, clear = "rgb(255, 255, 255)", "rgb(0, 0, 0)", "rgba(0, 0, 0, 0)"
+    assert browser._kinds(_facts(decorations=[["underline", white]])) == frozenset()
+    assert browser._kinds(_facts(decorations=[["line-through", clear]])) == frozenset()
+    assert browser._kinds(_facts(decorations=[["underline", "rgb(255, 0, 0)"]])) == {"underline"}
+    assert browser._kinds(_facts(decorations=[["line-through", black]])) == {"strike"}
+    assert browser._kinds(_facts(borders=[["bottom", white, None]])) == frozenset()
+    assert browser._kinds(_facts(borders=[["left", black, black]])) == frozenset()
+    assert browser._kinds(_facts(borders=[["left", black, None]])) == {"border"}
+    assert browser._kinds(_facts(borders=[["bottom", black, None]])) == {"underline"}
+
+
+def test_the_oracle_tells_any_other_alignment_apart() -> None:
+    # S11: text aligned top, middle or bottom is moved; the reader has no mark for it.
+    assert browser._kinds(_facts(align=["top"])) == {"vertical-align-top"}
+    assert browser._kinds(_facts(align=["super"])) == {"superscript"}
+
+
+def test_the_oracles_offsets_count_utf16_units() -> None:
+    # S51: the page counts a character outside the BMP as two.
+    text = "\U0001d6fc a"
+    runs = [[0, 3, _facts()], [3, 4, _facts(weight="700")]]
+    lines = browser.browser_lines({"text": text, "runs": runs, "error": None})
+    assert lines == [(text, (frozenset(), frozenset(), frozenset({"bold"})))]
+    with pytest.raises(browser.BrowserError):
+        browser.browser_lines({"text": text, "runs": [[0, 1, _facts()]], "error": None})
+
+
+def test_the_oracle_draws_a_faint_marker_as_none() -> None:
+    # S33: the marker is drawn in the item's colour and size, on the background outside it.
+    assert browser._drawn_marker("1. ", ["rgb(255, 255, 255)", "16px", None]) == ""
+    assert browser._drawn_marker("1. ", ["rgb(0, 0, 0)", "2px", None]) == ""
+    assert browser._drawn_marker("1. ", ["rgb(255, 255, 255)", "16px", "rgb(0, 0, 0)"]) == "1. "
+
+
+def test_the_oracle_reads_the_bundle_as_strictly_as_the_reader() -> None:
+    # S34, S35: one reading of each name, and the first entry's Composition, or nothing.
+    good = json.loads(EPI)
+    repeated = EPI.decode().replace('"title":', '"title": "decoy", "title":', 1).encode()
+    moved = copy.deepcopy(good)
+    moved["entry"].insert(0, {"resource": {"resourceType": "Patient"}})
+    for data in (repeated, json.dumps(moved).encode(), EPI[:-1] + b', "x": NaN}'):
+        with pytest.raises(epi.EpiRefusedError):
+            browser.verify_epi(data, {}, Path("/nonexistent"))
+
+
+@pytest.mark.skipif(CHROME is None, reason="Chrome is not installed")
+def test_chrome_facts_see_line_colours_block_backgrounds_alignment_and_markers() -> None:
+    assert CHROME is not None
+    divs = [
+        '<div><u style="color:white"><span style="color:black">x</span></u></div>',
+        '<div><span style="border-bottom:1px solid white">x</span></div>',
+        '<div><span style="background:black;color:white"><p>x</p></span></div>',
+        '<div><span style="vertical-align:top">x</span></div>',
+    ]
+    shown = browser.browser_sections(divs, CHROME)
+    assert [browser.browser_lines(s)[0][1][0] for s in shown] == [
+        frozenset(),
+        frozenset(),
+        frozenset({"faint"}),
+        frozenset({"vertical-align-top"}),
+    ]
+    markers = ['<ul><li style="color:white">x</li></ul>', "<ul><li>x</li></ul>"]
+    assert browser.browser_markers(markers, CHROME) == [[""], ["\u2022 "]]

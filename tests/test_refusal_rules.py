@@ -16,6 +16,7 @@ from label_docx.reader import DocxRefusedError, read_document
 from numbering_cases import abstract, lvl, num
 from test_headers_comments import header, reference, with_parts
 from test_reader import (
+    CONTENT_TYPES,
     NUMBERING,
     RELATIONSHIP,
     ROOT_RELS,
@@ -63,6 +64,7 @@ def _with_header(content: str, numbering: str | None = None) -> bytes:
 def _updating_fields(body: str) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as package:
+        package.writestr("[Content_Types].xml", CONTENT_TYPES)
         package.writestr("_rels/.rels", ROOT_RELS.format(target="word/document.xml"))
         package.writestr(
             "word/_rels/document.xml.rels",
@@ -95,7 +97,7 @@ def test_a_seq_field_in_a_note_is_refused() -> None:
 @pytest.mark.parametrize(
     ("content", "code", "fragment"),
     [
-        (p(_field("SEQ Table", "7")), "computed-field", "SEQ"),
+        (p(_field("SEQ Table", "7")), "computed-field", "a computed field or PAGEREF in a header"),
         (li(3), "unsupported-numbering", "a list in a header"),
     ],
     ids=["seq", "list"],

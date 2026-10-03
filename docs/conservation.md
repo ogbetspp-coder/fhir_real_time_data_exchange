@@ -21,10 +21,13 @@ For a document `D` and the reader's result `R`:
   hidden whitespace, floating pictures and shapes (anchored to a paragraph: Word's text shows
   none); for an ePI, whitespace CSS collapses and a break ending a paragraph.
 - **Character:** a text character is itself, or its Symbol-table character in a Symbol-font run;
-  `w:tab` is U+0009, `w:br` U+000A, a picture or shape in line with the text U+FFFC.
+  `w:tab` is U+0009, `w:br` U+000A, `w:sym` (only in Symbol, by one to four hex digits) its
+  Symbol-table character, a picture or shape in line with the text U+FFFC.
 
 The check verifies the sequence (string equality per paragraph), the structure (paragraphs,
-table cells, notes, sections and note and page places are `D`'s) and the ledger:
+table cells, paragraph styles, hidden paragraph marks, notes in the order the body refers to
+them, sections and note and page places are `D`'s; every mark is a span of its paragraph's text,
+of a kind the format names) and the ledger:
 `text + instructions + elements = output + field code + page numbers + page breaks + hidden
 whitespace + floating objects`. Equality is all or nothing, so a dropped, added, changed, repeated, swapped or moved
 character, and a dropped, split or merged paragraph, all fail it.
@@ -48,11 +51,21 @@ document read: every changed result is refused, and every unchanged result is ce
 - It treats the result as untrusted: a wrong result can only fail.
 - Each token has one reading. Whether a run is in the Symbol font, or hidden, the check decides
   itself by Word's precedence (run, character style, paragraph style, table style, defaults).
-  A run with Symbol in only some font slots, or hidden text with characters, is never certified.
+  A run with Symbol in only some font slots or under complex script, right to left or a font
+  hint; text in Wingdings or another dingbat or symbol-encoded font; hidden text with
+  characters; or a paragraph mark hidden by one reading of its styles and not by Word's toggle
+  rule, is never certified.
+- It reads a closed list of elements: containers it reads through (content controls, custom
+  XML, hyperlinks, smart tags, bidirectional embeddings, simple fields) and properties and place
+  markers it passes over, which must hold no text. Anything else (alternate content around
+  runs or paragraphs, ruby, a chunk of another format, a chart, a paragraph in a table outside
+  its cells, a note defined twice) is never certified.
 
 Beyond the text, the check works out on its own, by Word's rules written apart from the reader's,
 the key marks (bold, italic, caps, small caps, strike, double strike, super- and subscript,
 underline), every list label and every note mark. The result's must be the check's (R-35, R-36).
+It draws lists in the body only; a list anywhere else, a label in capitals, hidden or drawn as
+a picture, and a custom note mark's echo are never certified.
 
 ## Tracked changes
 
@@ -62,9 +75,12 @@ own walk: each run's content is in a view unless a change the view drops wraps i
 its table cell; a paragraph joins the next exactly where the view drops its mark; a row the view
 drops goes whole, and a table whose every row it drops; a note goes exactly when the view drops
 every reference to it; no revision is left in any part; every other part is the source's byte for
-byte. Formatting the views take from a change is held to
-Word: for every case in `corpus/tracked-cases`, the reader reads its view exactly as it reads
-Word's own Accept All / Reject All file.
+byte. In a part with revisions, everything else is the source's too, element by element: each
+run element in full with its run's properties and the elements around it, each paragraph's
+properties, attributes and place, and everything outside paragraphs (tables, sections, styles,
+note ids). Properties a change records are the current ones in the accepted view; the former
+ones the original takes are held to Word: for every case in `corpus/tracked-cases`, the reader
+reads its view exactly as it reads Word's own Accept All / Reject All file.
 
 ## What is held to the applications instead
 
@@ -72,7 +88,7 @@ The proof covers the text. How it is shown is held to the application that shows
 
 | What                                              | Held to | Where                                  |
 | ------------------------------------------------- | ------- | -------------------------------------- |
-| List labels, note marks, fields, text, emphasis, headers, footers, comments of a .docx | Word | `test_word_oracle.py` (corpus); `--word on` (every ingest) |
+| List labels, note marks, fields, text, emphasis, headers, footers, comments of a .docx | Word | `test_word_oracle.py` (corpus; comments by unit tests only, none in the corpus yet); `--word on` (every ingest) |
 | Text, marks and list markers of an ePI section    | Chrome  | `test_browser_oracle.py` (corpus); every ingest with Chrome |
 | Tracked views                                     | Word    | `test_tracked.py` (corpus); `--word on` |
 
@@ -84,10 +100,12 @@ checked (R-32). Word shows text in capitals by its own rule ("5 µg" in capitals
 ## Scope
 
 The body, footnotes, endnotes, headers, footers and comments of a .docx; the section titles and
-divs of an ePI. A header, footer or comment refused on its own is listed under `refused`. Text
+divs of an ePI. A header, footer or comment the reader refuses on its own is listed under
+`refused`, and the body is read all the same, whatever stops the check reading that part. Text
 anywhere else is listed under `notRead`: for a .docx each part (the glossary, a header no section
-names...) or note separator with the size of its text; for an ePI only the number of other
-narratives in the Bundle.
+names...), note separator or continuation notice, with the size of its text (every text character
+and every element that stands for one); for an ePI only the number of other narratives in the
+Bundle.
 
 ## Who checks the checker
 

@@ -30,7 +30,7 @@ from pathlib import Path
 
 import fuzz_docx
 import fuzz_epi
-from label_docx import certify, documents, epi, epi_output, output, reader
+from label_docx import browser, certify, documents, epi, epi_output, output, reader, word
 from label_docx.epi import EpiRefusedError, read_epi
 from label_docx.output import FORMAT_VERSION, canonical
 from label_docx.reader import READER_VERSION, read_docx
@@ -61,6 +61,10 @@ def current_versions() -> dict[str, tuple[str, str]]:
             epi_output.FORMAT_VERSION,
             _sha256(*(Path(str(m.__file__)) for m in (epi_output, output, documents, certify))),
         ),
+        # What Word and Chrome are asked and how their answers are judged: a kept verdict is
+        # filed under it.
+        "word-verifier": (word.VERIFIER, _sha256(Path(word.__file__))),
+        "browser-verifier": (browser.VERIFIER, _sha256(Path(browser.__file__))),
     }
 
 

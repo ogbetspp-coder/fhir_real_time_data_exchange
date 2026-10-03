@@ -416,20 +416,31 @@ def test_the_check_refuses_a_joined_paragraph_with_none_after_it() -> None:
         certify_tracked(source, {"accepted": docx(p(t("a")))})
 
 
-def test_the_check_leaves_run_properties_to_word() -> None:
-    # Formatting is held to Word (test_every_case_reads_as_word_makes_it), not counted here: a
-    # view whose run lost its properties holds the same content.
-    source = docx(p(r("<w:t>a</w:t>", "<w:b/>") + ins(t("b"))))
-    accepted, _, _ = tracked(source)
-    plain = _rewrite(
-        accepted, "word/document.xml", lambda x: x.replace("<ns0:rPr><ns0:b /></ns0:rPr>", "")
+def test_the_check_holds_run_properties_and_leaves_changed_ones_to_word() -> None:
+    # Properties a change records the former set of are, in the original view, held to Word
+    # (test_every_case_reads_as_word_makes_it); every other run's are the source's.
+    changed = f'<w:b/><w:rPrChange w:id="4" {WHO}><w:rPr/></w:rPrChange>'
+    source = docx(p(r("<w:t>a</w:t>", "<w:b/>") + r("<w:t>c</w:t>", changed) + ins(t("b"))))
+    accepted, original, _ = tracked(source)
+    body = "word/document.xml"
+    restyled = _rewrite(
+        original, body, lambda x: x.replace("<ns0:rPr />", "<ns0:rPr><ns0:i /></ns0:rPr>")
     )
-    assert plain != accepted
-    assert certify_tracked(source, {"accepted": plain})["accepted"] == {
+    assert restyled != original
+    assert certify_tracked(source, {"original": restyled})["original"] == {
         "characters": 2,
         "elements": 0,
         "paragraphsJoined": 0,
     }
+    for view, data in (("accepted", accepted), ("original", original)):
+        plain = _rewrite(data, body, lambda x: x.replace("<ns0:rPr><ns0:b /></ns0:rPr>", "", 1))
+        assert plain != data
+        with pytest.raises(CertificationError, match="does not hold its content"):
+            certify_tracked(source, {view: plain})
+    # In the accepted view, the changed run's properties are the current ones.
+    unbolded = _rewrite(accepted, body, lambda x: x[::-1].replace(">/ b:0sn<", "", 1)[::-1])
+    with pytest.raises(CertificationError, match="does not hold its content"):
+        certify_tracked(source, {"accepted": unbolded})
 
 
 def _row(text: str, marker: str = "") -> str:
@@ -621,3 +632,37 @@ def test_every_change_is_listed_and_only_a_formatting_copy_once() -> None:
     )
     _, _, changes = tracked(docx(p(t("m")), styles=styles))
     assert [(c.part, c.kind) for c in changes] == [("word/styles.xml", "format")] * 2
+
+
+@pytest.mark.parametrize("rows", ["first", "every"])
+def test_a_join_into_a_nested_row_the_view_drops_is_refused(rows: str) -> None:
+    # Word joins into the first paragraph in document order and cannot remove a row it joins
+    # into; for a nested table its answer is not on record (tracked-cases to record it).
+    second = _row("inner second", "del" if rows == "every" else "")
+    inner = f"<w:tbl>{_row('inner first', 'del')}{second}</w:tbl>"
+    outer = f"<w:tbl><w:tr><w:tc>{inner}{p(t('outer'))}</w:tc></w:tr></w:tbl>"
+    body = p(t("before"), mark("del")) + outer + p(t("after"))
+    with pytest.raises(DocxRefusedError, match="a row the view drops"):
+        tracked(docx(body))
+    with pytest.raises(CertificationError, match="meets a row the view drops"):
+        certify_tracked(docx(body), {"accepted": docx(p(t("x")))})
+
+
+@pytest.mark.parametrize(
+    "first",
+    [
+        '<w:footnotePr><w:numFmt w:val="lowerRoman"/><w:numStart w:val="3"/></w:footnotePr>',
+        '<w:endnotePr><w:numRestart w:val="eachSect"/></w:endnotePr>',
+        "<w:titlePg/>",
+    ],
+)
+def test_a_section_break_a_view_drops_between_sections_that_differ_in_what_is_read_is_refused(
+    first: str,
+) -> None:
+    # Which section's note numbering the joined section keeps is not on record (tracked-cases
+    # to record: section 1 lowerRoman from 3 with its break deleted, Accept All).
+    body = p(t("first"), f"<w:sectPr>{first}</w:sectPr>{mark('del')}") + p(t("second"))
+    with pytest.raises(DocxRefusedError, match="section"):
+        tracked(docx(body + "<w:sectPr/>"))
+    # The same settings on both sides: the join is read (mark-deleted-section-end).
+    tracked(docx(body + f"<w:sectPr>{first}</w:sectPr>"))

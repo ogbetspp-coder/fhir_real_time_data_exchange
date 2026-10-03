@@ -36,3 +36,14 @@ def test_every_corpus_file_is_the_recorded_byte_copy() -> None:
             data = (sources.parent / name).read_bytes()
             assert len(data) == source["bytes"], name
             assert hashlib.sha256(data).hexdigest() == source["sha256"], name
+
+
+def test_words_views_of_tracked_cases_are_of_the_cases_as_they_are() -> None:
+    # Each view Word made names the bytes of the case it was made of: a case written again
+    # under its name is asked again (scripts/tracked_cases.py --word).
+    folder = CORPUS / "tracked-cases"
+    views = json.loads((folder / "word" / "sources.json").read_text("utf-8"))["sources"]
+    assert views
+    for view in views:
+        case = (folder / view["case"]).read_bytes()
+        assert hashlib.sha256(case).hexdigest() == view["caseSha256"], view["file"]

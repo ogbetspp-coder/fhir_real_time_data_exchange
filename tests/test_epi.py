@@ -126,7 +126,7 @@ def test_layout_only_styles_are_ignored() -> None:
     style = (
         "margin: 0cm; line-height: 13pt; font-family: 'Times New Roman', serif; "
         "border-top: solid black 1pt; break-after: avoid; text-align: justify; "
-        "visibility: visible; width: 10pt; padding: 0cm 5.4pt"
+        "visibility: visible; min-width: 10pt; padding: 0cm 5.4pt"
     )
     assert kinds(f'<p style="{style}">x</p>') == []
 
@@ -945,7 +945,7 @@ def test_each_rule_refuses_alone(inner: str, code: str) -> None:
         ),
         ("<p><strike>x</strike></p>", [("x", None, None, ["strike"])]),
         (
-            '<p><span style="border-bottom:1px solid #0008">&lt;</span></p>',
+            '<p><span style="border-bottom:1px solid #000">&lt;</span></p>',
             [("<", None, None, ["underline"])],
         ),
         ('<p><span style="border-bottom:0ex solid">&lt;</span></p>', [("<", None, None, [])]),
@@ -1270,3 +1270,288 @@ def test_the_default_ignorable_lookup_is_the_table_at_every_edge() -> None:
     for code in sorted(edges):
         expected = any(low <= code <= high for low, high in DEFAULT_IGNORABLE)
         assert is_default_ignorable(code) == expected, hex(code)
+
+
+# --- sweep 2 ----------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "inner",
+    [
+        # S9: a line drawn in the decorating element's colour, invisible on what lies under it.
+        '<p><u style="color:white"><span style="color:black">&lt;</span></u> 5</p>',
+        '<p><s style="color:transparent"><span style="color:black">x</span></s></p>',
+        '<p><a href="x" style="color:white"><span style="color:black">x</span></a></p>',
+        '<table><tr><td style="background:black"><u><span style="color:white">&lt;</span>'
+        "</u></td></tr></table>",
+        '<table><tr style="text-decoration:underline;color:white"><td>'
+        '<span style="color:black">x</span></td></tr></table>',
+        '<p><span style="border-bottom:1px solid transparent">&lt;</span> 5</p>',
+        '<p><span style="border-bottom:1px solid white">&lt;</span> 5</p>',
+        '<p><span style="border-bottom:1px solid;border-color:white">&lt;</span> 5</p>',
+        '<p><span style="border-left:1px solid;color:white"><span style="color:black">1</span>'
+        "</span></p>",
+        # A colour with alpha, which the reader does not judge (nor the oracle, ``_hex``).
+        '<p><span style="border-bottom:1px solid #fff8">&lt;</span> 5</p>',
+        '<p><span style="border-bottom:1px solid #0008">&lt;</span> 5</p>',
+        '<p><span style="border-left:1px solid;border-color:red white">1</span> 5</p>',
+    ],
+)
+def test_a_line_drawn_in_a_colour_that_cannot_be_seen_refuses(inner: str) -> None:
+    assert refusal(inner) == "unsupported-style"
+
+
+def test_a_line_that_can_be_seen_is_marked() -> None:
+    assert kinds('<u style="color:red"><span style="color:black">x</span></u>') == [
+        (0, 1, "underline")
+    ]
+    assert kinds('<span style="border-bottom:1px solid;border-color:red">x</span>') == [
+        (0, 1, "underline")
+    ]
+    shaded = '<span style="background:black;color:white;border-bottom:1px solid">x</span>'
+    assert kinds(shaded) == [(0, 1, "color-white"), (0, 1, "shading-black"), (0, 1, "underline")]
+
+
+@pytest.mark.parametrize(
+    "inner",
+    [
+        # S10: a block inside an inline element: the inline's background, raise, shift and
+        # border do not reach it as the reader would carry them.
+        '<span style="background:black;color:white"><p>Do not use in pregnancy</p></span>',
+        "<sup><p>9 cells/L</p></sup>",
+        '<div><span style="vertical-align:sub"><div>x</div></span></div>',
+        '<div><span style="position:relative;top:-2pt"><div>x</div></span></div>',
+        '<div><span style="border-bottom:1px solid"><p>&lt; 30</p></span></div>',
+        '<a href="x"><table><tr><td>x</td></tr></table></a>',
+        "<b><ul><li>x</li></ul></b>",
+    ],
+)
+def test_a_block_inside_an_inline_element_refuses(inner: str) -> None:
+    assert refusal(inner) == "unsupported-element"
+
+
+@pytest.mark.parametrize("align", ["top", "middle", "bottom"])
+def test_inline_text_aligned_top_middle_or_bottom_refuses(align: str) -> None:
+    # S11: raised or lowered with no mark: "10" and a raised "9" would read "109".
+    inner = f'<p>10<span style="font-size:7pt;vertical-align:{align}">9</span>/L</p>'
+    assert refusal(inner) == "unsupported-style"
+    assert texts(f'<p style="vertical-align:{align}">x</p>') == ["x"]
+
+
+@pytest.mark.parametrize(
+    "inner",
+    [
+        '<a href="x" style="color:currentcolor;background-color:currentcolor">Do</a>',
+        '<a href="x" style="color:inherit;background:currentcolor">Do</a>',
+    ],
+)
+def test_a_link_painted_in_its_inherited_colour_is_faint(inner: str) -> None:
+    # S12: the background takes the colour the link inherits, not the link blue (its underline,
+    # in the same colour, cannot be seen either: without one it is read, faint).
+    assert refusal(inner) == "unsupported-style"
+    bare = inner.replace('">', ';text-decoration:none">')
+    assert kinds(bare) == [(0, 2, "faint"), (0, 2, "shading-black")]
+    red = kinds(f'<span style="color:red">{bare}</span>')
+    assert red == [(0, 2, "faint"), (0, 2, "shading-red")]
+
+
+@pytest.mark.parametrize(
+    ("inner", "refused"),
+    [
+        # S13: text drawn outside the box that paints its background.
+        ('<div style="width:0;background:black;color:white">Do not use</div>', True),
+        ('<p style="width:10pt">x</p>', True),
+        ('<div style="background:black;color:white"><p style="margin-left:-6pt">x</p></div>', True),
+        ('<p style="background:black;color:white;margin-left:36pt;text-indent:-18pt">x</p>', True),
+        (
+            '<table><tr><td style="background:black;color:white"><p style="margin-left:-9pt">x'
+            "</p></td></tr></table>",
+            True,
+        ),
+        (
+            '<table><tr style="background:black;color:white"><td><p style="text-indent:-9pt">x'
+            "</p></td></tr></table>",
+            True,
+        ),
+        ('<p style="margin-left:36pt;text-indent:-18pt">x</p>', False),
+        # White on the white page is the same paint: text beyond it lies on the same.
+        ('<p style="background:white;margin-left:36pt;text-indent:-18pt">x</p>', False),
+        (
+            '<div style="background:black;color:white"><p style="background:white;color:black;'
+            'text-indent:-9pt">x</p></div>',
+            True,
+        ),
+        ('<div style="background:black;color:white"><p style="margin-left:6pt">x</p></div>', False),
+        ('<table style="width:100%"><tr><td style="width:50%">x</td></tr></table>', False),
+        ('<p style="width:auto">x</p>', False),
+    ],
+)
+def test_text_outside_the_box_that_paints_its_background_refuses(inner: str, refused: bool) -> None:
+    _, refusal_, _ = read_div(div(inner))
+    assert (refusal_ is not None and refusal_.code == "unsupported-style") == refused
+
+
+@pytest.mark.parametrize(("weight", "refused"), [("500", False), ("501", True), ("550", True),
+                                                 ("599", True), ("600", False)])  # fmt: skip
+def test_a_weight_between_500_and_600_refuses(weight: str, refused: bool) -> None:
+    # S30: a family with 400 and 700 faces draws 501-599 bold, which no record settles.
+    _, refusal_, _ = read_div(div(f'<p style="font-weight:{weight}">Warning</p>'))
+    assert (refusal_ is not None and refusal_.code == "unsupported-style") == refused
+
+
+@pytest.mark.parametrize(
+    "inner",
+    [
+        # S33: the marker takes the item's colour and size and stands outside its background.
+        '<ul><li style="color:white;background:black">x</li></ul>',
+        '<ul><li style="color:white"><span style="color:black">x</span></li></ul>',
+        '<ol><li style="font-size:1pt"><span style="font-size:11pt">x</span></li></ol>',
+        '<div style="background:navy"><ul><li style="color:navy;background:white">x</li></ul>'
+        "</div>",
+    ],
+)
+def test_a_list_marker_drawn_faint_refuses(inner: str) -> None:
+    assert refusal(inner) == "unsupported-style"
+
+
+def test_a_list_marker_drawn_on_its_lists_background_is_read() -> None:
+    inner = '<ul style="background:black"><li style="color:white">x</li></ul>'
+    paragraphs, refused, _ = read_div(div(inner))
+    assert refused is None
+    assert paragraphs[0].numbering is not None
+
+
+def _composition_bundle(entries: list[Any]) -> bytes:
+    return json.dumps({"resourceType": "Bundle", "type": "document", "entry": entries}).encode()
+
+
+def test_a_repeated_json_name_or_a_non_number_refuses_the_document() -> None:
+    # S34: two "div" names are two readings; NaN and Infinity are not JSON.
+    good = bundle([{"title": "x", "text": {"div": div("<p>real</p>")}}]).decode()
+    repeated = good.replace('"div": ', f'"div": {json.dumps(div("<p>decoy</p>"))}, "div": ', 1)
+    for data in (repeated, good[:-1] + ', "x": NaN}', good[:-1] + ', "x": -Infinity}'):
+        with pytest.raises(EpiRefusedError) as refused:
+            read_epi(data.encode())
+        assert refused.value.code == "invalid-bundle"
+    assert read_epi(good.encode()).sections[0].paragraphs[0].text == "real"
+
+
+@pytest.mark.parametrize(
+    "first",
+    [
+        {"resourceType": "Composition", "title": "Real document (no body)"},
+        {"resourceType": "Patient"},
+    ],
+)
+def test_the_composition_read_is_the_first_entry(first: dict[str, Any]) -> None:
+    # S35: a document Bundle's first resource is its Composition (FHIR bdl-11).
+    other = {"resourceType": "Composition", "title": "Other", "section": [{"title": "s"}]}
+    with pytest.raises(EpiRefusedError) as refused:
+        read_epi(_composition_bundle([{"resource": first}, {"resource": other}]))
+    assert refused.value.code == "invalid-bundle"
+    read = read_epi(_composition_bundle([{"resource": other}, {"resource": first}]))
+    assert read.title == "Other"
+
+
+def test_a_weight_with_more_digits_than_python_reads_refuses() -> None:
+    # S56: not a crash.
+    assert refusal('<p style="font-weight:' + "0" * 4300 + '700">x</p>') == "unsupported-style"
+    assert kinds('<p style="font-weight:0700">x</p>') == [(0, 1, "bold")]
+
+
+@pytest.mark.parametrize(
+    ("title", "code"),
+    [
+        ("4.3 Contra\u202eindications", "format-character"),
+        ("4.3\u200b", "format-character"),
+        ("4.3\u0085", "format-character"),
+        ("4.3 \ue000", "private-use-character"),
+        ("4.3 \u0378", "unassigned-character"),
+        ("4.3 \ufffc", "reserved-character"),
+    ],
+)
+@pytest.mark.parametrize("where", ["section", "composition"])
+def test_a_title_holding_a_character_a_browser_does_not_show_refuses(
+    title: str, code: str, where: str
+) -> None:
+    # S70: a title is served as written; the characters a div refuses refuse the document.
+    data = bundle([{"title": title if where == "section" else "s"}])
+    if where == "composition":
+        data = data.replace(b'"title": "X"', json.dumps({"title": title})[1:-1].encode(), 1)
+    with pytest.raises(EpiRefusedError) as refused:
+        read_epi(data)
+    assert refused.value.code == code
+    assert read_epi(bundle([{"title": "4.3 Contra-\nindications\u00ad"}])).sections
+
+
+def test_json_nested_too_deeply_refuses_alike_in_any_thread() -> None:
+    # S71: the bound is the reader's, not the C stack's.
+    import threading
+
+    from label_docx import epi_output
+
+    data = bundle([{"title": "x"}])[:-1] + b', "x": ' + b"[" * 3000 + b"]" * 3000 + b"}"
+    with pytest.raises(EpiRefusedError) as refused:
+        read_epi(data)
+    assert refused.value.detail == "nested too deeply to read"
+    main = epi_output.read(data)
+    found: list[bytes] = []
+    size = threading.stack_size(64 * 1024)
+    try:
+        worker = threading.Thread(target=lambda: found.append(epi_output.read(data)[0]))
+        worker.start()
+        worker.join()
+    finally:
+        threading.stack_size(size)
+    assert found == [main[0]]
+    # A bracket in a string is not nesting.
+    assert read_epi(bundle([{"title": "[" * 3000}])).sections[0].title == "[" * 3000
+
+
+_OLD_HTML_OTHERWISE = __import__("re").compile(
+    r"<\?|<!--|xmlns:|</br\b|&#0*(12[89]|1[3-5][0-9]);|&#[xX]0*[89][0-9a-fA-F];"
+    r"|<(?!(?:br|hr|img)[\s/>])[A-Za-z][^\s/>]*(?:\s+[^\s=/>]+\s*=\s*(?:\"[^\"]*\"|'[^']*'))*\s*/>"
+)
+
+
+def test_markup_read_otherwise_is_found_in_linear_time_as_before() -> None:
+    # S76: the regular expression it replaces scanned "<a<a<a..." in quadratic time.
+    import time
+
+    from fuzz_epi import cases
+    from label_docx.epi import _html_otherwise
+
+    started = time.perf_counter()
+    assert not _html_otherwise(div("<p>" + "&lt;a" * 10 + "</p>" + "<a" * 20000))
+    assert time.perf_counter() - started < 1
+    samples = [
+        "<a<b/>", "<a<1/>", "<br/>", "<BR/>", "<br />", "<img/>", "<hr/>", "<brx/>", "<b r/>",
+        '<span title="a<b"/>', '<a x="1" y=\'2\' />', "<a x=1/>", "<a\n/>", "<a b='/>",
+        "x<br/>y<b/>", "<<a/>", "<a<br/>", "<img<b/>", "<a/ >", "<a >",
+    ]  # fmt: skip
+    divs = [div(s) for s in samples] + cases(1, 3000)
+    for path in sorted(SOURCES.glob("*.json")):
+        if path.stem in ("browser", "expected", "sources"):
+            continue
+
+        def visit(raws: list[dict[str, Any]]) -> None:
+            for raw in raws:
+                if isinstance(raw.get("text", {}).get("div"), str):
+                    divs.append(raw["text"]["div"])
+                visit(raw.get("section", []))
+
+        bundle_ = json.loads(path.read_bytes())
+        visit(bundle_["entry"][0]["resource"]["section"])
+    assert len(divs) > 4000
+    for each in divs:
+        assert _html_otherwise(each) == bool(_OLD_HTML_OTHERWISE.search(each)), each[:0]
+
+
+@pytest.mark.parametrize(
+    "inner", ["<p>\u65e5\u672c\n\u8a9e</p>", "<p><span>\u65e5\u672c\n</span>\u8a9e</p>"]
+)
+def test_a_line_break_between_wide_characters_is_a_space_as_chrome_shows_it(inner: str) -> None:
+    # S89: Chrome 154.0.8037.93 (scripts/browser_oracle.py compare) shows the space, and
+    # "\u00b1\n\u00b0" under lang="ja" too: no East Asian segment-break rule is applied.
+    assert texts(inner) == ["\u65e5\u672c \u8a9e"]
+    assert texts('<p lang="ja">\u00b1\n\u00b0</p>') == ["\u00b1 \u00b0"]

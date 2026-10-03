@@ -18,16 +18,28 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import hashlib
 import json
 import sys
 from pathlib import Path
 from typing import Any
 
-from label_docx.word import ask, is_tracked, judge, judge_tracked, word_updated, word_version
+from label_docx.word import (
+    VERIFIER,
+    ask,
+    is_tracked,
+    judge,
+    judge_tracked,
+    word_updated,
+    word_version,
+)
 
 
 def main() -> int:
-    """Record a corpus set's answers, or compare files; 1 if the reader differs from Word."""
+    """Record a corpus set's answers, or compare files.
+
+    1 if the reader differs from Word, else 2 if Word judged not every file, else 0.
+    """
     parser = argparse.ArgumentParser(description="Hold the reader's list labels to Word's.")
     commands = parser.add_subparsers(dest="command", required=True)
     recording = commands.add_parser("record", help="write word.json for a corpus set")
@@ -52,7 +64,15 @@ def main() -> int:
             sys.stdout.write(f"{path.name}: updated\n")
         return 0
     paths = sorted(args.folder.glob("*.docx")) if args.command == "record" else args.files
+    if args.command == "record":
+        unknown = sorted(set(args.only) - {path.name for path in paths})
+        if unknown:
+            raise SystemExit(f"--only names no .docx of {args.folder}: {', '.join(unknown)}")
+    # An answer on record is reused only for the same bytes, Word version and questions.
+    application = word_version() if args.command == "record" else ""
     answers: dict[str, list[str]] = {}
+    at_answers: dict[str, list[int]] = {}
+    digests: dict[str, str] = {}
     font_answers: dict[str, list[str | None]] = {}
     note_answers: dict[str, dict[str, list[str]]] = {}
     field_answers: dict[str, dict[str, list[str]]] = {}
@@ -68,27 +88,33 @@ def main() -> int:
     if args.command == "record" and args.only:
         kept = json.loads((args.folder / "word.json").read_text("utf-8"))
         for name in kept["drawn"]:
-            if name not in args.only:
+            if name not in args.only and name in kept.get("sha256", {}):
                 recorded.setdefault(
                     name,
                     {
                         "drawn": kept["drawn"][name],
                         "fonts": kept["fonts"][name],
+                        "at": kept.get("at", {}).get(name),
                         "notes": kept["notes"].get(name),
                         "fields": kept["fields"].get(name),
                         "prints": kept["prints"][name],
                         "emphasis": kept["emphasis"][name],
                         "stories": kept.get("stories", {}).get(name),
                         "text": kept.get("text", {}).get(name),
+                        "sha256": kept["sha256"][name],
+                        "application": kept["application"],
+                        "verifier": kept.get("verifier"),
                     },
                 )
     differs = False
+    unjudged = 0
     for path in paths:
         if not path.read_bytes().startswith(b"PK\x03\x04"):
             # A .doc under a .docx name makes Word convert it, and can leave a dialog open.
             if args.command == "record":
                 raise SystemExit(f"{path.name}: not a .docx")
             sys.stdout.write(f"{path.name}: not a .docx; not sent to Word\n")
+            unjudged += 1
             continue
         if args.command == "compare" and is_tracked(path):
             # Two texts: each view held to Word's, and Word's held to what Word shows.
@@ -96,13 +122,25 @@ def main() -> int:
                 result = judge_tracked(path)
             except SystemExit as failed:
                 sys.stdout.write(f"{failed}\n")
+                unjudged += 1
                 continue
             differs = differs or result.startswith("differs")
             sys.stdout.write(f"{path.name}: tracked changes, {result}\n")
             sys.stdout.flush()
             continue
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
         try:
-            kept = recorded[path.name] if path.name in recorded else ask(path)
+            kept = recorded.get(path.name, {})
+            if progress and (kept.get("sha256"), kept.get("application"), kept.get("verifier")) == (
+                digest,
+                application,
+                VERIFIER,
+            ):
+                sys.stdout.write(f"{path.name}: Word's answers on record reused\n")
+            else:
+                kept = ask(path)
+                if progress:
+                    kept |= {"sha256": digest, "application": application, "verifier": VERIFIER}
             if progress:
                 recorded[path.name] = kept
                 progress.write_text(json.dumps(recorded), "utf-8")
@@ -111,10 +149,14 @@ def main() -> int:
                 raise
             # One file Word cannot open or answer for does not stop a comparison of many.
             sys.stdout.write(f"{failed}\n")
+            unjudged += 1
             continue
+        digests[path.name] = digest
         word = kept["drawn"]
         answers[path.name] = word
         font_answers[path.name] = kept["fonts"]
+        if kept.get("at") is not None:
+            at_answers[path.name] = kept["at"]
         if kept["notes"] is not None:
             note_answers[path.name] = kept["notes"]
         print_answers[path.name] = kept["prints"]
@@ -133,10 +175,14 @@ def main() -> int:
         sys.stdout.flush()
     if args.command == "record":
         record = {
-            "application": word_version(),
+            "application": application,
+            "verifier": VERIFIER,
+            "sha256": digests,
+            "at": at_answers,
             "method": (
-                "list labels: convert numbers to text, what each list item gained; fonts: the "
-                "font Word gave each label, from its copy saved after; text: the "
+                "list labels: convert numbers to text, what each list item gained; fonts and at: "
+                "the font Word gave each label and its body paragraph, from its copy saved "
+                "after; sha256: the bytes each file's answers are for; text: the "
                 "body's text as Word shows it, paragraph by paragraph; note marks: "
                 "saved as text, what Word wrote between markers around each mark; fields: the "
                 "text between markers around each, as shown and after saving as PDF; prints: the "
@@ -161,7 +207,9 @@ def main() -> int:
         sys.stdout.write(f"wrote {target}\n")
         if progress:
             progress.unlink(missing_ok=True)
-    return 1 if differs else 0
+    if unjudged:
+        sys.stdout.write(f"{unjudged} file(s) not judged by Word\n")
+    return 1 if differs else 2 if unjudged else 0
 
 
 if __name__ == "__main__":

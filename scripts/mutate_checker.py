@@ -74,10 +74,6 @@ _TABLE_EDGE = (
 _XML_LINE = '_XML_NS = "http://www.w3.org/XML/1998/namespace"'
 _XML_PREFIX = "the xml prefix can never name Word's namespace, the only one the tokenizer looks for"
 _FIRST_LESS = "a '<' at the very start finds no capture open, so the chunk is never used there"
-_NO_DEFAULT = (
-    "a character style falls back to no default, as an unknown kind does: Word applies no "
-    "default character style to text"
-)
 _STRICT = "the lengths are compared just before, so zip(strict=True) never raises"
 _LEDGER = (
     "the counts follow from the sequences, which are equal by then: the ledger is a second "
@@ -190,14 +186,6 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
     ("_Story.token", _SYMBOL_COUNT, "bool", 0): (
         "the Symbol table maps one character to one, so the two are the same length"
     ),
-    ("_Story.inline", 'if child.tag == _w("pPr"):', "str:'pPr'", 0): (
-        "a paragraph's properties are walked as a container instead: they hold no run, and text "
-        "in them is refused either way"
-    ),
-    ("_Story.inline", "continue", "statement", 0): (
-        "a paragraph's properties are walked as a container instead: they hold no run, and text "
-        "in them is refused either way"
-    ),
     ("_Story.run", 'self.mark("note", (kind, self.story[1]))', "str:'note'", 0): _NOTE,
     ("_Story.flush_run", "return", "statement", 0): (
         "an empty run then adds an empty segment, or no hidden characters: nothing either way"
@@ -273,18 +261,6 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
         "bool",
         0,
     ): "called only after certify has compared the lengths",
-    (
-        "_Fonts.levels",
-        'found += self.chain(None if style is None else style.get(_w("val")), "character")',
-        "str:'character'",
-        0,
-    ): _NO_DEFAULT,
-    (
-        "_Fonts.marks",
-        'self.chain(None if style is None else style.get(_w("val")), "character"),',
-        "str:'character'",
-        0,
-    ): _NO_DEFAULT,
     ("_Fonts.marks.nearest", "return None", "statement", 0): (
         "the function returns None at its end anyway"
     ),
@@ -351,13 +327,6 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
         "str:'continuous'",
         0,
     ): "the default is only compared with 'eachSect', which 'Xontinuous' is not either",
-    (
-        "DocxSource.certify",
-        "for index, (label, theirs) in enumerate("
-        'zip(self.labels, value["paragraphs"], strict=True)):',
-        "bool",
-        0,
-    ): _STRICT,
     **{
         ("_Numbering.label", f"{name} = self.{name}.setdefault(key, [None] * 9)", "int:9", 0): (
             "a tenth place is never used: list levels are 0 to 8"

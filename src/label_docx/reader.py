@@ -27,18 +27,21 @@ What a paragraph carries:
   run, its styles or the document defaults (``Mark`` lists the kinds): bold, italic, superscript,
   subscript, raised or lowered text, capitals and small capitals, single and double strike-through,
   highlight with its colour, shading with its fill (or its pattern, colour and fill) on the run or
-  the paragraph, right-to-left, and faint text (white or a light theme colour, under two points in
-  any unit, or scaled under a fifth), and underline of any style (an underlined "<" is how "≤" is
-  often typed). ``text`` alone flattens "10" with a superscript "9" to "109"; a caller that uses
-  ``text`` must look at ``marks``. Bold, italic, capitals and strike-through are toggles, and
-  reported as Word shows them: two kinds of style that both set one cancel (see
+  the paragraph, right-to-left (the run's own ``rtl``, a ``dir`` embedding, a ``bidi``
+  paragraph), and faint text (a colour whose contrast with what is painted under it, the run's
+  highlight or shading, else the paragraph's, the cell's or the page, is below 1.33:1; under two
+  points in any unit; or scaled under a fifth), and underline of any style (an underlined "<" is
+  how "≤" is often typed). ``text`` alone flattens "10" with a superscript "9" to "109"; a
+  caller that uses ``text`` must look at ``marks``. Bold, italic, capitals and strike-through
+  are toggles, and reported as Word shows them: two kinds of style that both set one cancel (see
   ``_Properties.shown``). Other appearance (other colours, font size, borders) is not reported.
 - ``mark_hidden``: the paragraph mark is hidden (``vanish`` or ``specVanish``, directly or
   through the paragraph's styles), so Word shows this paragraph run on into the next one.
-- ``numbering``: the list the paragraph belongs to, directly or through its style, and the list
-  label Word draws before it (``Numbering.text``, with ``suffix`` naming what separates it from
-  the paragraph). The label is computed, not stored, so it is never put into ``text``; see
-  "List labels" below.
+  ``specVanish`` on a run with text does not hide it: Word shows and prints it.
+- ``numbering``: the list the paragraph belongs to, directly, through its style or the paragraph
+  defaults (Word draws a list set there), and the list label Word draws before it
+  (``Numbering.text``, with ``suffix`` naming what separates it from the paragraph). The label is
+  computed, not stored, so it is never put into ``text``; see "List labels" below.
 - ``table``: ``(table, row, cell)`` counted from zero in document order, else ``None``. A nested
   table's paragraphs carry the outermost cell; cells are counted as ``<w:tc>`` elements, not
   grid columns.
@@ -53,52 +56,65 @@ style, its table style (inside a table only) and the document defaults, each sty
 ``basedOn`` chain. An absent or unknown paragraph or table style id falls back to the document's
 default style of that kind (the last one marked default), as Word does. A character style does
 not: a run with no character style, or an unknown one, takes none, since Word does not apply the
-default character style to text. A reference to a style of another kind is refused. Paragraph
-shading and right-to-left are looked up the same way through the paragraph properties. The reader
-does not apply a table style's conditional formatting (``tblStylePr`` for the first row, banded
-rows and so on), so it refuses a table whose style's
+default character style to text. A reference to a style of another kind is refused. A paragraph
+style based on a character style takes nothing from it, as Word draws it; any other ``basedOn``
+naming a style of another kind is refused. Paragraph shading and right-to-left are looked up the
+same way through the paragraph properties. The reader does not apply a table style's conditional
+formatting (``tblStylePr`` for the first row, banded rows and so on), so it refuses a table whose
+style's
 conditional formatting could change what it produces, and reads one whose conditional formatting
-sets only what it cannot change: properties the reader does not report (bold, italic, spacing,
-borders, cell shading) and fonts, sizes and colours that are ordinary text. Under such
-formatting, Symbol text is refused, since a conditional font could replace the Symbol font.
+sets only what it cannot change: properties the reader does not report (spacing, borders) and
+fonts, sizes and colours that are ordinary text; and bold and italic only where no cell with
+text stands in a part of the table its looks may turn on. Word applies such bold, italic or
+capitals where ``tblLook`` turns the part on and nothing where it turns it off; the reader counts
+a part on if the table's or any row's look turns it on (by attribute or bit), every part on for
+a table without a look, corners and banding on, a header row as a first row, and every cell of a
+row with ``gridBefore`` or ``gridAfter`` as first and last. Cell shading a style may paint is
+taken as possibly under every cell, for faint text. Under such formatting, Symbol text is
+refused, since a conditional font could replace the Symbol font.
 
-Symbol fonts. A run whose effective ``ascii`` and ``hAnsi`` fonts (set directly, by a style, by
-the document defaults or through the theme) are both Symbol, with no complex-script or
-right-to-left property and no font hint other than ``default`` (which sends ambiguous characters
+Symbol fonts. A run whose effective ``ascii`` and ``hAnsi`` fonts (set directly, by a style, by the
+document defaults or through the theme) are both Symbol, by that exact name, with no complex-script
+or right-to-left property and no font hint other than ``default`` (which sends ambiguous characters
 to the ``hAnsi`` font, Symbol here), has every character mapped through ``SYMBOL_FONT``; a
 character the table does not hold is refused. ``<w:sym>`` in the Symbol font is mapped the same
 way. Any other run with Symbol in one of its four font slots is refused, because Word picks the
 font per character and the reader cannot be sure which characters it draws in Symbol. A dingbat
-font (Wingdings, Webdings, Zapf Dingbats, Marlett, MT Extra), or any font the document's font
-table declares symbol-encoded (charset 02), is refused.
+font (Wingdings, Webdings, Zapf Dingbats, Marlett, MT Extra, Monotype Sorts), another spelling of
+Symbol ("SymbolMT", "symbol", "Bookshelf Symbol 7": Word's answer is not on record), or any font
+the document's font table declares symbol-encoded (charset 02, or the symbol code page in
+``csb0``), embeds, or replaces when missing by a symbol or dingbat font (``altName``), is refused.
 
 Fields keep their stored result and drop their instruction, however deeply nested, so ``DOCPROPERTY
 ... MERGEFORMAT`` never reaches the text. Fields whose stored result is what Word shows and prints
 are read: HYPERLINK, DOCPROPERTY and TOC (a table of contents, whose entries Word prints as stored
 until someone updates it). Page numbers (PAGEREF, as in a table of contents' entries, PAGE,
 NUMPAGES, SECTIONPAGES) Word sets from the page layout when it prints; their stored text is left out
-of ``text`` and their place recorded in ``pages``. SEQ (caption numbers), STYLEREF (a heading's
-number or text), REF (a cross-reference: a bookmark's text) and NOTEREF (the mark of the note a
-bookmark holds) Word shows as stored but recomputes when it prints or saves as PDF, so the reader
-computes them as Word does and reads them only where the stored result is the computed one;
-otherwise screen and print disagree, and the document is refused (``stale-field``). A REF or NOTEREF
-to a bookmark that is not there (Word prints an error), that runs across paragraphs, or over a note
-mark (REF) is refused. SEQ counts each identifier in document order: one more than the last, ``\r``
-n sets the count, ``\c`` repeats it, ``\h`` counts and shows nothing, ``\s`` n restarts it after any
+of ``text`` and their place recorded in ``pages``. Only the switches Word has answered are placed
+(PAGEREF's ``\h``, and ``\*`` MERGEFORMAT, CHARFORMAT or Arabic; ``\p`` shows "above", ``\#`` a
+picture's text), a PAGEREF only to a bookmark REF could read, and never a locked one (``fldLock``),
+whose stored text Word shows. SEQ (caption numbers), STYLEREF (a heading's number or text), REF (a
+cross-reference: a bookmark's text) and NOTEREF (the mark of the note a bookmark holds) Word shows
+as stored but recomputes when it prints or saves as PDF, so the reader computes them as Word does
+and reads them only where the stored result is the computed one; otherwise screen and print
+disagree, and the document is refused (``stale-field``). A REF or NOTEREF to a bookmark that is not
+there (Word prints an error), that runs across paragraphs, or over a note mark (REF) is refused;
+NOTEREF counts only a note mark between the bookmark's start and end, not one next to it (Word
+prints an error). SEQ counts each identifier in document order: one more than the last, ``\r`` n
+sets the count, ``\c`` repeats it, ``\h`` counts and shows nothing, ``\s`` n restarts it after any
 paragraph in a built-in style "heading 1" to "heading n" (Word goes by the style's name, not its
 outline level), and ``\*`` shows it in ARABIC, ROMAN, roman, ALPHABETIC or alphabetic. STYLEREF
 finds the nearest paragraph of the style (a number n is "heading n") before the field, else after
 it, and shows its text, or with ``\s`` its list label without the final period. Each rule is Word's
 answer to a case in ``corpus/numbering-cases``. Other switches, a computed field (SEQ, STYLEREF, REF
-or NOTEREF) in a note, and a result that runs past its paragraph are refused. A field nested in
-another field's code is part of that code: its result is not text, and a computed one is neither
-counted nor checked. Any other field whose result would be shown (DATE, IF, a formula...) is
-refused, because Word recomputes it on display or print. The code is the first word of the
-instruction; a field nested in the instruction ahead of or inside that word makes the code unknown,
-and the field is refused. So are a field with no stored result (no ``separate``, as a form
-checkbox or a SYMBOL field, but a hidden SEQ; or an empty ``fldSimple``), a form field, a
-field marked for update, any field in a document whose settings ask Word to update fields on open,
-and field code outside an instruction.
+or NOTEREF) or a PAGEREF in a note, any of the four with a field in its own code or nested in
+another field's code, and a result that runs past its paragraph are refused. Any other field whose
+result would be shown (DATE, IF, a formula...) is refused, because Word recomputes it on display or
+print. The code is the first word of the instruction; a field nested in the instruction ahead of or
+inside that word makes the code unknown, and the field is refused. So are a field with no stored
+result (no ``separate``, as a form checkbox or a SYMBOL field, but a hidden SEQ; or an empty
+``fldSimple``), a form field, a field marked for update, any field in a document whose settings ask
+Word to update fields on open, and field code outside an instruction.
 
 List labels. Word draws "4.8", "b)" or a bullet before a numbered paragraph from the numbering part;
 the reader computes that label by Word's rules, each of which is Word's own answer to a case in
@@ -113,35 +129,39 @@ level up to ``n - 1``), counts every higher level not yet counted as that level'
 its own level: its list's ``startOverride`` the first time that list reaches the level, else one
 more than the shared count, else (after a restart) the ``startOverride`` of the list whose paragraph
 restarted it, or the ``abstractNum`` level's ``w:start``, 0 when there is none. ``lvlText`` is
-copied, with ``%1`` to ``%9`` replaced by the counter of that level in that level's format (all
-decimal under ``isLgl``): decimal, decimalZero, upper and lower roman (1 to 3999), upper and lower
-letter (a to z, then aa, bb...), or none; a bullet level's text is its bullet. The label is drawn in
-the level's run properties over the paragraph mark's, so its fonts are placed as a run's are: a
-Symbol bullet (U+F0B7) is mapped to "•", a Wingdings bullet through ``WINGDINGS_BULLETS`` (U+F0A7 to
-"▪"), and a bullet in any other dingbat font is refused. ``suffix`` is ``tab``, ``space`` or
+copied, with ``%1`` to ``%9`` replaced by the counter of that level in that level's format (under
+``isLgl`` all decimal, but decimalZero, which keeps its zero): decimal, decimalZero, upper and lower
+roman (1 to 3999), upper and lower letter (a to z, then aa, bb...), or none; a bullet level's text
+is its bullet. The label is drawn in the level's run properties over the paragraph mark's (with the
+mark's character style), so its fonts are placed as a run's are: a Symbol bullet (U+F0B7) is mapped
+to "•", a Wingdings bullet through ``WINGDINGS_BULLETS`` (U+F0A7 to "▪"), and a bullet in any other
+dingbat font is refused. ``suffix`` is ``tab``, ``space`` or
 ``nothing`` (``w:suff``), or ``legacy`` for a Word 6 level, where the gap is layout and not a
 character.
 
-Notes. ``read_document`` returns the footnotes and endnotes with the body, each note's
-paragraphs read by every rule above, in the order the body refers to them; ``read_docx``
-returns the body alone. A note's mark is its section's ``numStart`` plus the number of notes of
-its kind before it, in the document or, where the section restarts them (``numRestart``
-``eachSect``), in the section; it is drawn in the section's format: decimal, roman, letters, or
-symbols (``chicago``: *, †, ‡, §, then each doubled...). The section's ``footnotePr`` and
-``endnotePr`` decide this; Word ignores the settings part's. Footnotes default to decimal,
-endnotes to lower roman, and each kind counts apart. A note with a custom mark takes no number;
-its mark is the stored text that follows the reference. Every rule is Word's answer to a case in
-``corpus/numbering-cases``, held by ``tests/test_word_oracle.py``. Every note must be referred
-to exactly once, and every reference must name a note.
+Notes. ``read_document`` returns the footnotes and endnotes with the body, each note's paragraphs
+read by every rule above, in the order the body refers to them; ``read_docx`` returns the body
+alone. A note's mark is its section's ``numStart`` plus the number of notes of its kind before it,
+in the document or, where the section restarts them (``numRestart`` ``eachSect``), in the section;
+it is drawn in the section's format: decimal, roman, letters, or symbols (``chicago``: *, †, ‡, §,
+then each doubled, as far as ††, Word's answers). The section's ``footnotePr`` and ``endnotePr``
+decide this; Word ignores the settings part's. Footnotes default to decimal, endnotes to lower
+roman, and each kind counts apart. A note with a custom mark takes no number; its mark is the
+stored text that follows the reference. Every rule is Word's answer to a case in
+``corpus/numbering-cases``, held by ``tests/test_word_oracle.py``. Every note must be referred to
+exactly once, and every reference must name a note.
 
 What it refuses (``DocxRefusedError.code``):
 
 - ``tracked-change``: any revision, in the body, a note, a header, a footer, a comment, a style
   or a list. Such a document has more than one text: ``tracked`` makes its two views, each read
   by these rules, and refuses what it cannot undo (see ``tracked``).
-- ``hidden-text``: hidden text other than whitespace (hidden whitespace is left out), a hidden note
-  mark or a hidden page number, hidden directly or at any level of the style hierarchy (hiding is
-  treated as a fact as soon as any level asserts it, unless the run itself says it is visible).
+- ``hidden-text``: hidden text other than whitespace (hidden whitespace is left out), or a hidden
+  note mark, comment mark or page number, hidden directly or at any level of the style hierarchy
+  (hiding is treated as a fact as soon as any level asserts it, unless the run itself says it is
+  visible); and a run with text or a paragraph mark hidden by some level where Word's toggle rule
+  (``_Properties.shown``: a nearer style turns it off, or two kinds of style cancel) shows it,
+  since what Word then shows is not on record.
 - ``unmapped-symbol``: a Symbol-font code the table does not hold (or, in a Symbol run, a
   character above U+00FF outside U+F000 to U+F0FF), a ``w:sym`` without a hex code or in a font
   other than Symbol, or a Wingdings list bullet the table does not hold.
@@ -149,40 +169,73 @@ What it refuses (``DocxRefusedError.code``):
   of the font slots or under a table style's conditional fonts, or a theme font with no theme
   part or not in it.
 - ``private-use-character``: a private-use code point outside a Symbol-font run.
+- ``format-character``: in ``<w:t>``, an invisible formatting character (category Cf: zero-width
+  characters, bidirectional controls, a soft hyphen, which Word writes as ``w:softHyphen``), any
+  other code point Unicode says to ignore (Default_Ignorable_Code_Point, as the ePI reader), or a
+  C1 control.
+- ``unassigned-character``: in ``<w:t>``, a code point Unicode 16.0 does not assign (Cn).
 - ``reserved-character``: U+FFFC in ``<w:t>``, which the reader uses for a picture.
 - ``unpreserved-whitespace``: ``<w:t>`` text with leading or trailing spaces without
   ``xml:space="preserve"`` (a consumer may drop them), or a tab or line break inside ``<w:t>``
   (Word writes those as elements).
 - ``unbalanced-field``: a paragraph that ends inside a field instruction, field code
-  (``instrText``) outside an instruction, or a computed field's result or a page number that
-  runs past its paragraph.
+  (``instrText``) outside an instruction, a computed field's result or a page number that runs
+  past its paragraph, or a field character out of place: a second separator, a separator or end
+  with no field open, or an unknown kind.
 - ``field-without-result``: a field with no ``separate`` other than a hidden SEQ (``\h``), or an
   empty ``fldSimple``.
 - ``computed-field``: a shown field whose value Word computes rather than stores (any but those
-  read above), a computed field (SEQ, STYLEREF, REF or NOTEREF) the reader cannot compute or in
-  a note, header, footer or comment, or any field in a document set to update fields on open.
+  read above), a computed field (SEQ, STYLEREF, REF or NOTEREF) the reader cannot compute, one
+  with a field in its own code or nested in another field's code, a computed field or a PAGEREF
+  in a note, header, footer or comment, or any field in a document set to update fields on open.
 - ``stale-field``: a field marked for update, or a computed field (SEQ, STYLEREF, REF or
   NOTEREF) whose stored result is not what Word prints.
 - ``unsupported-element``: anything that can carry text and is not read above, and any element
   the reader does not know: text boxes, a drawing that is not a picture (a chart, a shape
-  outside alternate content) or neither in line nor anchored, a ``w:pict`` that is not one
-  visible picture in line or positioned absolutely, alternate content that is not a picture or
-  shape with no text, embedded objects, math, ``altChunk``, form fields, content controls bound
-  to data (in any namespace), a note mark in a field code or outside the body, a note's echo of
-  its mark outside that note, a comment mark in a comment, a comment's echo of its mark outside
-  it, a note of a type other than normal (separators aside), conditional table formatting that
-  could change the text, text in a vertically merged-away cell, and a style reference that names
-  a style of another kind.
+  outside alternate content) or neither in line nor anchored, a hidden picture in line
+  (``wp:docPr hidden``), a ``w:pict`` that is not one visible picture in line or positioned
+  absolutely, alternate content that is not a picture or shape with no text, embedded objects and
+  ActiveX controls, math, ``altChunk``, form fields, a run or paragraph property in a namespace
+  that is neither WordprocessingML nor one of Word's extensions (w14 on), alternate content in
+  the styles, theme, font table, settings or lists (but a list level's own child), content
+  marked for markup compatibility processing (``mc:ProcessContent``, ``mc:MustUnderstand``) in
+  any part, content controls bound to data (in any namespace), an empty content control naming a
+  placeholder building block (Word shows the placeholder; one with none shows nothing, as read),
+  a note or comment mark in a field code, a note mark outside the body, a note's echo of its mark
+  outside that note, a comment mark in a comment, a comment's echo of its mark outside it, a note
+  of a type other than normal (separators aside), conditional table formatting that could change
+  the text (bold or italic over text in a part its looks may turn on), text, whitespace, a list
+  label, or a note, comment or page mark in a vertically merged-away cell (Word draws none of it
+  and does not count the label; a horizontally merged one is read as its own cell, as Word shows
+  it), a bidirectional override (``bdo``) or an embedding (``dir``) of no direction, a style
+  reference that names a style of another kind, and a ``basedOn`` that does (but a paragraph
+  style's on a character style).
+- ``unsupported-formatting``: formatting or layout whose effect on what is shown is not on
+  record: complex script (right-to-left or ``cs`` in force, a ``dir`` embedding, or Hebrew,
+  Arabic, Indic, Thai... characters) whose ``b`` and ``bCs``, or ``i`` and ``iCs``, differ
+  (Word draws the second, its Font object reports the first); right-to-left set by a style or
+  the defaults (Word does not allow it there); a Word 2010 text fill (``w14:textFill``); a
+  colour, highlight or theme colour the reader cannot resolve, or text faint over one colour
+  that may be under it and not over another; and layout that may clip or overdraw text: a row of
+  exact height lower than its cell's lines (each its largest text or mark size), exact line
+  spacing lower than the text, line spacing under 0.8 lines, a frame or floating table more than
+  an inch before or 22 inches past its anchor, a frame of exact height lower than its text, a
+  paragraph or table indented more than an inch outward, ``fitText``, and characters condensed
+  by more than a quarter of their size. These are bounds, not a layout engine: wrapped lines in
+  an exact row, say, are a stated residual.
 - ``invalid-package``: not one whole zip archive (a PDF or a Word 97-2003 document is named as
   one; bytes before or after the archive are refused), not one main document part, a part name
   that occurs twice (ignoring case), a related part that is missing, duplicated or not of its
-  kind, a part that cannot be read (bad checksum, truncated, encrypted), any part damaged, read
-  or not, parts over ``MAX_PACKAGE_BYTES`` or ``MAX_ELEMENTS`` together, a part over
-  ``MAX_PART_BYTES``, an XML part, read or not, that is not well-formed, not UTF-8, declares
-  another encoding or a DTD, or nests over ``MAX_DEPTH`` deep, no ``w:body``, a number (an id, a
-  level, a start) that is not a number, a list level outside 0 to 8 in the numbering part, a
-  style, list, list level, note or comment defined twice, a note referred to twice, and a mark
-  of a note or comment that is not there, or a comment's mark that stands twice.
+  kind, a relationship to a part the reader reads of a type other than the one Word writes (one
+  only ending in its kind), a relationship Id repeated in one part's relationships, a part that
+  cannot be read (bad checksum, truncated, encrypted), any part damaged, read or not, parts over
+  ``MAX_PACKAGE_BYTES`` or ``MAX_ELEMENTS`` together, a part over ``MAX_PART_BYTES``, an XML part,
+  read or not, that is not well-formed, not UTF-8, declares another encoding or a DTD, or nests
+  over ``MAX_DEPTH`` deep, no ``w:body``, a number (an id, a level, a start, a table look) that is
+  not a number, a list level outside 0 to 8 in the numbering part, a style, list, list level, note
+  or comment defined twice, a section naming two headers or footers of one type, a note referred
+  to twice, and a mark of a note or comment that is not there, or a comment's mark that stands
+  twice.
 - ``stray-text``: character data in a WordprocessingML element of a part the reader reads,
   outside ``<w:t>`` and ``<w:instrText>`` (whitespace between elements aside), or an element
   inside either of them.
@@ -192,17 +245,19 @@ What it refuses (``DocxRefusedError.code``):
 - ``unsupported-numbering``: a list label the reader cannot draw exactly: a ``numId`` or level
   with no definition (or no numbering part), a paragraph's level outside 0 to 8, a format or
   suffix other than those above (ordinal and text formats depend on the language), a custom
-  format, a level with no ``lvlText``, a picture bullet, a level holding anything else the reader
-  does not know (alternate content, say), an ``lvlRestart`` at the paragraph's level or above
-  that restarts it after the level directly above (written out), itself or a deeper one (Word
-  draws such a level empty), a ``%`` in ``lvlText`` that names no level or a deeper or undefined
-  one, a bullet level that shows a counter or is shown in another's, ``isLgl`` showing a level
-  of format none, a number past a format's range, a label in capitals or small capitals with
-  letters in it, a numbering-style link the reader cannot follow (no ``styleLink`` back, or to a
-  list with overrides), a list in a note, header, footer or comment, a custom note number format
-  or one other than those above, or a note ``numRestart`` other than ``continuous``, ``eachSect``
-  or ``eachPage``.
-- ``ambiguous-numbering``: a label drawn hidden (the paragraph mark or the level is hidden) or a
+  format, a level with no ``lvlText`` or one over ``MAX_LEVEL_TEXT`` characters, a picture
+  bullet, a level holding anything else the reader does not know (alternate content, say), a
+  negative ``lvlRestart``, an ``lvlRestart`` at the paragraph's level or above that restarts it
+  after the level directly above (written out), itself or a deeper one (Word draws such a level
+  empty), a ``%`` in ``lvlText`` that names no level or a deeper or undefined one, a bullet level
+  that shows a counter or is shown in another's, ``isLgl`` showing a level of format none, a
+  number past a format's range, a label in capitals or small capitals with letters in it, a
+  numbering-style link the reader cannot follow (no ``styleLink`` back, or to a list with
+  overrides), a list (or its level) set by a table style, a list in a note, header, footer or
+  comment, a custom note number format or one other than those above, a note symbol past ††,
+  or a note ``numRestart`` other than ``continuous``, ``eachSect`` or ``eachPage``.
+- ``ambiguous-numbering``: a label drawn hidden (the paragraph mark is hidden at any level, its
+  character style included, whatever the list level says, or the level is hidden) or a
   numbered paragraph run on after a hidden paragraph mark, for which Word's list API reports a
   label but not whether or where it is drawn; a label that shows a level whose start the
   reader cannot find (only a ``lvlOverride`` defines it); a level that never restarts
@@ -216,22 +271,27 @@ What it refuses (``DocxRefusedError.code``):
 
 Headers, footers and comments. ``read_document`` also reads every header and footer part the
 sections refer to (``Story``: each part once, in the order referred to, with the (section,
-type) uses that name it; which one Word shows on a page is layout) and every comment of the
+type) uses that name it; which one Word shows on a page is layout), and every comment of the
 comments part (``Comment``: its author, initials and date as stored), each paragraph by every
 rule above. A comment's mark in a paragraph is placed in ``comments`` (``CommentReference``),
 never in ``text``; every comment must be anchored exactly once. Fields the reader computes
 (SEQ, STYLEREF, REF, NOTEREF) and lists are refused there, since how Word counts them outside
 the body is not on record; page numbers are placed. A header, footer or comment the reader
 cannot read exactly is refused on its own (``Story.refusal``, ``Comment.refusal``): the body
-is read all the same. The glossary (building blocks) is not read.
+is read all the same. A header or footer Word shows on no page is refused on its own as
+``unread-content``: a ``first`` part shows only in a section with ``titlePg``, an ``even`` part
+only with the settings' ``evenAndOddHeaders``, and a section naming no part of a type takes the
+one before it. The glossary (building blocks) is not read.
 """
 
 from __future__ import annotations
 
+import colorsys
 import io
 import itertools
 import posixpath
 import re
+import unicodedata
 import xml.etree.ElementTree as ET
 import zipfile
 from collections.abc import Iterator
@@ -248,8 +308,12 @@ MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
 PR = "http://schemas.openxmlformats.org/package/2006/relationships"
 R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 XML_SPACE = "{http://www.w3.org/XML/1998/namespace}space"
+# The relationship types Word writes for the parts the reader reads, each this and the kind.
+_RELATIONSHIPS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
+_PROCESSING = {f"{{{MC}}}ProcessContent", f"{{{MC}}}MustUnderstand"}
 PICTURE_URI = "http://schemas.openxmlformats.org/drawingml/2006/picture"
 WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+W14 = "http://schemas.microsoft.com/office/word/2010/wordml"
 OBJECT = "\ufffc"
 
 MAX_PART_BYTES = 20 * 1024 * 1024
@@ -325,7 +389,35 @@ WINGDINGS_BULLETS: dict[int, str] = {
     0xA7: "\u25aa"  # BLACK SMALL SQUARE (w-1167), Word's default third-level bullet
 }
 
-_DINGBAT_FONTS = ("wingdings", "webdings", "dingbat", "marlett", "mtextra")
+# Fonts drawn as symbols, by a part of their name (lower case, no spaces): any spelling of
+# Symbol but the exact one, and symbol-encoded fonts Word ships (Bookshelf Symbol 7, Monotype
+# Sorts...), refused even where no font table declares them.
+_DINGBAT_FONTS = ("wingdings", "webdings", "dingbat", "marlett", "mtextra", "symbol", "sorts")
+
+# Unicode's Default_Ignorable_Code_Point (Unicode 16.0, DerivedCoreProperties.txt): code points
+# drawn as nothing. The ePI reader's table (epi.DEFAULT_IGNORABLE), kept equal by a test.
+DEFAULT_IGNORABLE = (
+    (0x00AD, 0x00AD),
+    (0x034F, 0x034F),
+    (0x061C, 0x061C),
+    (0x115F, 0x1160),
+    (0x17B4, 0x17B5),
+    (0x180B, 0x180F),
+    (0x200B, 0x200F),
+    (0x202A, 0x202E),
+    (0x2060, 0x206F),
+    (0x3164, 0x3164),
+    (0xFE00, 0xFE0F),
+    (0xFEFF, 0xFEFF),
+    (0xFFA0, 0xFFA0),
+    (0xFFF0, 0xFFF8),
+    (0x1BCA0, 0x1BCA3),
+    (0x1D173, 0x1D17A),
+    (0xE0000, 0xE0FFF),
+)
+_IGNORABLE = frozenset(code for low, high in DEFAULT_IGNORABLE for code in range(low, high + 1))
+# Word's own extensions (w14 and later): namespaces Word knows, whose properties change no text.
+_WORD_EXTENSIONS = "{http://schemas.microsoft.com/office/word/"
 
 _TRACKED = {
     _w(name)
@@ -449,9 +541,9 @@ class Mark:
     One of bold, italic, superscript, subscript, position, caps, smallCaps, strike, dstrike,
     ``highlight-<colour>`` (Word's colour name, e.g. ``highlight-lightGray``),
     ``shading-<FILL>`` (e.g. ``shading-D9D9D9``) or ``shading-<pattern>-<COLOUR>-<FILL>``, rtl
-    (right-to-left), faint (white or a light theme colour, under two points, or scaled
-    under a fifth) and underline. Marks of one
-    kind that touch are merged; marks of different kinds may overlap.
+    (right-to-left), faint (a contrast under 1.33:1 with what is painted under it, under two
+    points, or scaled under a fifth) and underline. Marks of one kind that touch or overlap are
+    merged; marks of different kinds may overlap.
     """
 
     start: int
@@ -625,6 +717,26 @@ class _Package:
             raise DocxRefusedError("invalid-package", "bytes before the zip archive")
         if sum(info.file_size for info in self.zip.infolist()) > MAX_PACKAGE_BYTES:
             raise DocxRefusedError("invalid-package", f"parts over {MAX_PACKAGE_BYTES} bytes")
+        for info in self.zip.infolist():
+            name = info.filename
+            # zipfile reads a name other than the stored one from an Info-ZIP Unicode Path field
+            # (0x7075), and cuts one at a NUL: another zip reader finds another part there.
+            if name != info.orig_filename:
+                raise DocxRefusedError("invalid-package", "a part name other than the stored one")
+            # A backslash, a leading "/", or an empty, "." or ".." segment: not a part name, and
+            # maybe the same part as another to another zip reader (ECMA-376 Part 2).
+            if (
+                "\\" in name
+                or name.startswith("/")
+                or posixpath.normpath(name) != name
+                or ".." in name.split("/")
+            ):
+                raise DocxRefusedError("invalid-package", "a name that is not a part name")
+            # A package's parts are stored or deflated (ECMA-376 Part 2, its ZIP appendix).
+            if info.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
+                raise DocxRefusedError(
+                    "invalid-package", f"a part compressed by method {info.compress_type}"
+                )
         try:
             # Every part unpacked and its checksum compared, the ones the reader reads and the
             # ones it does not: a damaged package is not the document its author saved.
@@ -647,7 +759,17 @@ class _Package:
         # well-formed. A part Word could not open is not the document its author saved.
         for name in sorted(names):
             if name.endswith((".xml", ".rels")):
-                self.part(name)
+                root = self.part(name)
+                ids = (
+                    [r.get("Id") for r in root]
+                    if name.endswith(".rels") and root is not None
+                    else []
+                )
+                if len(set(ids)) != len(ids):
+                    # Which one a reference names is not on record; OPC Ids are unique.
+                    raise DocxRefusedError("invalid-package", f"{name} repeats a relationship Id")
+        if "[Content_Types].xml" not in self.names:
+            raise DocxRefusedError("invalid-package", "no [Content_Types].xml")
 
     def part(self, name: str) -> ET.Element | None:
         if name not in self.names:
@@ -696,8 +818,24 @@ class _Package:
                     )
         except ET.ParseError as error:
             raise DocxRefusedError("invalid-package", f"{name} is not well-formed") from error
-        self.parsed[name] = roots[0]
-        return roots[0]
+        root = roots[0]
+        stack = [root]
+        while stack:
+            element = stack.pop()
+            if not _PROCESSING.isdisjoint(element.keys()):
+                # Content a consumer must process or understand by rules the reader does not
+                # apply (ECMA-376 Part 3).
+                raise DocxRefusedError("unsupported-element", f"{name}: markup compatibility")
+
+            if element.tag in (_w("rPr"), _w("pPr")) and any(
+                not c.tag.startswith((f"{{{W}}}", _WORD_EXTENSIONS)) for c in element
+            ):
+                # A property Word does not know could hide or change the text; Word does not
+                # open a document with one it must understand.
+                raise DocxRefusedError("unsupported-element", f"an unknown property in {name}")
+            stack.extend(element)
+        self.parsed[name] = root
+        return root
 
     def _relationships(self, source: str) -> Iterator[tuple[ET.Element, str]]:
         """Each of ``source``'s relationships, with the part name its target resolves to."""
@@ -710,8 +848,15 @@ class _Package:
 
     @staticmethod
     def _is(rel: ET.Element, kind: str) -> bool:
-        """Whether ``rel`` is an internal relationship whose type ends in ``kind``."""
-        return rel.get("TargetMode") != "External" and rel.get("Type", "").endswith("/" + kind)
+        """Whether ``rel`` is an internal ``kind`` relationship, of the type Word writes.
+
+        A type that only ends in ``kind`` (another namespace, Strict's) is refused: what Word
+        does with it is not on record.
+        """
+        found = rel.get("Type", "")
+        if found.endswith("/" + kind) and found != _RELATIONSHIPS + kind:
+            raise DocxRefusedError("invalid-package", f"a relationship of type {found!r}")
+        return rel.get("TargetMode") != "External" and found == _RELATIONSHIPS + kind
 
     def target(self, source: str, relationship: str | None, kind: str) -> str:
         """The part ``source``'s relationship ``relationship`` names; refused unless a ``kind``."""
@@ -747,6 +892,10 @@ class _Style:
     conditional: str | None = None
     # Whether that formatting sets fonts, which could override a Symbol font beneath it.
     conditional_fonts: bool = False
+    # The parts of the table (``firstRow``...) whose conditional formatting sets bold or italic.
+    conditional_emphasis: frozenset[str] = frozenset()
+    # A table style's shading of the table and its cells, its parts' (firstRow...) included.
+    shadings: tuple[ET.Element, ...] = ()
     # The style's name (w:name), which Word's heading levels and STYLEREF go by.
     name: str | None = None
 
@@ -761,13 +910,72 @@ class _Styles:
     defaults: dict[str, str] = field(default_factory=dict)
     theme_fonts: dict[str, str] = field(default_factory=dict)
     has_theme: bool = False
-    # Fonts the font table declares symbol-encoded (charset 02), other than Symbol itself.
+    # Fonts, by lower-case name, the font table says Word may draw as symbols: declared
+    # symbol-encoded (charset 02, or the symbol code page in csb0) other than Symbol and
+    # Wingdings, embedded (its glyphs may be any), or replaced when missing (altName) by a
+    # symbol or dingbat font.
     symbol_encoded: set[str] = field(default_factory=set)
     # _Properties' style levels by (run style, paragraph style, table style, label mark).
     inherited: dict[
         tuple[str | None, str | None, str | None, ET.Element | None],
         tuple[list[list[ET.Element | None]], list[ET.Element]],
     ] = field(default_factory=dict)
+    # The theme's colours by slot (dk1, lt1, accent1...), and the names (background1, text1...)
+    # the settings map onto them.
+    theme_colours: dict[str, _Rgb] = field(default_factory=dict)
+    colour_names: dict[str, str] = field(default_factory=lambda: dict(_COLOUR_NAMES))
+    # What may be painted under the text where nothing nearer is: the white page, and the
+    # page colour (w:background), which Word shows on screen and does not print by default.
+    page: tuple[_Rgb, ...] = ((0xFF, 0xFF, 0xFF),)
+
+    def colours(
+        self, element: ET.Element, value: str, theme: str, tint: str, shade: str
+    ) -> list[_Rgb]:
+        """The colour an element names; none for ``auto`` or none named.
+
+        ``value``, or the theme colour ``theme`` with its tint or shade, which wins (ECMA-376
+        17.3.2.6).
+        """
+        named = element.get(_w(theme))
+        if named is not None:
+            slot = self.colour_names.get(named, named)
+            colours = self.theme_colours or _SYSTEM_COLOURS
+            rgb = colours.get(slot)
+            if rgb is None:
+                raise DocxRefusedError("unsupported-formatting", f"theme colour {named!r}")
+            return [_tinted(rgb, element.get(_w(tint)), element.get(_w(shade)))]
+        stated = element.get(_w(value))
+        if stated is None or stated.lower() == "auto":
+            return []
+        if not re.fullmatch(r"[0-9A-Fa-f]{6}", stated):
+            raise DocxRefusedError("unsupported-formatting", f"colour {stated!r}")
+        return [_rgb(stated)]
+
+    def painted(self, shading: ET.Element | None) -> list[_Rgb]:
+        """What a shading element paints; none where it is clear.
+
+        One colour, or more where the reader cannot say which is under a character (stripes).
+        """
+        if shading is None:
+            return []
+        pattern = shading.get(_w("val"))
+        fill = self.colours(shading, "fill", "themeFill", "themeFillTint", "themeFillShade")
+        if pattern in (None, "clear", "nil"):
+            return fill
+        # A pattern's automatic colour is black over a fill that is otherwise the page.
+        colour = self.colours(shading, "color", "themeColor", "themeTint", "themeShade")
+        colour, fill = colour or [(0, 0, 0)], fill or [(0xFF, 0xFF, 0xFF)]
+        if pattern == "solid":
+            return colour
+        share = re.fullmatch(r"pct([0-9]{1,3})", pattern)
+        if share is not None and int(share.group(1)) <= 100:
+            part = int(share.group(1)) / 100
+            return [
+                (round(a[0] * part + b[0] * (1 - part)), round(a[1] * part + b[1] * (1 - part)),
+                 round(a[2] * part + b[2] * (1 - part)))
+                for a in colour for b in fill
+            ]  # fmt: skip
+        return colour + fill
 
     def theme_font(self, theme: str) -> str:
         """The typeface a theme font reference (``minorHAnsi``...) names; refused if none."""
@@ -801,6 +1009,11 @@ class _Styles:
         return self.resolve(style_id, kind) if style_id in self.styles else []
 
     def chain(self, style_id: str | None) -> list[_Style]:
+        """``style_id``'s style and those its ``basedOn`` names in turn.
+
+        A paragraph style based on a character style takes nothing from it, as Word draws it
+        [Word's answer, 2026-10]; any other ``basedOn`` naming a style of another kind is refused.
+        """
         out: list[_Style] = []
         seen: set[str] = set()
         while style_id is not None and style_id not in seen and style_id in self.styles:
@@ -808,17 +1021,56 @@ class _Styles:
             style = self.styles[style_id]
             out.append(style)
             style_id = style.based_on
+            based = self.styles.get(style_id) if style_id is not None else None
+            if based is not None and based.kind != style.kind:
+                if (style.kind, based.kind) != ("paragraph", "character"):
+                    raise DocxRefusedError(
+                        "unsupported-element", f"a {style.kind} style based on a {based.kind} one"
+                    )
+                break
         return out
 
 
-def _styles(root: ET.Element | None, theme: ET.Element | None, fonts: ET.Element | None) -> _Styles:
+def _styles(
+    root: ET.Element | None,
+    theme: ET.Element | None,
+    fonts: ET.Element | None,
+    settings: ET.Element | None = None,
+) -> _Styles:
     styles = _Styles()
+    mapping = None if settings is None else settings.find(_w("clrSchemeMapping"))
+    for name, mapped in [] if mapping is None else mapping.attrib.items():
+        # Word writes bg1="light1" t1="dark1"...: the names text and background take.
+        short = {"bg1": "background1", "t1": "text1", "bg2": "background2", "t2": "text2"}
+        if _local(name) in short:
+            styles.colour_names[short[_local(name)]] = _COLOUR_NAMES.get(mapped, mapped)
+    scheme = None if theme is None else theme.find(f".//{{{A}}}clrScheme")
+    for slot in [] if scheme is None else list(scheme):
+        given = next(iter(slot), None)
+        value = (
+            None
+            if given is None
+            else given.get("val")
+            if _local(given.tag) == "srgbClr"
+            else given.get("lastClr")
+        )
+        if value is not None and re.fullmatch(r"[0-9A-Fa-f]{6}", value):
+            styles.theme_colours[_local(slot.tag)] = _rgb(value)
     if fonts is not None:
         for entry in fonts.findall(_w("font")):
             charset = entry.find(_w("charset"))
             name = entry.get(_w("name"), "")
-            encoded = charset is not None and charset.get(_w("val"), "").upper() == "02"
-            if encoded and _font_class(name) != "symbol":
+            pages = entry.find(_w("sig"))
+            csb0 = "" if pages is None else pages.get(_w("csb0"), "")
+            encoded = (charset is not None and charset.get(_w("val"), "").upper() == "02") or (
+                re.fullmatch(r"[0-9A-Fa-f]{1,8}", csb0) is not None and int(csb0, 16) >> 31 == 1
+            )
+            substitute = entry.find(_w("altName"))
+            if (
+                (encoded and _font_class(name) == "text")
+                or any(child.tag.startswith(_w("embed")) for child in entry)
+                or (substitute is not None and _font_class(substitute.get(_w("val"))) != "text")
+            ):
                 styles.symbol_encoded.add(name.lower())
     if theme is not None:
         styles.has_theme = True
@@ -854,6 +1106,19 @@ def _styles(root: ET.Element | None, theme: ET.Element | None, fonts: ET.Element
                 part.find(f"{_w('rPr')}/{_w('rFonts')}") is not None
                 for part in style.findall(_w("tblStylePr"))
             ),
+            shadings=tuple(
+                shd
+                for path in ("tblPr", "tcPr", "tblStylePr/tblPr", "tblStylePr/tcPr")
+                for shd in style.findall(f"{'/'.join(_w(n) for n in path.split('/'))}/{_w('shd')}")
+            ),
+            conditional_emphasis=frozenset(
+                part.get(_w("type"), "")
+                for part in style.findall(_w("tblStylePr"))
+                if any(
+                    part.find(f"{_w('rPr')}/{_w(name)}") is not None
+                    for name in ("b", "bCs", "i", "iCs")
+                )
+            ),
         )
         if style.get(_w("default")) in ("1", "true", "on"):
             # With more than one default of a kind, the last one is used (ECMA-376 17.7.4.17).
@@ -862,8 +1127,9 @@ def _styles(root: ET.Element | None, theme: ET.Element | None, fonts: ET.Element
 
 
 # What a table style's conditional formatting may set, since the reader does not apply it: run
-# and paragraph properties it does not report, and fonts, sizes and colours checked below to be
-# ordinary text. Cell, row and table properties (shading, borders) are not reported either.
+# and paragraph properties it does not report, fonts, sizes and colours checked below to be
+# ordinary text, and bold and italic, refused where a part that sets them may be on over text
+# (``_Body.table``). Cell, row and table properties (shading, borders) are not reported either.
 _CONDITIONAL_RUN = {
     _w(name)
     for name in (
@@ -921,7 +1187,10 @@ def _conditional(style: ET.Element, styles: _Styles) -> str | None:
                         return f"conditional table formatting ({kind}) sets the font {name}"
             elif child.tag in (_w("sz"), _w("szCs")) and _tiny(child.get(_w("val"))):
                 return f"conditional table formatting ({kind}) sets a tiny size"
-            elif child.tag == _w("color") and _faint_color(child):
+            elif child.tag == _w("color") and any(
+                _contrast(c, (0xFF, 0xFF, 0xFF)) < _FAINT_CONTRAST
+                for c in styles.colours(child, "val", "themeColor", "themeTint", "themeShade")
+            ):
                 return f"conditional table formatting ({kind}) sets a faint colour"
         ppr = part.find(_w("pPr"))
         for child in [] if ppr is None else list(ppr):
@@ -959,7 +1228,8 @@ class _Properties:
             element = direct.find(_w("rStyle"))
             run_style = element.get(_w("val")) if element is not None else None
         self.mark = mark
-        # The same for every run with these styles: worked out once per read (never a refusal).
+        # The same for every run with these styles, so worked out once per read (a refusal is
+        # never kept: it is raised again).
         key = (run_style, paragraph_style, table_style, mark)
         if key not in styles.inherited:
             # Each kind of style with its basedOn chain, nearest first: the character, paragraph
@@ -971,7 +1241,15 @@ class _Properties:
                 [style.rpr for style in styles.resolve(paragraph_style, "paragraph")],
                 [style.rpr for style in styles.chain(table_style)],
             ]
-            levels: list[ET.Element | None] = [mark, *(rpr for chain in chains for rpr in chain)]
+            # The mark's own character style, as for a run: Word draws the label in it (Sym
+            # gives Symbol, Caps capitals) [Word's answer, 2026-10].
+            marked = None if mark is None else mark.find(_w("rStyle"))
+            mark_style = None if marked is None else marked.get(_w("val"))
+            levels: list[ET.Element | None] = [
+                mark,
+                *(style.rpr for style in styles.resolve_named(mark_style, "character")),
+                *(rpr for chain in chains for rpr in chain),
+            ]
             levels.append(styles.default_rpr)
             styles.inherited[key] = (chains, [level for level in levels if level is not None])
         self.chains, self.inherited = styles.inherited[key]
@@ -1019,6 +1297,10 @@ class _Properties:
                 shown = not shown
         return shown
 
+    def levels(self) -> list[ET.Element]:
+        """Every level's run properties, the run's own first."""
+        return [level for level in [self.direct, *self.inherited] if level is not None]
+
     def value(self, name: str, attribute: str = "val") -> str | None:
         for level in [self.direct, *self.inherited]:
             if level is None:
@@ -1063,21 +1345,21 @@ _THEME_ATTRIBUTE = {
 def _font_class(name: str | None) -> str:
     if name is None:
         return "text"
-    key = name.lower().replace(" ", "")
-    if key in ("symbol", "symbolmt"):
+    # Each exactly: another spelling ("SymbolMT", "symbol") is refused below, not guessed.
+    if name == "Symbol":
         return "symbol"
-    if name == "Wingdings":  # exactly: another spelling is refused below, not guessed
+    if name == "Wingdings":
         return "wingdings"
+    key = name.lower().replace(" ", "")
     if any(part in key for part in _DINGBAT_FONTS):
         return "dingbat"
     return "text"
 
 
 def _font_kind(styles: _Styles, name: str | None) -> str:
-    font = _font_class(name)
-    if font == "text" and name is not None and name.lower() in styles.symbol_encoded:
+    if name is not None and name.lower() in styles.symbol_encoded:
         return "dingbat"
-    return font
+    return _font_class(name)
 
 
 def _in_symbol(styles: _Styles, properties: _Properties, table_style: str | None) -> bool:
@@ -1156,6 +1438,12 @@ def _characters(text: str, symbol: bool) -> str:
             raise DocxRefusedError("private-use-character", f"U+{code:04X}")
         elif character == OBJECT:
             raise DocxRefusedError("reserved-character", "U+FFFC stands for a picture")
+        elif unicodedata.category(character) in ("Cf", "Cc") or code in _IGNORABLE:
+            # Drawn as nothing, or reordering what is drawn around it (a bidirectional control),
+            # or a control drawn as a blank or a box; Word writes a soft hyphen as w:softHyphen.
+            raise DocxRefusedError("format-character", f"U+{code:04X}")
+        elif unicodedata.category(character) == "Cn":
+            raise DocxRefusedError("unassigned-character", f"U+{code:04X}")
         else:
             out.append(character)
     return "".join(out)
@@ -1166,6 +1454,23 @@ def _symbol(code: int, where: str) -> str:
     if low not in SYMBOL_FONT:
         raise DocxRefusedError("unmapped-symbol", f"{where}: Symbol code {code:#06x}")
     return SYMBOL_FONT[low]
+
+
+# Scripts Word draws as complex script whatever the run says: Hebrew, Arabic, Syriac, Thaana,
+# N'Ko and their neighbours; the Indic scripts; Thai, Lao, Tibetan, Myanmar, Khmer; and the
+# Hebrew and Arabic presentation forms.
+_COMPLEX_SCRIPT = (
+    (0x0590, 0x08FF),
+    (0x0900, 0x0DFF),
+    (0x0E00, 0x109F),
+    (0x1780, 0x17FF),
+    (0xFB1D, 0xFDFF),
+    (0xFE70, 0xFEFF),
+)
+
+
+def _complex_script(character: str) -> bool:
+    return any(low <= ord(character) <= high for low, high in _COMPLEX_SCRIPT)
 
 
 def _private_use(code: int) -> bool:
@@ -1194,6 +1499,10 @@ def _placed(drawing: ET.Element) -> str:
     """
     frames = [c.tag for c in drawing]
     if frames == [f"{{{WP}}}inline"]:
+        properties = drawing[0].find(f"{{{WP}}}docPr")
+        if properties is not None and properties.get("hidden") in ("1", "true"):
+            # Not drawn; whether Word's text shows it is not on record.
+            raise DocxRefusedError("unsupported-element", "a hidden drawing")
         return OBJECT
     if frames == [f"{{{WP}}}anchor"]:
         return ""
@@ -1206,10 +1515,14 @@ def _vml_picture(element: ET.Element) -> str:
     Word writes pictures this way in documents from before Word 2007 and when saving for them.
     Word's text shows one in line ("/") and none positioned absolutely, which floats apart from
     the text [drawing-vml-inline-picture, drawing-vml-floating-picture]. A text box, WordArt, an
-    embedded object, a drawn shape, a group, a hidden shape or any other position is refused.
+    embedded object or control (any WordprocessingML element inside), a drawn shape, a group, a
+    hidden shape or any other position is refused.
     """
     locals_ = {_local(node.tag) for node in element.iter()}
-    if locals_ & {"textbox", "txbxContent", "textpath", "t", "OLEObject"}:
+    if locals_ & {"textbox", "txbxContent", "textpath", "t", "OLEObject"} or any(
+        node.tag.startswith(f"{{{W}}}") for node in element.iter() if node is not element
+    ):
+        # Any of Word's own elements in it (an ActiveX control, w:control) can carry text.
         raise DocxRefusedError("unsupported-element", "pict with text or an embedded object")
     holders = [n for n in element.iter() if any(_local(c.tag) == "imagedata" for c in n)]
     if len(holders) != 1 or "group" in locals_:
@@ -1280,8 +1593,16 @@ class _ParagraphReader:
         table_style: str | None,
         runs: set[ET.Element],
         story: tuple[str, int] | None,
+        carried: int = 0,
+        under: tuple[_Rgb, ...] = (),
     ) -> None:
         self.styles = styles
+        # Fields an earlier paragraph left open in their results, which an end here may close.
+        self.carried = carried
+        # What may be painted under the paragraph's text (its shading, its cell's, the page).
+        self.under = under or styles.page
+        # The largest size the paragraph's text is drawn at, in points.
+        self.line = 0.0
         self.paragraph_style = paragraph_style
         self.table_style = table_style
         # Every run read, shared across the story, for the accounting in _check_accounted.
@@ -1305,9 +1626,13 @@ class _ParagraphReader:
         self.pages: list[int] = []
         self.layout = 0
         self.layout_open: list[bool] = []
-        # Bookmark starts (id, name, offset) and ends (id, offset), for REF and NOTEREF.
-        self.bookmark_starts: list[tuple[str, str, int]] = []
-        self.bookmark_ends: list[tuple[str, int]] = []
+        # Whether each open field is locked (fldLock): Word does not update it.
+        self.locked: list[bool] = []
+        # Bookmark starts (id, name, offset) and ends (id, offset), for REF and NOTEREF, each
+        # with the number of note marks before it: a mark has no width, so its offset alone
+        # cannot tell inside a bookmark from next to it.
+        self.bookmark_starts: list[tuple[str, str, int, int]] = []
+        self.bookmark_ends: list[tuple[str, int, int]] = []
         self.parts: list[str] = []
         self.length = 0
         self.marks: list[Mark] = []
@@ -1333,8 +1658,8 @@ class _ParagraphReader:
                 if child.get(_w("dirty")) in ("1", "true", "on"):
                     raise DocxRefusedError("stale-field", "a field marked for update")
                 instruction = child.get(_w("instr"), "")
-                code = None if self.in_instruction() else _check_field(instruction)
                 before = self.length
+                code = self._shown(instruction, self.in_instruction(), _locked(child), before)
                 if code in _LAYOUT_FIELDS and not self.layout:
                     self.pages.append(self.length)
                     self.layout += 1
@@ -1346,7 +1671,13 @@ class _ParagraphReader:
                     raise DocxRefusedError("field-without-result", "a simple field shows nothing")
                 if code in _COMPUTED_FIELDS:
                     self.computed.append((instruction, before, self.length))
-            elif tag in (_w("bdo"), _w("dir")):
+            elif tag == _w("bdo"):
+                # An override draws every character in one order ("10 mg" as "gm 01"), which
+                # no mark says; what Word draws is not on record.
+                raise DocxRefusedError("unsupported-element", "a bidirectional override (bdo)")
+            elif tag == _w("dir"):
+                if child.get(_w("val")) not in ("rtl", "ltr"):
+                    raise DocxRefusedError("unsupported-element", "an embedding of no direction")
                 rtl = child.get(_w("val")) == "rtl"
                 self.rtl += rtl
                 self.container(child)
@@ -1360,10 +1691,15 @@ class _ParagraphReader:
                     self.container(content)
             elif tag == _w("bookmarkStart"):
                 self.bookmark_starts.append(
-                    (child.get(_w("id"), ""), child.get(_w("name"), ""), self.length)
+                    (
+                        child.get(_w("id"), ""),
+                        child.get(_w("name"), ""),
+                        self.length,
+                        len(self.notes),
+                    )
                 )
             elif tag == _w("bookmarkEnd"):
-                self.bookmark_ends.append((child.get(_w("id"), ""), self.length))
+                self.bookmark_ends.append((child.get(_w("id"), ""), self.length, len(self.notes)))
             elif tag in _PROPERTIES or tag in _MARKERS:
                 continue
             else:
@@ -1375,7 +1711,14 @@ class _ParagraphReader:
             self.styles, run.find(_w("rPr")), self.paragraph_style, self.table_style
         )
         symbol = _in_symbol(self.styles, properties, self.table_style)
+        # A hidden run's text is whitespace (or refused) and dropped, so a mark or field
+        # character in it stands where the run starts.
+        hidden = properties.toggle("vanish")
         emitted: list[str] = []
+
+        def here() -> int:
+            return self.length if hidden else self.length + sum(len(part) for part in emitted)
+
         # Page-number text, left out of the text but still drawn: it must not be hidden.
         placed: list[str] = []
         references: list[NoteReference] = []
@@ -1385,9 +1728,12 @@ class _ParagraphReader:
             if tag == _w("commentReference"):
                 if self.story is not None and self.story[0] == "comment":
                     raise DocxRefusedError("unsupported-element", "a comment mark in a comment")
-                offset = self.length + sum(len(part) for part in emitted)
+                if self.in_instruction():
+                    raise DocxRefusedError("unsupported-element", "a comment mark in a field code")
+                if hidden:
+                    raise DocxRefusedError("hidden-text", "a hidden comment mark")
                 comments.append(
-                    CommentReference(offset, _int(child.get(_w("id"), ""), "comment id"))
+                    CommentReference(here(), _int(child.get(_w("id"), ""), "comment id"))
                 )
                 continue
             if tag == _w("annotationRef"):
@@ -1398,11 +1744,10 @@ class _ParagraphReader:
             if tag in _NOTE_REFERENCES:
                 if self.in_instruction():
                     raise DocxRefusedError("unsupported-element", "a note mark in a field code")
-                offset = self.length + sum(len(part) for part in emitted)
-                references.append(self._note(child, offset))
+                references.append(self._note(child, here()))
                 continue
             if tag == _w("fldChar"):
-                self._field(child, self.length + sum(len(part) for part in emitted))
+                self._field(child, here())
                 continue
             if tag == _w("instrText"):
                 if not (self.fields and self.fields[-1]):
@@ -1423,18 +1768,45 @@ class _ParagraphReader:
             elif self.fields[-1]:
                 self.instructions[-1].append(produced)
         text = "".join(emitted)
-        if references and properties.toggle("vanish"):
+        if references and hidden:
             raise DocxRefusedError("hidden-text", "a hidden note mark")
-        if "".join(placed).strip() and properties.toggle("vanish"):
+        if "".join(placed).strip() and hidden:
             raise DocxRefusedError("hidden-text", "a hidden page number")
         self.notes += references
         self.comments += comments
         if not text:
             return
-        if properties.toggle("vanish"):
+        if hidden:
+            if not properties.shown("vanish"):
+                # Hidden by the cautious reading, shown by Word's toggle rule (a nearer style
+                # turns it off, or two kinds of style cancel): what Word shows is not on record.
+                raise DocxRefusedError("hidden-text", "hiding that Word's toggle rule cancels")
             if text.strip():
                 raise DocxRefusedError("hidden-text", "a hidden run carries text")
             return
+        complex_script = (
+            self.rtl
+            or properties.toggle("rtl")
+            or properties.toggle("cs")
+            or any(_complex_script(c) for c in text)
+        )
+        if complex_script and any(
+            properties.shown(latin) != properties.shown(latin + "Cs") for latin in ("b", "i")
+        ):
+            # Word draws complex script with bCs and iCs (MS-OI29500 2.1.68-2.1.81), and its
+            # Font object reports b and i: what is drawn where they differ is not on record.
+            raise DocxRefusedError(
+                "unsupported-formatting", "complex script whose b and bCs, or i and iCs, differ"
+            )
+        size = _size(properties)
+        condensed = _twips(properties.element("spacing"), "val")
+        if properties.element("fitText") is not None or (
+            condensed is not None and -condensed / 20 > size / 4
+        ):
+            # Text squeezed into a width, or condensed by more than a quarter of its size:
+            # its characters may be drawn over one another.
+            raise DocxRefusedError("unsupported-formatting", "text drawn over itself")
+        self.line = max(self.line, size)
         start = self.length
         self.parts.append(text)
         self.length += len(text)
@@ -1473,10 +1845,12 @@ class _ParagraphReader:
             self.instructions.append([])
             self.results.append(None)
             self.layout_open.append(False)
-        elif kind == "separate" and self.fields:
+            self.locked.append(_locked(child))
+        elif kind == "separate" and self.fields and self.fields[-1]:
             # The result is shown, so it must be one Word shows as stored, one the reader
             # computes and checks, or a page number.
-            code = None if any(self.fields[:-1]) else _check_field("".join(self.instructions[-1]))
+            instruction = "".join(self.instructions[-1])
+            code = self._shown(instruction, any(self.fields[:-1]), self.locked[-1], offset)
             if code in _COMPUTED_FIELDS:
                 self.results[-1] = offset
             elif code in _LAYOUT_FIELDS and not self.layout:
@@ -1484,6 +1858,8 @@ class _ParagraphReader:
                 self.layout += 1
                 self.layout_open[-1] = True
             self.fields[-1] = False
+        elif kind == "end" and not self.fields and self.carried:
+            self.carried -= 1
         elif kind == "end" and self.fields:
             if self.fields[-1]:
                 # No separate: the field stores no result, and what Word shows is computed. A
@@ -1493,6 +1869,7 @@ class _ParagraphReader:
                 words = instruction.upper().split()
                 if any(self.fields[:-1]) or words[:1] != ["SEQ"] or "\\H" not in words:
                     raise DocxRefusedError("field-without-result", "a field with no stored result")
+                _check_field(instruction)
                 self.results[-1] = offset
                 self.fields[-1] = False
             start = self.results.pop()
@@ -1502,6 +1879,29 @@ class _ParagraphReader:
                 self.layout -= 1
             self.fields.pop()
             self.instructions.pop()
+            self.locked.pop()
+        else:
+            # A second separator would show text no check covers; a stray one, or a kind Word
+            # does not write, leaves the field's extent unknown.
+            raise DocxRefusedError("unbalanced-field", f"a field character {kind!r} out of place")
+
+    def _shown(self, instruction: str, nested: bool, locked: bool, offset: int) -> str | None:
+        """The code of a field whose result is shown, or None for one in another field's code.
+
+        A field in another's code shows nothing, so one the reader computes there would go
+        uncounted and is refused. A PAGEREF's bookmark is checked with the computed fields.
+        """
+        if nested:
+            if _code(instruction) in _COMPUTED_FIELDS:
+                raise DocxRefusedError("computed-field", "a computed field in another field's code")
+            return None
+        code = _check_field(instruction)
+        if locked and code in _LAYOUT_FIELDS:
+            # Word shows a locked field's stored text; what it prints is not on record.
+            raise DocxRefusedError("computed-field", f"a locked {code} field")
+        if code == "PAGEREF":
+            self.computed.append((instruction, offset, offset))
+        return code
 
     def _special(self, child: ET.Element) -> str:
         tag = child.tag
@@ -1516,7 +1916,7 @@ class _ParagraphReader:
         if tag == _w("softHyphen"):
             return "\u00ad"
         if tag == _w("sym"):
-            if _font_class(child.get(_w("font"))) != "symbol":
+            if _font_kind(self.styles, child.get(_w("font"))) != "symbol":
                 raise DocxRefusedError("unmapped-symbol", f"w:sym in {child.get(_w('font'))!r}")
             char = child.get(_w("char"), "")
             if not re.fullmatch(r"[0-9A-Fa-f]{1,4}", char):
@@ -1545,9 +1945,21 @@ class _ParagraphReader:
         shading = _shading(properties.element("shd"))
         if shading is not None:
             kinds.append(shading)
+        if (
+            properties.toggle("rtl")
+            and _on(None if properties.direct is None else properties.direct.find(_w("rtl")))
+            is None
+        ):
+            # Word does not allow rtl in styles or the defaults (MS-OI29500 17.7.5.4, 17.7.9.1);
+            # whether it draws such text right to left is not on record.
+            raise DocxRefusedError("unsupported-formatting", "right-to-left set by a style")
         if self.rtl or properties.toggle("rtl"):
             kinds.append("rtl")
-        if _faint(properties):
+        if any(level.find(f"{{{W14}}}textFill") is not None for level in properties.levels()):
+            # Word 2010's text effects fill the glyphs (with nothing, white, a gradient...);
+            # whether the text can be seen is not on record.
+            raise DocxRefusedError("unsupported-formatting", "a text fill (w14:textFill)")
+        if _faint(properties, self.under):
             kinds.append("faint")
         if properties.value("u") not in (None, "none"):
             kinds.append("underline")
@@ -1581,35 +1993,199 @@ def _shading(element: ET.Element | None) -> str | None:
 _POINTS = {"pt": 1.0, "pc": 12.0, "pi": 12.0, "in": 72.0, "cm": 72 / 2.54, "mm": 72 / 25.4}
 
 
-def _faint_color(color: ET.Element | None) -> bool:
-    """Whether a colour is white or a light theme colour."""
-    if color is None:
-        return False
-    theme = (color.get(_w("themeColor")) or "").lower()
-    return theme.startswith(("background", "light", "bg")) or (
-        (color.get(_w("val")) or "").lower() in ("ffffff", "white")
-    )
+type _Rgb = tuple[int, int, int]
+
+# Text is faint where its colour's contrast (WCAG 2's ratio) with what is painted under it is
+# below 1.33:1, as the ePI reader has it: white on white, yellow (FFFF00) on white, black on
+# black shading.
+_FAINT_CONTRAST = 1.33
+# The names a colour may take by its role, and the slots they name by default.
+_COLOUR_NAMES: dict[str, str] = {
+    "background1": "lt1",
+    "text1": "dk1",
+    "background2": "lt2",
+    "text2": "dk2",
+    "light1": "lt1",
+    "dark1": "dk1",
+    "light2": "lt2",
+    "dark2": "dk2",
+    "hyperlink": "hlink",
+    "followedHyperlink": "folHlink",
+}
+# Without a theme part, Word's window colours.
+_SYSTEM_COLOURS: dict[str, _Rgb] = {"lt1": (0xFF, 0xFF, 0xFF), "dk1": (0, 0, 0)}
+_HIGHLIGHTS: dict[str, _Rgb] = {
+    "black": (0, 0, 0),
+    "blue": (0, 0, 0xFF),
+    "cyan": (0, 0xFF, 0xFF),
+    "green": (0, 0xFF, 0),
+    "magenta": (0xFF, 0, 0xFF),
+    "red": (0xFF, 0, 0),
+    "yellow": (0xFF, 0xFF, 0),
+    "white": (0xFF, 0xFF, 0xFF),
+    "darkBlue": (0, 0, 0x80),
+    "darkCyan": (0, 0x80, 0x80),
+    "darkGreen": (0, 0x80, 0),
+    "darkMagenta": (0x80, 0, 0x80),
+    "darkRed": (0x80, 0, 0),
+    "darkYellow": (0x80, 0x80, 0),
+    "darkGray": (0x80, 0x80, 0x80),
+    "lightGray": (0xC0, 0xC0, 0xC0),
+}
+
+
+def _rgb(value: str) -> _Rgb:
+    return (int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16))
+
+
+def _tinted(rgb: _Rgb, tint: str | None, shade: str | None) -> _Rgb:
+    """A theme colour lightened (``themeTint``) or darkened (``themeShade``) in its lightness."""
+    hue, light, saturation = colorsys.rgb_to_hls(*(c / 255 for c in rgb))
+    for value, lighten in ((tint, True), (shade, False)):
+        if value is None:
+            continue
+        if not re.fullmatch(r"[0-9A-Fa-f]{2}", value):
+            raise DocxRefusedError("unsupported-formatting", f"theme tint or shade {value!r}")
+        share = int(value, 16) / 255
+        light = light * share + (1 - share) if lighten else light * share
+    red, green, blue = colorsys.hls_to_rgb(hue, light, saturation)
+    return (round(red * 255), round(green * 255), round(blue * 255))
+
+
+def _contrast(first: _Rgb, second: _Rgb) -> float:
+    """WCAG 2's contrast ratio of two colours."""
+
+    def luminance(rgb: _Rgb) -> float:
+        linear = [
+            c / 255 / 12.92 if c / 255 <= 0.03928 else ((c / 255 + 0.055) / 1.055) ** 2.4
+            for c in rgb
+        ]
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+    light, dark = sorted((luminance(first), luminance(second)), reverse=True)
+    return (light + 0.05) / (dark + 0.05)
+
+
+def _points(size: str) -> float | None:
+    """A font size in points (half-points, or with a unit), or None if it cannot be parsed."""
+    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)(pt|pc|pi|in|cm|mm)?", size)
+    if match is None:
+        return None
+    unit = match.group(2)
+    return float(match.group(1)) * _POINTS[unit] if unit else float(match.group(1)) / 2
 
 
 def _tiny(size: str | None) -> bool:
     """Whether a font size is under two points; one the reader cannot parse counts as tiny."""
     if size is None:
         return False
-    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)(pt|pc|pi|in|cm|mm)?", size)
-    if match is None:
-        return True
-    unit = match.group(2)
-    points = float(match.group(1)) * _POINTS[unit] if unit else float(match.group(1)) / 2
-    return points < 2
+    points = _points(size)
+    return points is None or points < 2
 
 
-def _faint(properties: _Properties) -> bool:
+def _size(properties: _Properties) -> float:
+    """The largest size the run's text may be drawn at, in points (Word's default 10 pt)."""
+    sizes = [properties.value(name) for name in ("sz", "szCs")]
+    return max((_points(size) or 0.0 for size in sizes if size is not None), default=10.0)
+
+
+# Layout bounds, in twentieths of a point: a frame, a floating table or an indent placed more
+# than an inch off its anchor's start, or more than 22 inches (the largest page) away.
+_INCH = 1440
+_FAR = 22 * _INCH
+
+
+def _twips(element: ET.Element | None, name: str) -> int | None:
+    """An integer measure of ``element``, or None where it is absent; refused if malformed."""
+    value = None if element is None else element.get(_w(name))
+    if value is None:
+        return None
+    if not re.fullmatch(r"-?[0-9]{1,7}", value):
+        raise DocxRefusedError("unsupported-formatting", f"{name} {value!r}")
+    return int(value)
+
+
+def _layout(levels: list[ET.Element | None], line: float) -> None:
+    """Refuse a paragraph whose layout may draw its text clipped, overdrawn or off the page.
+
+    ``levels`` are its paragraph properties, nearest first; ``line`` the largest size its text
+    is drawn at, in points. Each setting is taken from the nearest level that makes it.
+    """
+
+    def nearest(name: str, attribute: str) -> int | str | None:
+        for level in levels:
+            found = None if level is None else level.find(_w(name))
+            if found is not None and found.get(_w(attribute)) is not None:
+                return (
+                    found.get(_w(attribute))
+                    if attribute.endswith("Rule")
+                    else _twips(found, attribute)
+                )
+        return None
+
+    spacing, rule = nearest("spacing", "line"), nearest("spacing", "lineRule") or "auto"
+    if isinstance(spacing, int) and (
+        (rule == "exact" and spacing / 20 < line) or (rule == "auto" and spacing < 192)
+    ):
+        # An exact line lower than the text clips it; under 0.8 lines, lines overprint.
+        raise DocxRefusedError("unsupported-formatting", "line spacing that clips or overprints")
+    left = next((v for n in ("start", "left") if isinstance(v := nearest("ind", n), int)), 0)
+    right = next((v for n in ("end", "right") if isinstance(v := nearest("ind", n), int)), 0)
+    hanging, first = nearest("ind", "hanging"), nearest("ind", "firstLine")
+    opening = (
+        left - hanging
+        if isinstance(hanging, int)
+        else left + (first if isinstance(first, int) else 0)
+    )
+    if min(left, right, opening) < -_INCH:
+        raise DocxRefusedError("unsupported-formatting", "an indent more than an inch outward")
+    frame = next(
+        (
+            f
+            for level in levels
+            if level is not None and (f := level.find(_w("framePr"))) is not None
+        ),
+        None,
+    )
+    if frame is not None:
+        height = _twips(frame, "h")
+        if any(
+            v is not None and not -_INCH <= v <= _FAR
+            for v in (_twips(frame, "x"), _twips(frame, "y"))
+        ) or (frame.get(_w("hRule")) == "exact" and height is not None and height / 20 < line):
+            # A frame off the page, or too low for its text, which Word clips.
+            raise DocxRefusedError(
+                "unsupported-formatting", "a frame that may clip or lose its text"
+            )
+
+
+def _faint(properties: _Properties, under: tuple[_Rgb, ...]) -> bool:
     """Whether text with these properties is easy not to see.
 
-    White text (or a light theme colour), text under two points, or text scaled under a fifth
-    is. A size or scale the reader cannot parse counts as faint.
+    Text whose colour's contrast with what is painted under it is below ``_FAINT_CONTRAST``,
+    text under two points, or text scaled under a fifth is. ``under`` is what may be painted
+    beneath the paragraph; the run's highlight, else its shading, lies over it. Automatic
+    colour is never faint: Word draws it black or white against what is under it. Where what
+    is under the text could be one of several colours and the answer differs between them, it
+    is refused. A size or scale the reader cannot parse counts as faint.
     """
-    if _faint_color(properties.element("color")):
+    highlight = properties.value("highlight")
+    if highlight not in (None, "none"):
+        if highlight not in _HIGHLIGHTS:
+            raise DocxRefusedError("unsupported-formatting", f"highlight {highlight!r}")
+        under = (_HIGHLIGHTS[highlight],)
+    else:
+        under = tuple(properties.styles.painted(properties.element("shd"))) or under
+    color = properties.element("color")
+    drawn = (
+        []
+        if color is None
+        else properties.styles.colours(color, "val", "themeColor", "themeTint", "themeShade")
+    )
+    verdicts = {_contrast(text, back) < _FAINT_CONTRAST for text in drawn for back in under}
+    if len(verdicts) > 1:
+        raise DocxRefusedError("unsupported-formatting", "text faint on one colour under it only")
+    if verdicts == {True}:
         return True
     # szCs sizes complex-script text; the reader does not know which script a character is
     # drawn as, so either size being tiny counts.
@@ -1636,12 +2212,33 @@ _LAYOUT_FIELDS = {"PAGEREF", "PAGE", "NUMPAGES", "SECTIONPAGES"}
 _COMPUTED_FIELDS = {"SEQ", "STYLEREF", "REF", "NOTEREF"}
 
 
-def _check_field(instruction: str) -> str:
-    """The field's code, if its result is one the reader can vouch for; refused otherwise."""
+def _code(instruction: str) -> str:
     words = instruction.split()
-    code = words[0].upper() if words else ""
+    return words[0].upper() if words else ""
+
+
+def _locked(element: ET.Element) -> bool:
+    return element.get(_w("fldLock")) in ("1", "true", "on")
+
+
+def _check_field(instruction: str) -> str:
+    r"""The field's code, if its result is one the reader can vouch for; refused otherwise.
+
+    A field nested in the code of one the reader computes or places (a NUL stands for it) makes
+    its arguments unknown. A page number is placed only with the switches Word has answered:
+    PAGEREF's ``\h``, and ``\*`` MERGEFORMAT, CHARFORMAT or Arabic; ``\p`` shows "above" or
+    "below", ``\#`` a picture's text and other formats words.
+    """
+    code = _code(instruction)
     if code not in _STORED_FIELDS | _COMPUTED_FIELDS | _LAYOUT_FIELDS:
         raise DocxRefusedError("computed-field", f"a {code or 'blank'} field")
+    if code in _COMPUTED_FIELDS | _LAYOUT_FIELDS and "\x00" in instruction:
+        raise DocxRefusedError("computed-field", f"a {code} field with a field in its code")
+    if code in _LAYOUT_FIELDS:
+        flags = {"h"} if code == "PAGEREF" else set()
+        arguments, switches = _switches(_tokens(instruction)[1:], set(), flags)
+        if len(arguments) != (code == "PAGEREF") or switches.get("*", "ARABIC").upper() != "ARABIC":
+            raise DocxRefusedError("computed-field", f"a {code} field the reader cannot place")
     return code
 
 
@@ -1653,11 +2250,42 @@ def _check_whitespace(element: ET.Element, text: str) -> None:
         raise DocxRefusedError("unpreserved-whitespace", "w:t without xml:space=preserve")
 
 
+# What in a content control's content shows a character (or a note mark) where it stands.
+_SHOWN = {
+    _w(name)
+    for name in (
+        "sym",
+        "tab",
+        "ptab",
+        "br",
+        "cr",
+        "noBreakHyphen",
+        "softHyphen",
+        "drawing",
+        "pict",
+        "footnoteReference",
+        "endnoteReference",
+    )
+} | {_ALTERNATE}
+
+
 def _content_control(element: ET.Element) -> None:
     properties = element.find(_w("sdtPr"))
     if properties is not None and any(_local(c.tag) == "dataBinding" for c in properties):
         # The stored content is a cache; Word shows the bound data.
         raise DocxRefusedError("unsupported-element", "content control bound to data")
+    content = element.find(_w("sdtContent"))
+    if (
+        properties is not None
+        and properties.find(f"{_w('placeholder')}/{_w('docPart')}") is not None
+        and not any(
+            (node.tag == _w("t") and node.text) or node.tag in _SHOWN
+            for node in ([] if content is None else content.iter())
+        )
+    ):
+        # Word shows the placeholder's building block (the glossary, not read) in an empty
+        # control. With no placeholder part it shows nothing, as read.
+        raise DocxRefusedError("unsupported-element", "an empty content control's placeholder")
 
 
 def _int(value: str, where: str) -> int:
@@ -1699,15 +2327,20 @@ class _Context:
     # notes whose marks are custom.
     section: int = 0
     custom: frozenset[tuple[str, int]] = frozenset()
-    # The fields the reader computes: instruction, and the stored result's start and end in text.
+    # The fields the reader computes, and PAGEREFs: instruction, and the stored result's start
+    # and end in text (a PAGEREF's result is set aside: both are its place).
     fields: tuple[tuple[str, int, int], ...] = ()
-    # Bookmark starts (id, name, offset) and ends (id, offset) in the paragraph.
-    bookmark_starts: tuple[tuple[str, str, int], ...] = ()
-    bookmark_ends: tuple[tuple[str, int], ...] = ()
+    # Bookmark starts (id, name, offset, notes before) and ends (id, offset, notes before).
+    bookmark_starts: tuple[tuple[str, str, int, int], ...] = ()
+    bookmark_ends: tuple[tuple[str, int, int], ...] = ()
     # Whether any of its characters is read through the Symbol table.
     symbolic: bool = False
     # How many table rows, in any table, ended before the paragraph in its story.
     rows_ended: int = 0
+    # How many fields are open in their results when the paragraph ends (a table of contents).
+    fields_open: int = 0
+    # The height of its tallest character, at least (its text's and its mark's size), in points.
+    line: float = 0.0
 
 
 def _paragraph(
@@ -1718,6 +2351,8 @@ def _paragraph(
     runs: set[ET.Element],
     story: tuple[str, int] | None = None,
     section: int = 0,
+    carried: int = 0,
+    under: tuple[_Rgb, ...] = (),
 ) -> tuple[Paragraph, _Context]:
     ppr = element.find(_w("pPr"))
     style = None
@@ -1727,7 +2362,23 @@ def _paragraph(
     mark_rpr = ppr.find(_w("rPr")) if ppr is not None else None
     mark = _Properties(styles, mark_rpr, style, table_style)
     mark_hidden = mark.toggle("vanish") or mark.toggle("specVanish")
-    reader = _ParagraphReader(styles, style, table_style, runs, story)
+    if mark.toggle("vanish") and not mark.shown("vanish") and not mark.toggle("specVanish"):
+        # Whether Word runs the paragraph on is not on record (see ``run``).
+        raise DocxRefusedError("hidden-text", "a paragraph mark Word's toggle rule may show")
+    # The paragraph's properties, then its style's, its table style's and the defaults.
+    table_levels = [s.ppr for s in styles.chain(table_style) if s.ppr is not None]
+    levels = [
+        ppr,
+        *(s.ppr for s in styles.resolve(style, "paragraph")),
+        *table_levels,
+        styles.default_ppr,
+    ]
+    shading = next(
+        (e for level in levels if level is not None and (e := level.find(_w("shd"))) is not None),
+        None,
+    )
+    painted = tuple(styles.painted(shading)) or under
+    reader = _ParagraphReader(styles, style, table_style, runs, story, carried, painted)
     reader.container(element)
     if reader.in_instruction():
         raise DocxRefusedError("unbalanced-field", "a paragraph ends inside a field instruction")
@@ -1737,15 +2388,15 @@ def _paragraph(
         )
     if reader.layout:
         raise DocxRefusedError("unbalanced-field", "a page number runs past its paragraph")
-    # The paragraph's properties, then its style's, its table style's and the defaults.
-    levels = [
-        ppr,
-        *(s.ppr for s in styles.resolve(style, "paragraph")),
-        *(s.ppr for s in styles.chain(table_style)),
-        styles.default_ppr,
-    ]
     numbering = _numbering(levels)
+    if numbering != _numbering([level for level in levels if level not in table_levels]):
+        # A list, or its level, from the table style: what Word draws is not on record.
+        raise _refuse_numbering("a list from a table style")
+    line = max(reader.line, _size(mark))
+    if reader.length:
+        _layout(levels, line)
     context = _Context(
+        line=line,
         style=styles.effective(style, "paragraph"),
         table_style=table_style,
         mark=mark_rpr,
@@ -1755,6 +2406,7 @@ def _paragraph(
         fields=tuple(reader.computed),
         bookmark_starts=tuple(reader.bookmark_starts),
         bookmark_ends=tuple(reader.bookmark_ends),
+        fields_open=reader.carried + len(reader.fields),
     )
     return Paragraph(
         text="".join(reader.parts),
@@ -1791,7 +2443,15 @@ def _paragraph_marks(reader: _ParagraphReader, levels: list[ET.Element | None]) 
         marks.append(Mark(0, reader.length, shading))
     if reader.length and _on(nearest("bidi")):
         marks.append(Mark(0, reader.length, "rtl"))
-    return tuple(sorted(set(marks), key=lambda m: (m.start, m.end, m.kind)))
+    # Marks of one kind that overlap or touch are one mark (``Mark``).
+    merged: list[Mark] = []
+    for mark in sorted(marks, key=lambda m: (m.kind, m.start, m.end)):
+        last = merged[-1] if merged else None
+        if last is not None and last.kind == mark.kind and mark.start <= last.end:
+            merged[-1] = Mark(last.start, max(last.end, mark.end), mark.kind)
+        else:
+            merged.append(mark)
+    return tuple(sorted(merged, key=lambda m: (m.start, m.end, m.kind)))
 
 
 # --- list labels ---------------------------------------------------------------------------
@@ -1826,6 +2486,9 @@ _LEVEL_CHILDREN = {
     )
 }
 _PLACEHOLDER = re.compile(r"(%[1-9])")
+# The longest lvlText drawn: a label is rebuilt for every list item, and Word's answer for a
+# longer one is not on record.
+MAX_LEVEL_TEXT = 255
 _ROMAN = (
     (1000, "M"),
     (900, "CM"),
@@ -1875,6 +2538,8 @@ def _level(element: ET.Element) -> _Level:
     if text_element is not None:
         null = text_element.get(_w("null")) in ("1", "true", "on")
         text = "" if null else text_element.get(_w("val"), "")
+        if len(text) > MAX_LEVEL_TEXT:
+            unsupported = unsupported or f"a list level text over {MAX_LEVEL_TEXT} characters"
     legacy = element.find(_w("legacy"))
     suffix = value("suff") or "tab"
     if legacy is not None and legacy.get(_w("legacy")) not in ("0", "false", "off"):
@@ -2051,10 +2716,12 @@ class _Lists:
             raise _refuse_numbering(f"level {level} of numId {numbering.num_id} is not defined")
         for upper in range(level + 1):
             restart = levels[upper].restart if upper in levels else None
-            if restart is not None and restart != 0 and restart >= upper + (upper == 0):
+            if restart is not None and (
+                restart < 0 or (restart != 0 and restart >= upper + (upper == 0))
+            ):
                 # Restarting after the level directly above, written out (Word never writes it,
                 # it is the default), or after itself or a deeper one: Word draws the level
-                # empty [restart-level-above].
+                # empty [restart-level-above]. A negative one is not on record.
                 raise _refuse_numbering(f"lvlRestart {restart} on level {upper}")
         for shown in {int(n) - 1 for n in re.findall(r"%([1-9])", definition.text or "")}:
             if shown != level and shown in levels and levels[shown].restart == 0:
@@ -2097,6 +2764,9 @@ class _Lists:
         for deeper in range(level + 1, len(_LEVELS)):
             definition = levels.get(deeper)
             restart = definition.restart if definition is not None else None
+            if restart is not None and restart < 0:
+                # Whether it restarts the level is not on record.
+                raise _refuse_numbering(f"lvlRestart {restart} on level {deeper}")
             # lvlRestart n restarts the level after a paragraph at a level up to n - 1; 0 never.
             # A value that is not a higher level is ignored, and then any higher level restarts
             # [restart-never, restart-after-first].
@@ -2221,7 +2891,10 @@ class _Lists:
             value = counters.values[shown] if implied is None else implied
             if counters.unknown[shown] or value is None:
                 raise DocxRefusedError("ambiguous-numbering", f"the count of list level {shown}")
-            pieces.append(_number(value, "decimal" if definition.legal else source.format))
+            # isLgl draws every level in decimal, but a decimalZero one keeps its zero ("1.01",
+            # Word's answer, 2026-10).
+            legal = definition.legal and source.format != "decimalZero"
+            pieces.append(_number(value, "decimal" if legal else source.format))
         properties = _Properties(
             self.styles, definition.rpr, context.style, context.table_style, context.mark
         )
@@ -2277,6 +2950,10 @@ def _labelled(
             # Word runs this paragraph on after the previous one; where it draws the label, if
             # it draws one, is not documented.
             raise DocxRefusedError("ambiguous-numbering", "a list item run on after a hidden mark")
+        elif paragraph.mark_hidden:
+            # Its mark is hidden, by any level, whatever the list level says: whether Word draws
+            # the label is not documented.
+            raise DocxRefusedError("ambiguous-numbering", "a list item whose mark is hidden")
         else:
             out.append(replace(paragraph, numbering=lists.label(numbering, context)))
         hidden_before = paragraph.mark_hidden
@@ -2330,8 +3007,8 @@ def _note_mark(value: int, fmt: str) -> str:
         raise _refuse_numbering(f"the note number format {fmt}")
     if fmt != "chicago":
         return _number(value, fmt)
-    if not 1 <= value <= 8:
-        # Word's answer is on record up to the doubled signs; past them is not.
+    if not 1 <= value <= 6:
+        # Word's answers go to the sixth (††) [notes-chicago, notes-section-chicago].
         raise _refuse_numbering(f"the note number {value} in symbols")
     # *, †, ‡, §, then each doubled.
     return _CHICAGO[(value - 1) % 4] * ((value - 1) // 4 + 1)
@@ -2400,10 +3077,8 @@ def _read_notes(
         reader.blocks(element, None, None)
         _check_accounted(element, reader.runs)
         if any(c.fields for c in reader.contexts):
-            # Whether Word counts a computed field in a note with the body's is not yet on record.
-            raise DocxRefusedError(
-                "computed-field", f"a computed field (SEQ, STYLEREF, REF or NOTEREF) in a {kind}"
-            )
+            # Whether Word counts a SEQ in a note with the body's is not yet on record.
+            raise DocxRefusedError("computed-field", f"a computed field or PAGEREF in a {kind}")
         if any(p.numbering is not None and p.numbering.num_id for p in reader.out):
             # Whether a list in a note counts with the body's lists is not yet on record.
             raise _refuse_numbering(f"a list in a {kind}")
@@ -2492,6 +3167,14 @@ def _verify_fields(
         for instruction, start, end in context.fields:
             tokens = _tokens(instruction)
             code = tokens[0].upper()
+            if code == "PAGEREF":
+                # A bookmark REF could read; Word's print of one it cannot find is not on record.
+                (name,), _ = _switches(tokens[1:], set(), {"h"})
+                if bookmarks.get(name) is None:
+                    raise DocxRefusedError(
+                        "computed-field", "a PAGEREF to a bookmark it cannot read"
+                    )
+                continue
             if code == "SEQ":
                 shown = _seq(tokens[1:], index, counted, levels)
             elif code == "STYLEREF":
@@ -2505,32 +3188,32 @@ def _verify_fields(
                 )
 
 
-def _bookmarks(contexts: list[_Context], loose: set[str]) -> dict[str, tuple[int, int, int] | None]:
-    """Each bookmark's paragraph, start and end; None for one REF cannot be read from.
+type _Span = tuple[int, int, int, slice]
+
+
+def _bookmarks(contexts: list[_Context], loose: set[str]) -> dict[str, _Span | None]:
+    """Each bookmark's paragraph, start, end and the notes it holds; None for one REF cannot read.
 
     That is one that starts and ends in different paragraphs or between them, has no end, or
     shares its name with another.
     """
-    starts: dict[str, tuple[str, int, int]] = {}
-    ends: dict[str, tuple[int, int]] = {}
+    starts: dict[str, tuple[str, int, int, int]] = {}
+    ends: dict[str, tuple[int, int, int]] = {}
     for index, context in enumerate(contexts):
-        for key, name, offset in context.bookmark_starts:
-            starts[key] = (name, index, offset)
-        for key, offset in context.bookmark_ends:
-            ends[key] = (index, offset)
-    spans: dict[str, tuple[int, int, int] | None] = {}
-    for key, (name, index, start) in starts.items():
+        for key, name, offset, notes in context.bookmark_starts:
+            starts[key] = (name, index, offset, notes)
+        for key, offset, notes in context.bookmark_ends:
+            ends[key] = (index, offset, notes)
+    spans: dict[str, _Span | None] = {}
+    for key, (name, index, start, first) in starts.items():
         end = ends.get(key)
         whole = key not in loose and end is not None and end[0] == index and name not in spans
-        spans[name] = (index, start, end[1]) if whole and end is not None else None
+        spans[name] = (index, start, end[1], slice(first, end[2])) if whole and end else None
     return spans
 
 
 def _reference(
-    code: str,
-    tokens: list[str],
-    paragraphs: list[Paragraph],
-    bookmarks: dict[str, tuple[int, int, int] | None],
+    code: str, tokens: list[str], paragraphs: list[Paragraph], bookmarks: dict[str, _Span | None]
 ) -> str:
     """What REF (the bookmark's text) or NOTEREF (its note's mark) prints."""
     arguments, switches = _switches(tokens, set(), {"h", "f"} if code == "NOTEREF" else {"h"})
@@ -2543,11 +3226,13 @@ def _reference(
     span = bookmarks[name]
     if span is None:
         raise DocxRefusedError("computed-field", f"a {code} to a bookmark it cannot read")
-    index, start, end = span
+    index, start, end, held = span
     paragraph = paragraphs[index]
     inside = [n for n in paragraph.notes if start <= n.offset <= end]
     if code == "NOTEREF":
-        # The mark of the note referred to in the bookmark [fields-noteref].
+        # The mark of the note referred to in the bookmark [fields-noteref]: one between its
+        # start and end, not one next to it (Word prints an error for that).
+        inside = list(paragraph.notes[held])
         if len(inside) != 1 or inside[0].mark is None:
             raise DocxRefusedError("computed-field", "a NOTEREF to a bookmark without one note")
         return inside[0].mark
@@ -2653,7 +3338,11 @@ class _Body:
         self.loose_bookmarks: set[str] = set()
 
     def blocks(
-        self, element: ET.Element, table: tuple[int, int, int] | None, table_style: str | None
+        self,
+        element: ET.Element,
+        table: tuple[int, int, int] | None,
+        table_style: str | None,
+        under: tuple[_Rgb, ...] = (),
     ) -> None:
         for child in element:
             tag = child.tag
@@ -2666,6 +3355,8 @@ class _Body:
                     self.runs,
                     self.story,
                     len(self.sections),
+                    self.contexts[-1].fields_open if self.contexts else 0,
+                    under,
                 )
                 self.out.append(paragraph)
                 self.contexts.append(replace(context, rows_ended=self.rows_ended))
@@ -2673,14 +3364,14 @@ class _Body:
                 if closing is not None:
                     self.sections.append(closing)
             elif tag == _w("tbl"):
-                self.table(child, table)
+                self.table(child, table, under)
             elif tag == _w("sdt"):
                 _content_control(child)
                 content = child.find(_w("sdtContent"))
                 if content is not None:
-                    self.blocks(content, table, table_style)
+                    self.blocks(content, table, table_style, under)
             elif tag == _w("customXml"):
-                self.blocks(child, table, table_style)
+                self.blocks(child, table, table_style, under)
             elif tag in (_w("bookmarkStart"), _w("bookmarkEnd")):
                 self.loose_bookmarks.add(child.get(_w("id"), ""))
             elif tag in (_w("sectPr"), _w("tcPr")) or tag in _PROPERTIES or tag in _MARKERS:
@@ -2688,7 +3379,9 @@ class _Body:
             else:
                 raise DocxRefusedError("unsupported-element", _local(tag))
 
-    def table(self, element: ET.Element, outer: tuple[int, int, int] | None) -> None:
+    def table(
+        self, element: ET.Element, outer: tuple[int, int, int] | None, under: tuple[_Rgb, ...] = ()
+    ) -> None:
         index = self.tables
         self.tables += 1
         style_element = element.find(f"{_w('tblPr')}/{_w('tblStyle')}")
@@ -2702,19 +3395,156 @@ class _Body:
             # Formatting for the first row, banded rows and the like; the reader does not apply
             # it, so formatting that could hide or change text is refused.
             raise DocxRefusedError("unsupported-element", problem)
+        floating = element.find(f"{_w('tblPr')}/{_w('tblpPr')}")
+        indent = _twips(element.find(f"{_w('tblPr')}/{_w('tblInd')}"), "w")
+        if any(
+            v is not None and not -_INCH <= v <= _FAR
+            for v in (_twips(floating, "tblpX"), _twips(floating, "tblpY"), indent)
+        ):
+            # A table placed off the page, or more than an inch outward.
+            raise DocxRefusedError("unsupported-formatting", "a table placed off the page")
         rows: list[ET.Element] = []
         _collect(element, _w("tr"), rows, {_w("tblPr"), _w("tblGrid")})
+        emphasis = frozenset().union(
+            *(s.conditional_emphasis for s in self.styles.chain(table_style))
+        )
+        turned_on = _turned_on(element, rows) if emphasis else set()
+        # Under a cell without shading of its own: the table's, its style's (any part of it,
+        # as the reader does not apply the parts), or what is under the table.
+        shadings = [element.find(f"{_w('tblPr')}/{_w('shd')}")]
+        shadings += [row.find(f"{_w('tblPrEx')}/{_w('shd')}") for row in rows]
+        shadings += [shd for style in self.styles.chain(table_style) for shd in style.shadings]
+        # ponytail: every one of them may be under any cell (the union); a cell's own place in
+        # the table and the parts tblLook turns on would narrow it, if refusals call for it.
+        painted = [c for shd in shadings for c in self.styles.painted(shd)]
+        table_under = tuple(dict.fromkeys([*painted, *(under or self.styles.page)]))
         for row_index, row in enumerate(rows):
             cells: list[ET.Element] = []
             _collect(row, _w("tc"), cells, {_w("trPr"), _w("tblPrEx")})
             for cell_index, cell in enumerate(cells):
-                start = len(self.out)
-                self.blocks(cell, outer or (index, row_index, cell_index), table_style)
+                start, first = len(self.out), len(self.contexts)
+                own = tuple(self.styles.painted(cell.find(f"{_w('tcPr')}/{_w('shd')}")))
+                self.blocks(
+                    cell, outer or (index, row_index, cell_index), table_style, own or table_under
+                )
+                height = row.find(f"{_w('trPr')}/{_w('trHeight')}")
+                if (
+                    height is not None
+                    and height.get(_w("hRule")) == "exact"
+                    and any(p.text for p in self.out[start:])
+                    and (_twips(height, "val") or 0) / 20
+                    < sum(c.line for c in self.contexts[first:])
+                ):
+                    # A row of exact height lower than its lines: Word clips what does not fit.
+                    raise DocxRefusedError("unsupported-formatting", "a row too low for its text")
+                parts = _parts_of(row, row_index, len(rows), cell_index, len(cells))
+                # A part the reader does not know counts as on everywhere.
+                if any(p.text for p in self.out[start:]) and (
+                    emphasis & turned_on & parts or emphasis - _TABLE_PARTS
+                ):
+                    # Word applies the table style's bold or italic for the part to text there
+                    # (and nothing where tblLook turns the part off); the reader does not.
+                    raise DocxRefusedError(
+                        "unsupported-element", "conditional bold or italic over text"
+                    )
                 merge = cell.find(f"{_w('tcPr')}/{_w('vMerge')}")
                 continued = merge is not None and merge.get(_w("val")) in (None, "continue")
-                if continued and any(p.text.strip() for p in self.out[start:]):
-                    raise DocxRefusedError("unsupported-element", "text in a merged-away cell")
+                if continued and any(
+                    p.text
+                    or p.notes
+                    or p.comments
+                    or p.pages
+                    or (p.numbering and p.numbering.num_id)
+                    for p in self.out[start:]
+                ):
+                    # Word does not draw a merged-away cell: a list label there is neither
+                    # drawn nor counted (Word draws "1.", "1.", "2." for top, merged, after), and
+                    # what it does with text, whitespace or a mark there is not on record.
+                    raise DocxRefusedError(
+                        "unsupported-element", "text, a label or a mark in a merged-away cell"
+                    )
             self.rows_ended += 1
+
+
+# tblLook's bits (ECMA-376 17.4.56): the parts a table turns on, and the banding it turns off.
+_LOOK = {"firstRow": 0x20, "lastRow": 0x40, "firstColumn": 0x80, "lastColumn": 0x100}
+_NO_BANDS = {"noHBand": (0x200, "Horz"), "noVBand": (0x400, "Vert")}
+_TABLE_PARTS = {
+    "wholeTable",
+    "firstRow",
+    "lastRow",
+    "firstCol",
+    "lastCol",
+    "band1Horz",
+    "band2Horz",
+    "band1Vert",
+    "band2Vert",
+    "nwCell",
+    "neCell",
+    "swCell",
+    "seCell",
+}
+
+
+def _turned_on(table: ET.Element, rows: list[ET.Element]) -> set[str]:
+    """The conditional parts the table may turn on: every part any of its looks turns on.
+
+    The table's ``tblLook`` and each row's (``tblPrEx``), by attribute and by ``val`` bits; a
+    part on in any, and every part of a table without a look, counts as on. So do the corner
+    cells, and banding unless every look turns it off.
+    """
+    looks = [table.find(f"{_w('tblPr')}/{_w('tblLook')}")]
+    if looks[0] is None:
+        return set(_TABLE_PARTS)
+    looks += [row.find(f"{_w('tblPrEx')}/{_w('tblLook')}") for row in rows]
+    on = {"wholeTable", "nwCell", "neCell", "swCell", "seCell"}
+    for look in (look for look in looks if look is not None):
+        raw = look.get(_w("val"))
+        if raw is not None and not re.fullmatch(r"[0-9A-Fa-f]{1,4}", raw):
+            raise DocxRefusedError("invalid-package", f"tblLook {raw!r} is not a number")
+        bits = None if raw is None else int(raw, 16)
+
+        def says(
+            name: str, bit: int, look: ET.Element = look, bits: int | None = bits
+        ) -> list[bool]:
+            """What the look's attribute and its bits each say of ``name``, where they do."""
+            attribute = look.get(_w(name))
+            found = [] if attribute is None else [attribute.lower() not in ("0", "false", "off")]
+            return found + ([] if bits is None else [bool(bits & bit)])
+
+        on |= {name.replace("Column", "Col") for name, bit in _LOOK.items() if any(says(name, bit))}
+        for name, (bit, way) in _NO_BANDS.items():
+            if not all(says(name, bit)) or not says(name, bit):
+                on |= {f"band1{way}", f"band2{way}"}
+    return on
+
+
+def _parts_of(row: ET.Element, index: int, rows: int, cell: int, cells: int) -> set[str]:
+    """The conditional parts a cell may be in, counted generously.
+
+    A header row (``tblHeader``) is a first row too, and every cell of a row whose grid starts or
+    ends early (``gridBefore``, ``gridAfter``) a first and a last cell.
+    """
+    first = index == 0 or row.find(f"{_w('trPr')}/{_w('tblHeader')}") is not None
+    last = index == rows - 1
+    shifted = any(
+        row.find(f"{_w('trPr')}/{_w(n)}") is not None for n in ("gridBefore", "gridAfter")
+    )
+    left, right = cell == 0 or shifted, cell == cells - 1 or shifted
+    parts = {"wholeTable", "band1Horz", "band2Horz", "band1Vert", "band2Vert"}
+    for name, inside in (
+        ("firstRow", first),
+        ("lastRow", last),
+        ("firstCol", left),
+        ("lastCol", right),
+        ("nwCell", first and left),
+        ("neCell", first and right),
+        ("swCell", last and left),
+        ("seCell", last and right),
+    ):
+        if inside:
+            parts.add(name)
+    return parts
 
 
 def _collect(element: ET.Element, wanted: str, out: list[ET.Element], silent: set[str]) -> None:
@@ -2764,17 +3594,36 @@ def read_document(data: bytes) -> Document:
             # A tracked change to a style or a list gives the document two texts (``tracked``).
             if definitions is not None and any(e.tag in _TRACKED for e in definitions.iter()):
                 raise DocxRefusedError("tracked-change", f"in {_local(definitions.tag)}")
-        styles = _styles(*parts[:3])
+        for definitions in parts[:5]:
+            # Alternate content in the styles, theme, fonts, settings or lists: Word applies one
+            # branch, which the reader would not. Only a list level's own child is left to the
+            # level, which a paragraph cannot draw (``_level``).
+            if definitions is None:
+                continue
+            levels = set(definitions.iter(_w("lvl")))
+            if any(
+                element not in levels and any(c.tag == _ALTERNATE for c in element)
+                for element in definitions.iter()
+            ):
+                raise DocxRefusedError(
+                    "unsupported-element", f"AlternateContent in {_local(definitions.tag)}"
+                )
+        styles = _styles(*parts[:4])
         if parts[3] is not None:
             styles.update_fields = bool(_on(parts[3].find(_w("updateFields"))))
         lists = _Lists(parts[4], styles)
-        stories = _story_parts(package, mains[0], document)
+        even = parts[3] is not None and bool(_on(parts[3].find(_w("evenAndOddHeaders"))))
+        stories = _story_parts(package, mains[0], document, even)
         comment_parts = package.related(mains[0], "comments")
         if len(comment_parts) > 1:
             raise DocxRefusedError("invalid-package", "more than one comments part")
         comments_root = package.part(comment_parts[0]) if comment_parts else None
         if comment_parts and comments_root is None:
             raise DocxRefusedError("invalid-package", f"no {comment_parts[0]}")
+    background = document.find(_w("background"))
+    if background is not None:
+        page = styles.colours(background, "color", "themeColor", "themeTint", "themeShade")
+        styles.page = tuple(dict.fromkeys([*styles.page, *page]))
     _check_part(document)
     body = document.find(_w("body"))
     if body is None:
@@ -2824,7 +3673,12 @@ def read_document(data: bytes) -> Document:
     read_stories = {
         kind: tuple(
             _story(kind, name, tuple(uses), root, index, styles)
-            for index, (name, uses, root) in enumerate(found)
+            if shown
+            # Word shows it on no page; its text is in the file all the same.
+            else Story(
+                kind, name, tuple(uses), (), ("unread-content", f"a {kind} Word never shows")
+            )
+            for index, (name, uses, root, shown) in enumerate(found)
         )
         for kind, found in stories.items()
     }
@@ -2866,32 +3720,53 @@ def read_document(data: bytes) -> Document:
 
 
 def _story_parts(
-    package: _Package, main: str, document: ET.Element
-) -> dict[str, list[tuple[str, list[tuple[int, str]], ET.Element]]]:
+    package: _Package, main: str, document: ET.Element, even: bool
+) -> dict[str, list[tuple[str, list[tuple[int, str]], ET.Element, bool]]]:
     """The header and footer parts the sections refer to, each once, in the order referred to.
 
-    Each with the (section, type) uses that name it; sections are counted in document order.
+    Each with the (section, type) uses that name it, sections counted in document order, and
+    whether Word shows it on any page: a section naming no part of a type takes the one before
+    it; its ``first`` part is shown only where it turns its first page on (``titlePg``), its
+    ``even`` part only where the settings turn even pages on (``even``,
+    ``evenAndOddHeaders``); otherwise Word prints the default one there.
     """
-    found: dict[str, list[tuple[str, list[tuple[int, str]], ET.Element]]] = {
+    found: dict[str, list[tuple[str, list[tuple[int, str]], ET.Element, bool]]] = {
         "header": [],
         "footer": [],
     }
+    # The part each (kind, type) names in the section, a section naming none taking the one
+    # before it; and the parts some section shows.
+    current: dict[tuple[str, str], str] = {}
+    shown: set[str] = set()
     for section, properties in enumerate(document.iter(_w("sectPr"))):
+        named: set[tuple[str, str]] = set()
         for reference in properties:
             kind = next((k for k in found if reference.tag == _w(f"{k}Reference")), None)
             if kind is None:
                 continue
             name = package.target(main, reference.get(f"{{{R}}}id"), kind)
             use = (section, reference.get(_w("type"), "default"))
+            if (kind, use[1]) in named:
+                # Not allowed (ECMA-376 17.10.5); which one Word shows is not on record.
+                raise DocxRefusedError("invalid-package", f"a section names two {use[1]} {kind}s")
+            named.add((kind, use[1]))
+            current[(kind, use[1])] = name
             entry = next((e for e in found[kind] if e[0] == name), None)
             if entry is None:
                 root = package.part(name)
                 if root is None:
                     raise DocxRefusedError("invalid-package", f"no {name}")
-                found[kind].append((name, [use], root))
+                found[kind].append((name, [use], root, False))
             else:
                 entry[1].append(use)
-    return found
+        title = bool(_on(properties.find(_w("titlePg"))))
+        for (_, kind), name in current.items():
+            if {"first": title, "even": even}.get(kind, True):
+                shown.add(name)
+    return {
+        kind: [(name, uses, root, name in shown) for name, uses, root, _ in entries]
+        for kind, entries in found.items()
+    }
 
 
 def _story(
@@ -2922,9 +3797,7 @@ def _read_blocks(
     reader.blocks(root, None, None)
     _check_accounted(root, reader.runs)
     if any(c.fields for c in reader.contexts):
-        raise DocxRefusedError(
-            "computed-field", f"a computed field (SEQ, STYLEREF, REF or NOTEREF) in a {story[0]}"
-        )
+        raise DocxRefusedError("computed-field", f"a computed field or PAGEREF in a {story[0]}")
     if any(p.numbering is not None and p.numbering.num_id for p in reader.out):
         raise _refuse_numbering(f"a list in a {story[0]}")
     return tuple(reader.out)
@@ -3057,12 +3930,13 @@ def tracked(data: bytes) -> tuple[bytes, bytes, tuple[Change, ...]]:
 
     The views are .docx without tracked changes, every change accepted and every one rejected,
     each the package with only its revised parts written again. Each rule is Word's answer to a
-    case in ``corpus/tracked-cases``:
+    case in ``corpus/tracked-cases``, as far as those cases go:
 
     - A run change is kept (its runs stand in its place; a deletion's ``delText`` is ``t``
       again) or dropped whole; a move's range markers go.
     - A paragraph mark a view drops joins the paragraph to the next one in document order (past
-      a table, its first paragraph), which keeps its own properties.
+      a table, its first paragraph), which keeps its own properties. A section so joined takes
+      the next section's properties (recorded for two bare sections only).
     - A row the view drops goes whole, and a table whose every row it drops; a footnote or
       endnote whose reference it drops goes with it.
     - Changed run, paragraph, table, row, cell, section and style properties are the current
@@ -3070,8 +3944,10 @@ def tracked(data: bytes) -> tuple[bytes, bytes, tuple[Change, ...]]:
 
     Refused (``tracked-change``): a change holding part of a field (Word drops the whole field
     result), a dropped mark at the end of a table cell (Word dissolves the table) or of the
-    document, ending a section with headers or footers, or before a table whose first row the
-    view drops (Word cannot accept it), a join into an empty table or anything but a paragraph
+    document, ending a section with headers or footers or whose note settings or first page
+    differ from the next section's, or before a table whose row holding the paragraph it joins,
+    at any depth, the view drops (Word cannot accept it), a join into an empty table or anything
+    but a paragraph
     or table, a change to a list definition (Word's Reject All rewrites the styles instead), a
     change without its former properties, a content control a view empties (Word shows
     placeholder spaces), and a view with any revision left (cells inserted, deleted or merged).
@@ -3257,16 +4133,20 @@ def _view(element: ET.Element, view: str, revised: set[ET.Element]) -> None:
     runs = element.tag == _w("sdtContent") and _runs_in(element)
     for here, following in itertools.pairwise(element):
         mark = here.find(f"{_w('pPr')}/{_w('rPr')}") if here.tag == _w("p") else None
-        first = next(following.iter(_w("tr")), None) if following.tag == _w("tbl") else None
-        row = first.find(_w("trPr")) if first is not None else None
-        if (
-            mark is not None
-            and any(c.tag in drop for c in mark)
-            and row is not None
-            and any(c.tag in drop for c in row)
-        ):
+        if following.tag != _w("tbl") or mark is None or not any(c.tag in drop for c in mark):
+            continue
+        # The rows on the way to the paragraph the mark joins (``_first_paragraph``), at any
+        # depth: those before it in document order are the rows that hold it.
+        rows: list[ET.Element] = []
+        for node in following.iter():
+            if node.tag == _w("p"):
+                break
+            if node.tag == _w("tr"):
+                rows.append(node)
+        if any(c.tag in drop for row in rows for c in row.findall(f"{_w('trPr')}/*")):
             # Word's Accept All leaves such a mark: it cannot join a row it removes
-            # (corpus/tracked-cases, mark-deleted-before-table-first-row-deleted).
+            # (corpus/tracked-cases, mark-deleted-before-table-first-row-deleted); in a nested
+            # table its answer is not on record.
             raise DocxRefusedError("tracked-change", "a paragraph mark joins a row the view drops")
     children: list[ET.Element] = []
     for child in element:
@@ -3384,10 +4264,28 @@ def _join(element: ET.Element, drop: set[str]) -> None:
                 c.tag in (_w("headerReference"), _w("footerReference")) for c in section
             ):
                 raise DocxRefusedError("tracked-change", "a section with headers or footers ends")
+            after = next((n for c in children[index + 1 :] for n in c.iter(_w("sectPr"))), None)
+            if section is not None and any(
+                _shape(section.find(_w(name)))
+                != _shape(None if after is None else after.find(_w(name)))
+                for name in ("footnotePr", "endnotePr", "titlePg")
+            ):
+                # Which section's note numbering (or first page) the joined section keeps is not
+                # on record: corpus/tracked-cases has only two bare sections.
+                raise DocxRefusedError(
+                    "tracked-change", "a section ends between sections that differ"
+                )
             carried = [c for c in child if c.tag != _w("pPr")]
             continue
         out.append(child)
     element[:] = out
+
+
+def _shape(element: ET.Element | None) -> object:
+    """An element's name, attributes and children, to compare two as Word would read them."""
+    if element is None:
+        return None
+    return (element.tag, sorted(element.attrib.items()), [_shape(c) for c in element])
 
 
 def _first_paragraph(block: ET.Element) -> ET.Element:

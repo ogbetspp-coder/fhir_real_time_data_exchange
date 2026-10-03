@@ -27,10 +27,12 @@ import pytest
 from label_docx import epi_output, output
 from label_docx.certify import (
     CHECKED_MARKS,
+    CHECKER_VERSION,
     CertificationError,
     DocxSource,
     EpiSource,
     _formatted,
+    _unescape,
     certify_docx,
     certify_epi,
 )
@@ -783,6 +785,7 @@ def test_a_package_the_check_cannot_open_is_never_certified() -> None:
     )
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w") as archive:
+        archive.writestr("[Content_Types].xml", "<Types/>")
         archive.writestr("_rels/.rels", rels)
         archive.writestr("word/document.xml", f'<w:document xmlns:w="{W}"/>')
     with pytest.raises(CertificationError):
@@ -833,8 +836,10 @@ def _value(*paragraphs: str | dict[str, Any], **notes: list[dict[str, Any]]) -> 
     for paragraph in paragraphs:
         base: dict[str, Any] = {
             "comments": [],
+            "markHidden": False,
             "numbering": None,
             "marks": [],
+            "style": None,
             "pages": [],
             "notes": [],
             "table": None,
@@ -872,6 +877,37 @@ def test_each_page_number_field_is_set_aside_and_placed(code: str) -> None:
         DocxSource(data).certify(_value("p12"))
 
 
+@pytest.mark.parametrize(
+    ("code", "placed"),
+    [
+        ("PAGEREF \\h _Toc1", True),
+        ("PAGE \\* Arabic \\* MERGEFORMAT", True),
+        ("NUMPAGES \\* charformat", True),
+        ("PAGEREF _Ref1 \\p \\h", False),
+        ("PAGEREF \\p _Ref1", False),
+        ("PAGEREF \\h", False),
+        ("PAGE \\# 0", False),
+        ("PAGE \\* CardText", False),
+        ("PAGE \\*", False),
+        ("PAGE x", False),
+    ],
+)
+def test_a_page_field_with_a_switch_word_has_not_answered_is_never_certified(
+    code: str, placed: bool
+) -> None:
+    body = _p("<w:r><w:t>p</w:t></w:r>" + _field(code, "5"))
+    simple = _p(f'<w:r><w:t>p</w:t></w:r><w:fldSimple w:instr=" {code} ">{_RESULT}</w:fldSimple>')
+    for data in (docx(body), docx(simple)):
+        if placed:
+            DocxSource(data).certify(_value({"text": "p", "pages": [1]}))
+        else:
+            with pytest.raises(CertificationError):
+                DocxSource(data)
+
+
+_RESULT = "<w:r><w:t>5</w:t></w:r>"
+
+
 def test_a_field_in_another_fields_code_is_code() -> None:
     nested = (
         '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
@@ -899,6 +935,9 @@ def test_a_field_in_another_fields_code_is_code() -> None:
         '<w:fldChar w:fldCharType="begin"/><w:fldChar w:fldCharType="separate"/>'
         "<w:instrText>X</w:instrText>",
         '<w:sym w:font="Symbol"/>',
+        '<w:fldChar w:fldCharType="begin"/><w:instrText> SEQ Table </w:instrText>'
+        '<w:fldChar w:fldCharType="separate"/><w:t>WRONG</w:t>'
+        '<w:fldChar w:fldCharType="separate"/><w:t>1</w:t><w:fldChar w:fldCharType="end"/>',
     ],
     ids=[
         "code-outside-a-field",
@@ -906,6 +945,7 @@ def test_a_field_in_another_fields_code_is_code() -> None:
         "unknown-kind",
         "code-in-a-result",
         "sym-without-code",
+        "separate-twice",
     ],
 )
 def test_field_characters_out_of_place_are_never_certified(run: str) -> None:
@@ -930,7 +970,9 @@ def test_text_before_a_mark_in_the_same_run_stands_before_it() -> None:
                 "table": None,
                 "comments": [],
                 "marks": [],
+                "markHidden": False,
                 "numbering": None,
+                "style": None,
             }
         ],
     }
@@ -988,7 +1030,9 @@ def test_a_drawing_is_one_character_unless_it_holds_text(inner: str) -> None:
         DocxSource(data)
 
 
-@pytest.mark.parametrize("inner", ["", "<v:textbox/>", '<v:textpath string="x"/>'])
+@pytest.mark.parametrize(
+    "inner", ["", "<v:textbox/>", '<v:textpath string="x"/>', '<w:control w:name="CheckBox1"/>']
+)
 def test_a_vml_picture_is_one_character_unless_it_holds_text(inner: str) -> None:
     data = docx(_p(f"<w:r><w:pict><v:shape {_VML}><v:imagedata/>{inner}</v:shape></w:pict></w:r>"))
     if not inner:
@@ -1114,10 +1158,11 @@ def _styles(*styles: str, defaults: str = "") -> str:
 def _mapped(data: bytes) -> bool:
     """Whether the check reads the paragraph's "\u00b3" through the Symbol table, not as stored."""
     source = DocxSource(data)
+    style = source.body.paragraphs[0].style
     try:
-        source.certify(_value("\u2265"))
+        source.certify(_value({"text": "\u2265", "style": style}))
     except CertificationError:
-        source.certify(_value("\u00b3"))
+        source.certify(_value({"text": "\u00b3", "style": style}))
         return False
     return True
 
@@ -1176,9 +1221,14 @@ def test_a_table_style_gives_its_font_inside_its_table_only() -> None:
     DocxSource(docx(body, styles=named)).certify(_value({"text": "\u2265", "table": [0, 0, 0]}))
 
 
-@pytest.mark.parametrize("name", ["Symbol", "symbol", "SymbolMT", "Symbol MT"])
-def test_the_symbol_font_by_any_of_its_names(name: str) -> None:
-    assert _mapped(docx(_plain(run_properties=f'<w:rFonts w:ascii="{name}" w:hAnsi="{name}"/>')))
+@pytest.mark.parametrize("name", ["symbol", "SymbolMT", "Symbol MT", "Sym bol"])
+def test_the_symbol_font_by_its_exact_name_only(name: str) -> None:
+    assert _mapped(docx(_plain(run_properties='<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/>')))
+    # Another spelling, for a run or a w:sym, is not on record: never read either way.
+    with pytest.raises(CertificationError):
+        DocxSource(docx(_plain(run_properties=f'<w:rFonts w:ascii="{name}" w:hAnsi="{name}"/>')))
+    with pytest.raises(CertificationError):
+        DocxSource(docx(_p(f'<w:r><w:sym w:font="{name}" w:char="F061"/></w:r>')))
 
 
 def test_symbol_text_stored_in_the_private_range_is_mapped() -> None:
@@ -1274,7 +1324,7 @@ def _epi(*divs: str, entries: list[dict[str, Any]] | None = None, text: str | No
     bundle = {
         "resourceType": "Bundle",
         "type": "document",
-        "entry": [*(entries or []), {"resource": composition}],
+        "entry": [{"resource": composition}, *(entries or [])],
     }
     return json.dumps(bundle).encode()
 
@@ -1322,7 +1372,7 @@ def test_every_block_element_ends_a_paragraph() -> None:
     EpiSource(data).certify(value)
 
 
-def test_the_composition_is_found_among_the_entries_and_other_narratives_are_listed() -> None:
+def test_the_composition_is_the_first_entry_and_other_narratives_are_listed() -> None:
     other = {"resource": {"resourceType": "Organization", "text": {"div": "<div>EMA</div>"}}}
     data = _epi(
         "<p>a</p>", entries=[{"resource": "not a resource"}, other], text="<div>summary</div>"
@@ -1536,7 +1586,7 @@ def test_the_checks_own_list_labels_and_note_marks_are_words() -> None:
                 continue
             drawn = [
                 str(label["text"] or "") + SUFFIXES[str(label["suffix"] or "nothing")]
-                for label in source.labels
+                for label in (p.numbering for p in source.body.paragraphs)
                 if label is not None and label["numId"]
             ]
             fonts = answers["fonts"][name]
@@ -1591,7 +1641,8 @@ def _labels_certified(data: bytes) -> list[tuple[int, str | None, str | None]]:
     """The check's own labels, after the read is certified: reader and check agree on them."""
     value = json.loads(output.read(data)[0])
     assert "refusal" not in value, value.get("refusal")
-    labels = [label for label in DocxSource(data).labels if label is not None]
+    paragraphs = DocxSource(data).body.paragraphs
+    labels = [p.numbering for p in paragraphs if p.numbering is not None]
     return [(int(str(x["numId"])), x["text"], x["suffix"]) for x in labels]
 
 
@@ -1613,6 +1664,12 @@ _SETTINGS = {
         _list(_level(0, "%1.", "upperRoman"), _level(1, "%1.%2", "upperRoman", "<w:isLgl/>")),
         [(1, "I.", "tab"), (1, "1.1", "tab")],
     ),
+    # Word keeps a decimalZero level's zero under isLgl.
+    "legal-decimal-zero": (
+        _list(_level(0, "%1."), _level(1, "%1.%2", "decimalZero", "<w:isLgl/>")),
+        [(1, "1.", "tab"), (1, "1.01", "tab")],
+    ),
+    "text-of-255": (_list(_level(0, "x" * 255)), [(1, "x" * 255, "tab")]),
     **{
         f"text-null-{value}": (
             _list(
@@ -1662,8 +1719,9 @@ _STYLED = {
         ' w:default="1"',
         [(1, "1.", "tab")],
     ),
-    "table-style": ("", "table", "T", "", [(1, "1.", "tab")]),
-    "default-table-style": ("", "table", "T", ' w:default="1"', [(1, "1.", "tab")]),
+    # A table style's list is not on record: never drawn.
+    "table-style": ("", "table", "T", "", None),
+    "default-table-style": ("", "table", "T", ' w:default="1"', None),
     "default-table-style-outside": ("", "table", "T", ' w:default="1"', []),
 }
 
@@ -1685,7 +1743,11 @@ def test_the_check_finds_a_list_through_styles_as_word_does(name: str) -> None:
     elif name == "default-table-style":
         paragraph = f"<w:tbl><w:tr><w:tc>{paragraph}</w:tc></w:tr></w:tbl>"
     data = docx(paragraph, styles=styles, numbering=_list(_level(0, "%1.")) + _NUM)
-    assert _labels_certified(data) == expected
+    if expected is None:
+        with pytest.raises(CertificationError):
+            DocxSource(data)
+    else:
+        assert _labels_certified(data) == expected
 
 
 @pytest.mark.parametrize("numbered", ['<w:ilvl w:val="1"/>', '<w:ilvl w:val="0"/><w:numId/>'])
@@ -1709,7 +1771,7 @@ def test_a_bullet_in_symbol_through_a_paragraph_or_table_style(kind: str, defaul
     assert _labels_certified(data) == [(1, "\u2022", "tab")]
 
 
-_REFUSED_LISTS = {
+_REFUSED_LISTS: dict[str, tuple[str, list[tuple[Any, ...]]]] = {
     "custom-format": (
         _list(
             '<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal" w:format="001"/>'
@@ -1739,6 +1801,17 @@ _REFUSED_LISTS = {
         [(1, 0), (1, 1)],
     ),
     "restart-on-level-0": (_list(_level(0, "%1.", extra='<w:lvlRestart w:val="1"/>')), [(1, 0)]),
+    "negative-restart-deeper": (
+        _list(_level(0, "%1."), _level(1, "%2.", extra='<w:lvlRestart w:val="-1"/>')),
+        [(1, 0)],
+    ),
+    "text-past-255": (_list(_level(0, "x" * 256)), [(1, 0)]),
+    "hidden-mark": (_list(_level(0, "%1.")), [(1, 0, "<w:rPr><w:vanish/></w:rPr>")]),
+    "special-hidden-mark": (_list(_level(0, "%1.")), [(1, 0, "<w:rPr><w:specVanish/></w:rPr>")]),
+    "hidden-mark-visible-level": (
+        _list(_level(0, "%1.", extra='<w:rPr><w:vanish w:val="0"/></w:rPr>')),
+        [(1, 0, "<w:rPr><w:vanish/></w:rPr>")],
+    ),
 }
 
 
@@ -1746,7 +1819,7 @@ _REFUSED_LISTS = {
 def test_the_check_draws_no_label_it_cannot_draw_as_word_does(name: str) -> None:
     numbering, items = _REFUSED_LISTS[name]
     nums = "" if name == "list-without-definition" else _NUM
-    data = docx("".join(_item(n, level) for n, level in items), numbering=numbering + nums)
+    data = docx("".join(_item(*item) for item in items), numbering=numbering + nums)
     with pytest.raises(CertificationError):
         DocxSource(data)
 
@@ -1821,7 +1894,7 @@ def test_the_check_draws_no_note_mark_it_cannot_draw_as_word_does(body: str) -> 
         (53, "upperLetter", "AAA"),
         (780, "upperLetter", "Z" * 30),
         (5, "chicago", "**"),
-        (8, "chicago", "\u00a7\u00a7"),
+        (6, "chicago", "\u2020\u2020"),
         (7, "decimalZero", "07"),
         (0, "decimal", "0"),
         (12, "none", ""),
@@ -1841,7 +1914,7 @@ def test_numbers_are_written_in_every_format_as_word_writes_them(
         (0, "upperLetter"),
         (781, "lowerLetter"),
         (0, "chicago"),
-        (9, "chicago"),
+        (7, "chicago"),
         (-1, "decimal"),
         (1, "ordinal"),
     ],
@@ -1868,4 +1941,770 @@ def test_a_wingdings_bullet_is_drawn_through_its_closed_table_and_only_so() -> N
         _list(_level(0, "", "bullet", extra=wingdings)) + _NUM,
     ):
         with pytest.raises(CertificationError):
-            _ = DocxSource(docx(_item(1, 0), numbering=numbering)).labels
+            DocxSource(docx(_item(1, 0), numbering=numbering))
+
+
+# --- what the check holds beyond the text, and what it never passes over -----------------------
+
+
+def test_a_mark_must_be_a_span_of_the_text_of_a_kind_the_format_names() -> None:
+    source = DocxSource(docx(_p("<w:r><w:t>ab</w:t></w:r>")))
+
+    def marked(*marks: tuple[Any, Any, Any]) -> dict[str, Any]:
+        spans = [{"kind": k, "start": s, "end": e} for k, s, e in marks]
+        return _value({"text": "ab", "marks": spans})
+
+    kinds = ["position", "rtl", "faint", "highlight-yellow", "shading-D9D9D9"]
+    source.certify(marked(*((kind, 0, 2) for kind in kinds), ("faint", 1, 2)))
+    wrong = [
+        ("faint", -1, 1),  # text[-1:1] is empty
+        ("faint", 1, 1),  # empty
+        ("faint", 2, 1),  # reversed
+        ("faint", 0, 3),  # past the end
+        ("faint", "0", 1),
+        ("faint", True, 2),
+        ("faint", 0, 2.0),
+        ("Faint", 0, 2),
+        ("highlight-", 0, 2),
+        ("shading", 0, 2),
+        (None, 0, 2),
+    ]
+    for mark in wrong:
+        with pytest.raises(CertificationError, match="a mark"):
+            source.certify(marked(mark))
+
+
+_FOOTNOTE = '<w:footnote w:id="1"><w:p>{}<w:r><w:t>n</w:t></w:r></w:p></w:footnote>'
+_REFERRED = _p('<w:r><w:t>a</w:t></w:r><w:r><w:footnoteReference w:id="1"/></w:r>')
+
+
+def _noted(note: dict[str, Any], *notes: dict[str, Any]) -> dict[str, Any]:
+    marked = {"text": "a", "notes": [{"offset": 1, "kind": "footnote", "id": 1, "mark": "1"}]}
+    return _value(marked, footnotes=[note, *notes])
+
+
+def _note(text: str, note: int = 1, **paragraph: Any) -> dict[str, Any]:
+    base = {"text": text, "markHidden": False, "style": None, "numbering": None}
+    shape: dict[str, Any] = {"comments": [], "marks": [], "pages": [], "notes": [], "table": None}
+    return {"id": note, "mark": str(note), "paragraphs": [{**shape, **base, **paragraph}]}
+
+
+def test_a_list_label_outside_the_body_is_never_certified() -> None:
+    plain = DocxSource(docx(_REFERRED, footnotes=_FOOTNOTE.format("")))
+    plain.certify(_noted(_note("n")))
+    forged = {"text": "1.", "numId": 9, "level": 0, "suffix": "tab"}
+    with pytest.raises(CertificationError, match="list label"):
+        plain.certify(_noted(_note("n", numbering=forged)))
+    # Not in a list (numId 0): as in the body.
+    none = '<w:pPr><w:numPr><w:ilvl w:val="2"/><w:numId w:val="0"/></w:numPr></w:pPr>'
+    zero = DocxSource(docx(_REFERRED, footnotes=_FOOTNOTE.format(none)))
+    zero.certify(
+        _noted(_note("n", numbering={"level": 2, "numId": 0, "suffix": None, "text": None}))
+    )
+    with pytest.raises(CertificationError, match="list label"):
+        zero.certify(_noted(_note("n")))
+    # A list in a note is not drawn here (the reader refuses it).
+    listed = none.replace('w:val="0"', 'w:val="9"')
+    with pytest.raises(CertificationError, match="a list in a footnote"):
+        DocxSource(docx(_REFERRED, footnotes=_FOOTNOTE.format(listed)))
+
+
+def test_the_mark_hidden_style_and_order_of_notes_are_the_documents() -> None:
+    hidden = '<w:pPr><w:pStyle w:val="S"/><w:rPr><w:specVanish/></w:rPr></w:pPr>'
+    body = _p(hidden + "<w:r><w:t>a</w:t></w:r>") + _p("<w:r><w:t>b</w:t></w:r>")
+    source = DocxSource(docx(body))
+    value = _value({"text": "a", "markHidden": True, "style": "S"}, "b")
+    source.certify(value)
+    for name, wrong in (("markHidden", False), ("style", None), ("style", "Heading1")):
+        changed = copy.deepcopy(value)
+        changed["paragraphs"][0][name] = wrong
+        with pytest.raises(CertificationError):
+            source.certify(changed)
+    shown = copy.deepcopy(value)
+    shown["paragraphs"][1]["markHidden"] = True
+    with pytest.raises(CertificationError, match="hidden"):
+        source.certify(shown)
+    # Where the cautious reading and Word's toggle rule differ, the mark is not certain.
+    styles = (
+        '<w:style w:type="paragraph" w:styleId="P"><w:rPr><w:vanish/></w:rPr></w:style>'
+        '<w:style w:type="paragraph" w:styleId="C"><w:basedOn w:val="P"/>'
+        '<w:rPr><w:vanish w:val="0"/></w:rPr></w:style>'
+    )
+    child = _p('<w:pPr><w:pStyle w:val="C"/></w:pPr><w:r><w:t>a</w:t></w:r>')
+    with pytest.raises(CertificationError, match="one reading"):
+        DocxSource(docx(child, styles=styles))
+    # Notes in the order the body refers to them.
+    body = _p(
+        '<w:r><w:t>a</w:t></w:r><w:r><w:footnoteReference w:id="2"/></w:r>'
+        '<w:r><w:footnoteReference w:id="1"/></w:r>'
+    )
+    notes = _FOOTNOTE.format("") + _FOOTNOTE.format("").replace('"1"', '"2"')
+    two = DocxSource(docx(body, footnotes=notes))
+    references = [
+        {"offset": 1, "kind": "footnote", "id": 2, "mark": "1"},
+        {"offset": 1, "kind": "footnote", "id": 1, "mark": "2"},
+    ]
+    paragraph = {"text": "a", "notes": references}
+    first, second = _note("n", 2), _note("n", 1)
+    first["mark"], second["mark"] = "1", "2"
+    two.certify(_value(paragraph, footnotes=[first, second]))
+    with pytest.raises(CertificationError, match="footnotes are not"):
+        two.certify(_value(paragraph, footnotes=[second, first]))
+    # And every note the part defines: one the body never refers to is not left out.
+    unreferred = DocxSource(docx(_REFERRED, footnotes=notes))
+    with pytest.raises(CertificationError, match="footnotes are not"):
+        unreferred.certify(_noted(_note("n")))
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "<w:tbl><w:tr>" + _p("<w:r><w:t>x</w:t></w:r>") + "<w:tc><w:p/></w:tc></w:tr></w:tbl>",
+        "<w:tbl><w:r><w:t>x</w:t></w:r><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl>",
+        "<w:tbl><w:tr><w:sdt><w:sdtContent>"
+        + _p("<w:r><w:t>x</w:t></w:r>")
+        + "</w:sdtContent></w:sdt><w:tc><w:p/></w:tc></w:tr></w:tbl>",
+    ],
+    ids=["paragraph-in-a-row", "run-in-a-table", "paragraph-in-a-row-through-a-control"],
+)
+def test_text_in_a_table_outside_its_cells_is_never_passed_over(body: str) -> None:
+    with pytest.raises(CertificationError, match="outside the cells"):
+        DocxSource(docx(body))
+
+
+def test_a_note_defined_twice_is_never_certified() -> None:
+    with pytest.raises(CertificationError, match="defined twice"):
+        DocxSource(docx(_REFERRED, footnotes=_FOOTNOTE.format("") * 2))
+
+
+def test_a_custom_marks_echo_is_never_certified() -> None:
+    body = _p('<w:r><w:footnoteReference w:customMarkFollows="1" w:id="1"/><w:t>*</w:t></w:r>')
+    with pytest.raises(CertificationError, match="echo"):
+        DocxSource(docx(body, footnotes=_FOOTNOTE.format("<w:r><w:footnoteRef/></w:r>")))
+    # Without its echo, it is read.
+    DocxSource(docx(body, footnotes=_FOOTNOTE.format("")))
+
+
+@pytest.mark.parametrize(
+    ("extra", "drawn"),
+    [
+        ("<w:rPr><w:caps/></w:rPr>", None),
+        ("<w:rPr><w:smallCaps/></w:rPr>", None),
+        ("<w:rPr><w:vanish/></w:rPr>", None),
+        ("<w:rPr><w:specVanish/></w:rPr>", None),
+        ('<w:lvlPicBulletId w:val="0"/>', None),
+        ('<w:rPr><w:caps w:val="0"/><w:vanish w:val="0"/></w:rPr>', "a)"),
+    ],
+)
+def test_a_label_word_draws_otherwise_than_its_characters_is_never_certified(
+    extra: str, drawn: str | None
+) -> None:
+    letter = _list(_level(0, "%1)", "lowerLetter", extra=extra)) + _NUM
+    data = docx(_item(1, 0), numbering=letter)
+    if drawn is None:
+        with pytest.raises(CertificationError, match="list"):
+            DocxSource(data)
+    else:
+        assert DocxSource(data).body.paragraphs[0].numbering == {
+            "level": 0,
+            "numId": 1,
+            "suffix": "tab",
+            "text": drawn,
+        }
+    # Capitals change no digit.
+    digits = _list(_level(0, "%1.", extra=extra)) + _NUM
+    if "caps" in extra.lower() and drawn is None:
+        assert DocxSource(docx(_item(1, 0), numbering=digits)).body.paragraphs[0].numbering
+
+
+_MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+
+
+def _wrapped(inner: str) -> str:
+    return (
+        f'<mc:AlternateContent xmlns:mc="{_MC}"><mc:Choice Requires="w14">{inner}</mc:Choice>'
+        f"<mc:Fallback>{inner}</mc:Fallback></mc:AlternateContent>"
+    )
+
+
+def test_alternate_content_and_compatibility_processing_are_never_resolved() -> None:
+    vanish = _wrapped("<w:vanish/>")
+    hidden = (
+        f'<w:style w:type="paragraph" w:default="1" w:styleId="D"><w:rPr>{vanish}</w:rPr></w:style>'
+    )
+    with pytest.raises(CertificationError):
+        DocxSource(docx(_plain(), styles=hidden))
+    started = _list(_level(0, "%1.")) + _NUM.replace(
+        "</w:num>",
+        _wrapped('<w:lvlOverride w:ilvl="0"><w:startOverride w:val="5"/></w:lvlOverride>')
+        + "</w:num>",
+    )
+    with pytest.raises(CertificationError):
+        DocxSource(docx(_item(1, 0), numbering=started))
+    themed = docx(_plain(), minor_font="Calibri")
+    theme = f'<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">{_wrapped("<a:themeElements/>")}</a:theme>'
+    with pytest.raises(CertificationError):
+        DocxSource(_with_part(themed, "word/theme/theme1.xml", theme))
+    for attribute in ("ProcessContent", "MustUnderstand"):
+        with pytest.raises(CertificationError):
+            DocxSource(docx(f'<w:p mc:{attribute}="w"><w:r><w:t>a</w:t></w:r></w:p>'))
+    # A list level's own alternate content is the level's, and a level no paragraph draws.
+    unused = _list(_level(0, "%1."), _level(1, "%2.", extra=_wrapped("<w:isLgl/>"))) + _NUM
+    assert _labels_certified(docx(_item(1, 0), numbering=unused)) == [(1, "1.", "tab")]
+
+
+def test_a_label_takes_the_paragraph_marks_character_style() -> None:
+    styles = (
+        '<w:style w:type="character" w:styleId="Sym"><w:rPr>'
+        '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr></w:style>'
+    )
+    letters = _list(_level(0, "%1)", "lowerLetter")) + _NUM
+    data = docx(
+        _item(1, 0, '<w:rPr><w:rStyle w:val="Sym"/></w:rPr>'), styles=styles, numbering=letters
+    )
+    assert _labels_certified(data) == [(1, "\u03b1)", "tab")]
+
+
+def test_a_based_on_naming_another_kind_of_style() -> None:
+    # Word takes nothing from a character style a paragraph style is based on.
+    styles = (
+        f'<w:style w:type="character" w:styleId="C">{_SYMBOL}</w:style>'
+        '<w:style w:type="paragraph" w:styleId="P"><w:basedOn w:val="C"/></w:style>'
+    )
+    assert not _mapped(docx(_plain('<w:pStyle w:val="P"/>'), styles=styles))
+    # A character style based on a paragraph style is not on record.
+    under = (
+        f'<w:style w:type="paragraph" w:styleId="Q">{_SYMBOL}</w:style>'
+        '<w:style w:type="character" w:styleId="D"><w:basedOn w:val="Q"/></w:style>'
+    )
+    with pytest.raises(CertificationError):
+        DocxSource(docx(_plain(run_properties='<w:rStyle w:val="D"/>'), styles=under))
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/x/styles",
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/styles",
+    ],
+)
+def test_a_relationship_of_a_type_word_does_not_write_is_never_followed(kind: str) -> None:
+    data = docx(
+        _plain(),
+        styles=f'<w:style w:type="paragraph" w:default="1" w:styleId="D">{_SYMBOL}</w:style>',
+    )
+    standard = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"
+    import io
+    import zipfile
+
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        rels = archive.read("word/_rels/document.xml.rels").decode()
+    with pytest.raises(CertificationError):
+        DocxSource(_with_part(data, "word/_rels/document.xml.rels", rels.replace(standard, kind)))
+
+
+@pytest.mark.parametrize(
+    "inner",
+    [
+        "<w:p><w:r><w:t>\u00a0</w:t></w:r></w:p>",
+        '<w:p><w:pPr><w:numPr><w:numId w:val="1"/></w:numPr></w:pPr></w:p>',
+        '<w:p><w:r><w:commentReference w:id="0"/></w:r></w:p>',
+    ],
+)
+def test_the_check_holds_nothing_in_a_merged_away_cell(inner: str) -> None:
+    merged = (
+        "<w:tbl><w:tr><w:tc><w:p><w:r><w:t>top</w:t></w:r></w:p></w:tc></w:tr>"
+        f"<w:tr><w:tc><w:tcPr><w:vMerge/></w:tcPr>{inner}</w:tc></w:tr></w:tbl>"
+    )
+    with pytest.raises(CertificationError):
+        DocxSource(docx(merged))
+    DocxSource(docx(merged.replace(inner, "<w:p/>")))
+
+
+def test_hiding_that_words_toggle_rule_cancels_is_never_certified() -> None:
+    # Paragraph and character styles both hide: Word's toggle rule cancels them.
+    styles = (
+        '<w:style w:type="paragraph" w:styleId="PS"><w:rPr><w:vanish/></w:rPr></w:style>'
+        '<w:style w:type="character" w:styleId="CS"><w:rPr><w:vanish/></w:rPr></w:style>'
+    )
+    body = (
+        '<w:p><w:pPr><w:pStyle w:val="PS"/></w:pPr>'
+        '<w:r><w:rPr><w:vanish w:val="0"/></w:rPr><w:t>10</w:t></w:r>'
+        '<w:r><w:rPr><w:rStyle w:val="CS"/></w:rPr><w:t xml:space="preserve"> </w:t></w:r></w:p>'
+    )
+    with pytest.raises(CertificationError):
+        DocxSource(docx(body, styles=styles))
+    # Hidden by one kind of style alone, it is hidden by both rules: set aside.
+    one = docx(body.replace('<w:rStyle w:val="CS"/>', ""), styles=styles)
+    paragraph = {"text": "10", "style": "PS", "markHidden": True}
+    assert DocxSource(one).certify(_value(paragraph))["setAside"]["hiddenWhitespace"] == 1
+
+
+@pytest.mark.parametrize(
+    "run",
+    [
+        '<w:sym w:font="Times New Roman" w:char="F0B3"/>',
+        '<w:sym w:font="Wingdings" w:char="F0B7"/>',
+        '<w:sym w:char="F0B3"/>',
+        *(
+            f'<w:sym w:font="Symbol" w:char="{c}"/>'
+            for c in (" F0B3", "0xB3", "F0_B3", "0F0B3", "")
+        ),
+    ],
+)
+def test_a_symbol_element_is_read_only_in_symbol_by_its_hex_code(run: str) -> None:
+    with pytest.raises(CertificationError, match="w:sym"):
+        DocxSource(docx(_p(f"<w:r>{run}</w:r>")))
+
+
+@pytest.mark.parametrize("char", ["F0B3", "b3", "00B3"])
+def test_a_symbol_element_by_one_to_four_hex_digits_is_read(char: str) -> None:
+    data = docx(_p(f'<w:r><w:sym w:font="Symbol" w:char="{char}"/></w:r>'))
+    assert DocxSource(data).certify(_value("≥"))["symbolMapped"] == 1
+
+
+@pytest.mark.parametrize(
+    ("fonts", "table"),
+    [
+        *(
+            (f'<w:rFonts w:ascii="{font}" w:hAnsi="{font}"/>', "")
+            for font in (
+                "Wingdings",
+                "Wingdings 2",
+                "Webdings",
+                "Zapf Dingbats",
+                "ITC Zapf Dingbats",
+                "Marlett",
+                "MT Extra",
+            )
+        ),
+        ('<w:rFonts w:eastAsia="Webdings"/>', ""),
+        ('<w:rFonts w:ascii="Encoded" w:hAnsi="Encoded"/>', '<w:charset w:val="02"/>'),
+        ('<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:eastAsia="Wingdings"/>', ""),
+        ('<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/><w:rtl/>', ""),
+        ('<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/><w:cs/>', ""),
+        ('<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="eastAsia"/>', ""),
+    ],
+)
+def test_text_in_a_font_the_check_cannot_place_is_never_certified(fonts: str, table: str) -> None:
+    run = f"<w:r><w:rPr>{fonts}</w:rPr><w:t>a</w:t></w:r>"
+    font_table = f'<w:font w:name="Encoded">{table}</w:font>'
+    with pytest.raises(CertificationError, match="font"):
+        DocxSource(docx(_p(run), fonts=font_table))
+
+
+@pytest.mark.parametrize(
+    ("fonts", "text"),
+    [
+        ('<w:rFonts w:ascii="Encoded" w:hAnsi="Encoded"/>', "³"),
+        ('<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/>', "≥"),
+        ('<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/><w:rtl w:val="0"/><w:cs w:val="0"/>', "≥"),
+    ],
+)
+def test_text_in_a_font_the_check_can_place_is_read(fonts: str, text: str) -> None:
+    run = f"<w:r><w:rPr>{fonts}</w:rPr><w:t>³</w:t></w:r>"
+    font_table = '<w:font w:name="Encoded"><w:charset w:val="00"/></w:font>'
+    DocxSource(docx(_p(run), fonts=font_table)).certify(_value(text))
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        '<w:rPr><w:rFonts w:ascii="Marlett" w:hAnsi="Marlett"/></w:rPr>',
+        '<w:rPr><w:rFonts w:ascii="Wingdings" w:hAnsi="Wingdings"/><w:rtl/></w:rPr>',
+        '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/><w:cs/></w:rPr>',
+    ],
+)
+def test_a_label_in_a_font_the_check_cannot_place_is_never_certified(extra: str) -> None:
+    square = _list(_level(0, "", "bullet", extra=extra)) + _NUM
+    with pytest.raises(CertificationError):
+        DocxSource(docx(_item(1, 0), numbering=square))
+
+
+def _package(data: bytes, name: str, content: str) -> bytes:
+    import io
+    import zipfile
+
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(out, "w") as target:
+        for info in source.infolist():
+            target.writestr(info, source.read(info))
+        target.writestr(name, content)
+    return out.getvalue()
+
+
+_C = "http://schemas.openxmlformats.org/drawingml/2006/chart"
+
+
+def test_text_not_read_is_sized_by_every_character_it_holds() -> None:
+    separator = (
+        '<w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/>'
+        '<w:sym w:font="Symbol" w:char="F0B3"/><w:tab/></w:r></w:p></w:footnote>'
+    )
+    data = docx(_REFERRED, footnotes=separator + _FOOTNOTE.format(""))
+    certificate = DocxSource(data).certify(_noted(_note("n")))
+    assert certificate["notRead"] == {"word/footnotes.xml#separator": 2}
+    # A run's characters, a drawing once whichever branch draws it, and a chart's values; in
+    # a part of any name that is XML, and none in one that is not.
+    shown = (
+        "<w:r><w:br/><w:cr/><w:ptab/><w:noBreakHyphen/><w:softHyphen/><w:drawing/><w:pict/></w:r>"
+    )
+    alternate = f"<w:r>{_alternate('<w:drawing/>', '<w:pict/>')}</w:r>"
+    unread = (
+        f'<w:hdr xmlns:w="{W}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/'
+        f'2006" xmlns:c="{_C}"><w:p>{shown}{alternate}<w:tabs><w:tab/></w:tabs></w:p>'
+        "<c:v>12</c:v></w:hdr>"
+    )
+    plain = docx(_p("<w:r><w:t>Body</w:t></w:r>"))
+    data = _package(_package(plain, "word/extra.bin", unread), "word/media/a.png", "\x89PNG")
+    assert DocxSource(data).certify(_value("Body"))["notRead"] == {"word/extra.bin": 7 + 1 + 2}
+
+
+def test_a_chunk_of_another_format_or_a_chart_is_never_certified() -> None:
+    with pytest.raises(CertificationError):
+        DocxSource(
+            docx('<w:altChunk xmlns:r="http://x" r:id="c"/>' + _p("<w:r><w:t>a</w:t></w:r>"))
+        )
+    rels = (
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="c" Type="http://schemas.openxmlformats.org/officeDocument/2006/'
+        'relationships/aFChunk" Target="chunk.htm"/></Relationships>'
+    )
+    plain = docx(_p("<w:r><w:t>a</w:t></w:r>"))
+    with pytest.raises(CertificationError, match="chunk"):
+        DocxSource(_package(plain, "word/_rels/glossary.xml.rels", rels))
+    other = rels.replace("aFChunk", "image")
+    assert DocxSource(_package(plain, "word/_rels/glossary.xml.rels", other)).certify(_value("a"))
+    chart = (
+        f"<w:drawing><wp:inline xmlns:wp='{WP}'><a:graphic xmlns:a='http://x'>"
+        f"<a:graphicData uri='{_C}'/></a:graphic></wp:inline></w:drawing>"
+    )
+    with pytest.raises(CertificationError, match="kind the check does not read"):
+        DocxSource(docx(_p(f"<w:r>{chart}</w:r>")))
+
+
+_MC_XMLNS = f'xmlns:mc="{_MC}"'
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        _p(
+            f'<mc:AlternateContent {_MC_XMLNS}><mc:Choice Requires="w14"><w:r><w:t>X</w:t></w:r>'
+            "</mc:Choice><mc:Fallback><w:r><w:t>X</w:t></w:r></mc:Fallback></mc:AlternateContent>"
+        ),
+        f'<mc:AlternateContent {_MC_XMLNS}><mc:Choice Requires="w14">'
+        + _p("<w:r><w:t>X</w:t></w:r>")
+        + "</mc:Choice></mc:AlternateContent>",
+        _p(
+            "<w:ruby><w:rt><w:r><w:t>top</w:t></w:r></w:rt><w:rubyBase><w:r><w:t>base</w:t>"
+            "</w:r></w:rubyBase></w:ruby>"
+        ),
+        _p("<w:r><w:t>a</w:t></w:r>")
+        + "<w:sectPr>"
+        + _p("<w:r><w:t>b</w:t></w:r>")
+        + "</w:sectPr>",
+        "<w:sdt><w:sdtPr><w:r><w:t>b</w:t></w:r></w:sdtPr><w:sdtContent>"
+        + _p("<w:r><w:t>a</w:t></w:r>")
+        + "</w:sdtContent></w:sdt>",
+        _p('<x:wrap xmlns:x="urn:x"><w:r><w:t>a</w:t></w:r></x:wrap>'),
+        '<x:wrap xmlns:x="urn:x">' + _p("<w:r><w:t>a</w:t></w:r>") + "</x:wrap>",
+        _p("<w:del><w:r><w:delText>a</w:delText></w:r></w:del>"),
+    ],
+    ids=[
+        "alternate-runs",
+        "alternate-paragraphs",
+        "ruby",
+        "text-in-section-properties",
+        "text-in-control-properties",
+        "unknown-around-runs",
+        "unknown-around-paragraphs",
+        "revision",
+    ],
+)
+def test_an_element_the_walk_does_not_know_is_never_passed_through(body: str) -> None:
+    with pytest.raises(CertificationError):
+        DocxSource(docx(body))
+
+
+@pytest.mark.parametrize(
+    "name", ["sdt", "sdtContent", "customXml", "hyperlink", "smartTag", "dir", "bdo", "fldSimple"]
+)
+def test_the_walk_reads_through_every_container(name: str) -> None:
+    run = "<w:r><w:t>a</w:t></w:r>"
+    DocxSource(docx(_p(f"<w:{name}>{run}</w:{name}>"))).certify(_value("a"))
+    if name in ("sdt", "sdtContent", "customXml"):
+        DocxSource(docx(f"<w:{name}>{_p(run)}</w:{name}>")).certify(_value("a"))
+        row = f"<w:tr><w:tc>{_p(run)}</w:tc></w:tr>"
+        table = docx(f"<w:tbl><w:{name}>{row}</w:{name}></w:tbl>")
+        DocxSource(table).certify(_value({"text": "a", "table": [0, 0, 0]}))
+    else:
+        with pytest.raises(CertificationError, match="among paragraphs"):
+            DocxSource(docx(f"<w:{name}>{_p(run)}</w:{name}>"))
+
+
+_INERT_NAMES = [
+    "pPr", "sectPr", "tblPr", "tblGrid", "tblPrEx", "trPr", "tcPr", "sdtPr", "sdtEndPr",
+    "customXmlPr", "smartTagPr", "fldData", "bookmarkStart", "bookmarkEnd", "proofErr",
+    "permStart", "permEnd", "commentRangeStart", "commentRangeEnd",
+]  # fmt: skip
+
+
+@pytest.mark.parametrize("name", _INERT_NAMES)
+def test_the_walk_passes_over_every_inert_element_and_never_text_in_one(name: str) -> None:
+    for at in (
+        lambda x: _p(x + "<w:r><w:t>a</w:t></w:r>"),
+        lambda x: x + _p("<w:r><w:t>a</w:t></w:r>"),
+        lambda x: f"<w:tbl>{x}<w:tr><w:tc>{_p('<w:r><w:t>a</w:t></w:r>')}</w:tc></w:tr></w:tbl>",
+    ):
+        source = DocxSource(docx(at(f"<w:{name}><w:x/></w:{name}>")))
+        table = [0, 0, 0] if "tbl" in at("") else None
+        source.certify(_value({"text": "a", "table": table}))
+        for text in ("<w:t>b</w:t>", "<w:instrText>b</w:instrText>", "<w:delText>b</w:delText>",
+                     "<w:r/>", "<w:p/>"):  # fmt: skip
+            with pytest.raises(CertificationError, match=r"text in|inside a paragraph"):
+                DocxSource(docx(at(f"<w:{name}>{text}</w:{name}>")))
+
+
+def test_a_part_the_check_cannot_read_is_kept_as_refused_whatever_stops_it() -> None:
+    from test_headers_comments import _commented, header, reference, with_parts
+
+    body = _p("<w:r><w:t>Body</w:t></w:r>") + f"<w:sectPr>{reference('header', 'h1')}</w:sectPr>"
+    for content in (
+        _p('<w:r><w:footnoteReference w:id="x"/></w:r>'),
+        _p('<w:r><w:commentReference w:id="x"/></w:r>'),
+        _p('<w:pPr><w:numPr><w:numId w:val="x"/></w:numPr></w:pPr><w:r><w:t>a</w:t></w:r>'),
+    ):
+        data = with_parts(
+            docx(body), {"header1.xml": header(content)}, [("h1", "header", "header1.xml")]
+        )
+        value = json.loads(output.read(data)[0])
+        assert [p["text"] for p in value["paragraphs"]] == ["Body"], value.get("refusal")
+        assert value["refusedParts"] == 1
+    comment = (
+        '<w:comment w:id="0" w:author="A">'
+        + _p('<w:r><w:footnoteReference w:id="x"/></w:r>')
+        + "</w:comment>"
+    )
+    data = _commented(
+        _p('<w:r><w:t>x</w:t></w:r><w:r><w:commentReference w:id="0"/></w:r>'), comment
+    )
+    value = json.loads(output.read(data)[0])
+    assert value["refusedParts"] == 1, value.get("refusal")
+
+
+def test_a_view_holds_everything_outside_its_changes() -> None:
+    from label_docx.certify import certify_tracked
+    from label_docx.reader import tracked
+    from test_reader import PICTURE
+    from test_tracked import WHO, _rewrite, ins, t
+
+    changed = (
+        f'<w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:rPrChange w:id="5" {WHO}><w:rPr/>'
+        "</w:rPrChange>"
+    )
+    styles = (
+        f'<w:style w:type="character" w:styleId="A"><w:rPr>{changed}</w:rPr></w:style>'
+        '<w:style w:type="character" w:styleId="B"><w:rPr><w:b/></w:rPr></w:style>'
+    )
+    body = (
+        _p("<w:r><w:t>5 mg daily</w:t></w:r>" + ins(t("!")))
+        + _p('<w:fldSimple w:instr=" PAGE "><w:r><w:t>3</w:t></w:r></w:fldSimple>')
+        + _p(f"<w:r>{PICTURE}</w:r>")
+        + _p('<w:r><w:footnoteReference w:id="1"/></w:r><w:r><w:footnoteReference w:id="2"/></w:r>')
+    )
+    notes = (
+        f'<w:footnote w:id="1"><w:p>{t("one")}{ins(t("+"))}</w:p></w:footnote>'
+        f'<w:footnote w:id="2"><w:p>{t("two")}</w:p></w:footnote>'
+    )
+    source = docx(body, styles=styles, footnotes=notes)
+    accepted, original, _ = tracked(source)
+    certify_tracked(source, {"accepted": accepted, "original": original})
+    document, footnotes = "word/document.xml", "word/footnotes.xml"
+    symbol = '<ns0:rPr><ns0:rFonts ns0:ascii="Symbol" ns0:hAnsi="Symbol" /></ns0:rPr>'
+    listed = '<ns0:pPr><ns0:numPr><ns0:numId ns0:val="1" /></ns0:numPr></ns0:pPr>'
+    tampered = {
+        "symbol-on-an-untouched-run": (
+            document,
+            lambda x: x.replace("<ns0:r><ns0:t>5 mg", f"<ns0:r>{symbol}<ns0:t>5 mg"),
+        ),
+        "list-label-added": (
+            document,
+            lambda x: x.replace("<ns0:p><ns0:r>", f"<ns0:p>{listed}<ns0:r>", 1),
+        ),
+        "field-code-rewritten": (document, lambda x: x.replace('" PAGE "', '" DOCPROPERTY Page "')),
+        "picture-anchored": (document, lambda x: x.replace(":inline>", ":anchor>")),
+        "note-ids-swapped": (
+            footnotes,
+            lambda x: x.replace('"1"', '"9"').replace('"2"', '"1"').replace('"9"', '"2"'),
+        ),
+        "untouched-style-rewritten": (
+            "word/styles.xml",
+            lambda x: x.replace(
+                "<ns0:b />", '<ns0:rFonts ns0:ascii="Symbol" ns0:hAnsi="Symbol" />'
+            ),
+        ),
+    }
+    for view, data in (("accepted", accepted), ("original", original)):
+        for case, (name, change) in tampered.items():
+            wrong = _rewrite(data, name, change)
+            assert wrong != data, (view, case)
+            with pytest.raises(CertificationError, match="does not hold its content"):
+                certify_tracked(source, {view: wrong})
+
+
+def test_a_view_is_held_through_containers_moves_rows_and_property_changes() -> None:
+    from label_docx.certify import certify_tracked
+    from label_docx.reader import tracked
+    from test_tracked import WHO, _rewrite, ins, t
+
+    moved = (
+        '<w:moveFromRangeStart w:id="7" w:name="m" w:author="A"/>'
+        f'<w:moveFrom w:id="8" {WHO}><w:r><w:t>m</w:t></w:r></w:moveFrom>'
+        '<w:moveFromRangeEnd w:id="7"/>'
+    )
+    deleted = (
+        f'<w:del w:id="3" {WHO}><w:bookmarkStart w:id="0" w:name="b"/>'
+        "<w:r><w:delText>d</w:delText></w:r></w:del>"
+    )
+    row = (
+        '<w:tr><w:trPr><w:del w:id="4" '
+        + WHO
+        + "/></w:trPr><w:tc>"
+        + _p(t("gone"))
+        + "</w:tc></w:tr>"
+    )
+    kept = "<w:tr><w:tc>" + _p(t("kept")) + "</w:tc></w:tr>"
+    formatted = (
+        f'<w:tblPr><w:jc w:val="center"/><w:tblPrChange w:id="6" {WHO}><w:tblPr/>'
+        "</w:tblPrChange></w:tblPr>"
+    )
+    body = (
+        _p(f"<w:hyperlink>{t('ab')}</w:hyperlink>{ins(t('c'))}{deleted}{moved}")
+        + f"<w:tbl>{formatted}{row}{kept}</w:tbl>"
+        + f"<w:tbl>{row}</w:tbl>"
+        + _p(f'<w:moveTo w:id="9" {WHO}><w:r><w:t>m</w:t></w:r></w:moveTo>')
+    )
+    source = docx(body)
+    accepted, original, _ = tracked(source)
+    assert certify_tracked(source, {"accepted": accepted, "original": original}) == {
+        "checker": CHECKER_VERSION,
+        "accepted": {"characters": 3 + 4 + 1, "elements": 0, "paragraphsJoined": 0},
+        "original": {"characters": 4 + 4 + 4 + 4, "elements": 0, "paragraphsJoined": 0},
+    }
+    document = "word/document.xml"
+    # The original's table properties are the former ones, held to Word; the accepted view's
+    # are the current ones.
+    centred = '<ns0:jc ns0:val="center" />'
+    right = '<ns0:jc ns0:val="right" />'
+    certify_tracked(
+        source,
+        {
+            "original": _rewrite(
+                original,
+                document,
+                lambda x: x.replace("<ns0:tblPr />", f"<ns0:tblPr>{right}</ns0:tblPr>"),
+            )
+        },
+    )
+    with pytest.raises(CertificationError, match="does not hold its content"):
+        certify_tracked(
+            source, {"accepted": _rewrite(accepted, document, lambda x: x.replace(centred, right))}
+        )
+    # A run moved out of its hyperlink.
+    with pytest.raises(CertificationError, match="does not hold its content"):
+        certify_tracked(
+            source,
+            {
+                "accepted": _rewrite(
+                    accepted,
+                    document,
+                    lambda x: x.replace("<ns0:hyperlink>", "").replace("</ns0:hyperlink>", ""),
+                )
+            },
+        )
+
+
+def test_a_cell_change_is_never_applied_by_the_check() -> None:
+    from label_docx.certify import certify_tracked
+    from test_tracked import WHO, _rewrite, ins, t
+
+    cell = f'<w:tc><w:tcPr><w:cellIns w:id="1" {WHO}/></w:tcPr>{_p(t("x"))}</w:tc>'
+    source = docx(f"<w:tbl><w:tr>{cell}</w:tr></w:tbl>" + _p(ins(t("y"))))
+    view = _rewrite(
+        source,
+        "word/document.xml",
+        lambda x: (
+            x.replace(f'<w:cellIns w:id="1" {WHO}/>', "")
+            .replace(f'<w:ins w:id="1" {WHO}>', "")
+            .replace("</w:ins>", "")
+        ),
+    )
+    with pytest.raises(CertificationError, match="cellIns"):
+        certify_tracked(source, {"accepted": view})
+
+
+@pytest.mark.parametrize(
+    "run",
+    [
+        "<w:r><w:rPr><w:rtl/><w:b/></w:rPr><w:t>abc</w:t></w:r>",
+        "<w:r><w:rPr><w:cs/><w:i/><w:bCs/></w:rPr><w:t>abc</w:t></w:r>",
+        "<w:r><w:rPr><w:b/></w:rPr><w:t>مرحبا</w:t></w:r>",
+        '<w:dir w:val="rtl"><w:r><w:rPr><w:b/></w:rPr><w:t>abc</w:t></w:r></w:dir>',
+    ],
+)
+def test_complex_script_whose_emphasis_settings_differ_is_never_certified(run: str) -> None:
+    with pytest.raises(CertificationError):
+        DocxSource(docx(f"<w:p>{run}</w:p>"))
+    # Latin text with b alone, and complex script with both settings, are certified.
+    DocxSource(docx("<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>abc</w:t></w:r></w:p>"))
+    DocxSource(docx("<w:p><w:r><w:rPr><w:rtl/><w:b/><w:bCs/></w:rPr><w:t>abc</w:t></w:r></w:p>"))
+
+
+def test_conditional_emphasis_over_text_in_a_part_the_table_turns_on_is_never_certified() -> None:
+    styles = (
+        '<w:style w:type="table" w:styleId="T"><w:tblStylePr w:type="firstRow">'
+        "<w:rPr><w:b/></w:rPr></w:tblStylePr></w:style>"
+    )
+
+    def table(look: str, first: str) -> bytes:
+        return docx(
+            f'<w:tbl><w:tblPr><w:tblStyle w:val="T"/>{look}</w:tblPr>'
+            f"<w:tr><w:tc><w:p>{first}</w:p></w:tc></w:tr>"
+            "<w:tr><w:tc><w:p><w:r><w:t>Very common</w:t></w:r></w:p></w:tc></w:tr></w:tbl>",
+            styles=styles,
+        )
+
+    text = "<w:r><w:t>Frequency</w:t></w:r>"
+    for look in ('<w:tblLook w:val="04A0"/>', '<w:tblLook w:firstRow="1"/>', ""):
+        with pytest.raises(CertificationError):
+            DocxSource(table(look, text))
+    DocxSource(table('<w:tblLook w:val="0000"/>', text))
+    DocxSource(table('<w:tblLook w:val="04A0"/>', ""))
+
+
+def test_the_check_reads_the_bundle_strictly_and_on_its_own() -> None:
+    # S34, S35: one reading of each name, no NaN, the first entry's Composition; S71: a long
+    # character reference reads as the reader reads it, and nesting is counted without recursion.
+    data = _epi("<p>a</p>")
+    value = json.loads(epi_output.read(data)[0])
+    EpiSource(data).certify(value)
+    text = data.decode()
+    repeated = text.replace('"title": "T"', '"title": "T", "title": "U"', 1)
+    patient = {"resource": {"resourceType": "Patient"}}
+    moved = json.loads(text)
+    moved["entry"].insert(0, patient)
+    for bad in (repeated, text[:-1] + ', "x": NaN}', json.dumps(moved)):
+        with pytest.raises(CertificationError):
+            EpiSource(bad.encode())
+    long = _epi("<p>x&#" + "0" * 4300 + "65;y</p>")
+    value = json.loads(epi_output.read(long)[0])
+    assert value["sections"][0]["paragraphs"][0]["text"] == "xAy"
+    assert "certificate" in value
+    assert _unescape("&#" + "0" * 4300 + "65;") == "A"
+    deep = json.loads(text)
+    nested: list[Any] = []
+    for _ in range(5000):
+        nested = [nested]
+    deep["x"] = nested
+    assert EpiSource(json.dumps(deep).encode()).narratives == 0
