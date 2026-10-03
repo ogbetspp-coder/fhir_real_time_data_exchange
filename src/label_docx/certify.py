@@ -70,7 +70,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT
 
-CHECKER_VERSION = "conservation-check/1.6.0"
+CHECKER_VERSION = "conservation-check/1.7.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -1421,9 +1421,10 @@ def _run_tokens(
 ) -> tuple[list[list[tuple[Json, ...]]], int]:
     """Each paragraph's run content in order, as the view must hold it, and the paragraphs joined.
 
-    A paragraph whose mark the view drops is joined to the next: its tokens open the next
-    one's. Content inside a change the view drops is left out; a deleted text is a text. Run
-    properties are not content: changed formatting is held to Word.
+    A paragraph whose mark the view drops is joined to the next in document order (inside a
+    table, its first cell's first paragraph): its tokens open the next one's. A row the view
+    drops goes whole. Content inside a change the view drops is left out; a deleted text is a
+    text. Run properties are not content: changed formatting is held to Word.
     """
     paragraphs: list[list[tuple[Json, ...]]] = []
     carried: list[tuple[Json, ...]] = []
@@ -1444,6 +1445,9 @@ def _run_tokens(
                 else:
                     paragraphs.append(own)
                 continue
+            row = child.find(_w("trPr")) if child.tag == _w("tr") else None
+            if row is not None and any(c.tag in {_w(d) for d in drops} for c in row):
+                continue  # a row the view drops goes whole: its paragraphs and their content
             if element.tag == _w("r") and child.tag != _w("rPr"):
                 if not dropped:
                     mine.append(

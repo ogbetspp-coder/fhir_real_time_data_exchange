@@ -123,6 +123,54 @@
       "bytes": 3622
     },
     {
+      "name": "A deleted paragraph mark before a table whose first cell starts with a table.",
+      "file": "mark-deleted-before-nested-table.docx",
+      "sha256": "42b2cf83b177ebea8136e07b9b71d32060c474d0ebc1058d904823a88c7a6134",
+      "bytes": 3796
+    },
+    {
+      "name": "A deleted mark before a table: whose properties the joined paragraph keeps.",
+      "file": "mark-deleted-before-table-styled.docx",
+      "sha256": "c2ef9e498233563b81e1495ac6b2a4f9b41c20f49e7715df5a01e73e790580f5",
+      "bytes": 3719
+    },
+    {
+      "name": "The mark of a cell's last paragraph deleted: a cell's end cannot be joined.",
+      "file": "mark-deleted-last-in-cell.docx",
+      "sha256": "35b57d5e28223a3ea448d136dcbd77822aaeb13d6e69c6b12cd5633bdda6731f",
+      "bytes": 3736
+    },
+    {
+      "name": "The body's last paragraph mark deleted.",
+      "file": "mark-deleted-last-in-body.docx",
+      "sha256": "5db4c68d6384d62b96fd10208f00bfc180258fb447aa38171b2e606f8a233c3b",
+      "bytes": 3484
+    },
+    {
+      "name": "A deleted mark that ends a section.",
+      "file": "mark-deleted-section-end.docx",
+      "sha256": "2088d014e0ad9291c1f5fcfa90fb61ebc5ba46b16b97d1c0fe441789f57a4722",
+      "bytes": 3507
+    },
+    {
+      "name": "A table row deleted.",
+      "file": "row-deleted.docx",
+      "sha256": "31791b4bc578fcdbecf27b66bbb996b4d410697a045bedcba736491900b42dbb",
+      "bytes": 3820
+    },
+    {
+      "name": "Table, row and cell properties changed: the original has the former ones.",
+      "file": "format-table.docx",
+      "sha256": "70325cc7fb886924b9e30ba91c2df73b4bd305067ceaf57de787037054d30f45",
+      "bytes": 3882
+    },
+    {
+      "name": "Section properties changed: the original has the former ones.",
+      "file": "format-section.docx",
+      "sha256": "3719a4dc0c160f41e8db05b2108027bebfbbf2337065ca22e880838be68a6aec",
+      "bytes": 3540
+    },
+    {
       "name": "A table row inserted (the reader refuses it).",
       "file": "row-inserted.docx",
       "sha256": "7c2045d0b39df4bdc9d817007f7014697cf827050d123756412696744e40f1a0",

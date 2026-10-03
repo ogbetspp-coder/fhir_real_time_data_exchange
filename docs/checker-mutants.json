@@ -1,6 +1,6 @@
 {
-  "killed": 1511,
-  "mutants": 1569,
+  "killed": 1518,
+  "mutants": 1576,
   "survivors": [
     {
       "code": "_XML_NS = \"http://www.w3.org/XML/1998/namespace\"",
@@ -42,14 +42,14 @@
       "equivalent": "a row group is always met beside a table or a row, which end the paragraph; text directly in one is refused by the reader",
       "function": "<module>",
       "kind": "str:'thead'",
-      "line": 1516
+      "line": 1520
     },
     {
       "code": "\"tbody\",",
       "equivalent": "a row group is always met beside a table or a row, which end the paragraph; text directly in one is refused by the reader",
       "function": "<module>",
       "kind": "str:'tbody'",
-      "line": 1517
+      "line": 1521
     },
     {
       "code": "return None",
@@ -91,28 +91,28 @@
       "equivalent": "the parser starts at the div, a block, which ends the (empty) paragraph and clears it",
       "function": "_Div.__init__",
       "kind": "bool",
-      "line": 1540
+      "line": 1544
     },
     {
       "code": "parsed.close()",
       "equivalent": "the div ends with its own end tag, so nothing is left buffered",
       "function": "EpiSource._section",
       "kind": "call",
-      "line": 1632
+      "line": 1636
     },
     {
       "code": "parsed.flush()",
       "equivalent": "the div's end tag, a block's, has ended the last paragraph",
       "function": "EpiSource._section",
       "kind": "call",
-      "line": 1633
+      "line": 1637
     },
     {
       "code": "raise CertificationError(\"the ledger does not balance\")",
       "equivalent": "the counts follow from the sequences, which are equal by then: the ledger is a second statement of the same fact, stated in the certificate",
       "function": "EpiSource.certify",
       "kind": "statement",
-      "line": 1703
+      "line": 1707
     },
     {
       "code": "return tag.rsplit(\"}\", 1)[-1]",
@@ -175,14 +175,14 @@
       "equivalent": "a paragraph holds no paragraph and run content no run the walk reads: walking either again only adds to a list outside any paragraph, which is never read",
       "function": "_run_tokens.walk",
       "kind": "statement",
-      "line": 1446
+      "line": 1447
     },
     {
       "code": "continue",
       "equivalent": "a paragraph holds no paragraph and run content no run the walk reads: walking either again only adds to a list outside any paragraph, which is never read",
       "function": "_run_tokens.walk",
       "kind": "statement",
-      "line": 1452
+      "line": 1456
     },
     {
       "code": "self.chain(None if style is None else style.get(_w(\"val\")), \"character\"),",
@@ -329,7 +329,7 @@
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "EpiSource.certify",
       "kind": "bool",
-      "line": 1694
+      "line": 1698
     },
     {
       "code": "self.mark(\"note\", (kind, self.story[1]))",
@@ -343,7 +343,7 @@
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "EpiSource.certify.section",
       "kind": "bool",
-      "line": 1679
+      "line": 1683
     },
     {
       "code": "paragraph.section if value(\"numRestart\", \"continuous\") == \"eachSect\" else None,",
@@ -364,14 +364,14 @@
       "equivalent": "a paragraph mark's change markers are empty: dropping one drops no content",
       "function": "_run_tokens.walk",
       "kind": "str:'rPr'",
-      "line": 1453
+      "line": 1457
     },
     {
       "code": "self.open_tables.append([self.tables, -1, -1])",
       "equivalent": "the cell count starts again at each row; only the row count's start matters, and its mutant is caught",
       "function": "_Div.handle_starttag",
       "kind": "int:1",
-      "line": 1567
+      "line": 1571
     },
     {
       "code": "at = next(i for i, (a, b) in enumerate(zip(shown, claimed, strict=True)) if set(a) != b)",
@@ -392,7 +392,7 @@
       "equivalent": "where a difference is found only words the refusal",
       "function": "EpiSource.certify.section",
       "kind": "compare:0",
-      "line": 1661
+      "line": 1665
     },
     {
       "code": "self.ledger.symbol += sum(1 for a, b in zip(text, mapped, strict=True) if a != b)",
@@ -410,7 +410,7 @@
     }
   ],
   "target": "src/label_docx/certify.py",
-  "targetSha256": "90926987821d38f1ae9fd21e4d86ed8522d59de9d388c38e7722a6182011c527",
+  "targetSha256": "5a71f03a00fc0bcf9875ae79e7c0f4a7a2d53228b07d068b05f8b4258f79d6fc",
   "tests": [
     "tests/test_certify.py",
     "tests/test_headers_comments.py",

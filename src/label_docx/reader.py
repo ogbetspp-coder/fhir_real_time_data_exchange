@@ -226,8 +226,10 @@ from dataclasses import dataclass, field, replace
 # above, or a level with lvlRestart counted first by a deeper one, is refused; 1.15.0 restarts
 # a level as the list whose paragraph restarted it says (its startOverride, else the start), and
 # refuses a level that never restarts shown in a deeper level's label; 1.18.0 reads a document with
-# tracked changes as two, every change accepted and every one rejected (``tracked``).
-READER_VERSION = "docx-reader/1.18.0"
+# tracked changes as two, every change accepted and every one rejected (``tracked``); 1.19.0 joins a
+# paragraph past a table and a section's end, drops inserted and deleted rows, and undoes table,
+# row, cell and section formatting, each as Word does.
+READER_VERSION = "docx-reader/1.19.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -2821,7 +2823,8 @@ class Change:
 
     ``kind`` is ``insert``, ``delete``, ``move-from`` or ``move-to`` (runs), the same with
     ``-paragraph-mark`` (a paragraph's end, so two paragraphs are one in the other view),
-    ``format`` (a run's properties) or ``format-paragraph`` (a paragraph's).
+    ``insert-row`` or ``delete-row``, ``format`` (a run's properties), ``format-paragraph``,
+    ``format-table``, ``format-row``, ``format-cell`` or ``format-section``.
     """
 
     part: str
@@ -2841,10 +2844,12 @@ def tracked(data: bytes) -> tuple[bytes, bytes, tuple[Change, ...]]:
     each the package with only its revised parts written again; the changes are in the order
     stored, each once (a run split in two holds its change twice). A run change is kept (its
     runs stand in its place; a deletion's ``delText`` is ``t`` again) or dropped whole; a move's
-    range markers go. A paragraph mark a view drops joins the paragraph to the next one, which
-    keeps its own properties, as the mark that ends it does. Changed run and paragraph
-    properties are the current ones in the accepted view and the stored former ones in the
-    original. A change holding part of a field, and a view with any other revision left, are
+    range markers go, and a row the view drops goes whole. A paragraph mark a view drops joins
+    the paragraph to the next one in document order (past a table, its first cell's first
+    paragraph), which keeps its own properties, as the mark that ends it does. Changed run,
+    paragraph, table, row, cell and section properties are the current ones in the accepted
+    view and the stored former ones in the original. A change holding part of a field, a mark
+    at the end of a cell or of the document, and a view with any other revision left, are
     refused. Each rule is Word's answer to a case in ``corpus/tracked-cases``.
     """
     package = _Package(data)
@@ -2887,6 +2892,31 @@ def tracked(data: bytes) -> tuple[bytes, bytes, tuple[Change, ...]]:
     return out[0], out[1], tuple(changes)
 
 
+# Properties a change records the former set of: (the change, what the properties keep of their
+# own, whether the former set goes after those). A row's and a paragraph mark's own changes,
+# a cell's own changes and a section's header and footer references are not properties.
+_FORMER = {
+    _w("rPr"): (_w("rPrChange"), {_w(n) for n in _CHANGES}, False),
+    _w("pPr"): (_w("pPrChange"), {_w("rPr"), _w("sectPr")}, True),
+    _w("tblPr"): (_w("tblPrChange"), set(), False),
+    _w("tblPrEx"): (_w("tblPrExChange"), set(), False),
+    _w("trPr"): (_w("trPrChange"), {_w("ins"), _w("del")}, False),
+    _w("tcPr"): (_w("tcPrChange"), {_w(n) for n in ("cellIns", "cellDel", "cellMerge")}, False),
+    _w("tblGrid"): (_w("tblGridChange"), set(), False),
+    _w("sectPr"): (_w("sectPrChange"), {_w("headerReference"), _w("footerReference")}, False),
+}
+_FORMAT_KINDS = {
+    "rPrChange": "format",
+    "pPrChange": "format-paragraph",
+    "tblPrChange": "format-table",
+    "tblPrExChange": "format-table",
+    "tblGridChange": "format-table",
+    "trPrChange": "format-row",
+    "tcPrChange": "format-cell",
+    "sectPrChange": "format-section",
+}
+
+
 def _changes(part: str, root: ET.Element) -> list[Change]:
     found: list[Change] = []
 
@@ -2897,10 +2927,10 @@ def _changes(part: str, root: ET.Element) -> list[Change]:
             kind = _CHANGE_KINDS[name]
             if parent is not None and parent.tag == _w("rPr"):
                 kind += "-paragraph-mark"
-        elif element.tag == _w("rPrChange"):
-            kind = "format"
-        elif element.tag == _w("pPrChange"):
-            kind = "format-paragraph"
+            elif parent is not None and parent.tag == _w("trPr"):
+                kind += "-row"
+        elif element.tag.startswith(f"{{{W}}}") and name in _FORMAT_KINDS:
+            kind = _FORMAT_KINDS[name]
         if kind is not None:
             found.append(
                 Change(
@@ -2930,6 +2960,10 @@ def _view(element: ET.Element, view: str) -> None:
             _whole_fields(child)
         if element.tag in _RUN_HOLDERS and child.tag in drop:
             continue
+        row = child.find(_w("trPr")) if child.tag == _w("tr") else None
+        if row is not None and any(c.tag in drop for c in row):
+            # A row the view drops goes whole, as Word's does (corpus/tracked-cases).
+            continue
         _view(child, view)
         if element.tag in _RUN_HOLDERS and child.tag in keep:
             if view == "original":
@@ -2941,30 +2975,27 @@ def _view(element: ET.Element, view: str) -> None:
             children.extend(child)
         else:
             children.append(child)
-    former = element.find(_w("rPrChange")) if element.tag == _w("rPr") else None
-    if former is not None:
-        if view == "original":
-            # A paragraph mark's own changes stay: they are not its properties.
-            markers = [c for c in children if c.tag in {_w(n) for n in _CHANGES}]
-            stored = former.find(_w("rPr"))
-            children = markers + ([] if stored is None else list(stored))
-        else:
+    if element.tag in _FORMER:
+        change, own, after = _FORMER[element.tag]
+        former = element.find(change)
+        if former is not None and view == "original":
+            stored = former.find(element.tag)
+            old = [] if stored is None else list(stored)
+            kept = [c for c in children if c.tag in own]
+            children = old + kept if after else kept + old
+        elif former is not None:
             children = [c for c in children if c is not former]
-    former = element.find(_w("pPrChange")) if element.tag == _w("pPr") else None
-    if former is not None:
-        if view == "original":
-            own = [c for c in children if c.tag in (_w("rPr"), _w("sectPr"))]
-            stored = former.find(_w("pPr"))
-            children = ([] if stored is None else list(stored)) + own
-        else:
-            children = [c for c in children if c is not former]
-    if element.tag == _w("pPr"):
+    if element.tag in (_w("pPr"), _w("trPr")):
         mark = next((c for c in children if c.tag == _w("rPr")), None)
-        if mark is not None:
-            # The mark's changes this view keeps are no longer changes; one it drops stays as
-            # the sign that the paragraph joins the next (_join).
-            for marker in [c for c in mark if c.tag in keep]:
-                mark.remove(marker)
+        markers = mark if element.tag == _w("pPr") else element
+        if markers is not None:
+            # The mark's or row's changes this view keeps are no longer changes; a paragraph
+            # mark's change it drops stays as the sign that the paragraph joins the next (_join).
+            for marker in [c for c in markers if c.tag in keep]:
+                if markers is element:
+                    children.remove(marker)
+                else:
+                    markers.remove(marker)
     element[:] = children
     _join(element, drop)
 
@@ -2989,26 +3020,49 @@ def _whole_fields(change: ET.Element) -> None:
 
 
 def _join(element: ET.Element, drop: set[str]) -> None:
-    """Join each paragraph whose mark the view drops to the paragraph after it."""
+    """Join each paragraph whose mark the view drops to the paragraph after it.
+
+    The paragraph after it is the next in document order: past a table, its first cell's first
+    paragraph (Word's answer, corpus/tracked-cases). A paragraph that ends a section joins the
+    next section's first paragraph and the section ends there no more, unless the section has
+    headers or footers of its own; one at the end of a table cell or of the document is refused.
+    """
     children = list(element)
     out: list[ET.Element] = []
     carried: list[ET.Element] = []
     for index, child in enumerate(children):
-        if child.tag == _w("p") and carried:
-            properties = child.find(_w("pPr"))
-            at = 1 if properties is not None and child[0] is properties else 0
-            child[at:at] = carried
+        if carried:
+            target = _first_paragraph(child)
+            properties = target.find(_w("pPr"))
+            at = 1 if properties is not None and target[0] is properties else 0
+            target[at:at] = carried
             carried = []
         mark = child.find(f"{_w('pPr')}/{_w('rPr')}") if child.tag == _w("p") else None
         if mark is not None and any(c.tag in drop for c in mark):
             following = children[index + 1] if index + 1 < len(children) else None
-            if following is None or following.tag != _w("p"):
+            if following is None or following.tag not in (_w("p"), _w("tbl")):
                 raise DocxRefusedError(
                     "tracked-change", "a paragraph mark joins what is not a paragraph"
                 )
-            if child.find(f"{_w('pPr')}/{_w('sectPr')}") is not None:
-                raise DocxRefusedError("tracked-change", "a section's last paragraph mark")
+            section = child.find(f"{_w('pPr')}/{_w('sectPr')}")
+            if section is not None and any(
+                c.tag in (_w("headerReference"), _w("footerReference")) for c in section
+            ):
+                raise DocxRefusedError("tracked-change", "a section with headers or footers ends")
             carried = [c for c in child if c.tag != _w("pPr")]
             continue
         out.append(child)
     element[:] = out
+
+
+def _first_paragraph(block: ET.Element) -> ET.Element:
+    """The first paragraph of a paragraph or a table, in document order, or a refusal."""
+    while block.tag == _w("tbl"):
+        cell = block.find(f"{_w('tr')}/{_w('tc')}")
+        first = next((c for c in cell if c.tag != _w("tcPr")), None) if cell is not None else None
+        if first is None:
+            raise DocxRefusedError("tracked-change", "a paragraph mark joins an empty table")
+        block = first
+    if block.tag != _w("p"):
+        raise DocxRefusedError("tracked-change", "a paragraph mark joins what is not a paragraph")
+    return block

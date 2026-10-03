@@ -49,10 +49,11 @@ A document with tracked changes::
 change rejected, each with ``paragraphs``, the notes, headers, footers, comments and
 ``refusedParts`` as a read above; there is no ``paragraphs`` outside them, so the caller names
 the view it takes. ``changes`` lists each change as stored: ``part``, ``kind`` (``insert``,
-``delete``, ``move-from``, ``move-to``, each also with ``-paragraph-mark``, ``format``,
-``format-paragraph``), ``id``, ``author`` and ``date`` (null where absent). Each view is
-certified as a read is; ``certificate.views`` is the check's account of the views themselves
-(``certify_tracked``).
+``delete``, ``move-from``, ``move-to``, each also with ``-paragraph-mark``; ``insert-row``,
+``delete-row``; ``format``, ``format-paragraph``, ``format-table``, ``format-row``,
+``format-cell``, ``format-section``), ``id``, ``author`` and ``date`` (null where absent).
+Each view is certified as a read is; ``certificate.views`` is the check's account of the views
+themselves (``certify_tracked``).
 
 A refusal::
 
@@ -90,8 +91,9 @@ from label_docx.reader import (
 # by conservation-check/1.2.0; 1.7.0 certified by 1.3.0, which also works out the key marks;
 # 1.8.0 by 1.4.0, with Word's toggle and default-character-style rules; 1.9.0 by 1.5.0, which
 # also works out the list labels and note marks; 1.10.0 reads a document with tracked changes as
-# ``tracked``: both views and the changes, each view certified, and the views by 1.6.0.
-FORMAT_VERSION = "label-docx-json/1.10.0"
+# ``tracked``: both views and the changes, each view certified, and the views by 1.6.0; 1.11.0
+# by 1.7.0, which drops a row the view drops, and new kinds of change (rows, table formatting).
+FORMAT_VERSION = "label-docx-json/1.11.0"
 
 type Json = str | int | bool | list[Json] | dict[str, Json] | None
 

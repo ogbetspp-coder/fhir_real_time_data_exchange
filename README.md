@@ -260,10 +260,11 @@ downloads.
   serves one. Save them as .docx in Word first.
 - **Documents with tracked changes** are read as both views, accepted and original, and never
   as one: which text is "the label" is a decision the reader will not make. Inserted and
-  deleted text, moves, inserted and deleted paragraph marks, and changed run and paragraph
-  formatting are undone; other tracked changes (table cells, section and table properties,
-  numbering) are refused (`tracked-change`), as is a deleted paragraph mark before a table or
-  at the end of a section.
+  deleted text, moves, inserted and deleted paragraph marks (also before a table and at a
+  section's end), inserted and deleted table rows, and changed run, paragraph, table, row,
+  cell and section formatting are undone, each as Word does; inserted, deleted and merged
+  cells, a deleted mark at the end of a table cell (Word then dissolves the table) and a
+  change holding part of a field are refused (`tracked-change`).
 - **Font size, colour, font and alignment** are not reported (faint text aside: white, tiny or
   squeezed text is marked).
 

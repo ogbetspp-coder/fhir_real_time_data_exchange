@@ -294,8 +294,10 @@ deletions, joined and split paragraphs, bold and style changes): 38 agree view f
 refused, 3 of them because Word's own view is one the reader refuses too, 2 for the cases
 below.
 What the reader cannot undo exactly is refused (`tracked-change`): a change holding only part
-of a field (Word then drops the whole field result), a paragraph mark joined to a table, and
-changes to tables, sections and numbering definitions.
+of a field (Word then drops the whole field result), a deleted mark at the end of a table cell
+(Word then dissolves the whole table) or of the document (Word cannot accept it), and inserted,
+deleted or merged cells. Rows, joins past a table or a section's end, and table and section
+formatting each follow Word's answer to a case.
 
 ## What it does not cover
 
@@ -369,8 +371,8 @@ The script now stops rather than record such a run.
 - every survivor must have its reason;
 - more than 90% of all faults must be killed outright.
 
-The current run made 1,569 faults. The check now also draws every list label and note mark
-on its own, and holds the views of a tracked document to their source. The tests killed 1,511
+The current run made 1,576 faults. The check now also draws every list label and note mark
+on its own, and holds the views of a tracked document to their source. The tests killed 1,518
 of the faults (96%). The other 58 cannot change what the check does, and each is recorded with its reason: for example, the `xml` prefix, which can never
 name Word's namespace, a length compared just before, or a tenth place for list levels, which
 run 0 to 8. None is unexplained. The first run with the tracked-change check left 38 faults in it alive:

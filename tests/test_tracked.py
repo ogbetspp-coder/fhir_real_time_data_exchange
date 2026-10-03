@@ -123,22 +123,106 @@ def test_changed_formatting_is_current_when_accepted_and_former_when_rejected() 
     assert views(docx(styled)) == {"accepted": [("s", "New")], "original": [("s", "Old")]}
 
 
-def test_what_the_reader_cannot_undo_exactly_is_refused() -> None:
-    table = "<w:tbl><w:tr><w:tc><w:p><w:r><w:t>c</w:t></w:r></w:p></w:tc></w:tr></w:tbl>"
-    cases = [
-        # A paragraph mark joining a table, or ending a section, or the body's last paragraph.
-        p(t("a"), mark("del")) + table,
-        p(t("a"), f"<w:sectPr/>{mark('del')}") + p(t("b")),
-        p(t("a"), mark("del")),
-        # A revision the views do not undo: an inserted table cell.
-        '<w:tbl><w:tr><w:tc><w:tcPr><w:cellIns w:id="1"/></w:tcPr>'
-        "<w:p><w:r><w:t>c</w:t></w:r></w:p></w:tc></w:tr></w:tbl>",
+def test_a_paragraph_mark_joins_past_a_table_and_a_section_end() -> None:
+    # Into the first cell's first paragraph, inside a nested table too (Word's answer).
+    nested = "<w:tbl><w:tr><w:tc><w:tbl><w:tr><w:tc>" + p(t("in")) + "</w:tc></w:tr></w:tbl>"
+    body = p(t("a"), mark("del")) + nested + p(t("out")) + "</w:tc></w:tr></w:tbl>" + p(t("z"))
+    accepted, original, _ = tracked(docx(body))
+    assert [(x.text, x.table) for x in read_document(accepted).body] == [
+        ("ain", (0, 0, 0)),
+        ("out", (0, 0, 0)),
+        ("z", None),
     ]
-    for body in cases:
+    assert [x.text for x in read_document(original).body] == ["a", "in", "out", "z"]
+    # A section's last paragraph joins the next section's first: the section ends no more.
+    section = p(t("a"), f'<w:sectPr><w:pgSz w:w="1"/></w:sectPr>{mark("del")}') + p(t("b"))
+    assert views(docx(section)) == {
+        "accepted": [("ab", None)],
+        "original": [("a", None), ("b", None)],
+    }
+
+
+def test_a_row_inserted_or_deleted_is_in_one_view_only() -> None:
+    def row(text: str, marker: str = "") -> str:
+        props = f'<w:trPr><w:{marker} w:id="3" {WHO}/></w:trPr>' if marker else ""
+        return f"<w:tr>{props}<w:tc>{p(t(text))}</w:tc></w:tr>"
+
+    data = docx("<w:tbl>" + row("kept") + row("new", "ins") + row("gone", "del") + "</w:tbl>")
+    accepted, original, changes = tracked(data)
+    assert [(x.text, x.table) for x in read_document(accepted).body] == [
+        ("kept", (0, 0, 0)),
+        ("new", (0, 1, 0)),
+    ]
+    assert [(x.text, x.table) for x in read_document(original).body] == [
+        ("kept", (0, 0, 0)),
+        ("gone", (0, 1, 0)),
+    ]
+    assert [c.kind for c in changes] == ["insert-row", "delete-row"]
+    # The check drops the row whole too: a view that kept it is caught.
+    with pytest.raises(CertificationError):
+        certify_tracked(data, {"accepted": original})
+
+
+def test_table_and_section_formatting_is_former_in_the_original() -> None:
+    def changed(tag: str, now: str, before: str, own: str = "") -> str:
+        former = f'<w:{tag}Change w:id="5" {WHO}><w:{tag}>{before}</w:{tag}></w:{tag}Change>'
+        return f"<w:{tag}>{own}{now}{former}</w:{tag}>"
+
+    body = (
+        "<w:tbl>"
+        + changed("tblPr", '<w:jc w:val="center"/>', '<w:jc w:val="left"/>')
+        + '<w:tblGrid><w:gridCol w:w="2"/><w:tblGridChange w:id="6"><w:tblGrid>'
+        + '<w:gridCol w:w="1"/></w:tblGrid></w:tblGridChange></w:tblGrid><w:tr>'
+        + changed("trPr", "<w:cantSplit/>", "")
+        + "<w:tc>"
+        + changed("tcPr", '<w:shd w:val="clear" w:fill="D9D9D9"/>', "")
+        + p(t("c"))
+        + "</w:tc></w:tr></w:tbl>"
+        + p(t("d"))
+        + changed("sectPr", '<w:pgSz w:w="2"/>', '<w:pgSz w:w="1"/>')
+    )
+    accepted, original, changes = tracked(docx(body))
+    assert [c.kind for c in changes] == [
+        "format-table", "format-table", "format-row", "format-cell", "format-section",
+    ]  # fmt: skip
+    for view, width in ((accepted, "2"), (original, "1")):
+        with zipfile.ZipFile(io.BytesIO(view)) as package:
+            xml = package.read("word/document.xml").decode()
+        assert "Change" not in xml
+        assert f'pgSz ns0:w="{width}"' in xml
+        assert f'gridCol ns0:w="{width}"' in xml
+    assert views(docx(body)) == {
+        "accepted": [("c", None), ("d", None)],
+        "original": [("c", None), ("d", None)],
+    }
+
+
+def test_what_the_reader_cannot_undo_exactly_is_refused() -> None:
+    headed = with_parts(
+        docx(
+            p(t("a"), f"<w:sectPr>{reference('header', 'h1')}</w:sectPr>{mark('del')}") + p(t("b"))
+        ),
+        {"header1.xml": header(p(t("h")))},
+        [("h1", "header", "header1.xml")],
+    )
+    cases = [
+        # A paragraph mark at the end of a cell (Word then dissolves the table), of the body, or
+        # of a section with headers of its own; a table whose first cell holds no paragraph.
+        docx("<w:tbl><w:tr><w:tc>" + p(t("a"), mark("del")) + "</w:tc></w:tr></w:tbl>" + p(t("b"))),
+        docx(p(t("a"), mark("del"))),
+        headed,
+        docx(p(t("a"), mark("del")) + "<w:tbl><w:tr><w:tc><w:tcPr/></w:tc></w:tr></w:tbl>"),
+        # A revision the views do not undo: an inserted table cell.
+        docx(
+            '<w:tbl><w:tr><w:tc><w:tcPr><w:cellIns w:id="1"/></w:tcPr>'
+            "<w:p><w:r><w:t>c</w:t></w:r></w:p></w:tc></w:tr></w:tbl>"
+        ),
+    ]
+    for data in cases:
         with pytest.raises(DocxRefusedError) as caught:
-            tracked(docx(body))
+            tracked(data)
         assert caught.value.code == "tracked-change"
-        assert result(docx(body))["refusal"]["code"] == "tracked-change"
+        assert result(data)["refusal"]["code"] == "tracked-change"
 
 
 def test_the_result_holds_both_views_certified_and_no_text_of_its_own(tmp_path: Path) -> None:
@@ -199,7 +283,7 @@ def test_the_check_holds_each_view_to_the_source_on_its_own() -> None:
     source = docx(p(t("a"), mark("ins")) + p(t("b") + dele("c") + ins(t("d"))))
     accepted, original, _ = tracked(source)
     assert certify_tracked(source, {"accepted": accepted, "original": original}) == {
-        "checker": "conservation-check/1.6.0",
+        "checker": "conservation-check/1.7.0",
         "accepted": {"characters": 3, "elements": 0, "paragraphsJoined": 0},
         "original": {"characters": 3, "elements": 0, "paragraphsJoined": 1},
     }
@@ -237,7 +321,7 @@ def test_the_check_holds_each_view_to_the_source_on_its_own() -> None:
 
 CASES = Path(__file__).resolve().parents[1] / "corpus" / "tracked-cases"
 # The cases the reader refuses: what it cannot undo exactly (Word's views are on record).
-REFUSED = {"field-separator-deleted", "mark-deleted-before-table", "row-inserted"}
+REFUSED = {"field-separator-deleted", "mark-deleted-last-in-body", "mark-deleted-last-in-cell"}
 
 
 @pytest.mark.parametrize("path", sorted(CASES.glob("*.docx")), ids=lambda p: p.stem)
@@ -300,7 +384,7 @@ def test_the_check_counts_what_each_view_holds_and_only_the_revised_parts() -> N
     source = _with_part(docx(body, footnotes=note), "word/media/image1.png", b"\x89PNG\r\n")
     accepted, original, _ = tracked(source)
     assert certify_tracked(source, {"accepted": accepted, "original": original}) == {
-        "checker": "conservation-check/1.6.0",
+        "checker": "conservation-check/1.7.0",
         "accepted": {"characters": 5, "elements": 2, "paragraphsJoined": 0},
         "original": {"characters": 4, "elements": 1, "paragraphsJoined": 0},
     }

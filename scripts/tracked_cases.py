@@ -53,6 +53,18 @@ def numbered(level: int = 0, key: int = 1) -> str:
     return f'<w:numPr><w:ilvl w:val="{level}"/><w:numId w:val="{key}"/></w:numPr>'
 
 
+def table(*rows: str, props: str = "") -> str:
+    """A one-column table of ``rows`` (each a row's ``w:tr`` content after its properties)."""
+    grid = "<w:tblGrid><w:gridCol/></w:tblGrid>"
+    return f"<w:tbl><w:tblPr>{props}</w:tblPr>{grid}{''.join(rows)}</w:tbl>"
+
+
+def row(*cells: str, props: str = "") -> str:
+    """A row of cells, each cell's paragraphs given."""
+    inner = "".join(f"<w:tc>{c}</w:tc>" for c in cells)
+    return f"<w:tr>{f'<w:trPr>{props}</w:trPr>' if props else ''}{inner}</w:tr>"
+
+
 LIST = abstract(1, lvl(0), lvl(1, fmt="lowerLetter", text="%2)")) + num(1, 1)
 STYLES = (
     '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/>'
@@ -219,6 +231,67 @@ CASES: dict[str, Case] = {
         + "</w:p></w:tc></w:tr></w:tbl>"
         + para(words("after")),
     ),
+    "mark-deleted-before-nested-table": case(
+        "A deleted paragraph mark before a table whose first cell starts with a table.",
+        para(words("before"), props=mark("del"))
+        + table(row(table(row(para(words("inner")))) + para(words("outer"))))
+        + para(words("after")),
+    ),
+    "mark-deleted-before-table-styled": case(
+        "A deleted mark before a table: whose properties the joined paragraph keeps.",
+        para(words("a quote"), props=f'<w:pStyle w:val="Quote"/>{mark("del")}')
+        + table(row(para(words(" in a heading"), props='<w:pStyle w:val="Heading1"/>')))
+        + para(words("after")),
+    ),
+    "mark-deleted-last-in-cell": case(
+        "The mark of a cell's last paragraph deleted: a cell's end cannot be joined.",
+        table(
+            row(
+                para(words("first"), props=mark("del", 10)) + para(words("last"), props=mark("del"))
+            )
+        )
+        + para(words("after")),
+    ),
+    "mark-deleted-last-in-body": case(
+        "The body's last paragraph mark deleted.",
+        para(words("one")) + para(words("last"), props=mark("del")),
+    ),
+    "mark-deleted-section-end": case(
+        "A deleted mark that ends a section.",
+        para(words("first section"), props=f"<w:sectPr/>{mark('del')}") + para(words("second")),
+    ),
+    "row-deleted": case(
+        "A table row deleted.",
+        table(
+            row(para(words("kept"))),
+            row(para(dele(words("gone"))), props=f'<w:del w:id="4" {WHO}/>'),
+            row(para(words("last"))),
+        )
+        + para(words("after")),
+    ),
+    "format-table": case(
+        "Table, row and cell properties changed: the original has the former ones.",
+        table(
+            row(
+                para(words("cell")).replace(
+                    "<w:p>",
+                    '<w:tcPr><w:shd w:val="clear" w:fill="D9D9D9"/>'
+                    f'<w:tcPrChange w:id="5" {WHO}><w:tcPr/></w:tcPrChange></w:tcPr><w:p>',
+                    1,
+                ),
+                props=f'<w:cantSplit/><w:trPrChange w:id="6" {WHO}><w:trPr/></w:trPrChange>',
+            ),
+            props=f'<w:jc w:val="center"/><w:tblPrChange w:id="7" {WHO}><w:tblPr/></w:tblPrChange>',
+        )
+        + para(words("after")),
+    ),
+    "format-section": case(
+        "Section properties changed: the original has the former ones.",
+        para(words("body")),
+        final='<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/>'
+        f'<w:sectPrChange w:id="8" {WHO}><w:sectPr><w:pgSz w:w="11906" w:h="16838"/>'
+        "</w:sectPr></w:sectPrChange></w:sectPr>",
+    ),
     "row-inserted": case(
         "A table row inserted (the reader refuses it).",
         "<w:tbl><w:tblGrid><w:gridCol/></w:tblGrid><w:tr><w:tc><w:p>"
@@ -260,14 +333,23 @@ def record_word() -> None:
     """Have Word make each case's views, into ``word/``, with their hashes."""
     folder = FOLDER / "word"
     folder.mkdir(parents=True, exist_ok=True)
-    sources = []
+    manifest_path = folder / "sources.json"
+    kept = json.loads(manifest_path.read_text("utf-8"))["sources"] if manifest_path.exists() else []
+    case_hashes = {f"{n}.docx": hashlib.sha256(package(c)).hexdigest() for n, c in CASES.items()}
+    # Word's views are kept for every case they were made of, as it is now: Word's files are
+    # not the same bytes from run to run, so only new or changed cases are asked again.
+    sources = [s for s in kept if case_hashes.get(s["case"]) == s.get("caseSha256")]
+    asked = {s["case"] for s in sources}
     for name in CASES:
+        if f"{name}.docx" in asked:
+            continue
         for view, data in word_views(FOLDER / f"{name}.docx").items():
             path = folder / f"{name}.{view}.docx"
             path.write_bytes(data)
             sources.append(
                 {
                     "case": f"{name}.docx",
+                    "caseSha256": case_hashes[f"{name}.docx"],
                     "view": view,
                     "file": path.name,
                     "sha256": hashlib.sha256(data).hexdigest(),
@@ -281,7 +363,9 @@ def record_word() -> None:
         "note": "Each case with every change accepted, and every change rejected, by Word.",
         "sources": sources,
     }
-    (folder / "sources.json").write_text(json.dumps(manifest, indent=2) + "\n", "utf-8")
+    for stale in set(folder.glob("*.docx")) - {folder / s["file"] for s in sources}:
+        stale.unlink()
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", "utf-8")
 
 
 def main() -> int:
