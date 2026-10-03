@@ -2,8 +2,8 @@
 
 Every result the reader serves carries a certificate from an independent check
 ([`certify.py`](../src/label_docx/certify.py)). A result the check cannot account for is not
-served; it becomes the refusal `uncertified`. Requirements R-24 to R-27 and R-34 to R-36 in
-[requirements.md](requirements.md); tests in `tests/test_certify.py`.
+served; it becomes the refusal `uncertified`. Requirements R-24 to R-28, R-34 to R-36 and R-39
+in [requirements.md](requirements.md); tests in `tests/test_certify.py`.
 
 ## The statement
 
@@ -29,8 +29,8 @@ table cells, notes, sections and note and page places are `D`'s) and the ledger:
 whitespace + floating objects`. Equality is all or nothing, so a dropped, added, changed, repeated, swapped or moved
 character, and a dropped, split or merged paragraph, all fail it.
 
-`tests/test_certify.py` applies 20 kinds of change to the results of all 200 corpus documents
-read (10,768 changed results): every one is refused, and every unchanged result is certified.
+`tests/test_certify.py` applies each of its kinds of change to the result of every corpus
+document read: every changed result is refused, and every unchanged result is certified.
 
 ## Why it is independent
 
@@ -38,8 +38,13 @@ read (10,768 changed results): every one is refused, and every unchanged result 
   HTML parser, where the reader uses an XML parser.
 - Every text element of every part it reads is read twice: by Python's XML parser and by a
   tokenizer written in the check without any XML library (`_raw_texts`). The two must agree.
-- It shares no code with the readers, only data: the 49-entry Symbol table and the Wingdings bullet
-  table, held to Word.
+- It shares no code with the readers. It shares two tables: the 49-entry Symbol table and the
+  Wingdings bullet table, reviewed mappings from Adobe's `symbol.txt` (as the Unicode Consortium
+  maps it) and ISO/IEC N4384. Word does not check them: the Word oracle reads Word's stored codes
+  through the same tables (`word.as_drawn`, `word.label_as_drawn`).
+- It shares rules by design: Word's precedence for fonts and hiding, the toggles, list labels and
+  note marks are the reader's rules written again, apart. A rule wrong in both is caught only by
+  Word's recorded answers (`test_word_oracle.py`).
 - It treats the result as untrusted: a wrong result can only fail.
 - Each token has one reading. Whether a run is in the Symbol font, or hidden, the check decides
   itself by Word's precedence (run, character style, paragraph style, table style, defaults).
@@ -80,17 +85,19 @@ checked (R-32). Word shows text in capitals by its own rule ("5 µg" in capitals
 
 The body, footnotes, endnotes, headers, footers and comments of a .docx; the section titles and
 divs of an ePI. A header, footer or comment refused on its own is listed under `refused`. Text
-anywhere else in the package (the glossary, continuation notices, other ePI narratives) is
-listed under `notRead` with its size.
+anywhere else is listed under `notRead`: for a .docx each part (the glossary, a header no section
+names...) or note separator with the size of its text; for an ePI only the number of other
+narratives in the Bundle.
 
 ## Who checks the checker
 
 `scripts/mutate_checker.py` puts one fault at a time into a copy of `certify.py` (a comparison
 turned round, a number one off, a statement removed...) and runs the check's tests against it.
-`tests/test_checker_mutants.py` requires the recorded run to be of the current code, at least
-90% of faults killed, and every survivor recorded with the reason it cannot change a result.
-Current run (`docs/checker-mutants.json`): 1,552 of 1,612 killed, 60 equivalent, 0 unexplained.
-A run takes about 25 minutes and resumes in parts (`--budget`).
+`tests/test_checker_mutants.py` requires the recorded run to be of the current `certify.py`,
+its tests and the corpus, at least 90% of faults killed, and every survivor recorded with the
+reason it cannot change a result; each reason names one fault. The run works on a copy of the
+files taken when it starts, so an edit made meanwhile cannot reach it. Counts are in
+`docs/checker-mutants.json`. A run takes about 25 minutes and resumes in parts (`--budget`).
 
 ## Every time
 

@@ -13,14 +13,16 @@ import json
 
 from fuzz_docx import documents
 from label_docx import output
+from lock import GENERATED, docx_outcome, outcomes_sha256
 
 
 def test_every_generated_document_read_is_certified() -> None:
-    outcomes: dict[str, int] = {}
+    outcomes = []
     for seed in (101, 102):
         for data in documents(seed, 300):
-            value = json.loads(output.read(data)[0])
-            outcome = value["refusal"]["code"] if "refusal" in value else "certified"
-            assert outcome != "uncertified", value["refusal"]["detail"]
-            outcomes[outcome] = outcomes.get(outcome, 0) + 1
-    assert outcomes["certified"] > 300
+            outcomes.append(docx_outcome(output.read(data)[0]))
+            assert outcomes[-1] != "uncertified", f"seed {seed}, case {len(outcomes) - 1}"
+    assert outcomes.count("certified") > 300
+    # Each case's outcome as recorded: a reader that refuses more is a change to review.
+    recorded = json.loads(GENERATED.read_text("utf-8"))["docx"]
+    assert outcomes_sha256(outcomes) == recorded, "outcomes changed: review, run scripts/lock.py"

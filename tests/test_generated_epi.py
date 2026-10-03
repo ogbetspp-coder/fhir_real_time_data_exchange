@@ -15,6 +15,7 @@ from pathlib import Path
 from fuzz_epi import cases, cases_sha256
 from label_docx import epi
 from label_docx.browser import digest, markers_digest, reader_lines, reader_markers
+from lock import GENERATED, epi_outcome, outcomes_sha256
 
 RECORD = Path(__file__).resolve().parent / "data" / "generated-epi.json"
 
@@ -37,3 +38,7 @@ def test_every_generated_section_the_reader_reads_is_what_chrome_shows() -> None
         assert mine == answer, f"case {index}: run scripts/fuzz_epi.py --seed {seed} to see it"
         read += 1
     assert read > 1000
+    # Each case's outcome as recorded: a reader that refuses more is a change to review.
+    outcomes = [epi_outcome(div) for div in divs]
+    recorded = json.loads(GENERATED.read_text("utf-8"))["epi"]
+    assert outcomes_sha256(outcomes) == recorded, "outcomes changed: review, run scripts/lock.py"

@@ -34,11 +34,7 @@ a page number (set by the layout; its place must be in ``pages``), a page or col
 (layout), a picture or shape anchored to its paragraph (it floats apart from the text, and
 Word's text shows none; one in line is U+FFFC).
 
-Its scope is the text the reader claims to read: for a .docx the body, footnotes, endnotes,
-headers, footers and comments (one the reader refuses on its own is listed under ``refused``);
-for an ePI the Composition's section titles and divs. Text the package holds elsewhere (the
-glossary, note separators, other narratives in the Bundle) is listed under ``notRead`` with its
-size, so nothing is left out silently.
+Its scope, and what it lists as not read, is stated in ``docs/conservation.md`` ("Scope").
 
 For an ePI the same statement holds with HTML's tokens (parsed here by the standard library's
 HTML parser, not the reader's XML parser): every character of text, in order, with each run of
@@ -57,9 +53,10 @@ from a change is held to Word (``corpus/tracked-cases``).
 Beyond the text, the check works out on its own, by Word's rules written apart from the
 reader's, the key marks (``CHECKED_MARKS``), every list label and every note mark; the result's
 must be the check's. Other marks are held to Word and Chrome themselves
-(``tests/test_word_oracle.py``, ``tests/test_browser_oracle.py``). It shares one thing with the
-reader: the Symbol table (``SYMBOL_FONT``), 49 code points held to Word, and the closed table of
-Wingdings bullets (``WINGDINGS_BULLETS``).
+(``tests/test_word_oracle.py``, ``tests/test_browser_oracle.py``). It shares no code with the
+reader, only two tables: the Symbol table (``SYMBOL_FONT``, 49 codes) and the Wingdings bullets
+(``WINGDINGS_BULLETS``). See ``docs/conservation.md`` ("Why it is independent") for what that
+leaves unchecked.
 """
 
 from __future__ import annotations
@@ -189,9 +186,10 @@ class _Fonts:
     Worked out here, by Word's precedence, written down on its own (it shares no code with the
     reader): the run's own properties, then its character style, its paragraph style and the
     innermost table's style, each with its ``basedOn`` chain, then the document defaults; a
-    style id that is absent or unknown means the default style of its kind (the last marked
-    default). A font slot (``ascii``, ``hAnsi``...) is set by the first level that names it, a
-    theme reference there naming the theme's typeface for its script. A run is hidden when it
+    paragraph or table style id that is absent or unknown means the default style of its kind
+    (the last marked default), and a character one means none (Word gives text no default
+    character style). A font slot (``ascii``, ``hAnsi``...) is set by the first level that names
+    it, a theme reference there naming the theme's typeface for its script. A run is hidden when it
     says so itself, or, saying nothing, when any level says so (the reading the reader states;
     Word's prints are held to it by ``tests/test_word_oracle.py``).
     """
@@ -204,6 +202,8 @@ class _Fonts:
         self.doc_ppr: ET.Element | None = None
         self.defaults: dict[str, str] = {}
         self.doc_rpr: ET.Element | None = None
+        # ``chain``'s answers, worked out once each.
+        self.chains: dict[tuple[str | None, str], list[ET.Element]] = {}
         if styles is not None:
             for style in styles.findall(_w("style")):
                 style_id = style.get(_w("styleId"))
@@ -238,14 +238,21 @@ class _Fonts:
             # which Word gives no default character style.
             style_id = None if kind == "character" else self.defaults.get(kind)
         out: list[str] = []
-        while style_id is not None and style_id in self.kind and style_id not in out:
+        seen: set[str] = set()
+        while style_id is not None and style_id in self.kind and style_id not in seen:
             out.append(style_id)
+            seen.add(style_id)
             style_id = self.based[style_id]
         return out
 
     def chain(self, style_id: str | None, kind: str) -> list[ET.Element]:
-        """The run properties of each style in ``style_ids``, nearest first."""
-        return [rpr for i in self.style_ids(style_id, kind) if (rpr := self.rpr[i]) is not None]
+        """The run properties of each style in ``style_ids``, nearest first (never changed)."""
+        key = (style_id, kind)
+        if key not in self.chains:
+            self.chains[key] = [
+                rpr for i in self.style_ids(style_id, kind) if (rpr := self.rpr[i]) is not None
+            ]
+        return self.chains[key]
 
     def levels(
         self, run: ET.Element, paragraph_style: str | None, table_style: str | None, in_table: bool
@@ -407,7 +414,7 @@ def _bullet_reading(code: int) -> str:
 
 
 class _Story:
-    """The tokens of one story (the body, or one note), paragraph by paragraph."""
+    """The tokens of one story (the body, a note, a header, a footer or a comment), by paragraph."""
 
     def __init__(
         self, fonts: _Fonts, ledger: _Ledger, story: tuple[str, int] | None = None
@@ -732,20 +739,30 @@ def _docx_parts(data: bytes) -> tuple[zipfile.ZipFile, str, dict[str, str]]:
     return archive, main[0], related
 
 
-def _relation(archive: zipfile.ZipFile, source: str, relationship: str | None, kind: str) -> str:
-    """The part ``source``'s relationship ``relationship`` names, which must be a ``kind``."""
+def _by_id(archive: zipfile.ZipFile, source: str) -> dict[str | None, ET.Element]:
+    """The first of ``source``'s relationships with each Id."""
     folder, base = posixpath.split(source)
     name = posixpath.join(folder, "_rels", base + ".rels")
+    out: dict[str | None, ET.Element] = {}
     for rel in ET.fromstring(archive.read(name)).iter(f"{{{_RELS}}}Relationship"):
-        if rel.get("Id") != relationship:
-            continue
-        if rel.get("TargetMode") == "External" or not rel.get("Type", "").endswith("/" + kind):
-            raise CertificationError(f"{relationship} is not a {kind} part")
-        target = rel.get("Target", "")
-        return posixpath.normpath(
-            target[1:] if target.startswith("/") else posixpath.join(folder, target)
-        )
-    raise CertificationError(f"no relationship {relationship}")
+        out.setdefault(rel.get("Id"), rel)
+    return out
+
+
+def _relation(
+    by_id: dict[str | None, ET.Element], source: str, relationship: str | None, kind: str
+) -> str:
+    """The part ``source``'s relationship ``relationship`` names, which must be a ``kind``."""
+    rel = by_id.get(relationship)
+    if rel is None:
+        raise CertificationError(f"no relationship {relationship}")
+    if rel.get("TargetMode") == "External" or not rel.get("Type", "").endswith("/" + kind):
+        raise CertificationError(f"{relationship} is not a {kind} part")
+    target = rel.get("Target", "")
+    folder = posixpath.dirname(source)
+    return posixpath.normpath(
+        target[1:] if target.startswith("/") else posixpath.join(folder, target)
+    )
 
 
 def _relations(archive: zipfile.ZipFile, source: str, kind: str) -> list[str]:
@@ -825,7 +842,8 @@ def _formatted(value: int, fmt: str) -> str:
         # a to z, then aa to zz: the letter repeated.
         letters = chr(ord("A") + (value - 1) % 26) * ((value - 1) // 26 + 1)
         return letters if fmt == "upperLetter" else letters.lower()
-    if fmt == "chicago" and value >= 1:
+    if fmt == "chicago" and 1 <= value <= 8:
+        # *, †, ‡, §, then each doubled: Word's answer is on record that far.
         return _CHICAGO_SIGNS[(value - 1) % 4] * ((value - 1) // 4 + 1)
     raise CertificationError(f"the number {value} in {fmt}")
 
@@ -1163,7 +1181,10 @@ def _raw_texts(data: bytes) -> list[tuple[str, str]]:
             name = body.split(None, 1)[0] if body.strip() else ""
             # Copied only where the tag declares a prefix: a scope is never changed once made.
             scope = scopes[-1]
-            for key, double, single in _ATTRIBUTE.findall(body, len(name)):
+            # Attributes matter only for a declaration or a reference; most tags have neither.
+            for key, double, single in (
+                _ATTRIBUTE.findall(body, len(name)) if "xmlns" in body or "&" in body else ()
+            ):
                 value = double or single
                 # Without "&" a value has no reference to resolve, and no bare "&" to refuse.
                 value = _unescape(value) if "&" in value else value
@@ -1244,6 +1265,7 @@ class DocxSource:
                 "header": [],
                 "footer": [],
             }
+            main_rels: dict[str | None, ET.Element] | None = None
             for section, properties in enumerate(parse[main].iter(_w("sectPr"))):
                 for reference in properties:
                     story_kind = next(
@@ -1252,7 +1274,9 @@ class DocxSource:
                     if story_kind is None:
                         continue
                     kind = story_kind
-                    name = _relation(archive, main, reference.get(f"{{{_R}}}id"), kind)
+                    if main_rels is None:
+                        main_rels = _by_id(archive, main)
+                    name = _relation(main_rels, main, reference.get(f"{{{_R}}}id"), kind)
                     use = {"section": section, "type": reference.get(_w("type"), "default")}
                     found = next((e for e in self.stories[kind] if e[0] == name), None)
                     if found is not None:
@@ -1591,6 +1615,9 @@ def certify_tracked(source: bytes, views: dict[str, bytes]) -> dict[str, Json]:
         roots = {
             name: ET.fromstring(original.read(name)) for name in names if name.endswith(".xml")
         }
+        revised = {
+            name: any(e.tag in _REVISIONS for e in root.iter()) for name, root in roots.items()
+        }
         for view, data in views.items():
             characters = elements = joined = 0
             gone = _notes_gone(roots, _VIEW_DROPS[view])
@@ -1603,10 +1630,13 @@ def certify_tracked(source: bytes, views: dict[str, bytes]) -> dict[str, Json]:
                         if before != after:
                             raise CertificationError(f"{view} view: {name} is changed")
                         continue
+                    dropped = gone.get(roots[name].tag, set())
+                    if before == after and not dropped and not revised[name]:
+                        # The source's part as it is, with no revision and no note to drop.
+                        continue
                     source_root, view_root = ET.fromstring(before), ET.fromstring(after)
                     if any(e.tag in _REVISIONS for e in view_root.iter()):
                         raise CertificationError(f"{view} view: a revision is left in {name}")
-                    dropped = gone.get(source_root.tag, set())
                     for note in [n for n in source_root if n.get(_w("id")) in dropped]:
                         source_root.remove(note)
                     if not dropped and not any(e.tag in _REVISIONS for e in source_root.iter()):

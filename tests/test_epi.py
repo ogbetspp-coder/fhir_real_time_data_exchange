@@ -12,7 +12,14 @@ from typing import Any
 
 import pytest
 
-from label_docx.epi import EpiRefusedError, read_div, read_epi, walk
+from label_docx.epi import (
+    DEFAULT_IGNORABLE,
+    EpiRefusedError,
+    is_default_ignorable,
+    read_div,
+    read_epi,
+    walk,
+)
 
 SOURCES = Path(__file__).resolve().parents[1] / "corpus" / "ema-epi"
 XHTML = "http://www.w3.org/1999/xhtml"
@@ -1250,3 +1257,16 @@ def test_list_markers_are_the_ones_a_browser_draws() -> None:
         ("aa", "AA."),
     ]
     assert {p.numbering.suffix for p in paragraphs if p.numbering and p.numbering.text} == {"space"}
+
+
+def test_the_default_ignorable_lookup_is_the_table_at_every_edge() -> None:
+    # The lookup searches the sorted ranges; it must say what the table says on each side of
+    # every range edge, and at both ends of Unicode.
+    edges = {
+        0,
+        0x10FFFF,
+        *(c + d for low, high in DEFAULT_IGNORABLE for c in (low, high) for d in (-1, 0, 1)),
+    }
+    for code in sorted(edges):
+        expected = any(low <= code <= high for low, high in DEFAULT_IGNORABLE)
+        assert is_default_ignorable(code) == expected, hex(code)

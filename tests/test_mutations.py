@@ -1,4 +1,4 @@
-"""Every change to what Word shows changes the result or is refused; nothing else changes it.
+"""Sampled edits: each that changes what Word shows changes the result or is refused; no other does.
 
 scripts/mutate.py edits the corpus documents one small change at a time. This runs two of each
 kind of edit on every corpus document (a few thousand reads) and holds the reader to the rule: no
@@ -10,6 +10,7 @@ change and a result that did). What the reader does not report (font size) is he
 from __future__ import annotations
 
 import collections
+import concurrent.futures
 from pathlib import Path
 
 import pytest
@@ -23,9 +24,12 @@ DOCUMENTS = sorted(CORPUS.glob("*/*.docx"))
 @pytest.fixture(scope="module")
 def verdicts() -> dict[str, collections.Counter[str]]:
     table: dict[str, collections.Counter[str]] = collections.defaultdict(collections.Counter)
-    for path in DOCUMENTS:
-        for name, _, verdict in outcomes(path.read_bytes(), 2):
-            table[name][verdict] += 1
+    # Each document on its own core; the table is the same in any order.
+    with concurrent.futures.ProcessPoolExecutor() as pool:
+        datas = [path.read_bytes() for path in DOCUMENTS]
+        for found in pool.map(outcomes, datas, [2] * len(datas)):
+            for name, _, verdict in found:
+                table[name][verdict] += 1
     return table
 
 

@@ -78,6 +78,11 @@ def test_the_canonical_form_is_rfc_8785_for_the_values_the_reader_produces() -> 
         '{"a":[1,true,null],"b":"\\u0000\\b\\t\\n\\u000b\\f\\r\\u001f\\"\\\\/'
         '\x7f\u2028\U0001f600\u00e9"}\n'
     ).encode("utf-8")
+    # RFC 8785 3.2.3: keys sorted by UTF-16 code units, where U+1D4B3 (a surrogate pair from
+    # U+D835) comes before U+FF58; part names (certificate notRead) can be any Unicode.
+    assert canonical({"\uff58": 1, "\U0001d4b3": 2, "z": 3}) == (
+        '{"z":3,"\U0001d4b3":2,"\uff58":1}\n'.encode()
+    )
 
 
 def test_the_command_line_writes_the_same_bytes_and_exits_by_outcome(

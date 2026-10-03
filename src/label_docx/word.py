@@ -19,7 +19,7 @@ What Word is asked, each by a script on a copy of the document:
 - **Note marks:** markers around every note reference; Word saves the copy as text, and what it
   wrote between the markers is the mark.
 - **Fields:** markers around every field; the text Word shows, then the text after it saves as
-  PDF, when it recomputes SEQ, STYLEREF and REF. A field must show what Word prints.
+  PDF, when it recomputes SEQ, STYLEREF, REF and NOTEREF. A field must show what Word prints.
 - **Print:** the whole text as shown and after saving as PDF, page numbers aside: any field that
   Word reprints differently is caught.
 - **Emphasis:** whether each body paragraph is bold, italic, in capitals and struck through,

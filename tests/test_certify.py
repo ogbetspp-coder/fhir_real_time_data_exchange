@@ -16,6 +16,7 @@ import copy
 import functools
 import hashlib
 import json
+import pickle
 import random
 from collections.abc import Callable
 from pathlib import Path
@@ -440,9 +441,11 @@ def test_every_change_to_a_result_is_refused(path: Path) -> None:
     source, value = _certified(path)
     rng = random.Random(path.name)
     tried = 0
+    # One copy of the value per change, made from one pickle (faster than deepcopy, the same).
+    pickled = pickle.dumps(value)
     for change in CHANGES:
         for _ in range(_TIMES):
-            changed = copy.deepcopy(value)
+            changed = pickle.loads(pickled)
             if not change(changed, rng):
                 break
             tried += 1
@@ -1818,6 +1821,7 @@ def test_the_check_draws_no_note_mark_it_cannot_draw_as_word_does(body: str) -> 
         (53, "upperLetter", "AAA"),
         (780, "upperLetter", "Z" * 30),
         (5, "chicago", "**"),
+        (8, "chicago", "\u00a7\u00a7"),
         (7, "decimalZero", "07"),
         (0, "decimal", "0"),
         (12, "none", ""),
@@ -1837,6 +1841,7 @@ def test_numbers_are_written_in_every_format_as_word_writes_them(
         (0, "upperLetter"),
         (781, "lowerLetter"),
         (0, "chicago"),
+        (9, "chicago"),
         (-1, "decimal"),
         (1, "ordinal"),
     ],

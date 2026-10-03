@@ -488,14 +488,12 @@ CASES: dict[str, Case] = {
         "A startOverride on the first list sets its start.", SHARED, items((13, 0), (13, 0))
     ),
     "return-after-restart": Case(
-        "Back to the first list after a second restarted the count (the reader refuses).",
+        "Back to the first list after a second restarted the count.",
         SHARED,
         items((10, 0), (12, 0), (10, 0)),
     ),
     "plain-after-restart": Case(
-        "A list that overrides nothing after one that restarted (the reader refuses).",
-        SHARED,
-        items((12, 0), (11, 0)),
+        "A list that overrides nothing after one that restarted.", SHARED, items((12, 0), (11, 0))
     ),
     "override-deeper-level": Case(
         "A new list restarts level 1 at 5 under a level 0 counted by another list.",
@@ -503,17 +501,17 @@ CASES: dict[str, Case] = {
         items((1, 0), (1, 1), (2, 1), (2, 1)),
     ),
     "ancestor-never-counted": Case(
-        "A level shown before its parent level was counted (the reader refuses).",
+        "A level shown before its parent level was counted.",
         SECTIONS + num(1, 1),
         items((1, 1), (1, 1), (1, 0), (1, 1)),
     ),
     "missing-start": Case(
-        "A decimal level with no w:start (the reader refuses).",
+        "A decimal level with no w:start.",
         abstract(1, lvl(0, start=None)) + num(1, 1),
         items((1, 0), (1, 0)),
     ),
     "style-tied-deeper-level": Case(
-        "A style names numId 1 but no level; level 1 names the style (the reader refuses).",
+        "A style names numId 1 but no level; level 1 names the style.",
         abstract(1, lvl(0), lvl(1, text="%1.%2", extra='<w:pStyle w:val="H2"/>')) + num(1, 1),
         items((1, 0)) + styled("H2") + styled("H2"),
         HEADING,

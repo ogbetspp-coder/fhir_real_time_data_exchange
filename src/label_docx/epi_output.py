@@ -1,9 +1,11 @@
 """The ePI reader's result as canonical JSON, in the form ``output`` gives a .docx's.
 
 Canonical as ``output.canonical`` is (RFC 8785 for these values), and each paragraph has the
-shape of a .docx paragraph (``output.paragraph``): a browser has no paragraph styles, note marks
-or page numbers, so ``style`` is null and ``notes`` and ``pages`` are empty. Offsets count
-Unicode code points.
+shape of a .docx paragraph (``output.paragraph``): a browser has no paragraph styles, note marks,
+page numbers or comments, so ``style`` is null, ``markHidden`` false and ``notes``, ``pages``
+and ``comments`` empty. In a list item ``numbering.numId`` is 1 (``ul``) or 2 (``ol``) and
+``numbering.level`` is how many lists hold the item, from 1 (a .docx's counts from 0). Offsets
+count Unicode code points.
 
 A read::
 

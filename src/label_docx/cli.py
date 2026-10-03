@@ -9,21 +9,18 @@ detail names elements, fonts and codes, never the document's text.
 from __future__ import annotations
 
 import argparse
-import concurrent.futures
 import sys
 from pathlib import Path
 
 from label_docx.documents import kind
-from label_docx.service import browser_verifier, check_environment, serve, word_verifier
-from label_docx.store import Store
 
 
 def main(argv: list[str] | None = None) -> int:
     """Run the command line; the return value is the exit status."""
     parser = argparse.ArgumentParser(
-        prog="label-docx", description="Read a .docx and write its canonical JSON."
+        prog="label-docx", description="Read a .docx or an ePI Bundle and write its canonical JSON."
     )
-    parser.add_argument("file", type=Path, help="the .docx to read")
+    parser.add_argument("file", type=Path, help="the .docx or ePI Bundle (JSON) to read")
     parser.add_argument("-o", "--output", type=Path, help="write here instead of standard output")
     args = parser.parse_args(argv)
     try:
@@ -42,8 +39,15 @@ def main(argv: list[str] | None = None) -> int:
 
 def service_main(argv: list[str] | None = None) -> int:
     """``label-docx-service``: serve a store over HTTP, or ingest files into it."""
+    # Imported here, so that reading one file (``main``) does not load the service.
+    import concurrent.futures
+
+    from label_docx.service import browser_verifier, check_environment, serve, word_verifier
+    from label_docx.store import Store
+
     parser = argparse.ArgumentParser(
-        prog="label-docx-service", description="Ingest .docx documents into a write-once store."
+        prog="label-docx-service",
+        description="Ingest .docx and ePI documents into a write-once store.",
     )
     commands = parser.add_subparsers(dest="command", required=True)
     serving = commands.add_parser("serve", help="serve the store over HTTP")
@@ -119,6 +123,8 @@ def service_main(argv: list[str] | None = None) -> int:
 
 def _verified(job: tuple[Path, str]) -> str | None:
     """Why a kept document fails ``Store.verify``, or None if it passes."""
+    from label_docx.store import Store
+
     root, document = job
     try:
         Store(root).verify(document)

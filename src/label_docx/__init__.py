@@ -1,4 +1,4 @@
-"""A deterministic, fail-closed reader for the text of a label's Word (.docx) body."""
+"""A deterministic, fail-closed reader for the text of a label: a Word .docx or an EMA ePI."""
 
 from label_docx.output import FORMAT_VERSION, canonical, read
 from label_docx.reader import (

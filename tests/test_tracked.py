@@ -313,10 +313,19 @@ def test_the_check_holds_each_view_to_the_source_on_its_own() -> None:
         {"accepted": _rewrite(accepted, "word/_rels/document.xml.rels", lambda x: x + " ")},
         # A part missing.
         {"accepted": _rewrite(accepted, body, lambda x: x).replace(b"word/_rels", b"word/_relz")},
+        # The source itself, its revisions and all.
+        {"accepted": source},
     ]
     for tampered in wrong:
         with pytest.raises(CertificationError):
             certify_tracked(source, tampered)
+    # An XML part with no revisions written differently.
+    styled = docx(p(t("a") + ins(t("b"))), styles='<w:style w:type="paragraph" w:styleId="N"/>')
+    accepted, _, _ = tracked(styled)
+    with pytest.raises(CertificationError):
+        certify_tracked(
+            styled, {"accepted": _rewrite(accepted, "word/styles.xml", lambda x: x + " ")}
+        )
 
 
 CASES = Path(__file__).resolve().parents[1] / "corpus" / "tracked-cases"
@@ -598,3 +607,17 @@ def test_every_change_is_listed_and_only_a_formatting_copy_once() -> None:
     # Two insertions with one id are two changes; a run split in two holds one change twice.
     _, _, changes = tracked(docx(p(ins(t("a"), key=0) + t("b") + ins(t("c"), key=0))))
     assert [c.kind for c in changes] == ["insert", "insert"]
+    # Formatting changes sharing id, author and date are distinct unless one copies the last in
+    # its paragraph, former properties and all: in other paragraphs, with other former
+    # properties, or outside a paragraph (a style's), each is listed.
+    bold = f'<w:b/><w:rPrChange w:id="0" {WHO}><w:rPr/></w:rPrChange>'
+    italic = f'<w:b/><w:rPrChange w:id="0" {WHO}><w:rPr><w:i/></w:rPr></w:rPrChange>'
+    body = p(r("<w:t>a</w:t>", bold)) + p(r("<w:t>b</w:t>", bold) + r("<w:t>c</w:t>", italic))
+    _, _, changes = tracked(docx(body))
+    assert [c.kind for c in changes] == ["format"] * 3
+    styles = "".join(
+        f'<w:style w:type="character" w:styleId="{k}"><w:rPr><w:i/>{bold[6:]}</w:rPr></w:style>'
+        for k in "UV"
+    )
+    _, _, changes = tracked(docx(p(t("m")), styles=styles))
+    assert [(c.part, c.kind) for c in changes] == [("word/styles.xml", "format")] * 2

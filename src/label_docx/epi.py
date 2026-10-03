@@ -22,14 +22,14 @@ Each section is read on its own, so a section the reader cannot vouch for is ref
 
 What a section's text is:
 
-- Block elements (``div``, ``p``, ``li``, ``td``, ``th``, ``table``, ``tr``, ``ul``, ``ol``,
-  ``thead``, ``tbody``, ``hr``) end one paragraph and start the next. A paragraph with no text
-  is dropped. A list item carries ``numbering``: ``num_id`` 1 in a ``ul`` (a bullet), 2 in an
-  ``ol`` (a number); its first paragraph's ``numbering.text`` is the marker a browser draws
+- Block elements (``div``, ``p``, ``h1`` to ``h6``, ``li``, ``td``, ``th``, ``table``, ``tr``,
+  ``ul``, ``ol``, ``thead``, ``tbody``, ``hr``) end one paragraph and start the next. A paragraph
+  with no text is dropped. A list item carries ``numbering``: ``num_id`` 1 in a ``ul`` (a bullet), 2
+  in an ``ol`` (a number); its first paragraph's ``numbering.text`` is the marker a browser draws
   before it ("1.", "b.", "iv.", "\u2022", "\u25e6", "\u25a0"), with ``suffix`` ``space``, by the
   list's ``type`` and ``start`` and, for bullets, its depth (``_list_state``). Like the Word
-  reader's labels, a marker is never in the text. A list item without text, or one that begins
-  with a list, is refused: its marker would stand beside nothing the reader reads.
+  reader's labels, a marker is never in the text. A list item without text, or one that begins with
+  a list, is refused: its marker would stand beside nothing the reader reads.
 - Whitespace is collapsed as a browser does under ``white-space: normal``: a run of space, tab,
   line feed, carriage return or form feed is one space, and none is kept at the start or end of
   a paragraph. No-break space (U+00A0) is text and is kept. ``<br/>`` is U+000A.
@@ -55,10 +55,10 @@ with an ``href``, ``text-decoration: underline`` and a bottom border on an inlin
 underline (an underline turns a sign into another: "<" underlined is drawn "≤", and "1" with an
 underlined "a" reads "1ª"), and a border on another side of an inline element as border (drawn as a
 bar beside or over the text). Bold and italic are marked as a browser computes them: the font
-weight carried down from the parent (``b`` and ``strong`` bolder than it, ``th`` bold, then
-``font-weight``; ``bolder`` and ``lighter`` as CSS Fonts 4 steps them) drawn bold at 600 and
-above, and ``em``, ``i`` and ``font-style: italic`` or ``oblique`` as italic. Layout is not
-reported, except the layout that draws other text, which refuses (below).
+weight carried down from the parent (``b`` and ``strong`` bolder than it, ``th`` and ``h1`` to
+``h6`` bold, then ``font-weight``; ``bolder`` and ``lighter`` as CSS Fonts 4 steps them) drawn bold
+at 600 and above, and ``em``, ``i`` and ``font-style: italic`` or ``oblique`` as italic. Layout is
+not reported, except the layout that draws other text, which refuses (below).
 
 What refuses a section (``SectionRefusal.code``):
 
@@ -84,46 +84,48 @@ What refuses a section (``SectionRefusal.code``):
 
 Also refused as ``malformed-xhtml``: a root that is not a ``div``, a lone surrogate (in a div read
 on its own; in a Bundle the document refuses first), a ``br``, ``img`` or ``hr`` with content,
-markup an HTML parser rebuilds or reads otherwise (a block in an open ``p``, an ``li`` in an
-``li``, an ``a`` in an ``a``, a table part outside a table, a processing instruction or comment, an
-element with a namespace prefix, a self-closing element other than ``br``, ``hr`` and ``img``,
-``</br>``, a reference to U+0080 to U+009F, which HTML maps through windows-1252 (all but five of
-them)), elements nested deeper than 128 (a table's row group and row counted; a section deep in the
-Bundle can be refused as nested too deeply to read within that bound, a false failure), and a CDATA
-section (an XML parser reads it as text, an HTML parser as a comment). As ``unsupported-element``:
-text between the parts of a table, which a browser moves out of the table, and a ``thead`` after a
-table's body (a browser draws a table's first header group at the top). As ``unsupported-style``: a
-margin or indent more than an inch to the left, text drawn more than 12pt left of its container's
-start (the blocks' margins and the indent inherited through blocks, inline elements and table rows
-summed, each read as the most negative value any of its declarations names; a table cell starts
-again from zero, or from the table's own offset when that is negative), which moves it off the page
-or over what lies there, or a margin or indent in a unit the reader does not know (``%``, ``vw``,
+markup an HTML parser rebuilds or reads otherwise (a block in an open ``p``, an ``li`` in an ``li``,
+an ``a`` in an ``a``, a heading in a heading, a table part outside a table, a processing instruction
+or comment, an element with a namespace prefix, a self-closing element other than ``br``, ``hr`` and
+``img``, ``</br>``, a reference to U+0080 to U+009F, which HTML maps through windows-1252 (all but
+five of them)), elements nested deeper than 128 (a table's row group and row counted; a section deep
+in the Bundle can be refused as nested too deeply to read within that bound, a false failure), and a
+CDATA section (an XML parser reads it as text, an HTML parser as a comment). As
+``unsupported-element``: text between the parts of a table, which a browser moves out of the table,
+and a ``thead`` after a table's body (a browser draws a table's first header group at the top). As
+``unsupported-style``: a heading without its own ``font-size`` (a browser draws it larger), a margin
+or indent more than an inch to the left, text drawn more than 12pt left of its container's start
+(the blocks' margins and the indent inherited through blocks, inline elements and table rows summed,
+each read as the most negative value any of its declarations names; a table cell starts again from
+zero, or from the table's own offset when that is negative), which moves it off the page or over
+what lies there, or a margin or indent in a unit the reader does not know (``%``, ``vw``,
 ``calc()``...); layout that draws one text over another (a negative margin on inline text or at a
 block's top or bottom, vertical padding on inline text and any padding on it over a background, a
 border on it wider than a hairline, a height outside table parts and pictures, a line height below
 12pt, 100% or 1em, a font above 14pt); a font outside a closed list of Unicode text fonts (a symbol
 font draws other glyphs); a border value on inline text a browser would not accept whole, or one
-inherited from the parent; a shift other than ``position: relative`` with exactly one of ``top``
-and ``bottom`` on an inline element other than ``sup`` and ``sub``, without ``vertical-align``,
-by at most 6pt (``top`` or ``bottom`` alone included; a background on or inside a shifted element,
-which is painted over the text around it; a shift inside another, or inside a ``sup``, ``sub``
-or ``vertical-align``, and one of a point or more around one, since each is bounded only on its
-own); a colour or background keyword a browser drops (``color: none``, ``background-color:
-auto``), which leaves the declaration before it in force; a style CSS would split otherwise than
-the reader (a quote outside a font family name or inside a quoted one, a comment, an escape, a
-bracket outside ``rgb()``, a character outside ASCII letters, digits, whitespace and
-``# % ! . , : ; ' " ( ) -``); and a margin or indent with a value a browser drops (the wrong
-number of values, ``text-indent: auto``).
+inherited from the parent; a shift other than ``position: relative`` with exactly one of ``top`` and
+``bottom`` on an inline element other than ``sup`` and ``sub``, without ``vertical-align``, by at
+most 6pt (``top`` or ``bottom`` alone included; a background on or inside a shifted element, which
+is painted over the text around it; a shift inside another, or inside a ``sup``, ``sub`` or
+``vertical-align``, and one of a point or more around one, since each is bounded only on its own); a
+colour or background keyword a browser drops (``color: none``, ``background-color: auto``), which
+leaves the declaration before it in force; a style CSS would split otherwise than the reader (a
+quote outside a font family name or inside a quoted one, a comment, an escape, a bracket outside
+``rgb()``, a character outside ASCII letters, digits, whitespace and ``# % ! . , : ; ' " ( ) -``);
+and a margin or indent with a value a browser drops (the wrong number of values, ``text-indent:
+auto``).
 
-What refuses the document (``EpiRefusedError``): not UTF-8 JSON (or JSON with an integer longer
-than Python's digit limit), a lone surrogate anywhere in it, not a document Bundle, not the shape
-of one (a section, code, text, div or entry of the wrong JSON type), not exactly one entry with
-sections, a resource with sections that is not a Composition, a section without a title, or nesting
-too deep to read.
+What refuses the document (``EpiRefusedError``, code ``invalid-bundle``): not UTF-8 JSON (or JSON
+with an integer longer than Python's digit limit), a lone surrogate anywhere in it, not a document
+Bundle, not the shape of one (a section, code, text, div or entry of the wrong JSON type), not
+exactly one entry with sections, a resource with sections that is not a Composition, a section
+without a title, or nesting too deep to read.
 """
 
 from __future__ import annotations
 
+import bisect
 import json
 import re
 import unicodedata
@@ -219,9 +221,14 @@ DEFAULT_IGNORABLE: Final = (
 )
 
 
+_IGNORABLE_LOWS: Final = tuple(low for low, _ in DEFAULT_IGNORABLE)
+
+
 def is_default_ignorable(code_point: int) -> bool:
     """Unicode's Default_Ignorable_Code_Point (Unicode 16.0), from the table above."""
-    return any(low <= code_point <= high for low, high in DEFAULT_IGNORABLE)
+    # The ranges are sorted and apart: only the last one starting at or below can hold it.
+    index = bisect.bisect_right(_IGNORABLE_LOWS, code_point) - 1
+    return index >= 0 and code_point <= DEFAULT_IGNORABLE[index][1]
 
 
 class EpiRefusedError(Exception):
@@ -1057,14 +1064,12 @@ class _Builder:
 def _marks(kinds: list[frozenset[str]]) -> tuple[Mark, ...]:
     kinds = [frozenset("faint" if k == _FAINT_COLOUR else k for k in each) for each in kinds]
     out: list[Mark] = []
-    for kind in sorted(set().union(*kinds)) if kinds else []:
-        start: int | None = None
-        for index, present in enumerate([*(kind in k for k in kinds), False]):
-            if present and start is None:
-                start = index
-            elif not present and start is not None:
-                out.append(Mark(start, index, kind))
-                start = None
+    started: dict[str, int] = {}  # each kind open at this character, from where
+    for index, each in enumerate([*kinds, frozenset()]):
+        for kind in [kind for kind in started if kind not in each]:
+            out.append(Mark(started.pop(kind), index, kind))
+        for kind in each:
+            started.setdefault(kind, index)
     return tuple(sorted(out, key=lambda m: (m.start, m.end, m.kind)))
 
 

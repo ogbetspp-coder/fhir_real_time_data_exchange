@@ -3,11 +3,17 @@
 The document is an object with sorted keys, no insignificant whitespace, UTF-8 with no ASCII
 escaping, and a final newline. Every value is a string, an integer, a boolean, null, an array or
 an object; there are no floating-point numbers. For such values this is the JSON Canonicalization
-Scheme (RFC 8785): keys are ASCII, so code-point and UTF-16 key order agree, and Python escapes
-exactly the characters JCS escapes, in the same form. ``tests/test_output.py`` holds it to that.
+Scheme (RFC 8785): keys are sorted by UTF-16 code units, and Python escapes exactly the
+characters JCS escapes, in the same form. ``tests/test_output.py`` holds it to that.
 
 Offsets (``marks[].start`` and ``end``) count Unicode code points of ``text``, not UTF-16 code
 units or bytes: a consumer in JavaScript must index by code point.
+
+A paragraph (``paragraph``; ``reader.Paragraph`` says what each means): ``text``, ``marks``
+(``start``, ``end``, ``kind``), ``style`` (the style id as written, or null), ``markHidden``,
+``table`` (``[table, row, cell]``, or null), ``numbering`` (null, or ``numId``, ``level``,
+``text`` and ``suffix``; ``level`` is Word's ``ilvl``, from 0), and ``notes``, ``pages`` and
+``comments`` as below.
 
 A read::
 
@@ -35,8 +41,8 @@ the page layout when it prints, so its value is never in ``text`` and never know
 ``certificate`` is the independent conservation check's account of the read
 (``label_docx.certify``): how many characters the source's text holds, how many the output
 holds, and how many were set aside and why (field code, page numbers, page breaks, hidden
-whitespace), with the parts holding text the reader does not read. The check found every
-character of the output in the source, in order, and every source character in the output or
+whitespace, floating objects), with the parts holding text the reader does not read. The check found
+every character of the output in the source, in order, and every source character in the output or
 set aside; a read it cannot account for is refused as ``uncertified``.
 
 A document with tracked changes::
@@ -58,9 +64,6 @@ themselves (``certify_tracked``).
 A refusal::
 
     {"format": ..., "reader": ..., "refusal": {"code": ..., "detail": ...}, "source": {...}}
-
-``paragraphs_sha256`` in ``tests`` and ``corpus/`` is the SHA-256 of ``canonical(paragraphs(...))``
-alone, so a new reader version that reads the same way keeps the same digest.
 """
 
 from __future__ import annotations
@@ -91,8 +94,21 @@ type Json = str | int | bool | list[Json] | dict[str, Json] | None
 
 def canonical(value: Json) -> bytes:
     """``value`` as canonical JSON bytes, with a final newline."""
-    text = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    text = json.dumps(_jcs_order(value), ensure_ascii=False, separators=(",", ":"))
     return (text + "\n").encode("utf-8")
+
+
+def _jcs_order(value: Json) -> Json:
+    """``value`` with every object's keys in RFC 8785 order: by UTF-16 code units.
+
+    Code-point order differs from it only for a key outside the BMP against one from U+E000 up;
+    part names in ``notRead`` can be any Unicode.
+    """
+    if isinstance(value, dict):
+        return {k: _jcs_order(value[k]) for k in sorted(value, key=lambda k: k.encode("utf-16-be"))}
+    if isinstance(value, list):
+        return [_jcs_order(item) for item in value]
+    return value
 
 
 def paragraph(item: Paragraph) -> dict[str, Json]:

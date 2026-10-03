@@ -27,18 +27,22 @@ ENVIRONMENTS = [
 def test_fresh_processes_under_other_hash_seeds_and_locales_write_the_same_bytes(
     path: Path,
 ) -> None:
-    outputs = set()
-    for seed, locale in ENVIRONMENTS:
-        env = {**os.environ, "PYTHONHASHSEED": seed, "LC_ALL": locale, "LANG": locale}
-        done = subprocess.run(
+    # The four processes run at once, each in its own environment.
+    running = [
+        subprocess.Popen(
             [sys.executable, "-m", "label_docx", str(path)],
-            env=env,
-            capture_output=True,
-            check=False,
+            env={**os.environ, "PYTHONHASHSEED": seed, "LC_ALL": locale, "LANG": locale},
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
+        for seed, locale in ENVIRONMENTS
+    ]
+    outputs = set()
+    for process in running:
+        stdout, stderr = process.communicate()
         # Read or refused (corpus/numbering-cases holds one refusal), never an error.
-        assert done.returncode in (0, 2), done.stderr.decode()
-        outputs.add(done.stdout)
+        assert process.returncode in (0, 2), stderr.decode()
+        outputs.add(stdout)
     assert outputs == {read(path.read_bytes())[0]}
 
 

@@ -63,13 +63,13 @@
       "bytes": 3312
     },
     {
-      "name": "Back to the first list after a second restarted the count (the reader refuses).",
+      "name": "Back to the first list after a second restarted the count.",
       "file": "return-after-restart.docx",
       "sha256": "20a86c73e2af321d272d2bfa0a49ac70485b8afad9fe6fe3eb06337b3419f730",
       "bytes": 3425
     },
     {
-      "name": "A list that overrides nothing after one that restarted (the reader refuses).",
+      "name": "A list that overrides nothing after one that restarted.",
       "file": "plain-after-restart.docx",
       "sha256": "a0842636db8d397723bb68625e1b6f1609253af03e73d4d217ff656efe7ab9de",
       "bytes": 3312
@@ -81,19 +81,19 @@
       "bytes": 3551
     },
     {
-      "name": "A level shown before its parent level was counted (the reader refuses).",
+      "name": "A level shown before its parent level was counted.",
       "file": "ancestor-never-counted.docx",
       "sha256": "617e136f80bd10bd5c208c4431e43acb31bbe05864cb6a3f4e8fc54efbfb7837",
       "bytes": 3426
     },
     {
-      "name": "A decimal level with no w:start (the reader refuses).",
+      "name": "A decimal level with no w:start.",
       "file": "missing-start.docx",
       "sha256": "f4b020efcd8da3cec4d6d41cbd3538d5b310c3e8b10ddc5e9aec12078e8a49bc",
       "bytes": 2981
     },
     {
-      "name": "A style names numId 1 but no level; level 1 names the style (the reader refuses).",
+      "name": "A style names numId 1 but no level; level 1 names the style.",
       "file": "style-tied-deeper-level.docx",
       "sha256": "73f18d5ea4c000816683ea221ec26d49664f6119af4def1308ff3c79f34adf33",
       "bytes": 3289

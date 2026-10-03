@@ -1,7 +1,7 @@
 [project]
 name = "label-docx"
 version = "0.1.0"
-description = "A deterministic, fail-closed reader for the text of a label's Word (.docx) body: the exact text, or a refusal with a reason"
+description = "A deterministic, fail-closed reader for the text of a label (a Word .docx: body, notes, headers, footers, comments; or an EMA ePI): the exact text, or a refusal with a reason"
 readme = "README.md"
 # The Unicode Character Database ships with the interpreter, and the reader's refusals use it
 # (str.strip and str.split decide what is blank). 3.14.x ships Unicode 16.0.0. A different minor
@@ -40,7 +40,7 @@ packages = ["src/label_docx"]
 line-length = 100
 src = ["src", "tests", "scripts"]
 target-version = "py314"
-# The virtualenv uv is installed into (README, "Set-up and checks").
+# The virtualenv uv is installed into (README, "Development").
 extend-exclude = [".uv-bootstrap"]
 
 [tool.ruff.format]

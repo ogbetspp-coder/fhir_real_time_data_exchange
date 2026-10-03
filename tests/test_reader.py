@@ -306,7 +306,6 @@ PICTURE = (
 def test_a_picture_is_an_object_replacement_character_where_it_stands() -> None:
     paragraphs = read_docx(docx(p(r("<w:t>a</w:t>") + r(PICTURE) + r("<w:t>b</w:t>"))))
     assert [paragraph.text for paragraph in paragraphs] == ["a\ufffcb"]
-    assert paragraphs[0].has_drawing
 
 
 def test_a_floating_picture_is_not_in_the_text_as_word_shows_it() -> None:
@@ -1802,6 +1801,8 @@ def test_note_marks_the_reader_cannot_vouch_for_are_refused(
         ('<w:numRestart w:val="eachPage"/>', "ambiguous-numbering"),
         ('<w:numFmt w:val="ordinal"/>', "unsupported-numbering"),
         ('<w:numFmt w:val="decimal" w:format="01"/>', "unsupported-numbering"),
+        # Past the doubled signs (numStart 9 would be "***"): Word's answer is not on record.
+        ('<w:numFmt w:val="chicago"/><w:numStart w:val="9"/>', "unsupported-numbering"),
     ],
 )
 def test_note_numbering_that_depends_on_layout_or_language_is_refused(

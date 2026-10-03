@@ -11,12 +11,13 @@ from __future__ import annotations
 import io
 import json
 import random
+import tracemalloc
 import zipfile
 from pathlib import Path
 
 import pytest
 
-from label_docx import documents
+from label_docx import documents, reader
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 DOCUMENTS = [
@@ -70,3 +71,31 @@ def test_damage_is_refused_or_read_and_certified_never_an_error(path: Path) -> N
         outcomes[outcome] = outcomes.get(outcome, 0) + 1
     assert "uncertified" not in outcomes, outcomes
     assert sum(outcomes.values()) == _TRIES
+
+
+def test_a_compressed_xml_bomb_is_refused_before_it_is_built(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A part the reader does not read, 4 MB of "<b/>" deflated to a few kilobytes: refused as
+    # the elements are counted, not after a tree of a million elements is built.
+    monkeypatch.setattr(reader, "MAX_ELEMENTS", 10_000)
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
+        with zipfile.ZipFile(CORPUS / "word-authored" / "table-of-contents.docx") as source:
+            for info in source.infolist():
+                archive.writestr(info.filename, source.read(info))
+        archive.writestr("customXml/item9.xml", "<x>" + "<b/>" * 1_000_000 + "</x>")
+    data = out.getvalue()
+    assert len(data) < 100_000
+    tracemalloc.start()
+    try:
+        result, read = documents.kind(data).read(data)
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+    assert not read
+    assert json.loads(result)["refusal"] == {
+        "code": "invalid-package",
+        "detail": "parts over 10000 XML elements",
+    }
+    assert peak < 32 * 1024 * 1024, peak

@@ -73,13 +73,14 @@ from another web page.
 
 - Offsets (`marks`, `notes`, `pages`, `comments`) count Unicode code points of `text`.
 - `numbering` is the list label Word draws before the paragraph (`text`, `suffix`); it is not
-  part of `text`. `table` is `[table, row, cell]`, counted from 0.
+  part of `text`. Its `level` counts from 0 in a .docx (Word's `ilvl`) and from 1 in an ePI (the
+  lists around the item). `table` is `[table, row, cell]`, counted from 0.
 - A refusal has `"refusal": {"code": …, "detail": …}` in place of the text.
 - A tracked document has `"tracked": {"accepted": {…}, "original": {…}, "changes": […]}` in place
   of the text; each view has the shape above.
 - Word draws caps marks by its own rule: "5 µg" in capitals is "5 µG", never "5 ΜG".
 
-Every field: the docstrings of [`output.py`](src/label_docx/output.py) and
+Every key: the docstrings of [`output.py`](src/label_docx/output.py) and
 [`epi_output.py`](src/label_docx/epi_output.py).
 
 ## How it is checked
@@ -91,8 +92,8 @@ Every field: the docstrings of [`output.py`](src/label_docx/output.py) and
 | Tracked views are Word's Accept All / Reject All              | Word's own files (`test_tracked.py`)       |
 | ePI sections are what Chrome shows                            | Chrome's recorded answers (`test_browser_oracle.py`) |
 | Every result is certified; every changed result is caught     | `test_certify.py`                          |
-| Every fault put into the checker is caught by its tests       | the mutation record (`test_checker_mutants.py`) |
-| Every edit to a document changes the result or is refused     | `test_mutations.py`                        |
+| Each fault put into the checker is caught by its tests, or recorded as unable to change a result | the mutation record (`test_checker_mutants.py`) |
+| Each kind of edit in `scripts/mutate.py` to what the reader reports changes the result or is refused; others (font size, bookkeeping) change nothing | `test_mutations.py` |
 | Same bytes everywhere; damaged files never crash it           | `test_determinism.py`, `test_robustness.py` |
 
 Every requirement and its tests: [docs/requirements.md](docs/requirements.md). To check
