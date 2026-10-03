@@ -211,6 +211,22 @@ write:
   - 20 packed documents with 556 fields (265 SEQ, 82 REF, 171 STYLEREF, 38 NOTEREF): all read,
     every field as Word computed it, and all 20 agreed.
 
+  `--stories` makes each chapter a section with its own headers and footers (default, first
+  page, even pages; some shared, some left to the section before), holding styled text, page
+  numbers and tables, and puts comments by several authors on body text. The first 10 packed
+  documents showed three things to correct in Word's side of the comparison, none in the
+  reader. Each was confirmed by asking Word directly, and each correction was checked to still
+  catch built changes:
+  - a paragraph that closes a section ends, in Word's text, with a section break instead of a
+    paragraph mark, which the label check took for part of the next paragraph;
+  - Word's text shows text in capitals as capitals, where the reader keeps the letters and marks
+    them: the reader's capitals marks are now applied and so held to Word as well;
+  - a table cell's end mark can follow its last paragraph without a paragraph mark.
+  After these, all 10 agreed.
+  - 20 packed documents with everything at once (fields updated by Word, then headers,
+    footers, comments and lists): 3,100 list items, 581 headers and footers, 569 comments;
+    all 20 agreed.
+
   The first of them showed a fault in Word's side of the comparison. The emphasis check took a
   paragraph's whole range, which in Word holds each field's hidden code, with formatting of its
   own. So a paragraph struck through looked "not struck" wherever a field's code was not.

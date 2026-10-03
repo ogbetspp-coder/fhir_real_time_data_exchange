@@ -4,6 +4,7 @@
     uv run --frozen python scripts/fuzz_docx.py --documents 6 --chapters 10 --seed 1 FOLDER
     uv run --frozen python scripts/fuzz_docx.py --documents 6 --chapters 10 --fields --seed 1 IN
     uv run --frozen python scripts/word_oracle.py update OUT IN/*.docx
+    uv run --frozen python scripts/fuzz_docx.py --documents 6 --chapters 10 --stories --seed 1 F
     uv run --frozen python scripts/word_oracle.py compare FOLDER/*.docx
 
 The numbering cases (``scripts/numbering_cases.py``) put one question each to Word; these mix
@@ -27,6 +28,11 @@ headings and STYLEREF to them, and REF and NOTEREF to bookmarked captions and no
 Their results are placeholders; ``word_oracle.py update`` has Word update every field and save
 the document, so the results are Word's own, in Word's own XML. The reader must then compute
 each one as Word did: a result it calls stale there is a difference from Word.
+
+``--stories`` makes each chapter a section with headers and footers of its own (default, first
+page, even pages; some shared, some left to the previous section's), holding styled text, page
+numbers and tables, and adds comments by several authors on the body's runs. Word's headers,
+footers and comments are then compared with the reader's (``word.story_verdict``).
 """
 
 from __future__ import annotations
@@ -46,6 +52,7 @@ NOTE_FORMATS = ("decimal", "lowerRoman", "upperRoman", "lowerLetter", "upperLett
 # Chapters drawn, at most, for one the reader reads.
 _TRIES = 200
 SEQ_FORMATS = ("", " \\* ARABIC", " \\* ROMAN", " \\* roman", " \\* ALPHABETIC", " \\* alphabetic")
+AUTHORS = ("Reviewer", "QA", "Regulatory Affairs", "M. Example")
 HEADINGS = (
     '<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/></w:style>'
     '<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/></w:style>'
@@ -62,6 +69,7 @@ class Document:
         chapter: int = 0,
         notes: list[int] | None = None,
         fields: bool = False,
+        stories: bool = False,
     ) -> None:
         self.rng = rng
         # A chapter's styles, table style and list ids are its own (chapter 0's as before).
@@ -69,9 +77,13 @@ class Document:
         self.base = 10 * chapter
         self.paragraph_styles = [f"{self.prefix}P{i}" for i in range(rng.randint(1, 4))]
         self.character_styles = [f"{self.prefix}C{i}" for i in range(rng.randint(1, 3))]
-        # The notes and bookmarks so far, in every chapter: one count each, as one document has.
-        self.counter = [0, 0] if notes is None else notes
+        # The notes, bookmarks and comments so far, in every chapter: one count each, as one
+        # document has.
+        self.counter = [0, 0, 0] if notes is None else notes
         self.fields = fields
+        self.stories = stories
+        # This chapter's comments, as the comments part holds them.
+        self.comments: list[str] = []
         # Bookmarks a REF or NOTEREF can name: captions, and note references.
         self.captions: list[str] = []
         self.marked_notes: list[str] = []
@@ -181,6 +193,50 @@ class Document:
                 reference = bookmark(self.counter[1], name, reference)
             return words(text) + reference
         prefix = f"<w:rPr>{properties}</w:rPr>" if properties else ""
+        out = f'<w:r>{prefix}<w:t xml:space="preserve">{text} </w:t></w:r>'
+        if self.stories and rng.random() < 0.06:
+            self.counter[2] += 1
+            key = self.counter[2]
+            said = " ".join(rng.choice(WORDS) for _ in range(rng.randint(1, 4)))
+            self.comments.append(
+                f'<w:comment w:id="{key}" w:author="{rng.choice(AUTHORS)}" w:initials="X" '
+                f'w:date="2026-01-02T03:04:05Z"><w:p><w:r><w:annotationRef/></w:r>'
+                f"{words(said)}</w:p></w:comment>"
+            )
+            out = (
+                f'<w:commentRangeStart w:id="{key}"/>{out}<w:commentRangeEnd w:id="{key}"/>'
+                f'<w:r><w:commentReference w:id="{key}"/></w:r>'
+            )
+        return out
+
+    def story(self) -> str:
+        """A header's or footer's content: styled runs, maybe a page number, maybe a table."""
+        rng = self.rng
+        keep, self.stories = self.stories, False
+
+        def line() -> str:
+            pieces = [self.plain_run() for _ in range(rng.randint(1, 2))]
+            if rng.random() < 0.4:
+                pieces.append(words("Page ") + field("PAGE", "1"))
+            style = rng.choice(self.paragraph_styles)
+            return para(*pieces, props=f'<w:pStyle w:val="{style}"/>' if rng.random() < 0.5 else "")
+
+        out = "".join(line() for _ in range(rng.randint(1, 2)))
+        if rng.random() < 0.2:
+            cells = "".join(f"<w:tc>{line()}</w:tc>" for _ in range(rng.randint(1, 2)))
+            out += f"<w:tbl><w:tr>{cells}</w:tr></w:tbl>" + para(words("end"))
+        self.stories = keep
+        return out
+
+    def plain_run(self) -> str:
+        """A run as ``run`` makes, but never a note reference: headers hold none."""
+        rng = self.rng
+        style = ""
+        if rng.random() < 0.4:
+            style = f'<w:rStyle w:val="{rng.choice(self.character_styles)}"/>'
+        properties = style + self.toggles()
+        text = " ".join(rng.choice(WORDS) for _ in range(rng.randint(1, 3)))
+        prefix = f"<w:rPr>{properties}</w:rPr>" if properties else ""
         return f'<w:r>{prefix}<w:t xml:space="preserve">{text} </w:t></w:r>'
 
     def bookmark(self, kind: str) -> str:
@@ -275,14 +331,37 @@ def _certified(case: Case, fields: bool = False) -> bool:
     return "refusal" not in value or (fields and value["refusal"]["code"] == "stale-field")
 
 
-def generated(rng: random.Random, chapters: int = 1, fields: bool = False) -> Case:
+def _section(rng: random.Random, first: Document, parts: list[tuple[str, str, str]]) -> str:
+    """A section's header and footer references: to new parts, to shared ones, or none."""
+    out = ""
+    for kind in ("header", "footer"):
+        for type_ in ("default", "first", "even"):
+            roll = rng.random()
+            mine = [key for key, k, _ in parts if k == kind]
+            if roll < 0.35:
+                key = f"{kind[0]}{len(parts) + 1}"
+                parts.append((key, kind, first.story()))
+            elif roll < 0.5 and mine:
+                key = rng.choice(mine)
+            else:
+                continue
+            out += f'<w:{kind}Reference w:type="{type_}" r:id="{key}"/>'
+    return out
+
+
+def generated(
+    rng: random.Random, chapters: int = 1, fields: bool = False, stories: bool = False
+) -> Case:
     """One document of ``chapters`` chapters, as a numbering case for ``package``.
 
     With more than one chapter, each is one the reader reads and the check certifies on its
     own: one refused would refuse the whole document, and Word would have nothing to judge.
     """
-    counter = [0, 0]
-    styles = Document(rng, 0, counter).defaults() + (HEADINGS if fields else "")
+    counter = [0, 0, 0]
+    first = Document(rng, 0, counter)
+    styles = first.defaults() + (HEADINGS if fields else "")
+    parts: list[tuple[str, str, str]] = []
+    comments: list[str] = []
     fmt = rng.choice(NOTE_FORMATS)
     start = rng.randint(1, 4)
     final = (
@@ -292,30 +371,58 @@ def generated(rng: random.Random, chapters: int = 1, fields: bool = False) -> Ca
     abstracts = nums = body = ""
     for chapter in range(chapters):
         for _ in range(_TRIES):
-            before, marks = counter
-            part = Document(rng, chapter, counter, fields)
+            before = list(counter)
+            part = Document(rng, chapter, counter, fields, stories)
             definitions, lists, numbers = part.numbering()
             own_styles = part.styles()
-            # An empty paragraph between chapters, so no table runs on into the next.
-            own_body = ("<w:p/>" if chapter else "") + part.body(numbers)
-            own_notes = notes("footnote", *range(before + 1, counter[0] + 1))
-            alone = Case("chapter", definitions + lists, own_body, styles + own_styles, own_notes)
+            own_body = part.body(numbers)
+            own_notes = notes("footnote", *range(before[0] + 1, counter[0] + 1))
+            alone = Case(
+                "chapter",
+                definitions + lists,
+                own_body,
+                styles + own_styles,
+                own_notes,
+                stories=(("c1", "comments", "".join(part.comments)),) if part.comments else (),
+            )
             if chapters == 1 or _certified(alone._replace(final=final), fields):
                 break
-            counter[:] = [before, marks]
+            counter[:] = before
         else:
             raise SystemExit(f"no chapter the reader reads in {_TRIES} tries")
         abstracts, nums = abstracts + definitions, nums + lists
         styles += own_styles
+        comments += part.comments
+        if chapter and stories:
+            # The paragraph between chapters closes the last one's section.
+            closing = f"<w:sectPr>{_section(rng, first, parts)}</w:sectPr>"
+            body += f"<w:p><w:pPr>{closing}</w:pPr></w:p>"
+        elif chapter:
+            # An empty paragraph between chapters, so no table runs on into the next.
+            body += "<w:p/>"
         body += own_body
+    if stories:
+        final = final.replace("<w:sectPr>", f"<w:sectPr>{_section(rng, first, parts)}", 1)
+        if comments:
+            parts.append(("c1", "comments", "".join(comments)))
     footnotes = notes("footnote", *range(1, counter[0] + 1)) if counter[0] else ""
-    return Case("generated", abstracts + nums, body, styles, footnotes=footnotes, final=final)
+    return Case(
+        "generated",
+        abstracts + nums,
+        body,
+        styles,
+        footnotes=footnotes,
+        final=final,
+        stories=tuple(parts),
+    )
 
 
-def documents(seed: int, count: int, chapters: int = 1, fields: bool = False) -> list[bytes]:
+def documents(
+    seed: int, count: int, chapters: int = 1, fields: bool = False, stories: bool = False
+) -> list[bytes]:
     """``count`` documents of ``chapters`` chapters, the same ones for the same seed."""
     rng = random.Random(seed)
-    return [package(generated(rng, chapters, fields)) for _ in range(count)]
+    return [package(generated(rng, chapters, fields, stories)) for _ in range(count)]
 
 
 def main() -> int:
@@ -326,9 +433,11 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--chapters", type=int, default=1, help="generated documents in each")
     parser.add_argument("--fields", action="store_true", help="captions and cross-references")
+    parser.add_argument("--stories", action="store_true", help="headers, footers, comments")
     args = parser.parse_args()
     args.folder.mkdir(parents=True, exist_ok=True)
-    for index, data in enumerate(documents(args.seed, args.documents, args.chapters, args.fields)):
+    made = documents(args.seed, args.documents, args.chapters, args.fields, args.stories)
+    for index, data in enumerate(made):
         (args.folder / f"generated-{args.seed}-{index:03d}.docx").write_bytes(data)
     sys.stdout.write(f"wrote {args.documents} documents to {args.folder}\n")
     return 0

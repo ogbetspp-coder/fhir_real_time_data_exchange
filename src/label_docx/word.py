@@ -375,8 +375,10 @@ def word_labels(path: Path) -> list[str]:
     # wrong where empty list items gain a label.
     # U+0007 is Word's end-of-cell and end-of-row mark, which follows a paragraph mark and would
     # otherwise stand at the start of the paragraph after a table, ahead of its label.
+    # U+000C ends a paragraph that closes a section, in place of its paragraph mark.
     stored, drawn = stored.replace("\x07", ""), drawn.replace("\x07", "")
-    before, after = stored.rstrip("\n").split("\n"), drawn.rstrip("\n").split("\n")
+    before = re.split(r"[\n\x0c]", stored.rstrip("\n"))
+    after = re.split(r"[\n\x0c]", drawn.rstrip("\n"))
     if len(before) != len(after) or not all(
         a.endswith(b) for b, a in zip(before, after, strict=True)
     ):
@@ -822,12 +824,12 @@ def word_stories(path: Path) -> dict[str, list[list[Any]]] | None:
 
 
 def _shown(text: str) -> list[str]:
-    """Word's text of a story as its paragraphs, empty ones and table cell marks left out."""
-    return [
-        piece.replace("\x07", "")
-        for piece in re.split(r"[\r\n]", text)
-        if piece.replace("\x07", "")
-    ]
+    """Word's text of a story as its paragraphs, empty ones left out.
+
+    A paragraph ends at a paragraph mark, or at a table cell's end mark (U+0007), which Word's
+    text shows after the cell's last paragraph with or without a paragraph mark.
+    """
+    return [piece for piece in re.split(r"[\r\n\x07]", text) if piece]
 
 
 def story_verdict(word: dict[str, list[list[Any]]], path: Path) -> str:
@@ -856,9 +858,16 @@ def story_verdict(word: dict[str, list[list[Any]]], path: Path) -> str:
             mine: list[str] = []
             left = list(pages)
             for paragraph in story.paragraphs:
+                # Word's text shows text in capitals as capitals, where the reader keeps the
+                # letters and marks them: so the marks are held to Word too.
+                filled = paragraph.text
+                for mark in paragraph.marks:
+                    if mark.kind == "caps":
+                        upper = filled[mark.start : mark.end].upper()
+                        filled = filled[: mark.start] + upper + filled[mark.end :]
                 # Word's text shows an inline picture as "/", where the reader writes one U+FFFC
                 # (the conservation check holds each to a picture in the source).
-                filled = paragraph.text.replace("\ufffc", "/")
+                filled = filled.replace("\ufffc", "/")
                 numbers = [left.pop(0) if left else "?" for _ in paragraph.pages]
                 for offset, number in sorted(
                     zip(paragraph.pages, numbers, strict=True), reverse=True

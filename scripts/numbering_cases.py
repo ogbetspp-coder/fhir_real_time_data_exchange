@@ -43,6 +43,8 @@ class Case(NamedTuple):
     endnotes: str = ""
     settings: str = ""
     final: str = "<w:sectPr/>"
+    # Headers, footers and comments: (relationship id, kind, content), each in its own part.
+    stories: tuple[tuple[str, str, str], ...] = ()
 
 
 def lvl(
@@ -931,7 +933,17 @@ def package(case: Case) -> bytes:
         )
         if content
     ]
-    roots = {"footnotes": "w:footnotes", "endnotes": "w:endnotes", "settings": "w:settings"}
+    roots = {
+        "footnotes": "w:footnotes",
+        "endnotes": "w:endnotes",
+        "settings": "w:settings",
+        "header": "w:hdr",
+        "footer": "w:ftr",
+        "comments": "w:comments",
+    }
+    # A story part is named by its relationship id; the document then declares the r: prefix.
+    named = [(f"{key}.xml", kind, content) for key, kind, content in case.stories]
+    declare = f' xmlns:r="{OFFICE}"' if case.stories else ""
     parts = {
         "[Content_Types].xml": (
             '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -944,6 +956,10 @@ def package(case: Case) -> bytes:
             + "".join(
                 f'<Override PartName="/word/{name}.xml" ContentType="{MAIN}.{name}+xml"/>'
                 for name, content in extra
+            )
+            + "".join(
+                f'<Override PartName="/word/{name}" ContentType="{MAIN}.{kind}+xml"/>'
+                for name, kind, _ in named
             )
             + "</Types>"
         ),
@@ -960,10 +976,15 @@ def package(case: Case) -> bytes:
                 f'<Relationship Id="rId{3 + i}" Type="{OFFICE}/{name}" Target="{name}.xml"/>'
                 for i, (name, content) in enumerate(extra)
             )
+            + "".join(
+                f'<Relationship Id="{key}" Type="{OFFICE}/{kind}" Target="{key}.xml"/>'
+                for key, kind, _ in case.stories
+            )
             + "</Relationships>"
         ),
         "word/document.xml": (
-            f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="{W}">'
+            f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            f'<w:document xmlns:w="{W}"{declare}>'
             f"<w:body>{case.body}{case.final}</w:body></w:document>"
         ),
         "word/styles.xml": (
@@ -979,6 +1000,11 @@ def package(case: Case) -> bytes:
         parts[f"word/{name}.xml"] = (
             f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><{roots[name]} xmlns:w="{W}">'
             f"{content}</{roots[name]}>"
+        )
+    for name, kind, content in named:
+        parts[f"word/{name}"] = (
+            f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><{roots[kind]} xmlns:w="{W}">'
+            f"{content}</{roots[kind]}>"
         )
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_STORED) as archive:
