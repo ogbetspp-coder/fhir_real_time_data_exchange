@@ -3,7 +3,7 @@
 scripts/mutate.py edits the corpus documents one small change at a time. This runs two of each
 kind of edit on every corpus document (a few thousand reads) and holds the reader to the rule: no
 ``miss`` (a page that changed and a result that did not) and no ``unstable`` (a page that did not
-change and a result that did). What the reader does not report (bold, italic, size) is held to
+change and a result that did). What the reader does not report (font size) is held to
 "unchanged", so its blind spots are known and cannot drift.
 """
 

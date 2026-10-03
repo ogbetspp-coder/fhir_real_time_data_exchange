@@ -1,7 +1,7 @@
 # Agent instructions
 
-This repository is a reader whose one job is to give the exact text of a label's .docx body or
-refuse. Every rule below serves that.
+This repository is a reader whose one job is to give the exact text of a label (a Word .docx, or
+an EMA ePI) or refuse. Every rule below serves that.
 
 - **Fail closed.** When the reader meets something whose text it cannot produce exactly, it
   raises `DocxRefusedError` with a code. Never add a fallback that keeps going: a reader that
@@ -27,10 +27,12 @@ refuse. Every rule below serves that.
 - **Trace every test.** `docs/requirements.md` names, for each requirement, the tests that prove
   it; a new test goes there, and `tests/test_traceability.py` fails on a test that proves nothing
   or a requirement that names a test that is gone.
-- **Version every change.** Changing `src/label_docx/reader.py` means bumping `READER_VERSION`;
-  changing `src/label_docx/output.py` or `certify.py` means bumping `FORMAT_VERSION`; the same
-  for `epi.py` and `epi_output.py`. Then run `scripts/lock.py` and review the diff of
-  `corpus/*/expected.json`. Never re-lock a version to other code.
+- **Version every change.** `versions.lock.json` ties each version to the files that decide it
+  (`scripts/lock.py`, `current_versions`): `reader.py` to `READER_VERSION`; `output.py` and
+  `certify.py` to `label-docx-json`; `epi.py` to the ePI reader; `epi_output.py`, `output.py`,
+  `documents.py` and `certify.py` to `label-epi-json`. Bump every version whose files changed,
+  run `scripts/lock.py` and review the diff of `corpus/*/expected.json`. Never re-lock a version
+  to other code.
 - **Public or synthetic documents only** in `corpus/` and in tests, each set with a
   `sources.json`. No client or confidential labels in the repository.
 - **Tests never print label text.** A failure names a file, a code or a digest.

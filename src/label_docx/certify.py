@@ -32,10 +32,11 @@ never certified). The set-aside reasons are fixed too: a field's instruction (co
 a page number (set by the layout; its place must be in ``pages``), a page or column break
 (layout).
 
-Its scope is the text the reader claims to read: for a .docx the body and the footnotes and
-endnotes; for an ePI the Composition's section titles and divs. Text the package holds elsewhere
-(headers, footers, comments; other narratives in the Bundle) is not read by the reader, and the
-certificate lists it under ``notRead`` with its size, so nothing is left out silently.
+Its scope is the text the reader claims to read: for a .docx the body, footnotes, endnotes,
+headers, footers and comments (one the reader refuses on its own is listed under ``refused``);
+for an ePI the Composition's section titles and divs. Text the package holds elsewhere (the
+glossary, note separators, other narratives in the Bundle) is listed under ``notRead`` with its
+size, so nothing is left out silently.
 
 For an ePI the same statement holds with HTML's tokens (parsed here by the standard library's
 HTML parser, not the reader's XML parser): every character of text, in order, with each run of
@@ -46,14 +47,16 @@ A document with tracked changes is read as two views, every change accepted and 
 rejected, each a package of its own that the reader reads and this check certifies as above.
 The views themselves are held to the source by ``certify_tracked``, again with its own walk: in
 each part with revisions, every run's content is kept or dropped by the change around it, in
-order, and a paragraph is joined to the next exactly where the view drops its mark; no revision
-is left in any part, and every other part is the source's, byte for byte. Formatting the views
-take from a change (``rPrChange``, ``pPrChange``) is held to Word.
+order, in the same table cell, and a paragraph is joined to the next exactly where the view
+drops its mark; a row the view drops goes, and a table whose every row it drops; no revision is
+left in any part, and every other part is the source's, byte for byte. Formatting the views take
+from a change is held to Word (``corpus/tracked-cases``).
 
-What it does not check: the marks, list labels and note marks, which are interpretations of
-the formatting and are held to Word and Chrome themselves (``tests/test_word_oracle.py``,
-``tests/test_browser_oracle.py``). It shares one thing with the reader: the Symbol table
-(``SYMBOL_FONT``), a list of 49 code points held to Word.
+Beyond the text, the check works out on its own, by Word's rules written apart from the
+reader's, the key marks (``CHECKED_MARKS``), every list label and every note mark; the result's
+must be the check's. Other marks are held to Word and Chrome themselves
+(``tests/test_word_oracle.py``, ``tests/test_browser_oracle.py``). It shares one thing with the
+reader: the Symbol table (``SYMBOL_FONT``), 49 code points held to Word.
 """
 
 from __future__ import annotations
@@ -64,13 +67,14 @@ import posixpath
 import re
 import xml.etree.ElementTree as ET
 import zipfile
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from typing import Any
 
 from label_docx.reader import SYMBOL_FONT
 
-CHECKER_VERSION = "conservation-check/1.7.0"
+CHECKER_VERSION = "conservation-check/1.8.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -1038,6 +1042,11 @@ def _unescape(text: str) -> str:
     return _REFERENCE.sub(one, text)
 
 
+# A tag after its "<": up to the first ">" outside a quoted value; a quote ends only at the same
+# quote character. A quote left open matches nothing.
+_TAG = re.compile(r"""[^>"']*(?:(?:"[^"]*"|'[^']*')[^>"']*)*>""")
+
+
 def _raw_texts(data: bytes) -> list[tuple[str, str]]:
     """Every ``w:t`` and ``w:instrText`` of a part, with its text, read by a tokenizer here.
 
@@ -1073,13 +1082,10 @@ def _raw_texts(data: bytes) -> list[tuple[str, str]]:
         elif text.startswith("<!", less):
             raise CertificationError("a declaration the check does not read")
         else:
-            end, quote = less + 1, ""
-            while end < len(text) and (quote or text[end] != ">"):
-                if text[end] in "\"'":
-                    quote = "" if quote == text[end] else quote or text[end]
-                end += 1
-            if end >= len(text):
+            found = _TAG.match(text, less + 1)
+            if found is None:
                 raise CertificationError("a tag that does not end")
+            end = found.end() - 1
             tag = text[less + 1 : end]
             at = end + 1
             if tag.startswith("/"):
@@ -1091,12 +1097,14 @@ def _raw_texts(data: bytes) -> list[tuple[str, str]]:
             closed = tag.endswith("/")
             body = tag[:-1] if closed else tag
             name = body.split(None, 1)[0] if body.strip() else ""
-            scope = dict(scopes[-1])
-            for key, double, single in _ATTRIBUTE.findall(body[len(name) :]):
-                value = _unescape(double or single)
-                if key == "xmlns":
-                    scope[""] = value
-                elif key.startswith("xmlns:"):
+            # Copied only where the tag declares a prefix: a scope is never changed once made.
+            scope = scopes[-1]
+            for key, double, single in _ATTRIBUTE.findall(body, len(name)):
+                value = double or single
+                # Without "&" a value has no reference to resolve, and no bare "&" to refuse.
+                value = _unescape(value) if "&" in value else value
+                if key == "xmlns" or key.startswith("xmlns:"):
+                    scope = dict(scope) if scope is scopes[-1] else scope
                     scope[key[6:]] = value
             prefix, _, local = name.rpartition(":")
             if scope.get(prefix) == W and local in _TEXT_LOCALS and capture is None:
@@ -1416,51 +1424,91 @@ _REVISIONS = {
 _SAME_AS = {"delText": "t", "delInstrText": "instrText"}
 
 
+type _Place = tuple[int, int, int] | None
+
+
 def _run_tokens(
     root: ET.Element, drops: tuple[str, ...]
-) -> tuple[list[list[tuple[Json, ...]]], int]:
-    """Each paragraph's run content in order, as the view must hold it, and the paragraphs joined.
+) -> tuple[list[tuple[_Place, list[tuple[Json, ...]]]], int]:
+    """Each paragraph's place and run content, in order, as the view must hold it; the joins.
 
+    A paragraph's place is its outermost table cell (table, row, cell, counted from 0) or None.
     A paragraph whose mark the view drops is joined to the next in document order (inside a
     table, its first cell's first paragraph): its tokens open the next one's. A row the view
-    drops goes whole. Content inside a change the view drops is left out; a deleted text is a
-    text. Run properties are not content: changed formatting is held to Word.
+    drops goes whole, and a table whose every row it drops goes with them; a table with no row
+    at all is still a table. Content inside a change the view drops is left out; a deleted text
+    is a text. Run properties are not content: changed formatting is held to Word.
     """
-    paragraphs: list[list[tuple[Json, ...]]] = []
+    dropping = {_w(d) for d in drops}
+    paragraphs: list[tuple[_Place, list[tuple[Json, ...]]]] = []
     carried: list[tuple[Json, ...]] = []
-    joins = 0
+    joins = tables = 0
 
-    def walk(element: ET.Element, dropped: bool, mine: list[tuple[Json, ...]]) -> None:
+    def gone_row(row: ET.Element) -> bool:
+        properties = row.find(_w("trPr"))
+        return properties is not None and any(c.tag in dropping for c in properties)
+
+    def table(element: ET.Element, dropped: bool, mine: list[tuple[Json, ...]]) -> None:
+        nonlocal tables
+        rows = list(_within(element, _w("tr")))
+        if carried and rows and gone_row(rows[0]):
+            raise CertificationError("a joined paragraph meets a row the view drops")
+        kept = [row for row in rows if not gone_row(row)]
+        if rows and not kept:
+            return
+        index, tables = tables, tables + 1
+        for r, row in enumerate(kept):
+            for c, cell in enumerate(_within(row, _w("tc"))):
+                walk(cell, dropped, mine, (index, r, c))
+
+    def walk(
+        element: ET.Element, dropped: bool, mine: list[tuple[Json, ...]], place: _Place
+    ) -> None:
         nonlocal carried, joins
         for child in element:
             local = _local(child.tag)
             if child.tag == _w("p"):
                 own: list[tuple[Json, ...]] = carried
                 carried = []
-                walk(child, dropped, own)
+                walk(child, dropped, own, place)
                 mark = child.find(f"{_w('pPr')}/{_w('rPr')}")
-                if mark is not None and any(c.tag in {_w(d) for d in drops} for c in mark):
+                if mark is not None and any(c.tag in dropping for c in mark):
                     carried = own
                     joins += 1
                 else:
-                    paragraphs.append(own)
+                    paragraphs.append((place, own))
                 continue
-            row = child.find(_w("trPr")) if child.tag == _w("tr") else None
-            if row is not None and any(c.tag in {_w(d) for d in drops} for c in row):
-                continue  # a row the view drops goes whole: its paragraphs and their content
+            if child.tag == _w("tbl") and place is None:
+                table(child, dropped, mine)
+                continue
+            if child.tag == _w("tr") and gone_row(child):
+                continue  # a row of a nested table the view drops goes whole too
             if element.tag == _w("r") and child.tag != _w("rPr"):
                 if not dropped:
                     mine.append(
                         (_SAME_AS.get(local, local), child.text or "", sorted(child.attrib.items()))
                     )
                 continue
-            gone = dropped or (child.tag in {_w(d) for d in drops} and element.tag != _w("rPr"))
-            walk(child, gone, mine)
+            gone = dropped or (child.tag in dropping and element.tag != _w("rPr"))
+            walk(child, gone, mine, place)
 
-    walk(root, False, [])
+    walk(root, False, [], None)
     if carried:
         raise CertificationError("a joined paragraph has no paragraph after it")
     return paragraphs, joins
+
+
+def _within(element: ET.Element, tag: str) -> Iterator[ET.Element]:
+    """The ``tag`` elements of ``element``, through any wrapper but never inside one found.
+
+    A table's rows and a row's cells: a nested table stands inside a cell, which is never
+    entered here.
+    """
+    for child in element:
+        if child.tag == tag:
+            yield child
+        else:
+            yield from _within(child, tag)
 
 
 def certify_tracked(source: bytes, views: dict[str, bytes]) -> dict[str, Json]:
@@ -1469,13 +1517,18 @@ def certify_tracked(source: bytes, views: dict[str, bytes]) -> dict[str, Json]:
     Each view must be the source package with only the parts holding revisions written again,
     with no revision left anywhere, and each part's paragraphs must hold the source's run
     content as the view keeps it: every token, in order, with paragraphs joined only where the
-    view drops a paragraph mark, and to the paragraph after.
+    view drops a paragraph mark, and to the paragraph after. A footnote or endnote whose every
+    reference in the body the view drops is gone from the view's notes, and only such a note.
     """
     out: dict[str, Json] = {"checker": CHECKER_VERSION}
     with zipfile.ZipFile(io.BytesIO(source)) as original:
         names = original.namelist()
+        roots = {
+            name: ET.fromstring(original.read(name)) for name in names if name.endswith(".xml")
+        }
         for view, data in views.items():
             characters = elements = joined = 0
+            gone = _notes_gone(roots, _VIEW_DROPS[view])
             with zipfile.ZipFile(io.BytesIO(data)) as copy:
                 if copy.namelist() != names:
                     raise CertificationError(f"the {view} view's parts are not the document's")
@@ -1488,7 +1541,10 @@ def certify_tracked(source: bytes, views: dict[str, bytes]) -> dict[str, Json]:
                     source_root, view_root = ET.fromstring(before), ET.fromstring(after)
                     if any(e.tag in _REVISIONS for e in view_root.iter()):
                         raise CertificationError(f"{view} view: a revision is left in {name}")
-                    if not any(e.tag in _REVISIONS for e in source_root.iter()):
+                    dropped = gone.get(source_root.tag, set())
+                    for note in [n for n in source_root if n.get(_w("id")) in dropped]:
+                        source_root.remove(note)
+                    if not dropped and not any(e.tag in _REVISIONS for e in source_root.iter()):
                         if before != after:
                             raise CertificationError(f"{view} view: {name} is changed")
                         continue
@@ -1496,12 +1552,29 @@ def certify_tracked(source: bytes, views: dict[str, bytes]) -> dict[str, Json]:
                     if _run_tokens(view_root, ())[0] != expected:
                         raise CertificationError(f"{view} view: {name} does not hold its content")
                     joined += joins
-                    tokens = [token for p in expected for token in p]
+                    tokens = [token for _, p in expected for token in p]
                     # Counted so that a run split in two counts the same: its characters, and
                     # the run content that is not text (tabs, breaks, symbols, field marks...).
                     characters += sum(len(str(token[1])) for token in tokens)
                     elements += sum(1 for token in tokens if token[0] not in ("t", "instrText"))
             out[view] = {"characters": characters, "elements": elements, "paragraphsJoined": joined}
+    return out
+
+
+def _notes_gone(roots: dict[str, ET.Element], drops: tuple[str, ...]) -> dict[str, set[str]]:
+    """The notes a view drops, by notes part: those whose every body reference it drops."""
+    body = next(root for root in roots.values() if root.tag == _w("document"))
+    kept = {
+        (token[0], value)
+        for _, tokens in _run_tokens(body, drops)[0]
+        for token in tokens
+        for key, value in token[2]
+        if key == _w("id")
+    }
+    out: dict[str, set[str]] = {}
+    for kind in ("footnote", "endnote"):
+        referred = {e.get(_w("id"), "") for e in body.iter(_w(f"{kind}Reference"))}
+        out[_w(f"{kind}s")] = {i for i in referred if (f"{kind}Reference", i) not in kept}
     return out
 
 

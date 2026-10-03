@@ -1104,9 +1104,7 @@ def test_any_other_shift_refuses(inner: str) -> None:
 
 
 def test_a_shift_under_a_point_may_hold_a_superscript() -> None:
-    # As in Imatinib Teva's 5.1 ("5 MIU/m" and a raised "2" in a span shifted by 0.5pt), which T
-    # drops too (under 0.1 of the superscript's size); T refuses one from 0.9pt at 12pt, which
-    # the reader reads (a divergence recorded in scripts/generate_style_cases.py).
+    # As in Imatinib Teva's 5.1 ("5 MIU/m" and a raised "2" in a span shifted by 0.5pt).
     body = '<p>a<span style="position: relative; top: .5pt">m<sup>2</sup></span></p>'
     assert kinds(body) == [(2, 3, "superscript")]
 

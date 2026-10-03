@@ -12,7 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-from mutate_checker import EQUIVALENT, RECORD, TARGET, mutants
+from mutate_checker import EQUIVALENT, RECORD, TARGET, count
 
 
 def test_the_record_is_the_run_of_the_check_as_it_is() -> None:
@@ -20,7 +20,7 @@ def test_the_record_is_the_run_of_the_check_as_it_is() -> None:
     assert record["targetSha256"] == hashlib.sha256(TARGET.read_bytes()).hexdigest(), (
         "certify.py changed: run scripts/mutate_checker.py --write"
     )
-    assert record["mutants"] == len(mutants())
+    assert record["mutants"] == count()
 
 
 def test_every_fault_is_caught_or_recorded_as_unable_to_matter() -> None:

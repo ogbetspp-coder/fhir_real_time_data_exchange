@@ -12,17 +12,13 @@ smaller than the text in it, a block overflowing its table cell, a margin drawin
 its list number, text at the bounds' edge, a combining mark on a space drawn as a stroke, text
 moved far to the right, off a printed page, a bottom border on a block or cell drawn under a lone
 sign as "≤", text shifted by up to 6pt over the line above or below), the reader refuses only the
-cases listed below, and the rest is a stated residual;
-rendering the page and comparing it with this reading is ADR 0005's renderer cross-check. Nor does
-it parse the div as a browser does: it parses XML, and a browser the EMA's div as HTML. Where the
-two build different trees it refuses the cases listed below (processing instructions, comments,
-prefixed elements, self-closing elements other than ``br``, ``hr`` and ``img``, and the rest); any
-other difference is a stated residual, and reading with an HTML5 parser, as a browser does, is a
-tracked follow-up (``docs/roadmap.md``, item 3a). It is not the fidelity scanner
-(``zone_a.fidelity.xhtml``), which is the contract for narrative this repository publishes and
-stays as strict as it is; the EMA's own divs carry inline CSS on nearly every element, which that
-scanner rightly refuses. Here each section is read on its own, so a section the reader cannot vouch
-for is refused (``Section.refusal``) without losing the rest of the document.
+cases listed below. Nor does it parse the div as a browser does: it parses XML, and a browser the
+EMA's div as HTML. Where the two build different trees it refuses the cases listed below
+(processing instructions, comments, prefixed elements, self-closing elements other than ``br``,
+``hr`` and ``img``, and the rest). What remains of either is held in check by Chrome itself, which
+shows every section read (``scripts/browser_oracle.py``, and the service for every ePI it ingests).
+Each section is read on its own, so a section the reader cannot vouch for is refused
+(``Section.refusal``) without losing the rest of the document.
 
 What a section's text is:
 
@@ -137,13 +133,8 @@ from typing import Any, Final
 
 from label_docx.reader import Mark, Numbering, Paragraph
 
-# The version of the rules above. A change to this file changes its hash in versions.lock.json,
-# and tests/test_versions_lock.py then requires a new version here.
-# 1.1.0 draws list markers as the browser does; 1.2.0 lets an element's own style replace its
-# default lines (a sup styled sub is lowered only), sizes text by the cascade (faint under 2pt),
-# and draws a link styled inherit or currentcolor in the colour around it: each found by
-# generated sections held to Chrome (scripts/fuzz_epi.py).
-READER_VERSION = "epi-reader/1.2.1"
+# The version of the rules above; versions.lock.json ties it to this file (tests/test_locks.py).
+READER_VERSION = "epi-reader/1.2.2"
 XHTML = "http://www.w3.org/1999/xhtml"
 OBJECT = "\ufffc"
 _COLLAPSIBLE = " \t\n\r\f"
@@ -668,7 +659,7 @@ def _style(style: str) -> None:
         if name == "font-family":
             # A symbol-encoded font draws other glyphs for the same code points (Wingdings "J"
             # is drawn as a smiling face, Symbol "³" as "≥"), so every family named must be a
-            # Unicode text font the reader knows (ADR 0005's closed list).
+            # Unicode text font the reader knows (``_TEXT_FONTS``, a closed list).
             for family in value.split(","):
                 if family.strip().strip("'\"") not in _TEXT_FONTS:
                     raise _RefusedError("unsupported-style", f"{name}: {value}")
@@ -718,12 +709,11 @@ _SHIFT_LENGTH: Final = re.compile(r"([+-]?)([0-9]+(?:\.[0-9]*)?|\.[0-9]+)(pt|px|
 def _shift(name: str, style: str) -> set[str]:
     """The mark a ``position: relative`` shift asks for (superscript, subscript or none).
 
-    As the authority import's T accepts it (``docs/design/authority-import-t.md``, T4): on an
-    inline element other than ``sup`` and ``sub``, with exactly one of ``top`` and ``bottom``,
-    and no ``vertical-align``; ``top`` or ``bottom`` without it, or any other ``position``,
-    refuses. The shift is bounded by ``_SHIFT_BOUND_POINTS`` (an ``em`` counted at the largest
-    font the reader allows); what a shift within it still draws over the line above or below is
-    a stated residual.
+    Read only on an inline element other than ``sup`` and ``sub``, with exactly one of ``top``
+    and ``bottom``, and no ``vertical-align``; ``top`` or ``bottom`` without it, or any other
+    ``position``, refuses. The shift is bounded by ``_SHIFT_BOUND_POINTS`` (an ``em`` counted at
+    the largest font the reader allows); what a shift within it still draws over the line above
+    or below is a stated residual.
     """
     declared = dict(_importance_ordered(style))
     position, top, bottom = declared.get("position"), declared.get("top"), declared.get("bottom")
@@ -793,10 +783,7 @@ def _paint_element(style: str, builder: _Builder, name: str) -> None:
     refused; and a shift is bounded only on its own, so one inside another shift or inside a
     superscript, a subscript or a ``vertical-align`` is refused (five nested 6pt shifts move text
     30pt), and so is one of a point or more around them. One under a point may hold a
-    superscript (Imatinib Teva's 5.1 writes "m" and a raised "2" in a 0.5pt shift). T drops a
-    shift only under 0.1 of the smallest text beneath it and refuses a larger one around a
-    superscript, so between that bound and a point (0.9pt around a superscript of 12pt text) the
-    two differ: a recorded divergence of the shared style cases (``generate_style_cases.py``).
+    superscript (Imatinib Teva's 5.1 writes "m" and a raised "2" in a 0.5pt shift).
     """
     painted = _paint(style, builder)
     _font(style, builder, name)

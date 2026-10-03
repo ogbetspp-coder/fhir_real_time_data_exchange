@@ -7,8 +7,9 @@ Unicode code points.
 
 A read::
 
-    {"documentType": ..., "date": ..., "format": ..., "quirks": [...], "reader": ...,
-     "sections": [...], "source": {"bytes": n, "sha256": hex}, "title": ...}
+    {"certificate": {...}, "date": ..., "documentType": ..., "format": ..., "quirks": [...],
+     "reader": ..., "refusedSections": n, "sections": [...], "source": {"bytes": n, "sha256": hex},
+     "title": ...}
 
 Each section, in the Composition's order, carries its ``code``, ``title``, ``paragraphs``, the
 ``notes`` the reader made on defects it read through, its ``refusal`` (null, or the ``code`` and
@@ -33,11 +34,9 @@ from label_docx.certify import EpiSource
 from label_docx.epi import READER_VERSION, EpiRefusedError, Section, read_epi, walk
 from label_docx.output import Json, canonical, certified, paragraphs
 
-# The version of the shape above. A change to this file changes its hash in versions.lock.json.
-# 1.1.0 adds the certificate, and refuses a read the conservation check cannot account for;
-# 1.2.0 certifies with conservation-check/1.1.0; 1.3.0 with 1.2.0; 1.4.0 with 1.3.0; 1.5.0
-# with 1.4.0; 1.6.0 with 1.5.0; 1.7.0 with 1.6.0; 1.8.0 with 1.7.0.
-FORMAT_VERSION = "label-epi-json/1.8.0"
+# The version of the shape above, and of the check that certifies it: versions.lock.json ties
+# it to both files (tests/test_locks.py).
+FORMAT_VERSION = "label-epi-json/1.9.0"
 
 
 def section(item: Section) -> dict[str, Json]:

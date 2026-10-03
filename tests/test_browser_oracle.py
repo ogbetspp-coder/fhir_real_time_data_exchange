@@ -13,9 +13,9 @@ from pathlib import Path
 
 from browser_oracle import sections
 from label_docx.browser import digest, markers_digest, reader_lines, reader_markers
+from lock import MANIFESTS
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
-_MANIFESTS = {"sources", "expected", "word", "browser"}
 
 
 def _sets() -> list[Path]:
@@ -26,7 +26,7 @@ def test_every_epi_in_the_corpus_has_the_browsers_answers() -> None:
     assert _sets()
     for folder in _sets():
         recorded = json.loads((folder / "browser.json").read_text("utf-8"))["sections"]
-        present = {p.name for p in folder.glob("*.json") if p.stem not in _MANIFESTS}
+        present = {p.name for p in folder.glob("[!.]*.json") if p.stem not in MANIFESTS}
         assert set(recorded) == present, folder.name
 
 

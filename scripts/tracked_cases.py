@@ -22,7 +22,19 @@ import sys
 from pathlib import Path
 
 from label_docx.word import word_version, word_views
-from numbering_cases import Case, abstract, field, lvl, notes, num, package, para, words
+from numbering_cases import (
+    Case,
+    abstract,
+    field,
+    files,
+    lvl,
+    notes,
+    num,
+    package,
+    para,
+    words,
+    write,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 FOLDER = ROOT / "corpus" / "tracked-cases"
@@ -79,8 +91,9 @@ SYMBOL = '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/>'
 
 
 def case(question: str, body: str, **parts: object) -> Case:
-    """A case with the list and the styles every case shares."""
-    return Case(question, LIST, body, styles=STYLES, **parts)  # type: ignore[arg-type]
+    """A case with the list and the styles every case shares, unless it brings its own."""
+    numbering = str(parts.pop("numbering", LIST))
+    return Case(question, numbering, body, **{"styles": STYLES, **parts})  # type: ignore[arg-type]
 
 
 CASES: dict[str, Case] = {
@@ -224,7 +237,7 @@ CASES: dict[str, Case] = {
         ),
     ),
     "mark-deleted-before-table": case(
-        "A deleted paragraph mark before a table (the reader refuses it).",
+        "A deleted paragraph mark before a table: the text joins the first cell.",
         para(words("before"), props=mark("del"))
         + "<w:tbl><w:tblGrid><w:gridCol/></w:tblGrid><w:tr><w:tc><w:p>"
         + words("cell")
@@ -292,8 +305,98 @@ CASES: dict[str, Case] = {
         f'<w:sectPrChange w:id="8" {WHO}><w:sectPr><w:pgSz w:w="11906" w:h="16838"/>'
         "</w:sectPr></w:sectPrChange></w:sectPr>",
     ),
+    "table-deleted-whole": case(
+        "Every row of a table deleted: whether the table goes, and how later tables count.",
+        table(row(para(dele(words("gone"))), props=f'<w:del w:id="4" {WHO}/>'))
+        + para(words("between"))
+        + table(row(para(words("kept"))))
+        + para(words("after")),
+    ),
+    "table-inserted-whole": case(
+        "Every row of a table inserted: the original has no table there.",
+        table(row(para(ins(words("new"))), props=f'<w:ins w:id="4" {WHO}/>'))
+        + para(words("between"))
+        + table(row(para(words("kept"))))
+        + para(words("after")),
+    ),
+    "mark-deleted-before-table-first-row-deleted": case(
+        "A deleted mark before a table whose first row is deleted: which paragraph it joins.",
+        para(words("before"), props=mark("del"))
+        + table(
+            row(para(dele(words("first row"))), props=f'<w:del w:id="4" {WHO}/>'),
+            row(para(words("second row"))),
+        )
+        + para(words("after")),
+    ),
+    "footnote-reference-deleted": case(
+        "A footnote's reference deleted: whether the note goes with it.",
+        para(
+            words("Body"),
+            dele(
+                '<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr>'
+                '<w:footnoteReference w:id="1"/></w:r>'
+            ),
+            words(" text."),
+        ),
+        footnotes=notes("footnote", 1),
+    ),
+    "footnote-reference-inserted": case(
+        "A footnote's reference inserted: whether the original has the note.",
+        para(
+            words("Body"),
+            ins(
+                '<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr>'
+                '<w:footnoteReference w:id="1"/></w:r>'
+            ),
+            words(" text."),
+        ),
+        footnotes=notes("footnote", 1),
+    ),
+    "content-control-emptied": case(
+        "A content control whose whole content is inserted: what the original shows (the reader "
+        "refuses it).",
+        '<w:sdt><w:sdtPr><w:alias w:val="Name"/></w:sdtPr><w:sdtContent>'
+        + para(ins(words("all new")))
+        + "</w:sdtContent></w:sdt>"
+        + para(words("after")),
+    ),
+    "format-section-note-numbers": case(
+        "A section's footnote numbering changed: which marks each view draws.",
+        para(words("Body"), '<w:r><w:footnoteReference w:id="1"/></w:r>'),
+        footnotes=notes("footnote", 1),
+        final='<w:sectPr><w:footnotePr><w:numFmt w:val="lowerRoman"/></w:footnotePr>'
+        f'<w:sectPrChange w:id="8" {WHO}><w:sectPr><w:footnotePr><w:numFmt w:val="decimal"/>'
+        "</w:footnotePr></w:sectPr></w:sectPrChange></w:sectPr>",
+    ),
+    "style-definition-changed": case(
+        "A style's definition changed: whether Reject All restores it (the reader refuses it).",
+        para(words("styled"), props='<w:pStyle w:val="Changed"/>'),
+        styles=STYLES + '<w:style w:type="paragraph" w:styleId="Changed"><w:name w:val="Changed"/>'
+        '<w:basedOn w:val="Normal"/><w:rPr><w:b/>'
+        f'<w:rPrChange w:id="9" {WHO}><w:rPr><w:i/></w:rPr></w:rPrChange></w:rPr></w:style>',
+    ),
+    "style-paragraph-definition-changed": case(
+        "A paragraph style's definition changed (its list and alignment): whether Reject All "
+        "restores it.",
+        para(words("styled"), props='<w:pStyle w:val="Listed"/>') + para(words("plain")),
+        styles=STYLES + '<w:style w:type="paragraph" w:styleId="Listed"><w:name w:val="Listed"/>'
+        '<w:basedOn w:val="Normal"/><w:pPr><w:numPr><w:numId w:val="1"/></w:numPr>'
+        f'<w:pPrChange w:id="9" {WHO}><w:pPr><w:jc w:val="center"/></w:pPr></w:pPrChange>'
+        "</w:pPr></w:style>",
+    ),
+    "list-definition-changed": case(
+        "A list level's definition changed (its format): whether Reject All restores it.",
+        para(words("item"), props=numbered()) + para(words("item"), props=numbered()),
+        numbering=abstract(
+            1,
+            '<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="upperRoman"/>'
+            '<w:lvlText w:val="%1."/><w:rPr><w:b/>'
+            f'<w:rPrChange w:id="9" {WHO}><w:rPr><w:i/></w:rPr></w:rPrChange></w:rPr></w:lvl>',
+        )
+        + num(1, 1),
+    ),
     "row-inserted": case(
-        "A table row inserted (the reader refuses it).",
+        "A table row inserted: the original has no such row.",
         "<w:tbl><w:tblGrid><w:gridCol/></w:tblGrid><w:tr><w:tc><w:p>"
         + words("kept")
         + "</w:p></w:tc></w:tr><w:tr><w:trPr>"
@@ -307,26 +410,9 @@ CASES: dict[str, Case] = {
 
 def wanted() -> dict[Path, bytes]:
     """Every file of the corpus set, with its bytes."""
-    out: dict[Path, bytes] = {}
-    sources = []
-    for name, item in CASES.items():
-        data = package(item)
-        out[FOLDER / f"{name}.docx"] = data
-        sources.append(
-            {
-                "name": item.question,
-                "file": f"{name}.docx",
-                "sha256": hashlib.sha256(data).hexdigest(),
-                "bytes": len(data),
-            }
-        )
-    manifest = {
-        "schemaVersion": "1.0.0",
-        "note": "Synthetic tracked-change cases written by scripts/tracked_cases.py.",
-        "sources": sources,
-    }
-    out[FOLDER / "sources.json"] = (json.dumps(manifest, indent=2) + "\n").encode("utf-8")
-    return out
+    return files(
+        FOLDER, CASES, "Synthetic tracked-change cases written by scripts/tracked_cases.py."
+    )
 
 
 def record_word() -> None:
@@ -374,23 +460,10 @@ def main() -> int:
     parser.add_argument("--check", action="store_true", help="fail rather than write")
     parser.add_argument("--word", action="store_true", help="have Word make each case's views")
     args = parser.parse_args()
-    files = wanted()
-    present = set(FOLDER.glob("*.docx")) if FOLDER.exists() else set()
-    stale = [p for p, data in files.items() if not p.exists() or p.read_bytes() != data]
-    extra = sorted(present - set(files))
-    if args.check:
-        for path in [*stale, *extra]:
-            sys.stderr.write(f"out of date: {path.relative_to(ROOT)}\n")
-        return 1 if stale or extra else 0
-    FOLDER.mkdir(parents=True, exist_ok=True)
-    for path in extra:
-        path.unlink()
-    for path in stale:
-        path.write_bytes(files[path])
-        sys.stdout.write(f"wrote {path.relative_to(ROOT)}\n")
-    if args.word:
+    status = write(FOLDER, wanted(), args.check)
+    if args.word and not args.check:
         record_word()
-    return 0
+    return status
 
 
 if __name__ == "__main__":

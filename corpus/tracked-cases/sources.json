@@ -117,7 +117,7 @@
       "bytes": 4355
     },
     {
-      "name": "A deleted paragraph mark before a table (the reader refuses it).",
+      "name": "A deleted paragraph mark before a table: the text joins the first cell.",
       "file": "mark-deleted-before-table.docx",
       "sha256": "ff1b7c394b8bce207d611fea41f13f93926b461fd04aa750051e1fe133c62803",
       "bytes": 3622
@@ -171,7 +171,67 @@
       "bytes": 3540
     },
     {
-      "name": "A table row inserted (the reader refuses it).",
+      "name": "Every row of a table deleted: whether the table goes, and how later tables count.",
+      "file": "table-deleted-whole.docx",
+      "sha256": "8d4420dd6a9bffbfcf3084a56d8ad08ad5cfb1fc25215af618604b361300cd39",
+      "bytes": 3866
+    },
+    {
+      "name": "Every row of a table inserted: the original has no table there.",
+      "file": "table-inserted-whole.docx",
+      "sha256": "5ce82e7808ad91ad345061af3b25001230c34f9eb42efa155233a009b337c4ac",
+      "bytes": 3853
+    },
+    {
+      "name": "A deleted mark before a table whose first row is deleted: which paragraph it joins.",
+      "file": "mark-deleted-before-table-first-row-deleted.docx",
+      "sha256": "4a302c2452b605baf3ca2bf85c4909b8eef96def7aae4b61de0988d109f39227",
+      "bytes": 3902
+    },
+    {
+      "name": "A footnote's reference deleted: whether the note goes with it.",
+      "file": "footnote-reference-deleted.docx",
+      "sha256": "b6c9f2d32ebf78d29a8f61b9a3b0c6ecf3be302d7057e32e52ba43780d0bb24e",
+      "bytes": 4403
+    },
+    {
+      "name": "A footnote's reference inserted: whether the original has the note.",
+      "file": "footnote-reference-inserted.docx",
+      "sha256": "af7b6cdb0658d98f1c2cd38913fd45a58ea6e257923fb848584ac2f0c09ac5bb",
+      "bytes": 4403
+    },
+    {
+      "name": "A content control whose whole content is inserted: what the original shows (the reader refuses it).",
+      "file": "content-control-emptied.docx",
+      "sha256": "5487dce92ac404f6ac1ee8e04381762112cb1f06da6a3abbc526de01d496b6de",
+      "bytes": 3552
+    },
+    {
+      "name": "A section's footnote numbering changed: which marks each view draws.",
+      "file": "format-section-note-numbers.docx",
+      "sha256": "a8d972a9ab052d8ca524536558c745c6580204ebf1f3064e3a8155a32c96dbc4",
+      "bytes": 4466
+    },
+    {
+      "name": "A style's definition changed: whether Reject All restores it (the reader refuses it).",
+      "file": "style-definition-changed.docx",
+      "sha256": "b0faf317970cd834b4b071dc71b405109fc097a9d7fa96456df3ab6a29e1904f",
+      "bytes": 3612
+    },
+    {
+      "name": "A paragraph style's definition changed (its list and alignment): whether Reject All restores it.",
+      "file": "style-paragraph-definition-changed.docx",
+      "sha256": "7e5e6e77a710130af2c0d604d90b594b2ae546c8d00029eb7747ed599452eec1",
+      "bytes": 3717
+    },
+    {
+      "name": "A list level's definition changed (its format): whether Reject All restores it.",
+      "file": "list-definition-changed.docx",
+      "sha256": "cf2abfd21e8d42d13a2b66ea3cbf07a4fafb84d33f749d730ed1db337f162270",
+      "bytes": 3564
+    },
+    {
+      "name": "A table row inserted: the original has no such row.",
       "file": "row-inserted.docx",
       "sha256": "7c2045d0b39df4bdc9d817007f7014697cf827050d123756412696744e40f1a0",
       "bytes": 3708

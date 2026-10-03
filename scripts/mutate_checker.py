@@ -4,7 +4,7 @@
     uv run --frozen python scripts/mutate_checker.py --write  # and write the record
     uv run --frozen python scripts/mutate_checker.py --write --budget 100  # in parts
 
-A run is long (over two hours), so each mutant's result is kept as it comes in
+A run takes about half an hour on eight cores, so each mutant's result is kept as it comes in
 (``.mutants-progress.json``), with a fingerprint of everything a result depends on: the
 package, the tests, the scripts and the corpus. With ``--budget MINUTES`` a run starts no
 mutant after that time, keeps what it has and stops (exit 3); the next run takes up where it
@@ -16,8 +16,8 @@ turned round (``==`` to ``!=``, ``<`` to ``<=``, ``in`` to ``not in``), ``and`` 
 ``not`` dropped, a number one off, a ``True`` made ``False``, one character of a string made
 another, an addition made a subtraction, a ``raise``, ``return``, ``continue`` or ``break``
 removed or a refusal made to pass, a call's result discarded. Each faulty copy is run against
-the check's tests (``tests/test_certify.py``, ``tests/test_robustness.py``,
-``tests/test_output.py``); a fault the tests notice is killed. A fault that survives is either
+the check's tests (``TESTS``); a fault the tests notice is killed, and the test that last killed
+it is tried first next time. A fault that survives is either
 a missing test, to be added, or a change that cannot alter what the check does (an equivalent
 mutant), to be recorded in ``EQUIVALENT`` below with the reason. ``tests/test_checker_mutants.py``
 holds the recorded run: every mutant killed or recorded as equivalent.
@@ -89,6 +89,10 @@ _SECTIONS_ZIP = (
 _SYMBOL_COUNT = "self.ledger.symbol += sum(1 for a, b in zip(text, mapped, strict=True) if a != b)"
 # Mutants that cannot change what the check does, by function, line and mutation, each with the
 # reason. A survivor not listed here fails the run.
+_TABLE_STEP = (
+    "the table count is compared only between two walks that both make it: any step but zero "
+    "numbers the same tables apart, so a table added or lost shows either way"
+)
 EQUIVALENT: dict[tuple[str, str, str], str] = {
     ("_run_tokens.walk", "continue", "statement"): (
         "a paragraph holds no paragraph and run content no run the walk reads: walking either"
@@ -96,9 +100,15 @@ EQUIVALENT: dict[tuple[str, str, str], str] = {
     ),
     (
         "_run_tokens.walk",
-        'gone = dropped or (child.tag in {_w(d) for d in drops} and element.tag != _w("rPr"))',
+        'gone = dropped or (child.tag in dropping and element.tag != _w("rPr"))',
         "str:'rPr'",
     ): "a paragraph mark's change markers are empty: dropping one drops no content",
+    ("_run_tokens.table", "index, tables = tables, tables + 1", "binop"): _TABLE_STEP,
+    ("_run_tokens.table", "index, tables = tables, tables + 1", "int:1"): _TABLE_STEP,
+    ("_raw_texts", "found = _TAG.match(text, less + 1)", "int:1"): (
+        "a tag's first character is its name's, never '>' or a quote, so matching from one "
+        "character later finds the same end"
+    ),
     ("_local", 'return tag.rsplit("}", 1)[-1]', "int:1"): (
         "an element's tag holds one '}', after its namespace"
     ),
@@ -214,10 +224,6 @@ EQUIVALENT: dict[tuple[str, str, str], str] = {
     ),
     ("_raw_texts", "chunk = text[at:] if less < 0 else text[at:less]", "compare:0"): _FIRST_LESS,
     ("_raw_texts", "chunk = text[at:] if less < 0 else text[at:less]", "int:0"): _FIRST_LESS,
-    ("_raw_texts", 'end, quote = less + 1, ""', "int:1"): (
-        "a tag's first character is its name's, never '>' or a quote, so starting the scan one "
-        "later finds the same end"
-    ),
     ("_raw_texts", 'name = body.split(None, 1)[0] if body.strip() else ""', "int:1"): (
         "splitting once more leaves the first word, the name, the same"
     ),
@@ -399,6 +405,11 @@ class _Replace(ast.NodeTransformer):
             return self.replacement
         visited: ast.AST = super().visit(node)
         return visited
+
+
+def count() -> int:
+    """How many mutants ``mutants`` makes: one per site, without making them."""
+    return len(list(_sites(ast.parse(TARGET.read_text("utf-8")))))
 
 
 def mutants() -> list[Mutant]:

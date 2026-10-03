@@ -1,7 +1,8 @@
 r"""Generate ePI sections at random and hold the reader to Chrome on every one it reads.
 
     uv run --frozen python scripts/fuzz_epi.py --cases 5000 --seed 1
-    uv run --frozen python scripts/fuzz_epi.py --cases 300 --seed 7 --write corpus/epi-generated
+    uv run --frozen python scripts/fuzz_epi.py --cases 3000 --seed 1000 \
+        --record tests/data/generated-epi.json
 
 The corpus holds what authors happened to write; this explores what they could write. Each
 case is a div built from the elements, attributes and inline styles the reader accepts, nested
@@ -11,9 +12,8 @@ is shown by headless Chrome and compared line by line, character by character, m
 and list marker by list marker; each it refuses is counted. A case read otherwise than Chrome
 shows is a fault in the reader, printed with its seed and number so it can be made again.
 
-``--write`` keeps the cases as a corpus set (one ePI Bundle of all of them, with ``sources.json``
-naming the seed), so ``scripts/browser_oracle.py record`` can record Chrome's answers and the
-tests hold every later reader to them without a browser.
+``--record`` keeps Chrome's answers for the cases (a digest of each), so
+``tests/test_generated_epi.py`` holds every later reader to them without a browser.
 """
 
 from __future__ import annotations
@@ -318,22 +318,11 @@ def record(divs: list[str], seed: int, target: Path) -> None:
     sys.stdout.write(f"wrote {target}\n")
 
 
-def _bundle(divs: list[str]) -> bytes:
-    composition = {
-        "resourceType": "Composition",
-        "title": "Generated cases",
-        "section": [{"title": f"Case {i}", "text": {"div": d}} for i, d in enumerate(divs)],
-    }
-    bundle = {"resourceType": "Bundle", "type": "document", "entry": [{"resource": composition}]}
-    return json.dumps(bundle, ensure_ascii=False, indent=1).encode("utf-8")
-
-
 def main() -> int:
     """Run the cases; 1 if any is read otherwise than Chrome shows it."""
     parser = argparse.ArgumentParser(description="Hold the ePI reader to Chrome on random cases.")
     parser.add_argument("--cases", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=1)
-    parser.add_argument("--write", type=Path, help="keep the cases as a corpus set here")
     parser.add_argument("--record", type=Path, help="write Chrome's answers for the cases here")
     args = parser.parse_args()
     divs = cases(args.seed, args.cases)
@@ -341,27 +330,6 @@ def main() -> int:
     if args.record:
         record(divs, args.seed, args.record)
     sys.stdout.write(f"{json.dumps(counts, sort_keys=True)}\n")
-    if args.write:
-        args.write.mkdir(parents=True, exist_ok=True)
-        data = _bundle(divs)
-        name = f"generated-seed-{args.seed}.json"
-        (args.write / name).write_bytes(data)
-        manifest = {
-            "schemaVersion": "1.0.0",
-            "note": (
-                f"Synthetic ePI sections written by scripts/fuzz_epi.py --cases {args.cases} "
-                f"--seed {args.seed}; the same seed writes the same bytes."
-            ),
-            "sources": [
-                {
-                    "name": f"{args.cases} generated sections, seed {args.seed}",
-                    "file": name,
-                    "sha256": hashlib.sha256(data).hexdigest(),
-                    "bytes": len(data),
-                }
-            ],
-        }
-        (args.write / "sources.json").write_text(json.dumps(manifest, indent=2) + "\n", "utf-8")
     return 1 if counts["differ"] else 0
 
 

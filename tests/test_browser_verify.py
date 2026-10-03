@@ -1,8 +1,8 @@
 """Every ePI ingested is held to Chrome where it is installed; a disagreement is never served.
 
 The store asks a verifier (``label_docx.browser.verify_epi`` in the service) about every ePI it
-reads and keeps the verdict beside the result, once per Chrome version: the same Chrome must give
-the same verdict byte for byte. A result Chrome disagrees with is kept, as everything is, but
+reads and keeps the verdict beside the result, once per Chrome version: a version already kept is
+not asked again. A result Chrome disagrees with is kept, as everything is, but
 the service will not serve it. Most tests use a stand-in verifier, so the store's rules are held
 without a browser; the last ones ask Chrome itself, where it is installed.
 """
@@ -18,7 +18,8 @@ import pytest
 
 from label_docx import browser, epi_output
 from label_docx.service import Service
-from label_docx.store import Store, StoreError
+from label_docx.store import Checker, Store
+from test_service import _call
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 EPI = (CORPUS / "ema-epi" / "jentadueto-smpc-en.json").read_bytes()
@@ -28,6 +29,10 @@ CHROME = browser.find_chrome()
 
 def _agreeing(_data: bytes, _result: dict[str, Any]) -> dict[str, Any]:
     return {"application": "Stand-in 1.0", "agrees": 1, "differs": [], "refused": 0, "sections": 1}
+
+
+def _checker(verify: Any) -> Checker:
+    return Checker(lambda: "Stand-in 1.0", verify)
 
 
 def _differing(_data: bytes, _result: dict[str, Any]) -> dict[str, Any]:
@@ -41,30 +46,10 @@ def _differing(_data: bytes, _result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _call(
-    service: Service, method: str, path: str, body: bytes = b""
-) -> tuple[str, dict[str, str], bytes]:
-    import io
-
-    answer: dict[str, Any] = {}
-
-    def start_response(status: str, headers: list[tuple[str, str]]) -> None:
-        answer["status"], answer["headers"] = status, dict(headers)
-
-    environ = {
-        "REQUEST_METHOD": method,
-        "PATH_INFO": path,
-        "CONTENT_LENGTH": str(len(body)),
-        "wsgi.input": io.BytesIO(body),
-    }
-    payload = b"".join(service(environ, start_response))
-    return answer["status"], answer["headers"], payload
-
-
 def test_an_epi_is_verified_and_the_verdict_kept_once_per_browser(tmp_path: Path) -> None:
-    store = Store(tmp_path, browser=_agreeing)
+    store = Store(tmp_path, browser=_checker(_agreeing))
     first = store.ingest(EPI)
-    again = Store(tmp_path, browser=_agreeing).ingest(EPI)
+    again = Store(tmp_path, browser=_checker(_agreeing)).ingest(EPI)
     assert first.verification is not None
     assert first.verification == again.verification
     assert json.loads(first.verification)["application"] == "Stand-in 1.0"
@@ -73,19 +58,34 @@ def test_an_epi_is_verified_and_the_verdict_kept_once_per_browser(tmp_path: Path
 
 
 def test_a_word_document_and_a_refused_epi_are_not_sent_to_the_browser(tmp_path: Path) -> None:
-    store = Store(tmp_path, browser=_differing)
+    store = Store(tmp_path, browser=_checker(_differing))
     assert store.ingest(DOCX).verification is None
     assert store.ingest(b'{"resourceType": "Bundle"}').verification is None
 
 
-def test_the_same_browser_must_give_the_same_verdict(tmp_path: Path) -> None:
-    Store(tmp_path, browser=_agreeing).ingest(EPI)
-    with pytest.raises(StoreError):
-        Store(tmp_path, browser=lambda d, r: {**_agreeing(d, r), "agrees": 2}).ingest(EPI)
+def test_a_kept_verdict_is_not_asked_again_and_a_new_version_is(tmp_path: Path) -> None:
+    asked: list[str] = []
+
+    def verify(data: bytes, result: dict[str, Any]) -> dict[str, Any]:
+        asked.append("asked")
+        return _agreeing(data, result)
+
+    first = Store(tmp_path, browser=_checker(verify)).ingest(EPI)
+    # The same version is not asked again, even if it would now answer otherwise.
+    again = Store(tmp_path, browser=_checker(lambda d, r: {**_agreeing(d, r), "agrees": 2}))
+    assert again.ingest(EPI).verification == first.verification
+    assert asked == ["asked"]
+    newer = Checker(
+        lambda: "Stand-in 2.0", lambda d, r: {**_agreeing(d, r), "application": "Stand-in 2.0"}
+    )
+    assert json.loads(Store(tmp_path, browser=newer).ingest(EPI).verification or b"")[
+        "application"
+    ] == ("Stand-in 2.0")
+    assert len(Store(tmp_path).verifications(first.document)) == 2
 
 
 def test_a_result_the_browser_disagrees_with_is_never_served(tmp_path: Path) -> None:
-    service = Service(Store(tmp_path, browser=_differing))
+    service = Service(Store(tmp_path, browser=_checker(_differing)))
     status, headers, body = _call(service, "POST", "/v1/documents", EPI)
     assert status == "201 Created"
     assert headers["Verification"] == "differs"
@@ -106,7 +106,7 @@ def test_without_a_browser_a_result_is_served_and_says_it_was_not_verified(tmp_p
     assert _call(service, "GET", f"/v1/documents/{document}")[0] == "200 OK"
     status, _, body = _call(service, "GET", f"/v1/documents/{document}/verification")
     assert (status, json.loads(body)) == ("200 OK", {"verifications": []})
-    agreeing = Service(Store(tmp_path, browser=_agreeing))
+    agreeing = Service(Store(tmp_path, browser=_checker(_agreeing)))
     assert _call(agreeing, "POST", "/v1/documents", EPI)[1]["Verification"] == "agrees"
     assert _call(agreeing, "POST", "/v1/documents", DOCX)[1]["Verification"] == "not-verified"
 
@@ -166,6 +166,8 @@ def test_strict_service_serves_no_read_its_application_has_not_checked(tmp_path:
     assert _call(unchecked, "GET", f"/v1/documents/{json.loads(body)['document']}")[0] == "200 OK"
     _, _, body = _call(unchecked, "POST", "/v1/documents", b'{"resourceType": "Bundle"}')
     assert _call(unchecked, "GET", f"/v1/documents/{json.loads(body)['document']}")[0] == "200 OK"
-    checked = Service(Store(tmp_path / "b", browser=_agreeing), require=frozenset({"epi"}))
+    checked = Service(
+        Store(tmp_path / "b", browser=_checker(_agreeing)), require=frozenset({"epi"})
+    )
     _, _, body = _call(checked, "POST", "/v1/documents", EPI)
     assert _call(checked, "GET", f"/v1/documents/{json.loads(body)['document']}")[0] == "200 OK"

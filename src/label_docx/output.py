@@ -82,18 +82,9 @@ from label_docx.reader import (
     tracked,
 )
 
-# The version of the shape above. A change to this file changes its hash in versions.lock.json.
-# 1.1.0 adds numbering.text and numbering.suffix, the list label; 1.2.0 adds paragraphs' notes
-# and the footnotes and endnotes; 1.3.0 adds paragraphs' pages, where Word draws a page number;
-# 1.4.0 adds the certificate, and refuses a read the conservation check cannot account for;
-# 1.5.0 certifies with conservation-check/1.1.0, which leaves the reader no choice of reading;
-# 1.6.0 adds the headers, footers and comments, and each paragraph's comment marks, certified
-# by conservation-check/1.2.0; 1.7.0 certified by 1.3.0, which also works out the key marks;
-# 1.8.0 by 1.4.0, with Word's toggle and default-character-style rules; 1.9.0 by 1.5.0, which
-# also works out the list labels and note marks; 1.10.0 reads a document with tracked changes as
-# ``tracked``: both views and the changes, each view certified, and the views by 1.6.0; 1.11.0
-# by 1.7.0, which drops a row the view drops, and new kinds of change (rows, table formatting).
-FORMAT_VERSION = "label-docx-json/1.11.0"
+# The version of the shape above, and of the check that certifies it: versions.lock.json ties
+# it to both files (tests/test_locks.py).
+FORMAT_VERSION = "label-docx-json/1.12.0"
 
 type Json = str | int | bool | list[Json] | dict[str, Json] | None
 

@@ -6,6 +6,7 @@ import dataclasses
 import hashlib
 import io
 import json
+import socket
 import threading
 import urllib.error
 import urllib.request
@@ -18,8 +19,8 @@ import pytest
 from label_docx import documents, epi_output, output
 from label_docx.cli import service_main
 from label_docx.output import canonical, read
-from label_docx.service import Service, check_environment, health
-from label_docx.store import Store, StoreError
+from label_docx.service import Service, _QuietHandler, _ThreadingServer, check_environment, health
+from label_docx.store import Checker, Store, StoreError
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 TEMPLATE = (
@@ -119,8 +120,8 @@ def test_ingesting_one_document_at_once_from_many_threads_keeps_it_once(tmp_path
     for thread in threads:
         thread.join()
     assert len(set(receipts)) == 1
-    # The source, result and receipt are each created once; a thread that created any says so.
-    assert 1 <= created.count(True) <= 3
+    # One of them wrote the receipt, so one says it created the document's answer.
+    assert created.count(True) == 1
     assert len(list(tmp_path.rglob("source"))) == len(list(tmp_path.rglob("result.json"))) == 1
     assert len(list(tmp_path.rglob("receipt.json"))) == 1
     assert not list(tmp_path.rglob(".incoming-*"))
@@ -144,7 +145,12 @@ def test_a_new_reader_version_adds_its_result_and_leaves_the_old_one(
 
 
 def _call(
-    service: Service, method: str, path: str, body: bytes = b"", length: str | None = None
+    service: Service,
+    method: str,
+    path: str,
+    body: bytes = b"",
+    length: str | None = None,
+    **headers: str,
 ) -> tuple[str, dict[str, str], bytes]:
     answer: dict[str, object] = {}
 
@@ -156,6 +162,7 @@ def _call(
         "PATH_INFO": path,
         "CONTENT_LENGTH": str(len(body)) if length is None else length,
         "wsgi.input": io.BytesIO(body),
+        **{f"HTTP_{name.upper()}": value for name, value in headers.items()},
     }
     payload = b"".join(service(environ, start_response))
     return str(answer["status"]), answer["headers"], payload  # type: ignore[return-value]
@@ -187,6 +194,9 @@ def test_the_api_answers_the_same_bytes_and_serves_what_it_keeps(tmp_path: Path)
         ("POST", "/v1/documents", b"", "0", "400"),
         ("POST", "/v1/documents", b"abc", "10", "400"),
         ("POST", "/v1/documents", b"", str(64 * 1024 * 1024 + 1), "413"),
+        # A digit to str.isdigit that int() cannot read, and more digits than any size has.
+        ("POST", "/v1/documents", b"", "\u00b2", "411"),
+        ("POST", "/v1/documents", b"", "9" * 20, "411"),
     ],
 )
 def test_the_api_refuses_what_it_cannot_answer(
@@ -202,7 +212,153 @@ def test_a_store_that_holds_other_bytes_answers_500(tmp_path: Path) -> None:
     document = json.loads(_call(service, "POST", "/v1/documents", TEMPLATE)[2])["document"]
     _, result = _paths(tmp_path, document)
     result.write_bytes(b"{}")
+    status, headers, body = _call(service, "GET", f"/v1/documents/{document}")
+    assert status.startswith("500")
+    assert headers["Content-Type"] == "application/json"
+    # The store's paths go to the log, never to the client.
+    assert str(tmp_path) not in body.decode()
+    result.with_name("receipt.json").write_bytes(b"{")
     assert _call(service, "GET", f"/v1/documents/{document}")[0].startswith("500")
+
+
+def test_any_failure_is_answered_in_json_and_its_detail_logged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    store = Store(tmp_path)
+
+    def fails(_data: bytes) -> None:
+        raise RuntimeError("a fault at /private/path")
+
+    monkeypatch.setattr(store, "ingest", fails)
+    status, headers, body = _call(Service(store), "POST", "/v1/documents", TEMPLATE)
+    assert (status, headers["Content-Type"]) == ("500 Internal Server Error", "application/json")
+    assert json.loads(body) == {"error": "internal error"}
+    assert "a fault at /private/path" in capsys.readouterr().err
+
+
+def test_only_its_own_hosts_and_its_own_origin_are_answered(tmp_path: Path) -> None:
+    service = Service(Store(tmp_path), hosts=frozenset({"127.0.0.1:8080"}))
+    assert _call(service, "GET", "/v1/health", host="evil.test:8080")[0].startswith("421")
+    assert _call(service, "GET", "/v1/health", host="127.0.0.1:8080")[0] == "200 OK"
+    # A page elsewhere cannot post a document; the page served here and curl (no Origin) can.
+    other = _call(
+        service, "POST", "/v1/documents", TEMPLATE, host="127.0.0.1:8080", origin="http://evil.test"
+    )
+    assert other[0].startswith("403")
+    same = _call(
+        service,
+        "POST",
+        "/v1/documents",
+        TEMPLATE,
+        host="127.0.0.1:8080",
+        origin="http://127.0.0.1:8080",
+    )
+    assert same[0] == "201 Created"
+    assert (
+        _call(service, "POST", "/v1/documents", REFUSED, host="127.0.0.1:8080")[0] == "201 Created"
+    )
+
+
+def test_a_document_kept_by_an_earlier_reader_is_read_again_when_asked_for(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service = Service(Store(tmp_path))
+    document = json.loads(_call(service, "POST", "/v1/documents", TEMPLATE)[2])["document"]
+    monkeypatch.setattr(
+        documents, "DOCX", dataclasses.replace(documents.DOCX, reader="docx-reader/99.0.0")
+    )
+    monkeypatch.setattr(output, "READER_VERSION", "docx-reader/99.0.0")
+    status, _, body = _call(service, "GET", f"/v1/documents/{document}")
+    assert status == "200 OK"
+    assert json.loads(body)["reader"] == "docx-reader/99.0.0"
+    assert len(list((tmp_path / "documents").rglob("receipt.json"))) == 2
+
+
+def test_nothing_is_served_while_its_application_is_asked(tmp_path: Path) -> None:
+    store = Store(tmp_path)
+    seen: list[bytes | None] = []
+
+    def verify(data: bytes, _result: dict[str, object]) -> dict[str, object]:
+        seen.append(store.result(hashlib.sha256(data).hexdigest()))
+        return {"application": "Word 1.0", "differs": []}
+
+    store.word = Checker(lambda: "Word 1.0", verify)
+    ingested = store.ingest(TEMPLATE)
+    assert seen == [None]
+    assert store.result(ingested.document) == ingested.result
+
+
+def test_an_application_that_fails_in_any_way_verifies_nothing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def broken(_data: bytes, _result: dict[str, object]) -> dict[str, object]:
+        raise ZeroDivisionError("a stand-in that fails")
+
+    for checker in (Checker(lambda: "Word 1.0", broken), Checker(lambda: str(1 / 0), broken)):
+        store = Store(tmp_path / str(id(checker)), word=checker)
+        ingested = store.ingest(TEMPLATE)
+        assert ingested.verification is None
+        assert store.verifications(ingested.document) == []
+    assert "ZeroDivisionError" in capsys.readouterr().err
+
+
+def test_verify_holds_receipts_and_verdicts_and_checks_every_document(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    kept = Store(tmp_path)
+    one, two = kept.ingest(TEMPLATE).document, kept.ingest(REFUSED).document
+    _, result = _paths(tmp_path, one)
+    receipt = result.with_name("receipt.json")
+    forged = json.loads(receipt.read_bytes())
+    forged["outcome"] = "refused"
+    receipt.write_bytes(canonical(forged))
+    with pytest.raises(StoreError):
+        kept.verify(one)
+    receipt.write_bytes(canonical({**forged, "outcome": "read-in-part"}))
+    kept.verify(one)
+    planted = result.parent / "word" / "Microsoft-Word-1.0.json"
+    planted.parent.mkdir()
+    planted.write_bytes(canonical({"application": "Microsoft Word 1.0"}))
+    with pytest.raises(StoreError):
+        kept.verify(one)
+    # A document that cannot be read at all is reported, and the others are still verified.
+    _, other = _paths(tmp_path, two)
+    other.with_name("receipt.json").write_bytes(b"{")
+    assert service_main(["verify", "--store", str(tmp_path)]) == 1
+    captured = capsys.readouterr()
+    assert "0 of 2 documents verified" in captured.out
+    assert one in captured.err
+    assert two in captured.err
+
+
+def test_a_client_that_stops_sending_is_dropped_and_a_large_document_is_continued(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(_QuietHandler, "timeout", 1)
+    with make_server(
+        "127.0.0.1", 0, Service(Store(tmp_path)), _ThreadingServer, _QuietHandler
+    ) as running:
+        threading.Thread(target=running.serve_forever, daemon=True).start()
+        address = ("127.0.0.1", running.server_port)
+        head = f"POST /v1/documents HTTP/1.1\r\nHost: x\r\nContent-Length: {len(TEMPLATE)}\r\n"
+        with socket.create_connection(address, timeout=10) as client:
+            client.sendall((head + "Expect: 100-continue\r\n\r\n").encode())
+            assert client.recv(64).startswith(b"HTTP/1.1 100 Continue")
+            client.sendall(TEMPLATE)
+            assert b" 201 Created" in _received(client).split(b"\r\n", 1)[0]
+        with socket.create_connection(address, timeout=10) as client:
+            client.sendall(
+                b"POST /v1/documents HTTP/1.1\r\nHost: x\r\nContent-Length: 10\r\n\r\nabc"
+            )
+            assert b" 408 " in _received(client).split(b"\r\n", 1)[0]
+        running.shutdown()
+
+
+def _received(client: socket.socket) -> bytes:
+    data = b""
+    while chunk := client.recv(1 << 16):
+        data += chunk
+    return data
 
 
 @pytest.fixture

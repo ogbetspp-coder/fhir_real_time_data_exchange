@@ -35,10 +35,10 @@ from label_docx.certify import (
 )
 from label_docx.output import canonical
 from label_docx.word import SUFFIXES, as_drawn
+from lock import MANIFESTS
 from test_reader import W, docx
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
-_MANIFESTS = {"sources", "expected", "word", "browser"}
 # A character no document holds and no reading can produce: an inserted or substituted
 # character is always one the document does not have there.
 _FOREIGN = "\u2603"
@@ -49,8 +49,8 @@ _TIMES = 4
 def _documents() -> list[Path]:
     return sorted(
         p
-        for p in CORPUS.glob("*/*")
-        if (p.suffix == ".docx" or (p.suffix == ".json" and p.stem not in _MANIFESTS))
+        for p in CORPUS.glob("*/[!.]*")
+        if (p.suffix == ".docx" or (p.suffix == ".json" and p.stem not in MANIFESTS))
     )
 
 
@@ -1343,6 +1343,14 @@ def test_table_parts_outside_their_place_are_never_passed_over(body: str) -> Non
             f'<w:p xmlns:w="{W}"><w:t>&quot;quoted&quot; &apos;one&apos;</w:t></w:p>',
             [("t", "\"quoted\" 'one'")],
         ),
+        # A namespace written with a reference is the namespace it spells.
+        (f'<w:p xmlns:w="{W[:-1]}&#110;"><w:t>spelled</w:t></w:p>', [("t", "spelled")]),
+        # A prefix bound again inside an element is bound so there only.
+        (
+            f'<w:p xmlns:w="{W}"><x:a xmlns:x="urn:x" xmlns:w="urn:other"><w:t>no</w:t></x:a>'
+            "<w:t>yes</w:t></w:p>",
+            [("t", "yes")],
+        ),
     ],
     ids=[
         "references",
@@ -1355,6 +1363,8 @@ def test_table_parts_outside_their_place_are_never_passed_over(body: str) -> Non
         "other-namespace",
         "declaration",
         "quotes",
+        "namespace-reference",
+        "rebound-prefix",
     ],
 )
 def test_the_second_reading_of_the_text_matches_the_xml_parser(

@@ -9,12 +9,13 @@ detail names elements, fonts and codes, never the document's text.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import sys
 from pathlib import Path
 
 from label_docx.documents import kind
 from label_docx.service import browser_verifier, check_environment, serve, word_verifier
-from label_docx.store import Store, StoreError
+from label_docx.store import Store
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -67,7 +68,7 @@ def service_main(argv: list[str] | None = None) -> int:
             choices=("auto", "on", "require", "off"),
             default="off",
             help=(
-                "hold every .docx to Microsoft Word (macOS; about a minute a document); "
+                "hold every .docx to Microsoft Word (macOS; a minute or more a document); "
                 "require: serve no read Word has not checked"
             ),
         )
@@ -97,16 +98,16 @@ def service_main(argv: list[str] | None = None) -> int:
         word=word_verifier(getattr(args, "word", "off")),
     )
     if args.command == "verify":
-        failed = 0
         documents = store.documents()
-        for document in documents:
-            try:
-                store.verify(document)
-            except StoreError as failure:
-                failed += 1
-                sys.stderr.write(f"{failure}\n")
-        sys.stdout.write(f"{len(documents) - failed} of {len(documents)} documents verified\n")
-        return 1 if failed else 0
+        # Each document on its own, on every core: one that fails is reported, and the rest go on.
+        with concurrent.futures.ProcessPoolExecutor() as pool:
+            jobs = [(args.store, document) for document in documents]
+            failures = [f for f in pool.map(_verified, jobs) if f is not None]
+        for failure in failures:
+            sys.stderr.write(f"{failure}\n")
+        verified = len(documents) - len(failures)
+        sys.stdout.write(f"{verified} of {len(documents)} documents verified\n")
+        return 1 if failures else 0
     refused = False
     for path in args.files:
         ingested = store.ingest(path.read_bytes())
@@ -114,6 +115,16 @@ def service_main(argv: list[str] | None = None) -> int:
         sys.stdout.buffer.write(ingested.receipt)
     sys.stdout.buffer.flush()
     return 2 if refused else 0
+
+
+def _verified(job: tuple[Path, str]) -> str | None:
+    """Why a kept document fails ``Store.verify``, or None if it passes."""
+    root, document = job
+    try:
+        Store(root).verify(document)
+    except Exception as failure:  # noqa: BLE001 - any failure of one document is reported
+        return f"{document}: {type(failure).__name__}: {failure}"
+    return None
 
 
 if __name__ == "__main__":

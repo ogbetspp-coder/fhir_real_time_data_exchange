@@ -2,8 +2,10 @@
 
     uv run --frozen python scripts/survey.py path/to/folder
 
-For a folder of labels of your own: it prints how many documents the reader reads, how many it
-refuses and for which reasons, and how many carry counted list labels, and writes nothing. It
+For a folder of labels of your own: it prints how many documents are read (``tracked`` where a
+document holds tracked changes, read as two texts), how many are refused and for which reasons,
+and how many carry counted list labels, and writes nothing. Each outcome is the certified result
+the service would serve (``label_docx.read``). It
 never prints a document's text, only file names, refusal codes and the reader's refusal details
 (which name elements, fonts and codes). Add ``--files`` to list each file's outcome.
 """
@@ -12,23 +14,27 @@ from __future__ import annotations
 
 import argparse
 import collections
+import json
 import sys
 from pathlib import Path
 
-from label_docx.reader import READER_VERSION, DocxRefusedError, read_docx
+from label_docx import READER_VERSION, read
 
 
 def outcome(path: Path) -> tuple[str, str, bool]:
-    """The refusal code and detail, or "read" and whether any list label shows a number."""
-    try:
-        paragraphs = read_docx(path.read_bytes())
-    except DocxRefusedError as refused:
-        return refused.code, refused.detail, False
+    """The refusal code and detail, or "read" or "tracked" and whether a list label counts."""
+    value = json.loads(read(path.read_bytes())[0])
+    if "refusal" in value:
+        return value["refusal"]["code"], value["refusal"]["detail"], False
+    tracked = "tracked" in value
+    paragraphs = value["tracked"]["accepted"]["paragraphs"] if tracked else value["paragraphs"]
     counted = any(
-        p.numbering is not None and p.numbering.text and any(c.isalnum() for c in p.numbering.text)
+        p["numbering"]
+        and p["numbering"]["text"]
+        and any(c.isalnum() for c in p["numbering"]["text"])
         for p in paragraphs
     )
-    return "read", "", counted
+    return "tracked" if tracked else "read", "", counted
 
 
 def main() -> int:
@@ -45,7 +51,9 @@ def main() -> int:
     for code, count in codes.most_common():
         out.write(f"  {count:5}  {code}\n")
     out.write(f"  {sum(c for _, _, c in results.values()):5}  read, with numbered list labels\n")
-    reasons = collections.Counter((c, d) for c, d, _ in results.values() if c != "read")
+    reasons = collections.Counter(
+        (c, d) for c, d, _ in results.values() if c not in ("read", "tracked")
+    )
     if reasons:
         out.write("refusals:\n")
         for (code, detail), count in reasons.most_common():

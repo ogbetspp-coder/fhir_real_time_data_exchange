@@ -29,7 +29,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from label_docx import epi
+from label_docx import epi, output
 from label_docx.reader import Paragraph
 
 # How long Chrome may take over one document's page.
@@ -294,15 +294,7 @@ def _canonical_kind(kind: str) -> str:
 
 def reader_lines(paragraphs: tuple[Paragraph, ...]) -> list[Line]:
     """The reader's paragraphs in lines, each character with its marks."""
-    characters: list[tuple[str, frozenset[str]]] = []
-    for paragraph in paragraphs:
-        kinds: list[set[str]] = [set() for _ in paragraph.text]
-        for mark in paragraph.marks:
-            for index in range(mark.start, mark.end):
-                kinds[index].add(_canonical_kind(mark.kind))
-        characters += [(c, frozenset(k)) for c, k in zip(paragraph.text, kinds, strict=True)]
-        characters.append(("\n", frozenset()))
-    return _split(characters, "\n")
+    return result_lines([output.paragraph(p) for p in paragraphs])
 
 
 def digest(lines: list[Line]) -> dict[str, str]:
@@ -490,11 +482,7 @@ def browser_markers(divs: list[str], chrome: Path = CHROME) -> list[list[str]]:
 
 def reader_markers(paragraphs: tuple[Paragraph, ...]) -> list[str]:
     """The markers the reader's paragraphs draw, each with the space after it, in order."""
-    return [
-        p.numbering.text + " "
-        for p in paragraphs
-        if p.numbering is not None and p.numbering.text is not None
-    ]
+    return result_markers([output.paragraph(p) for p in paragraphs])
 
 
 def markers_digest(markers: list[str]) -> str:

@@ -22,7 +22,6 @@ from label_docx.reader import DocxRefusedError, read_document
 from test_reader import W, docx, p, r
 
 R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
 KIND = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
 
 

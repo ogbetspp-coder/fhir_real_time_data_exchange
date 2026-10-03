@@ -28,7 +28,7 @@ from pathlib import Path
 from label_docx import certify, documents, epi, epi_output, output, reader
 from label_docx.epi import EpiRefusedError, read_epi
 from label_docx.output import FORMAT_VERSION, canonical
-from label_docx.reader import READER_VERSION, DocxRefusedError, read_docx
+from label_docx.reader import READER_VERSION, read_docx
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSIONS = ROOT / "versions.lock.json"
@@ -83,7 +83,8 @@ def _certificate(result: bytes) -> dict[str, str]:
 def expected(folder: Path) -> dict[str, dict[str, str]]:
     """What the readers produce for every .docx and every ePI (.json) in ``folder``."""
     out: dict[str, dict[str, str]] = {}
-    for path in sorted(folder.glob("*.json")):
+    # Hidden files (a recording's progress) are not documents.
+    for path in sorted(folder.glob("[!.]*.json")):
         if path.stem in MANIFESTS:
             continue
         data = path.read_bytes()
@@ -102,18 +103,18 @@ def expected(folder: Path) -> dict[str, dict[str, str]]:
         data = path.read_bytes()
         entry = {"sha256": hashlib.sha256(data).hexdigest()}
         result = output.read(data)[0]
-        tracked = json.loads(result).get("tracked")
-        if tracked is not None:
+        value = json.loads(result)
+        if "refusal" in value:
+            # The refusal served: a tracked document's may come from one of its views.
+            entry["refusal"] = value["refusal"]["code"]
+        elif "tracked" in value:
             # Two texts: both views and the changes, held whole.
-            entry["trackedSha256"] = hashlib.sha256(canonical(tracked)).hexdigest()
-            out[path.name] = entry | _certificate(result)
-            continue
-        try:
+            entry["trackedSha256"] = hashlib.sha256(canonical(value["tracked"])).hexdigest()
+            entry |= _certificate(result)
+        else:
             body = canonical(output.paragraphs(read_docx(data)))
             entry["paragraphsSha256"] = hashlib.sha256(body).hexdigest()
-            entry |= _certificate(output.read(data)[0])
-        except DocxRefusedError as refused:
-            entry["refusal"] = refused.code
+            entry |= _certificate(result)
         out[path.name] = entry
     return out
 

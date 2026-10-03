@@ -21,7 +21,7 @@ from label_docx.reader import DocxRefusedError, read_document, tracked
 from label_docx.store import Store
 from label_docx.word import tracked_verdict
 from test_headers_comments import header, reference, with_parts
-from test_reader import docx, p, r
+from test_reader import W, docx, p, r
 
 VIEWS = ("accepted", "original")
 WHO = 'w:author="A" w:date="2026-01-01T00:00:00Z"'
@@ -283,7 +283,7 @@ def test_the_check_holds_each_view_to_the_source_on_its_own() -> None:
     source = docx(p(t("a"), mark("ins")) + p(t("b") + dele("c") + ins(t("d"))))
     accepted, original, _ = tracked(source)
     assert certify_tracked(source, {"accepted": accepted, "original": original}) == {
-        "checker": "conservation-check/1.7.0",
+        "checker": "conservation-check/1.8.0",
         "accepted": {"characters": 3, "elements": 0, "paragraphsJoined": 0},
         "original": {"characters": 3, "elements": 0, "paragraphsJoined": 1},
     }
@@ -321,7 +321,14 @@ def test_the_check_holds_each_view_to_the_source_on_its_own() -> None:
 
 CASES = Path(__file__).resolve().parents[1] / "corpus" / "tracked-cases"
 # The cases the reader refuses: what it cannot undo exactly (Word's views are on record).
-REFUSED = {"field-separator-deleted", "mark-deleted-last-in-body", "mark-deleted-last-in-cell"}
+REFUSED = {
+    "content-control-emptied",  # Word shows placeholder spaces the document does not hold
+    "field-separator-deleted",  # Word drops the whole field result
+    "list-definition-changed",  # Word's Reject All rewrites the styles instead
+    "mark-deleted-before-table-first-row-deleted",  # Word cannot accept it
+    "mark-deleted-last-in-body",  # Word cannot accept it
+    "mark-deleted-last-in-cell",  # Word dissolves the table
+}
 
 
 @pytest.mark.parametrize("path", sorted(CASES.glob("*.docx")), ids=lambda p: p.stem)
@@ -384,7 +391,7 @@ def test_the_check_counts_what_each_view_holds_and_only_the_revised_parts() -> N
     source = _with_part(docx(body, footnotes=note), "word/media/image1.png", b"\x89PNG\r\n")
     accepted, original, _ = tracked(source)
     assert certify_tracked(source, {"accepted": accepted, "original": original}) == {
-        "checker": "conservation-check/1.7.0",
+        "checker": "conservation-check/1.8.0",
         "accepted": {"characters": 5, "elements": 2, "paragraphsJoined": 0},
         "original": {"characters": 4, "elements": 1, "paragraphsJoined": 0},
     }
@@ -414,3 +421,180 @@ def test_the_check_leaves_run_properties_to_word() -> None:
         "elements": 0,
         "paragraphsJoined": 0,
     }
+
+
+def _row(text: str, marker: str = "") -> str:
+    properties = f'<w:trPr><w:{marker} w:id="3" {WHO}/></w:trPr>' if marker else ""
+    return f"<w:tr>{properties}<w:tc>{p(t(text))}</w:tc></w:tr>"
+
+
+def test_a_table_whose_every_row_a_view_drops_goes_with_them() -> None:
+    body = (
+        f"<w:tbl>{_row('gone', 'del')}</w:tbl>{p(t('mid'))}"
+        f"<w:tbl>{_row('kept')}</w:tbl>{p(t('end'))}"
+    )
+    source = docx(body)
+    accepted, original, _ = tracked(source)
+    assert [(x.text, x.table) for x in read_document(accepted).body] == [
+        ("mid", None),
+        ("kept", (0, 0, 0)),
+        ("end", None),
+    ]
+    assert [x.table for x in read_document(original).body] == [(0, 0, 0), None, (1, 0, 0), None]
+    certify_tracked(source, {"accepted": accepted, "original": original})
+    # An empty table left behind moves every later table: the check refuses it.
+    left = _rewrite(
+        accepted, "word/document.xml", lambda x: x.replace("<ns0:body>", "<ns0:body><ns0:tbl />")
+    )
+    with pytest.raises(CertificationError):
+        certify_tracked(source, {"accepted": left})
+
+
+def test_a_join_past_a_table_goes_into_its_first_paragraph_in_document_order() -> None:
+    # The first cell wrapped in a content control is still the first cell.
+    wrapped = (
+        "<w:tbl><w:tr><w:sdt><w:sdtContent><w:tc>"
+        + p(t("c1"))
+        + "</w:tc></w:sdtContent></w:sdt><w:tc>"
+        + p(t("c2"))
+        + "</w:tc></w:tr></w:tbl>"
+    )
+    source = docx(p(t("a"), mark("del")) + wrapped + p(t("z")))
+    accepted, original, _ = tracked(source)
+    assert [(x.text, x.table) for x in read_document(accepted).body] == [
+        ("ac1", (0, 0, 0)),
+        ("c2", (0, 0, 1)),
+        ("z", None),
+    ]
+    certify_tracked(source, {"accepted": accepted, "original": original})
+
+
+def test_a_style_definition_changed_is_former_in_the_original_and_a_list_is_refused() -> None:
+    former = f'<w:rPrChange w:id="1" {WHO}><w:rPr><w:b/></w:rPr></w:rPrChange>'
+    styles = f'<w:style w:type="character" w:styleId="U"><w:rPr><w:i/>{former}</w:rPr></w:style>'
+    styled = docx(p(r("<w:t>m</w:t>", '<w:rStyle w:val="U"/>')), styles=styles)
+    accepted, original, changes = tracked(styled)
+    assert [m.kind for m in read_document(accepted).body[0].marks] == ["italic"]
+    assert [m.kind for m in read_document(original).body[0].marks] == ["bold"]
+    assert [(c.part, c.kind) for c in changes] == [("word/styles.xml", "format")]
+    listed = docx(
+        p(t("item"), '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>'),
+        numbering='<w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:start w:val="1"/>'
+        f'<w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:rPr><w:b/>{former}</w:rPr>'
+        '</w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>',
+    )
+    assert result(listed)["refusal"] == {
+        "code": "tracked-change",
+        "detail": "a change to a definition in word/numbering.xml",
+    }
+
+
+def _part_of(data: bytes, name: str) -> str:
+    with zipfile.ZipFile(io.BytesIO(data)) as package:
+        return package.read(name).decode()
+
+
+def test_a_note_goes_with_the_reference_a_view_drops() -> None:
+    for kind in ("footnote", "endnote"):
+        reference = f'<w:r><w:{kind}Reference w:id="1"/></w:r>'
+        note = f'<w:{kind} w:id="1"><w:p><w:r><w:{kind}Ref/></w:r>{t(" a note")}</w:p></w:{kind}>'
+        for marker, dropping in (("ins", "original"), ("del", "accepted")):
+            changed = f'<w:{marker} w:id="2" {WHO}>{reference}</w:{marker}>'
+            body = p(t("Body") + changed + t(" text."))
+            source = docx(body, footnotes=note) if kind == "footnote" else docx(body, endnotes=note)
+            accepted, original, _ = tracked(source)
+            views = {"accepted": accepted, "original": original}
+            keeping = "accepted" if dropping == "original" else "original"
+            assert getattr(read_document(views[dropping]), f"{kind}s") == ()
+            assert [n.id for n in getattr(read_document(views[keeping]), f"{kind}s")] == [1]
+            certify_tracked(source, views)
+            # The dropping view with its note put back, or the keeping one without it, is caught.
+            notes = f"word/{kind}s.xml"
+            stored = _part_of(source, notes)
+            back = _rewrite(views[dropping], notes, lambda _x, s=stored: s)
+            with pytest.raises(CertificationError):
+                certify_tracked(source, {dropping: back})
+            empty = f'<w:{kind}s xmlns:w="{W}"/>'
+            without = _rewrite(views[keeping], notes, lambda _x, e=empty: e)
+            with pytest.raises(CertificationError):
+                certify_tracked(source, {keeping: without})
+
+
+def test_a_join_into_a_row_the_view_drops_is_refused() -> None:
+    # Word's Accept All cannot remove such a mark: it stays, so the reader refuses.
+    body = (
+        p(t("before"), mark("del"))
+        + f"<w:tbl>{_row('first', 'del')}{_row('second')}</w:tbl>"
+        + p(t("after"))
+    )
+    with pytest.raises(DocxRefusedError, match="a row the view drops"):
+        tracked(docx(body))
+    # The check refuses such a view on its own, whatever the view holds.
+    with pytest.raises(CertificationError, match="meets a row the view drops"):
+        certify_tracked(docx(body), {"accepted": docx(p(t("x")))})
+
+
+def test_the_check_holds_nested_tables_to_their_outermost_cell() -> None:
+    inner = f"<w:tbl>{_row('in1')}{_row('in2', 'del')}</w:tbl>"
+    body = f"<w:tbl><w:tr><w:tc>{inner}{p(t('out'))}</w:tc></w:tr>{_row('second')}</w:tbl>"
+    source = docx(body + p(t("z")))
+    accepted, original, _ = tracked(source)
+    assert [(x.text, x.table) for x in read_document(accepted).body] == [
+        ("in1", (0, 0, 0)),
+        ("out", (0, 0, 0)),
+        ("second", (0, 1, 0)),
+        ("z", None),
+    ]
+    certify_tracked(source, {"accepted": accepted, "original": original})
+    # The dropped inner row put back, or the inner rows counted as the outer table's, is caught.
+    back = _rewrite(
+        accepted,
+        "word/document.xml",
+        lambda x: x.replace(
+            "</ns0:tbl><ns0:p>", "<ns0:tr><ns0:tc><ns0:p /></ns0:tc></ns0:tr></ns0:tbl><ns0:p>", 1
+        ),
+    )
+    with pytest.raises(CertificationError):
+        certify_tracked(source, {"accepted": back})
+
+
+def test_a_malformed_change_or_too_deep_a_part_is_refused_never_an_error() -> None:
+    cases = {
+        # A change without the former properties it records, or holding more than properties.
+        "rPrChange without its properties": p(
+            r("<w:t>x</w:t>", f'<w:b/><w:rPrChange w:id="4" {WHO}/>')
+        ),
+        "pPrChange without its properties": p(
+            t("x"),
+            f'<w:jc w:val="left"/><w:pPrChange w:id="5" {WHO}><w:pPr><w:sectPr/></w:pPr>'
+            "</w:pPrChange>",
+        ),
+        # A move recorded on a row (no schema has one) is read or refused, never an error.
+        "": "<w:tbl><w:tr><w:trPr>"
+        f'<w:moveFrom w:id="3" {WHO}/><w:trPrChange w:id="4" {WHO}><w:trPr/></w:trPrChange>'
+        f"</w:trPr><w:tc>{p(t('x'))}</w:tc></w:tr></w:tbl>{p(t('z'))}",
+    }
+    for detail, body in cases.items():
+        value = result(docx(body))
+        if detail:
+            assert value["refusal"] == {"code": "tracked-change", "detail": detail}
+        else:
+            assert "tracked" in value
+    deep = '<w:customXml w:element="x">' * 300 + r("<w:t>a</w:t>") + "</w:customXml>" * 300
+    assert result(docx(p(deep + ins(t("b")))))["refusal"]["code"] == "invalid-package"
+
+
+def test_a_content_control_a_view_empties_is_refused() -> None:
+    # Word then shows the control's placeholder, which is not in the document.
+    control = "<w:sdt><w:sdtContent>{}</w:sdtContent></w:sdt>" + p(t("z"))
+    assert result(docx(control.format(p(ins(t("all new"))))))["refusal"] == {
+        "code": "tracked-change",
+        "detail": "a content control left empty",
+    }
+    assert "tracked" in result(docx(control.format(p(t("kept ") + ins(t("new"))))))
+
+
+def test_every_change_is_listed_and_only_a_formatting_copy_once() -> None:
+    # Two insertions with one id are two changes; a run split in two holds one change twice.
+    _, _, changes = tracked(docx(p(ins(t("a"), key=0) + t("b") + ins(t("c"), key=0))))
+    assert [c.kind for c in changes] == ["insert", "insert"]

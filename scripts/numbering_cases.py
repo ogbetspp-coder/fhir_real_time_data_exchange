@@ -1043,13 +1043,13 @@ def package(case: Case) -> bytes:
     return buffer.getvalue()
 
 
-def wanted() -> dict[Path, bytes]:
-    """Every file of the corpus set, with its bytes."""
+def files(folder: Path, cases: dict[str, Case], note: str) -> dict[Path, bytes]:
+    """Every file of a set of cases, with its bytes: one .docx each, and ``sources.json``."""
     out: dict[Path, bytes] = {}
     sources = []
-    for name, case in CASES.items():
+    for name, case in cases.items():
         data = package(case)
-        out[FOLDER / f"{name}.docx"] = data
+        out[folder / f"{name}.docx"] = data
         sources.append(
             {
                 "name": case.question,
@@ -1058,35 +1058,41 @@ def wanted() -> dict[Path, bytes]:
                 "bytes": len(data),
             }
         )
-    manifest = {
-        "schemaVersion": "1.0.0",
-        "note": "Synthetic list-numbering cases written by scripts/numbering_cases.py.",
-        "sources": sources,
-    }
-    out[FOLDER / "sources.json"] = (json.dumps(manifest, indent=2) + "\n").encode("utf-8")
+    manifest = {"schemaVersion": "1.0.0", "note": note, "sources": sources}
+    out[folder / "sources.json"] = (json.dumps(manifest, indent=2) + "\n").encode("utf-8")
     return out
+
+
+def write(folder: Path, wanted_files: dict[Path, bytes], check: bool) -> int:
+    """Write the set's files (or, checking, report any out of date); 1 if checking finds one."""
+    present = set(folder.glob("*.docx")) if folder.exists() else set()
+    stale = [p for p, data in wanted_files.items() if not p.exists() or p.read_bytes() != data]
+    extra = sorted(present - set(wanted_files))
+    if check:
+        for path in [*stale, *extra]:
+            sys.stderr.write(f"out of date: {path.relative_to(ROOT)}\n")
+        return 1 if stale or extra else 0
+    folder.mkdir(parents=True, exist_ok=True)
+    for path in extra:
+        path.unlink()
+    for path in stale:
+        path.write_bytes(wanted_files[path])
+        sys.stdout.write(f"wrote {path.relative_to(ROOT)}\n")
+    return 0
+
+
+def wanted() -> dict[Path, bytes]:
+    """Every file of the corpus set, with its bytes."""
+    return files(
+        FOLDER, CASES, "Synthetic list-numbering cases written by scripts/numbering_cases.py."
+    )
 
 
 def main() -> int:
     """Write the cases, or with --check report whether they are current."""
     parser = argparse.ArgumentParser(description="Write or check corpus/numbering-cases.")
     parser.add_argument("--check", action="store_true", help="fail rather than write")
-    args = parser.parse_args()
-    files = wanted()
-    present = set(FOLDER.glob("*.docx")) if FOLDER.exists() else set()
-    stale = [p for p, data in files.items() if not p.exists() or p.read_bytes() != data]
-    extra = sorted(present - set(files))
-    if args.check:
-        for path in [*stale, *extra]:
-            sys.stderr.write(f"out of date: {path.relative_to(ROOT)}\n")
-        return 1 if stale or extra else 0
-    FOLDER.mkdir(parents=True, exist_ok=True)
-    for path in extra:
-        path.unlink()
-    for path in stale:
-        path.write_bytes(files[path])
-        sys.stdout.write(f"wrote {path.relative_to(ROOT)}\n")
-    return 0
+    return write(FOLDER, wanted(), parser.parse_args().check)
 
 
 if __name__ == "__main__":

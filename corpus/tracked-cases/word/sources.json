@@ -466,6 +466,166 @@
       "file": "format-section.original.docx",
       "sha256": "7874c156ef4fbda35f927bf32d984380f5759e4305b4f3f469867e6cf4bfa9a2",
       "bytes": 13022
+    },
+    {
+      "case": "table-deleted-whole.docx",
+      "caseSha256": "8d4420dd6a9bffbfcf3084a56d8ad08ad5cfb1fc25215af618604b361300cd39",
+      "view": "accepted",
+      "file": "table-deleted-whole.accepted.docx",
+      "sha256": "3c5f7527fb60c69c9e6b4c39e8b436cba9ec4d984f8bb042d0a3245bd7421b0a",
+      "bytes": 13218
+    },
+    {
+      "case": "table-deleted-whole.docx",
+      "caseSha256": "8d4420dd6a9bffbfcf3084a56d8ad08ad5cfb1fc25215af618604b361300cd39",
+      "view": "original",
+      "file": "table-deleted-whole.original.docx",
+      "sha256": "0702ba69452779c6feabce4fd90c42922c5517136c5a343c2bb065c3870de95e",
+      "bytes": 13245
+    },
+    {
+      "case": "table-inserted-whole.docx",
+      "caseSha256": "5ce82e7808ad91ad345061af3b25001230c34f9eb42efa155233a009b337c4ac",
+      "view": "accepted",
+      "file": "table-inserted-whole.accepted.docx",
+      "sha256": "fcb0765154916fea305fbc3324244164b5974aa49761439a209151dfc75a5975",
+      "bytes": 13244
+    },
+    {
+      "case": "table-inserted-whole.docx",
+      "caseSha256": "5ce82e7808ad91ad345061af3b25001230c34f9eb42efa155233a009b337c4ac",
+      "view": "original",
+      "file": "table-inserted-whole.original.docx",
+      "sha256": "ad0289978fabfbb729ef94de8230fac8a56165dfe0e45c5e6f5559ff75ef9c71",
+      "bytes": 13204
+    },
+    {
+      "case": "mark-deleted-before-table-first-row-deleted.docx",
+      "caseSha256": "4a302c2452b605baf3ca2bf85c4909b8eef96def7aae4b61de0988d109f39227",
+      "view": "accepted",
+      "file": "mark-deleted-before-table-first-row-deleted.accepted.docx",
+      "sha256": "d1185e9dfeeac2f0de41891913a939874efb7b3f2d4f2f4f8c322e98da05dbac",
+      "bytes": 13279
+    },
+    {
+      "case": "mark-deleted-before-table-first-row-deleted.docx",
+      "caseSha256": "4a302c2452b605baf3ca2bf85c4909b8eef96def7aae4b61de0988d109f39227",
+      "view": "original",
+      "file": "mark-deleted-before-table-first-row-deleted.original.docx",
+      "sha256": "bddc52ac2f53938c53a3d8a22b41742cd58d2985c6590f1084e8852d938a8289",
+      "bytes": 13241
+    },
+    {
+      "case": "footnote-reference-deleted.docx",
+      "caseSha256": "b6c9f2d32ebf78d29a8f61b9a3b0c6ecf3be302d7057e32e52ba43780d0bb24e",
+      "view": "accepted",
+      "file": "footnote-reference-deleted.accepted.docx",
+      "sha256": "a906db396f259c265595b57d0bfa9fac5474d74cc447419667d6279cb17d8e22",
+      "bytes": 14765
+    },
+    {
+      "case": "footnote-reference-deleted.docx",
+      "caseSha256": "b6c9f2d32ebf78d29a8f61b9a3b0c6ecf3be302d7057e32e52ba43780d0bb24e",
+      "view": "original",
+      "file": "footnote-reference-deleted.original.docx",
+      "sha256": "9a6d51715bba6ad9ef8644c3c521995edf187c954dd81815a373de55334ce070",
+      "bytes": 14841
+    },
+    {
+      "case": "footnote-reference-inserted.docx",
+      "caseSha256": "af7b6cdb0658d98f1c2cd38913fd45a58ea6e257923fb848584ac2f0c09ac5bb",
+      "view": "accepted",
+      "file": "footnote-reference-inserted.accepted.docx",
+      "sha256": "8a3191f9c95205b87592f792dda2a780ede7296a6c709a076232269d333a63e9",
+      "bytes": 14835
+    },
+    {
+      "case": "footnote-reference-inserted.docx",
+      "caseSha256": "af7b6cdb0658d98f1c2cd38913fd45a58ea6e257923fb848584ac2f0c09ac5bb",
+      "view": "original",
+      "file": "footnote-reference-inserted.original.docx",
+      "sha256": "f5e7fa2ccc3c0afdd5a5890673970a5e9823e211e00cc2f906c40497813fe771",
+      "bytes": 14763
+    },
+    {
+      "case": "content-control-emptied.docx",
+      "caseSha256": "5487dce92ac404f6ac1ee8e04381762112cb1f06da6a3abbc526de01d496b6de",
+      "view": "accepted",
+      "file": "content-control-emptied.accepted.docx",
+      "sha256": "97b50d494ab2c1e873a4adc4c678d246a7ae06733488ea866b90d094d67d8790",
+      "bytes": 13074
+    },
+    {
+      "case": "content-control-emptied.docx",
+      "caseSha256": "5487dce92ac404f6ac1ee8e04381762112cb1f06da6a3abbc526de01d496b6de",
+      "view": "original",
+      "file": "content-control-emptied.original.docx",
+      "sha256": "24ca44e76ea8ab596d91740bc99736e7427506983e42ba8f3f4d3475d8b5d8c8",
+      "bytes": 13105
+    },
+    {
+      "case": "format-section-note-numbers.docx",
+      "caseSha256": "a8d972a9ab052d8ca524536558c745c6580204ebf1f3064e3a8155a32c96dbc4",
+      "view": "accepted",
+      "file": "format-section-note-numbers.accepted.docx",
+      "sha256": "fa6d795e415ad74435c24ebcd82c1668f5a71cb3233d2dd544e9c5dbe01f3076",
+      "bytes": 14869
+    },
+    {
+      "case": "format-section-note-numbers.docx",
+      "caseSha256": "a8d972a9ab052d8ca524536558c745c6580204ebf1f3064e3a8155a32c96dbc4",
+      "view": "original",
+      "file": "format-section-note-numbers.original.docx",
+      "sha256": "46c10ba8ab69173a97e98b634616cc50cb5723ad306b4a07e8ae4d6233b01daf",
+      "bytes": 14827
+    },
+    {
+      "case": "style-definition-changed.docx",
+      "caseSha256": "b0faf317970cd834b4b071dc71b405109fc097a9d7fa96456df3ab6a29e1904f",
+      "view": "accepted",
+      "file": "style-definition-changed.accepted.docx",
+      "sha256": "6ece6d9b190a37252fc5aebb504364114d06fee168a5d21af059355fed0bba2a",
+      "bytes": 13041
+    },
+    {
+      "case": "style-definition-changed.docx",
+      "caseSha256": "b0faf317970cd834b4b071dc71b405109fc097a9d7fa96456df3ab6a29e1904f",
+      "view": "original",
+      "file": "style-definition-changed.original.docx",
+      "sha256": "34ad5e9b060ba891cb75ec8d90eda8c6cd78d4eb7976e70c1d534dd8385cc55b",
+      "bytes": 13116
+    },
+    {
+      "case": "style-paragraph-definition-changed.docx",
+      "caseSha256": "7e5e6e77a710130af2c0d604d90b594b2ae546c8d00029eb7747ed599452eec1",
+      "view": "accepted",
+      "file": "style-paragraph-definition-changed.accepted.docx",
+      "sha256": "e244ccb89a1c72cee779e21c049b2fc49bacee12d55186f588e47549ca78f1d0",
+      "bytes": 13084
+    },
+    {
+      "case": "style-paragraph-definition-changed.docx",
+      "caseSha256": "7e5e6e77a710130af2c0d604d90b594b2ae546c8d00029eb7747ed599452eec1",
+      "view": "original",
+      "file": "style-paragraph-definition-changed.original.docx",
+      "sha256": "fbc3c960392837a551b9d90efda8e1a7c28625fde29fb37c9a2f1cc046d3d608",
+      "bytes": 13156
+    },
+    {
+      "case": "list-definition-changed.docx",
+      "caseSha256": "cf2abfd21e8d42d13a2b66ea3cbf07a4fafb84d33f749d730ed1db337f162270",
+      "view": "accepted",
+      "file": "list-definition-changed.accepted.docx",
+      "sha256": "72b8553c85b73bdac219a4195e59bada5d58f31f10a22375d365d170191567ab",
+      "bytes": 13040
+    },
+    {
+      "case": "list-definition-changed.docx",
+      "caseSha256": "cf2abfd21e8d42d13a2b66ea3cbf07a4fafb84d33f749d730ed1db337f162270",
+      "view": "original",
+      "file": "list-definition-changed.original.docx",
+      "sha256": "315096e677c200ea35f5ae200b70a77c8b9133d8dfaf0f9fe9887daf1b70dfd2",
+      "bytes": 13117
     }
   ]
 }

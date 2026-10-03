@@ -290,24 +290,37 @@ function trackedProof(c) {
 
 async function ingest(file) {
   out.replaceChildren(el("div", { class: "card" }, `Reading ${file.name}…`));
-  const bytes = await file.arrayBuffer();
-  const answer = await fetch("/v1/documents", { method: "POST", body: bytes });
-  const receiptText = await answer.text();
-  const receipt = JSON.parse(receiptText);
-  const served = await fetch(`/v1/documents/${receipt.document}`);
-  const resultText = await served.text();
-  const result = JSON.parse(resultText);
-  const verdicts = (await (await fetch(`/v1/documents/${receipt.document}/verification`)).json()).verifications;
-  if (served.status === 409) return disagreed(file.name, receipt, result.verification);
-  show(file.name, receipt, receiptText, result, resultText, answer.status, verdicts);
+  try {
+    if (file.size > 64 * 1024 * 1024) throw new Error("the service takes documents up to 64 MiB");
+    const answer = await fetch("/v1/documents", { method: "POST", body: await file.arrayBuffer() });
+    const receiptText = await answer.text();
+    if (!answer.ok) throw new Error(errorOf(receiptText, answer.status));
+    const receipt = JSON.parse(receiptText);
+    const served = await fetch(`/v1/documents/${receipt.document}`);
+    const resultText = await served.text();
+    const result = JSON.parse(resultText);
+    if (served.status === 409 && result.verification) return disagreed(file.name, receipt, result.verification);
+    if (!served.ok) throw new Error(errorOf(resultText, served.status));
+    const verdicts = (await (await fetch(`/v1/documents/${receipt.document}/verification`)).json()).verifications;
+    show(file.name, receipt, receiptText, result, resultText, answer.status, verdicts);
+  } catch (failure) {
+    out.replaceChildren(el("div", { class: "card" },
+      el("div", { class: "verdict" }, el("span", { class: "badge refused" }, "Not shown"), el("strong", {}, file.name)),
+      el("div", { class: "refusal" }, String(failure.message || failure))));
+  }
+}
+
+// The service's error message, or the status where the answer is not its JSON.
+function errorOf(text, status) {
+  try { return JSON.parse(text).error || `answer ${status}`; } catch { return `answer ${status}`; }
 }
 
 // What Word said about a .docx read.
 function wordLine(verdicts) {
   if (!verdicts.length) return el("div", { class: "again" }, "Not checked against Microsoft Word (start the service with --word on, on a Mac with Word).");
   const v = verdicts[verdicts.length - 1];
-  return el("div", { class: "again same" },
-    `Checked against ${v.application}: list numbers, note marks, fields, print and bold/italic ${v.verdict}.`);
+  return el("div", { class: "again" + (v.differs.length ? "" : " same") },
+    `Checked against ${v.application}: list numbers, note marks, fields, text, print, emphasis, headers, footers and comments: ${v.verdict}.`);
 }
 
 // The browser showed a section otherwise than the result reads: the result is not shown.
@@ -380,7 +393,7 @@ function show(name, receipt, receiptText, result, resultText, status, verdicts) 
        el("pre", {}, resultText))));
 }
 
-input.addEventListener("change", () => input.files[0] && ingest(input.files[0]));
+input.addEventListener("change", () => { if (input.files[0]) ingest(input.files[0]); input.value = ""; });
 drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
 drop.addEventListener("dragleave", () => drop.classList.remove("over"));
 drop.addEventListener("drop", e => {

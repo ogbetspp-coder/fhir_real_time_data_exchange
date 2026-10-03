@@ -20,6 +20,7 @@ from label_docx.reader import (
     read_document,
     read_docx,
 )
+from numbering_cases import abstract, lvl, num
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 SOURCES = Path(__file__).resolve().parents[1] / "corpus" / "ema-qrd"
@@ -103,29 +104,6 @@ def refusal(body: str, styles: str | None = None, numbering: str | None = None) 
     with pytest.raises(DocxRefusedError) as caught:
         read_docx(docx(body, styles, numbering=numbering))
     return caught.value.code
-
-
-def lvl(
-    level: int,
-    fmt: str = "decimal",
-    text: str | None = None,
-    extra: str = "",
-    start: int | None = 1,
-) -> str:
-    shown = f"%{level + 1}." if text is None else text
-    first = "" if start is None else f'<w:start w:val="{start}"/>'
-    return (
-        f'<w:lvl w:ilvl="{level}">{first}<w:numFmt w:val="{fmt}"/>'
-        f'<w:lvlText w:val="{shown}"/>{extra}</w:lvl>'
-    )
-
-
-def abstract(key: int, *levels: str) -> str:
-    return f'<w:abstractNum w:abstractNumId="{key}">{"".join(levels)}</w:abstractNum>'
-
-
-def num(key: int, abstract_id: int, overrides: str = "") -> str:
-    return f'<w:num w:numId="{key}"><w:abstractNumId w:val="{abstract_id}"/>{overrides}</w:num>'
 
 
 # Lists 3, 4 and 7 share one definition: "1.", then "1)", then "1]" a level down.

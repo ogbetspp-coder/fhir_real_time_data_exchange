@@ -3,57 +3,39 @@
     uv run --frozen python scripts/word_oracle.py record corpus/numbering-cases
     uv run --frozen python scripts/word_oracle.py compare path/to/label.docx [...]
 
-Word is the reference for list labels. For each document it reads the text, runs its own
-"convert numbers to text" (which writes every list label into the paragraph, followed by the tab
-or space after it), reads the text again, and closes the document without saving. What each list
-item gained is what Word draws before it; three requests a document, where asking paragraph by
-paragraph took Word over a minute for a long template.
+``record`` writes Word's answers for a corpus set to its ``word.json``, which
+``tests/test_word_oracle.py`` holds the reader to without Word. ``compare`` prints a verdict for
+any files and writes nothing, so a confidential label can be checked and never enter the
+repository. Verdicts name where the reader differs, never the text.
 
-``record`` asks Word about every .docx in a corpus set and writes the answers to the set's
-``word.json``, which ``tests/test_word_oracle.py`` holds the reader to without Word. ``compare``
-prints the verdict for any files and writes nothing, so a confidential label can be checked on one
-machine and never enter the repository. Both print, for each file, whether the reader agrees with
-Word, differs (at which list item), or refuses; never the paragraphs' text.
+What Word is asked, each by a script on a copy of the document:
 
-The reader's side is its label followed by the character its suffix names: a tab for ``tab`` and
-for ``legacy`` (Word converts a Word 6 level's gap to a tab), a space for ``space``, nothing for
-``nothing``. A list item whose label and suffix are both empty gains nothing in Word and cannot be
-seen, so it is left out on both sides. Word writes a Symbol-font character as the code it stores
-(a bullet as U+F0B7); ``as_drawn`` maps it through the reader's Symbol table before comparing. A
-private-use code in any other font is one the reader refuses, so the mapping cannot hide a
-difference.
-
-Footnote and endnote marks are the second reference. Word does not report the mark it draws,
-so the oracle writes a copy of the document with ``@@n@@`` before and ``@@/@@`` after every note
-reference's run (and every note's echo of its mark), has Word save the copy as text, and reads
-what Word wrote between them. Text runs take no part in note numbering, so the marks are those
-of the document itself. Word saves text in Mac OS Roman, which holds every mark the reader draws
-(digits, letters, roman numerals, *, †, ‡, §).
-
-Computed fields (SEQ captions, STYLEREF) are the third. Word shows a field's stored result on
-screen and recomputes SEQ and STYLEREF when it prints or saves as PDF, so the oracle writes a copy
-with markers around every field, reads the text Word shows, saves it as PDF, and reads the text
-again. The reader must read a document only where every field shows what Word prints, and refuse
-one (``stale-field``) where any does not.
-
-The fourth is the whole document. For every document, the oracle reads the text Word shows and
-the text after it saves as PDF, with the page numbers (PAGEREF, PAGE...) set aside, since Word
-sets those from the layout. The reader may read a document only where the two are the same: any
-field, known to the reader or not, that Word reprints differently is caught here.
-
-The fifth is emphasis. For every body paragraph the oracle asks Word whether its text is bold,
-italic, in capitals and struck through (a copy marks each paragraph's start so its text range is
-known): every paragraph of a document up to 150 paragraphs, and about 150 evenly spaced ones of a
-longer one, since each takes Word several requests. Word answers false for a paragraph that is
-partly so, so a paragraph is held to Word's answer only where the reader finds it wholly so or
-wholly not; one with a note mark or a page number, whose text Word holds differently, is left out.
+- **List labels:** Word's "convert numbers to text" writes each label into its paragraph; what
+  each paragraph gained is the label and the tab or space after it. Word stores a Symbol-font
+  character as its code (a bullet as U+F0B7), mapped by ``as_drawn``.
+- **Text:** the body's text as Word shows it, paragraph by paragraph (``text_verdict`` maps
+  Word's own codes for hyphens, breaks, note references and pictures).
+- **Note marks:** markers around every note reference; Word saves the copy as text, and what it
+  wrote between the markers is the mark.
+- **Fields:** markers around every field; the text Word shows, then the text after it saves as
+  PDF, when it recomputes SEQ, STYLEREF and REF. A field must show what Word prints.
+- **Print:** the whole text as shown and after saving as PDF, page numbers aside: any field that
+  Word reprints differently is caught.
+- **Emphasis:** whether each body paragraph is bold, italic, in capitals and struck through,
+  over the text it shows (between its own fields, and each field's result). Word answers false
+  for a paragraph that is partly so, so a paragraph is held only where the reader finds it
+  wholly so or wholly not.
+- **Headers, footers and comments:** each section's by type, and each comment's author and text.
+- **Tracked changes:** Word's own Accept All and Reject All files (``word_views``).
 
 Word runs sandboxed: each file is copied into Word's container, where it opens without a
-permission prompt, and removed after.
+permission prompt, and removed after. One script runs at a time (``_osascript``).
 """
 
 from __future__ import annotations
 
+import fcntl
+import hashlib
 import io
 import itertools
 import json
@@ -309,9 +291,18 @@ _NOTE_RUN = {
 def _osascript(command: list[str], script: str) -> subprocess.CompletedProcess[str]:
     """Run an AppleScript for Word, failing after 15 minutes rather than waiting on a hung Word.
 
-    Word quits now and then in a long recording ("Connection is invalid", -609; "not running",
-    -600): it is started again and the script run again, twice at most.
+    One script at a time, across processes (a lock file in Word's container): each finds its
+    document by name, and two at once could find each other's. Word quits now and then in a
+    long recording ("Connection is invalid", -609; "not running", -600): it is started again and
+    the script run again, twice at most.
     """
+    CONTAINER.mkdir(parents=True, exist_ok=True)
+    with (CONTAINER / ".label-docx-word.lock").open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        return _run_alone(command, script)
+
+
+def _run_alone(command: list[str], script: str) -> subprocess.CompletedProcess[str]:
     # Word's scripts find the document by its name: one of that name already open would be the
     # one asked about.
     try:
@@ -723,9 +714,15 @@ on run argv
               set codeStart to (start of content of code) - 1
               set shownStart to start of content of shown
               set shownEnd to end of content of shown
-              if codeStart > doneTo then set end of pieces to {doneTo, codeStart}
-              if shownEnd > shownStart then set end of pieces to {shownStart, shownEnd}
-              set doneTo to shownEnd + 1
+              -- Only fields that begin in this paragraph: Word also gives a paragraph in a table
+              -- the fields before it, and one inside a longer field (a table of contents) that
+              -- field, whose text is outside the paragraph or all of it.
+              if codeStart >= fromHere and codeStart < toHere then
+                if shownEnd > toHere then set shownEnd to toHere
+                if codeStart > doneTo then set end of pieces to {doneTo, codeStart}
+                if shownEnd > shownStart then set end of pieces to {shownStart, shownEnd}
+                set doneTo to shownEnd + 1
+              end if
             end repeat
             if toHere > doneTo then set end of pieces to {doneTo, toHere}
             set {isBold, isItalic, isCaps, isStruck} to {true, true, true, true}
@@ -1106,8 +1103,8 @@ def judge(path: Path, answers: dict[str, Any]) -> str:
     """The verdict on the reader's reading of ``path`` against Word's ``answers``.
 
     ``agrees``, ``differs: ...`` (where, never the text) or ``reader refuses: ...``: list
-    labels first, then note marks, emphasis, the print and the fields, each judged only where
-    the ones before agree.
+    labels first, then the text, note marks, emphasis, the print, the fields, and headers,
+    footers and comments, each judged only where the ones before agree.
     """
     result = verdict(answers["drawn"], reader_labels(path))
     if answers.get("text") is not None and result == "agrees":
@@ -1135,7 +1132,8 @@ def verify_docx(data: bytes, result: dict[str, Any]) -> dict[str, Any]:
     Word shows otherwise; a Word that fails is a ``WordError``, and nothing is recorded.
     """
     with tempfile.TemporaryDirectory() as folder:
-        path = Path(folder) / "document.docx"
+        # Named for the document: Word finds each document it is asked about by its name.
+        path = Path(folder) / f"{hashlib.sha256(data).hexdigest()[:16]}.docx"
         path.write_bytes(data)
         try:
             outcome = judge_tracked(path) if "tracked" in result else judge(path, ask(path))
@@ -1144,6 +1142,7 @@ def verify_docx(data: bytes, result: dict[str, Any]) -> dict[str, Any]:
             raise WordError(str(failed)) from failed
     return {
         "application": application,
-        "differs": [{"where": outcome}] if outcome.startswith("differs") else [],
+        # Anything but agreement (a difference, or a reading the reader would refuse) differs.
+        "differs": [] if outcome == "agrees" else [{"where": outcome}],
         "verdict": outcome,
     }

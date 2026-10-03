@@ -106,6 +106,7 @@ class Document:
         stories: bool = False,
     ) -> None:
         self.rng = rng
+        self._last = 0  # the last list level drawn
         # A chapter's styles, table style and list ids are its own (chapter 0's as before).
         self.prefix = f"K{chapter}" if chapter else ""
         self.base = 10 * chapter
@@ -302,7 +303,7 @@ class Document:
 
     def level(self) -> int:
         """The next list level: mostly one step from the last, as authors write lists."""
-        last = getattr(self, "_last", 0)
+        last = self._last
         roll = self.rng.random()
         if roll < 0.1:
             nxt = self.rng.randint(0, 2)

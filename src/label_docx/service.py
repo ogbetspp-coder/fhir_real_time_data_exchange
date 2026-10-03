@@ -5,7 +5,7 @@
                                        first, 200 after)
     GET  /v1/documents/<id>            the reader's result (canonical JSON), read or refused
     GET  /v1/documents/<id>/source     the document's bytes as ingested
-    GET  /v1/documents/<id>/verification   the browser's verdicts on an ePI's result
+    GET  /v1/documents/<id>/verification   Chrome's or Word's verdicts on the result
     GET  /v1/health                    the reader, format and runtime the service answers with
 
 ``<id>`` is the SHA-256 of the document's bytes. The same bytes always get the same receipt and
@@ -14,7 +14,10 @@ the same result, byte for byte, whoever sends them and however often: the store 
 are canonical JSON, and every result names the reader and format versions that made it.
 
 The service runs only on the interpreter the results are pinned to: the reader's notion of
-whitespace comes from its Unicode database (``check_environment``).
+whitespace comes from its Unicode database (``check_environment``). It answers only requests
+for the host it serves (bound to a loopback address, only loopback names) and refuses a POST from
+another web origin, so a web page cannot fill the store. A client that stops sending is dropped
+after ``_QuietHandler.timeout`` seconds; documents are read at most ``READING`` at a time.
 """
 
 from __future__ import annotations
@@ -23,6 +26,8 @@ import importlib.resources
 import json
 import re
 import sys
+import threading
+import traceback
 import unicodedata
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -32,7 +37,7 @@ from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 from label_docx import browser, documents, word
 from label_docx.output import FORMAT_VERSION, Json, canonical
 from label_docx.reader import READER_VERSION
-from label_docx.store import Store, StoreError, Verifier
+from label_docx.store import Checker, Store, StoreError
 
 # The largest document accepted, in bytes; the reader caps each part at 20 MiB.
 MAX_DOCUMENT_BYTES = 64 * 1024 * 1024
@@ -46,6 +51,9 @@ type StartResponse = Callable[[str, list[tuple[str, str]]], object]
 type Environ = dict[str, object]
 
 _DOCUMENT = re.compile(r"/v1/documents/([0-9a-f]{64})(/source|/verification)?")
+# Reading is bound to one core (the reader is pure Python), so more at once only costs memory.
+READING = threading.BoundedSemaphore(2)
+_LOOPBACK = ("127.0.0.1", "localhost", "::1")
 
 
 def check_environment() -> None:
@@ -81,23 +89,51 @@ def _error(status: str, message: str) -> tuple[str, str, bytes]:
 class Service:
     """The WSGI application over a store."""
 
-    def __init__(self, store: Store, require: frozenset[str] = frozenset()) -> None:
+    def __init__(
+        self,
+        store: Store,
+        require: frozenset[str] = frozenset(),
+        hosts: frozenset[str] | None = None,
+    ) -> None:
         self.store = store
         # The kinds of document ("epi", "docx") whose reads are served only once their
         # application (Chrome, Word) has checked them and agrees.
         self.require = require
+        # The Host headers answered (None: any), against a page reaching a local service
+        # through a name of its own.
+        self.hosts = hosts
 
     def __call__(self, environ: Environ, start_response: StartResponse) -> Iterable[bytes]:
         """Answer one request."""
         try:
-            status, content_type, body, headers = self._route(environ)
-        except StoreError as failure:
-            status, content_type, body = _error("500 Internal Server Error", str(failure))
+            status, content_type, body, headers = self._guarded(environ)
+        except Exception as failure:  # noqa: BLE001 - every answer is JSON, never a traceback
+            # The log keeps the detail (a store path, a traceback); the client gets none of it.
+            sys.stderr.write("".join(traceback.format_exception(failure)))
+            message = (
+                "the store holds other bytes than it wrote"
+                if isinstance(failure, StoreError)
+                else "internal error"
+            )
+            status, content_type, body = _error("500 Internal Server Error", message)
             headers = []
         start_response(
             status, [("Content-Type", content_type), ("Content-Length", str(len(body))), *headers]
         )
         return [body]
+
+    def _guarded(self, environ: Environ) -> tuple[str, str, bytes, list[tuple[str, str]]]:
+        host = str(environ.get("HTTP_HOST", ""))
+        if self.hosts is not None and host not in self.hosts:
+            return (*_error("421 Misdirected Request", "not a host this service answers"), [])
+        origin = environ.get("HTTP_ORIGIN")
+        if (
+            environ.get("REQUEST_METHOD") == "POST"
+            and origin is not None
+            and origin != (f"http://{host}")
+        ):
+            return (*_error("403 Forbidden", "a document is posted from this origin only"), [])
+        return self._route(environ)
 
     def _route(self, environ: Environ) -> tuple[str, str, bytes, list[tuple[str, str]]]:
         method, path = str(environ.get("REQUEST_METHOD", "")), str(environ.get("PATH_INFO", ""))
@@ -121,58 +157,75 @@ class Service:
             return (*_error("405 Method Not Allowed", "use GET"), [("Allow", "GET")])
         document, part = match.group(1), match.group(2)
         if part == "/verification":
-            if self.store.source(document) is None:
+            if self.store.kind_of(document) is None:
                 return (*_error("404 Not Found", f"no document {document}"), [])
             verdicts = self.store.verifications(document)
             return "200 OK", JSON, canonical({"verifications": verdicts}), []
-        source = part == "/source"
-        body = self.store.source(document) if source else self.store.result(document)
+        if part == "/source":
+            body = self.store.source(document)
+            if body is None:
+                return (*_error("404 Not Found", f"no document {document}"), [])
+            return "200 OK", FHIR_JSON if documents.kind(body) is documents.EPI else DOCX, body, []
+        body = self.store.result(document)
         if body is None:
-            return (*_error("404 Not Found", f"no document {document}"), [])
-        if not source:
-            disagreement = self.store.disagreement(document)
-            if disagreement is not None:
-                # The browser shows a section otherwise than the result reads: not served.
-                message: Json = {
-                    "error": "the browser shows otherwise",
-                    "verification": disagreement,
+            source = self.store.source(document)
+            if source is None:
+                return (*_error("404 Not Found", f"no document {document}"), [])
+            # Kept, but not read by this reader version (or stopped before its receipt): read it.
+            with READING:
+                self.store.ingest(source)
+            body = self.store.result(document)
+            if body is None:  # pragma: no cover - ingest always leaves a result and receipt
+                raise StoreError(f"no result for {document} after reading it")
+        disagreement = self.store.disagreement(document)
+        if disagreement is not None:
+            # The application shows the document otherwise than the result reads: not served.
+            message: Json = {
+                "error": "the application shows it otherwise",
+                "verification": disagreement,
+            }
+            return "409 Conflict", JSON, canonical(message), []
+        reading = self.store.kind_of(document)
+        strict = reading is not None and reading.name in self.require
+        if strict and "refusal" not in json.loads(body):
+            agreed = [
+                v
+                for v in self.store.verifications(document)
+                if isinstance(v, dict) and v.get("differs") == []
+            ]
+            if not agreed:
+                # Strict: a read no application has checked is not served.
+                application = "Chrome" if reading is documents.EPI else "Microsoft Word"
+                message = {
+                    "error": f"not yet checked by {application}, which this service requires"
                 }
                 return "409 Conflict", JSON, canonical(message), []
-            reading = documents.kind(self.store.source(document) or b"")
-            if reading.name in self.require and "refusal" not in json.loads(body):
-                agreed = [
-                    v
-                    for v in self.store.verifications(document)
-                    if isinstance(v, dict) and not v["differs"]
-                ]
-                if not agreed:
-                    # Strict: a read no application has checked is not served.
-                    application = "Chrome" if reading is documents.EPI else "Microsoft Word"
-                    message = {
-                        "error": f"not yet checked by {application}, which this service requires"
-                    }
-                    return "409 Conflict", JSON, canonical(message), []
-            return "200 OK", JSON, body, []
-        return "200 OK", FHIR_JSON if documents.kind(body) is documents.EPI else DOCX, body, []
+        return "200 OK", JSON, body, []
 
     def _ingest(self, environ: Environ) -> tuple[str, str, bytes, list[tuple[str, str]]]:
         length = str(environ.get("CONTENT_LENGTH") or "")
-        if not length.isdigit():
+        # ASCII digits only ("²" is a digit to str.isdigit), and no more than a size can need.
+        if not (length.isascii() and length.isdigit() and len(length) <= 12):
             return (*_error("411 Length Required", "send the document with a length"), [])
         if int(length) > MAX_DOCUMENT_BYTES:
             return (*_error("413 Content Too Large", f"over {MAX_DOCUMENT_BYTES} bytes"), [])
         if int(length) == 0:
             return (*_error("400 Bad Request", "no document"), [])
         stream = environ["wsgi.input"]
-        data = stream.read(int(length))  # type: ignore[attr-defined]
+        try:
+            data = stream.read(int(length))  # type: ignore[attr-defined]
+        except OSError:  # the client stopped sending (the handler's timeout)
+            return (*_error("408 Request Timeout", "the document was not sent in time"), [])
         if len(data) != int(length):
             return (*_error("400 Bad Request", "the document was cut short"), [])
-        ingested = self.store.ingest(data)
+        with READING:
+            ingested = self.store.ingest(data)
         status = "201 Created" if ingested.created else "200 OK"
         if ingested.verification is None:
             verified = "not-verified"
         else:
-            verified = "differs" if json.loads(ingested.verification)["differs"] else "agrees"
+            agreed = json.loads(ingested.verification).get("differs") == []
+            verified = "agrees" if agreed else "differs"
         headers = [("Location", f"/v1/documents/{ingested.document}"), ("Verification", verified)]
         return status, JSON, ingested.receipt, headers
 
@@ -182,12 +235,17 @@ class _ThreadingServer(ThreadingMixIn, WSGIServer):
 
 
 class _QuietHandler(WSGIRequestHandler):
+    # A client that sends nothing for this long is dropped, not waited on with a thread.
+    timeout = 30
+    # Answers "Expect: 100-continue" (curl sends it for a large document) at once.
+    protocol_version = "HTTP/1.1"
+
     def log_message(self, format: str, *args: object) -> None:  # noqa: A002
         # One line per request on standard error, as wsgiref writes it; never a document's text.
         sys.stderr.write(f"{self.address_string()} {format % args}\n")
 
 
-def browser_verifier(choice: str) -> Verifier | None:
+def browser_verifier(choice: str) -> Checker | None:
     """The browser to hold ePIs to, by the ``--browser`` choice.
 
     Chrome where installed (``auto``), always (``on`` and ``require``), or none (``off``).
@@ -199,10 +257,13 @@ def browser_verifier(choice: str) -> Verifier | None:
         if choice in ("on", "require"):
             raise SystemExit("label-docx: --browser on, but Chrome is not installed")
         return None
-    return lambda data, result: browser.verify_epi(data, result, chrome)
+    return Checker(
+        lambda: browser.chrome_version(chrome),
+        lambda data, result: browser.verify_epi(data, result, chrome),
+    )
 
 
-def word_verifier(choice: str) -> Verifier | None:
+def word_verifier(choice: str) -> Checker | None:
     """Word to hold .docx reads to, by the ``--word`` choice.
 
     Where installed (``auto``), always (``on``, ``require``), never (``off``).
@@ -213,20 +274,25 @@ def word_verifier(choice: str) -> Verifier | None:
         if choice in ("on", "require"):
             raise SystemExit("label-docx: --word on, but Microsoft Word is not installed")
         return None
-    return word.verify_docx
+    return Checker(word.word_version, word.verify_docx)
 
 
 def serve(
     root: Path,
-    host: str = "127.0.0.1",
-    port: int = 8080,
-    verifier: Verifier | None = None,
-    word_check: Verifier | None = None,
-    require: frozenset[str] = frozenset(),
+    host: str,
+    port: int,
+    verifier: Checker | None,
+    word_check: Checker | None,
+    require: frozenset[str],
 ) -> None:
     """Serve the store at ``root`` until interrupted."""
     check_environment()
-    service = Service(Store(root, browser=verifier, word=word_check), require)
+    hosts = (
+        frozenset(f"{name}:{port}" for name in ("127.0.0.1", "localhost", "[::1]"))
+        if host in _LOOPBACK
+        else None
+    )
+    service = Service(Store(root, browser=verifier, word=word_check), require, hosts)
     with make_server(
         host, port, service, server_class=_ThreadingServer, handler_class=_QuietHandler
     ) as server:

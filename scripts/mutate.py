@@ -7,10 +7,9 @@ Each mutation makes one small edit to a document's XML. A mutation that changes 
 the reader's result or make it refuse: if the result is the same, a change went unnoticed (a
 ``miss``). A mutation that changes nothing Word shows (bookkeeping attributes, a run split in two,
 a proofing mark) must leave the result byte-identical: otherwise the reader is not stable (an
-``unstable``). Some mutations change appearance the reader does not report (bold, italic, size,
-colour); they are counted as ``unreported`` and must leave the result identical, so what the
-reader is blind to is known and stays the same. Bold and italic, reported since docx-reader
-1.11.0, are changes.
+``unstable``). Some mutations change appearance the reader does not report (font size); they are
+counted as ``unreported`` and must leave the result identical, so what the reader is blind to is
+known and stays the same.
 
 The result compared is the reader's canonical JSON without its ``source`` (which names the bytes
 and so always differs). Mutants are chosen by a generator seeded with the document's SHA-256, so a
@@ -61,7 +60,6 @@ def _pick[T](items: list[T], rng: random.Random) -> T | None:
     return items[rng.randrange(len(items))] if items else None
 
 
-_ANY_RUN = re.compile(r"<w:r(?:\s[^>]*)?>(?:(?!</w:r>).)*?</w:r>", re.S)
 _LAYOUT = {"PAGEREF", "PAGE", "NUMPAGES", "SECTIONPAGES"}
 
 
@@ -69,7 +67,7 @@ def _page_numbers(xml: str) -> list[tuple[int, int]]:
     """Where page-number fields stand: Word sets their text from the layout, not the file."""
     spans: list[tuple[int, int]] = []
     stack: list[tuple[int, list[str]]] = []
-    for run in _ANY_RUN.finditer(xml):
+    for run in _RUN.finditer(xml):
         body = run.group(0)
         if 'fldCharType="begin"' in body:
             stack.append((run.start(), []))

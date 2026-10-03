@@ -2,8 +2,8 @@
 
     uv run --frozen python scripts/word_authored.py corpus/word-authored
 
-The synthetic cases (scripts/numbering_cases.py) are written by the reader's own tests; these are
-written by Word itself, so they hold exactly what Word writes when an author inserts a table of
+The synthetic cases (scripts/numbering_cases.py) are written by a script; these are written by
+Word itself, so they hold exactly what Word writes when an author inserts a table of
 contents: its field codes, styles, bookmarks and the page numbers it computed. Each document
 starts as a synthetic body (built here), is opened in Word, given what an author would add, and
 saved by Word. Word's files are not the same bytes from run to run (it stamps them with session
