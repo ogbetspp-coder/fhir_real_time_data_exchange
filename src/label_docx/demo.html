@@ -52,6 +52,14 @@
   .refusal { background: var(--stop-bg); color: var(--stop); border-radius: 8px; padding: 12px 14px;
              margin-top: 12px; }
   .refusal code { font-family: var(--mono); font-weight: 600; }
+  .tracked { background: var(--mark); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+  .switch { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  .switch button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--card); color: var(--ink); cursor: pointer; }
+  .switch button[aria-selected="true"] { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .changes { border-collapse: collapse; font-size: 13px; margin: 8px 0; }
+  .changes th, .changes td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; }
+  h4.view { margin: 14px 0 0; font-size: 14px; }
   .doc p { margin: 0 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .doc .label { color: var(--accent); font-weight: 600; margin-right: 6px; white-space: pre; }
   .doc .hidden-mark::after { content: "¶"; color: var(--muted); font-size: 11px; }
@@ -206,6 +214,80 @@ function section(item) {
   return wrap;
 }
 
+// A .docx reading: body, headers, footers, comments, footnotes and endnotes.
+function docxParts(result) {
+  const doc = el("div", {});
+  doc.append(body(result.paragraphs));
+  for (const [kind, parts] of [["Headers", result.headers || []], ["Footers", result.footers || []]]) {
+    const shown = parts.filter(part => part.refusal || part.paragraphs.some(x => x.text || x.pages.length));
+    if (!shown.length) continue;
+    const section = el("div", { class: "notes" }, el("h3", {}, kind));
+    for (const part of shown) {
+      const uses = part.uses.map(u => `section ${u.section + 1}, ${u.type}`).join("; ");
+      section.append(el("div", { class: "legend" }, `${part.part} (${uses})`));
+      section.append(part.refusal ? partRefusal(part.refusal) : body(part.paragraphs));
+    }
+    doc.append(section);
+  }
+  if ((result.comments || []).length) {
+    const section = el("div", { class: "notes" }, el("h3", {}, "Comments"));
+    for (const c of result.comments) {
+      section.append(el("div", { class: "legend" }, `c${c.id}: ${c.author || "no author"}${c.date ? ", " + c.date : ""}`));
+      section.append(c.refusal ? partRefusal(c.refusal) : body(c.paragraphs));
+    }
+    doc.append(section);
+  }
+  for (const [kind, notes] of [["Footnotes", result.footnotes || []], ["Endnotes", result.endnotes || []]]) {
+    if (!notes.length) continue;
+    const section = el("div", { class: "notes" }, el("h3", {}, kind));
+    for (const note of notes) section.append(body(note.paragraphs));
+    doc.append(section);
+  }
+  return doc;
+}
+
+// A document with tracked changes: two texts, and the reader does not choose between them.
+function trackedView(tracked) {
+  const wrap = el("div", {});
+  const n = tracked.changes.length;
+  wrap.append(el("div", { class: "tracked" },
+    el("strong", {}, `${n.toLocaleString()} tracked change${n === 1 ? "" : "s"}: this document holds two texts. `),
+    "The reader returns both and does not choose: which one is the label is a decision for the person using it."));
+  const shown = el("div", {});
+  const buttons = el("div", { class: "switch", role: "tablist" });
+  const pick = view => {
+    for (const b of buttons.children) b.setAttribute("aria-selected", String(b.dataset.view === view));
+    shown.replaceChildren(docxParts(tracked[view]));
+  };
+  for (const [view, label] of [["accepted", "All changes accepted"], ["original", "Original (all rejected)"]]) {
+    const b = el("button", { type: "button", role: "tab", "data-view": view }, label);
+    b.addEventListener("click", () => pick(view));
+    buttons.append(b);
+  }
+  const kinds = {};
+  for (const c of tracked.changes) kinds[c.kind] = (kinds[c.kind] || 0) + 1;
+  const list = el("details", {}, el("summary", {}, "The changes, as stored: " +
+    Object.entries(kinds).map(([k, v]) => `${v} ${k}`).join(", ")),
+    el("table", { class: "changes" },
+      el("tr", {}, ...["Kind", "Author", "Date", "Part"].map(h => el("th", {}, h))),
+      ...tracked.changes.map(c => el("tr", {}, ...[c.kind, c.author || "", c.date || "", c.part].map(v => el("td", {}, v))))));
+  wrap.append(list, buttons, shown);
+  pick("accepted");
+  return wrap;
+}
+
+// The certificate of a document with tracked changes: each view's, and the views' own.
+function trackedProof(c) {
+  const n = x => Number(x).toLocaleString();
+  const box = el("div", {});
+  for (const [view, label] of [["accepted", "All changes accepted"], ["original", "Original"]]) {
+    const v = c.views[view];
+    box.append(el("h4", { class: "view" }, label), proof(c[view], false),
+      el("div", { class: "again" }, `This text was checked against the original file by itself: ${n(v.characters)} characters and ${n(v.elements)} other marks (tabs, breaks, symbols) kept from it, every change applied, ${n(v.paragraphsJoined)} paragraph(s) joined where a paragraph break was changed.`));
+  }
+  return box;
+}
+
 async function ingest(file) {
   out.replaceChildren(el("div", { class: "card" }, `Reading ${file.name}…`));
   const bytes = await file.arrayBuffer();
@@ -250,10 +332,12 @@ function show(name, receipt, receiptText, result, resultText, status, verdicts) 
   const card = el("div", { class: "card" });
   const read = receipt.outcome !== "refused";
   const part = receipt.outcome === "read-in-part";
-  const partsRefused = result.refusedSections ?? result.refusedParts;
+  const partsRefused = result.refusedSections ?? result.refusedParts ??
+    Math.max(result.tracked?.accepted.refusedParts ?? 0, result.tracked?.original.refusedParts ?? 0);
   card.append(el("div", { class: "verdict" },
     el("span", { class: "badge " + (part ? "part" : read ? "read" : "refused") },
-      part ? `Read exactly, ${partsRefused} ${result.sections ? "section(s)" : "header, footer or comment part(s)"} refused` : read ? "Read exactly" : "Refused"),
+      (part ? `Read exactly, ${partsRefused} ${result.sections ? "section(s)" : "header, footer or comment part(s)"} refused` : read ? "Read exactly" : "Refused") +
+        (result.tracked ? ` — two texts, ${receipt.trackedChanges.toLocaleString()} tracked change(s)` : "")),
     el("strong", {}, name)));
   const facts = el("dl", { class: "facts" });
   const add = (term, value) => facts.append(el("dt", {}, term), el("dd", {}, value));
@@ -274,7 +358,8 @@ function show(name, receipt, receiptText, result, resultText, status, verdicts) 
       el("code", {}, receipt.refusal.code), " — ", receipt.refusal.detail,
       el("div", { class: "legend" }, "The reader will not guess: nothing is returned for a document it cannot read exactly.")));
   }
-  if (result.certificate) card.append(proof(result.certificate, result.sections !== undefined));
+  if (result.tracked) card.append(trackedProof(result.certificate));
+  else if (result.certificate) card.append(proof(result.certificate, result.sections !== undefined));
   if (result.sections !== undefined && read) card.append(browserLine(verdicts));
   if (result.sections === undefined && read) card.append(wordLine(verdicts));
   out.replaceChildren(card);
@@ -285,32 +370,8 @@ function show(name, receipt, receiptText, result, resultText, status, verdicts) 
       el("span", { class: "note" }, "1"), el("span", {}, "note mark"),
       el("span", { class: "page" }, "page #"), el("span", {}, "page number (set by layout)")));
     if (result.sections) for (const item of result.sections) doc.append(section(item));
-    else doc.append(body(result.paragraphs));
-    for (const [kind, parts] of [["Headers", result.headers || []], ["Footers", result.footers || []]]) {
-      const shown = parts.filter(part => part.refusal || part.paragraphs.some(x => x.text || x.pages.length));
-      if (!shown.length) continue;
-      const section = el("div", { class: "notes" }, el("h3", {}, kind));
-      for (const part of shown) {
-        const uses = part.uses.map(u => `section ${u.section + 1}, ${u.type}`).join("; ");
-        section.append(el("div", { class: "legend" }, `${part.part} (${uses})`));
-        section.append(part.refusal ? partRefusal(part.refusal) : body(part.paragraphs));
-      }
-      doc.append(section);
-    }
-    if ((result.comments || []).length) {
-      const section = el("div", { class: "notes" }, el("h3", {}, "Comments"));
-      for (const c of result.comments) {
-        section.append(el("div", { class: "legend" }, `c${c.id}: ${c.author || "no author"}${c.date ? ", " + c.date : ""}`));
-        section.append(c.refusal ? partRefusal(c.refusal) : body(c.paragraphs));
-      }
-      doc.append(section);
-    }
-    for (const [kind, notes] of [["Footnotes", result.footnotes || []], ["Endnotes", result.endnotes || []]]) {
-      if (!notes.length) continue;
-      const section = el("div", { class: "notes" }, el("h3", {}, kind));
-      for (const note of notes) section.append(body(note.paragraphs));
-      doc.append(section);
-    }
+    else if (result.tracked) doc.append(trackedView(result.tracked));
+    else doc.append(docxParts(result));
     out.append(doc);
   }
   out.append(el("div", { class: "card" },
