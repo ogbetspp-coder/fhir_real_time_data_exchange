@@ -171,3 +171,14 @@ def test_strict_service_serves_no_read_its_application_has_not_checked(tmp_path:
     )
     _, _, body = _call(checked, "POST", "/v1/documents", EPI)
     assert _call(checked, "GET", f"/v1/documents/{json.loads(body)['document']}")[0] == "200 OK"
+
+
+@pytest.mark.parametrize("span", [(-1, 1), (1, 1), (2, 1), (0, 3), ("0", 1), (True, 2)])
+def test_a_mark_that_is_no_span_of_its_text_is_never_compared(span: tuple[Any, Any]) -> None:
+    def lines(start: Any, end: Any) -> list[browser.Line]:
+        mark = {"kind": "bold", "start": start, "end": end}
+        return browser.result_lines([{"text": "ab", "marks": [mark]}])
+
+    assert lines(0, 2) != lines(1, 2)
+    with pytest.raises(ValueError, match="no span"):
+        lines(*span)

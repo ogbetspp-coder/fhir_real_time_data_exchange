@@ -156,9 +156,15 @@ def test_private_use_character_in_a_symbol_run_is_mapped() -> None:
     ("body", "code"),
     [
         (p(r('<w:sym w:font="Symbol" w:char="F0E5"/>')), "unmapped-symbol"),
-        (p(r('<w:sym w:font="Wingdings" w:char="F0FC"/>')), "unmapped-symbol"),
+        # Codes the Symbol table holds, in another font: the font decides.
+        (p(r('<w:sym w:font="Wingdings" w:char="F0B7"/>')), "unmapped-symbol"),
+        (p(r('<w:sym w:font="Times New Roman" w:char="F0B3"/>')), "unmapped-symbol"),
         (p(r("<w:t>\uf0b3</w:t>")), "private-use-character"),
         (p(r("<w:t>\uf0b3</w:t>", '<w:rFonts w:ascii="Wingdings"/>')), "symbol-font"),
+        *(
+            (p(r("<w:t>a</w:t>", f'<w:rFonts w:ascii="{font}" w:hAnsi="{font}"/>')), "symbol-font")
+            for font in ("Zapf Dingbats", "ITC Zapf Dingbats", "Marlett", "MT Extra")
+        ),
     ],
 )
 def test_a_symbol_the_table_does_not_hold_is_refused(body: str, code: str) -> None:
@@ -1350,7 +1356,10 @@ def test_bullets_are_drawn_in_their_font() -> None:
         # A Wingdings code outside the table, Wingdings in one Latin slot only, another dingbat.
         ('<w:rPr><w:rFonts w:ascii="Wingdings" w:hAnsi="Wingdings"/></w:rPr>', "unmapped-symbol"),
         ('<w:rPr><w:rFonts w:ascii="Wingdings" w:hAnsi="Arial"/></w:rPr>', "symbol-font"),
-        ('<w:rPr><w:rFonts w:ascii="Webdings" w:hAnsi="Webdings"/></w:rPr>', "symbol-font"),
+        *(
+            (f'<w:rPr><w:rFonts w:ascii="{font}" w:hAnsi="{font}"/></w:rPr>', "symbol-font")
+            for font in ("Webdings", "Zapf Dingbats", "ITC Zapf Dingbats", "Marlett", "MT Extra")
+        ),
         # Another spelling of the name: how Word draws it is not on record.
         ('<w:rPr><w:rFonts w:ascii="wingdings" w:hAnsi="wingdings"/></w:rPr>', "symbol-font"),
         ('<w:rPr><w:rFonts w:ascii="Wing dings" w:hAnsi="Wing dings"/></w:rPr>', "symbol-font"),

@@ -407,20 +407,31 @@ def test_the_check_refuses_a_joined_paragraph_with_none_after_it() -> None:
         certify_tracked(source, {"accepted": docx(p(t("a")))})
 
 
-def test_the_check_leaves_run_properties_to_word() -> None:
-    # Formatting is held to Word (test_every_case_reads_as_word_makes_it), not counted here: a
-    # view whose run lost its properties holds the same content.
-    source = docx(p(r("<w:t>a</w:t>", "<w:b/>") + ins(t("b"))))
-    accepted, _, _ = tracked(source)
-    plain = _rewrite(
-        accepted, "word/document.xml", lambda x: x.replace("<ns0:rPr><ns0:b /></ns0:rPr>", "")
+def test_the_check_holds_run_properties_and_leaves_changed_ones_to_word() -> None:
+    # Properties a change records the former set of are, in the original view, held to Word
+    # (test_every_case_reads_as_word_makes_it); every other run's are the source's.
+    changed = f'<w:b/><w:rPrChange w:id="4" {WHO}><w:rPr/></w:rPrChange>'
+    source = docx(p(r("<w:t>a</w:t>", "<w:b/>") + r("<w:t>c</w:t>", changed) + ins(t("b"))))
+    accepted, original, _ = tracked(source)
+    body = "word/document.xml"
+    restyled = _rewrite(
+        original, body, lambda x: x.replace("<ns0:rPr />", "<ns0:rPr><ns0:i /></ns0:rPr>")
     )
-    assert plain != accepted
-    assert certify_tracked(source, {"accepted": plain})["accepted"] == {
+    assert restyled != original
+    assert certify_tracked(source, {"original": restyled})["original"] == {
         "characters": 2,
         "elements": 0,
         "paragraphsJoined": 0,
     }
+    for view, data in (("accepted", accepted), ("original", original)):
+        plain = _rewrite(data, body, lambda x: x.replace("<ns0:rPr><ns0:b /></ns0:rPr>", "", 1))
+        assert plain != data
+        with pytest.raises(CertificationError, match="does not hold its content"):
+            certify_tracked(source, {view: plain})
+    # In the accepted view, the changed run's properties are the current ones.
+    unbolded = _rewrite(accepted, body, lambda x: x[::-1].replace(">/ b:0sn<", "", 1)[::-1])
+    with pytest.raises(CertificationError, match="does not hold its content"):
+        certify_tracked(source, {"accepted": unbolded})
 
 
 def _row(text: str, marker: str = "") -> str:

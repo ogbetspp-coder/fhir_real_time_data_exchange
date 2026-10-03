@@ -332,7 +332,11 @@ def result_lines(paragraphs: list[dict[str, Any]]) -> list[Line]:
         text: str = paragraph["text"]
         kinds: list[set[str]] = [set() for _ in text]
         for mark in paragraph["marks"]:
-            for index in range(mark["start"], mark["end"]):
+            start, end = mark["start"], mark["end"]
+            # A mark means text[start:end]: anything else is no reading of the text to compare.
+            if not (type(start) is int and type(end) is int and 0 <= start < end <= len(text)):
+                raise ValueError(f"a mark that is no span of its text: {start!r} to {end!r}")
+            for index in range(start, end):
                 kinds[index].add(_canonical_kind(mark["kind"]))
         characters += [(c, frozenset(k)) for c, k in zip(text, kinds, strict=True)]
         characters.append(("\n", frozenset()))
