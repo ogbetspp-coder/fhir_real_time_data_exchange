@@ -1912,7 +1912,7 @@ def test_a_table_of_contents_is_read_as_stored_and_its_page_numbers_placed() -> 
         + r("<w:t>1</w:t><w:tab/><w:t>Stability</w:t><w:tab/>")
         + _field("PAGEREF _Toc1 \\h", "4")
     )
-    end = p(r('<w:fldChar w:fldCharType="end"/>') + r("<w:t>Stability</w:t>"))
+    end = p(r('<w:fldChar w:fldCharType="end"/>') + _marked("_Toc1", r("<w:t>Stability</w:t>")))
     paragraphs = read_docx(docx(entry + end))
     # The entry is what Word prints; the page number, set by the layout, is not in the text.
     assert [(x.text, x.pages) for x in paragraphs] == [("1\tStability\t", (12,)), ("Stability", ())]
@@ -2255,3 +2255,251 @@ def test_a_font_word_may_draw_as_symbols_is_refused(fonts: str, name: str) -> No
     with pytest.raises(DocxRefusedError) as caught:
         read_docx(docx(run, fonts=fonts))
     assert caught.value.code == "symbol-font"
+
+
+# --- fields and text (sweep 2) -----------------------------------------------------------------
+
+BEGIN = r('<w:fldChar w:fldCharType="begin"/>')
+SEPARATE = r('<w:fldChar w:fldCharType="separate"/>')
+END = r('<w:fldChar w:fldCharType="end"/>')
+HIDDEN_SPACE = '<w:rPr><w:vanish/></w:rPr><w:t xml:space="preserve"> </w:t>'
+
+
+def _code(code: str) -> str:
+    return r(f'<w:instrText xml:space="preserve"> {code} </w:instrText>')
+
+
+def _after_hidden_space(inner: str, same_run: bool) -> str:
+    """A hidden space, then ``inner`` in the same run or a run of its own."""
+    if same_run:
+        return f"<w:r>{HIDDEN_SPACE}{inner}</w:r>"
+    return f"<w:r>{HIDDEN_SPACE}</w:r><w:r>{inner}</w:r>"
+
+
+@pytest.mark.parametrize("same_run", [True, False])
+def test_hidden_whitespace_before_a_field_character_does_not_shift_the_field(
+    same_run: bool,
+) -> None:
+    # The hidden space is dropped, so nothing after it moves: in its own run or not, one result.
+    figure = r('<w:t xml:space="preserve">Figure </w:t>')
+    end = _after_hidden_space('<w:fldChar w:fldCharType="end"/>', same_run)
+    seq = p(figure + BEGIN + _code("SEQ Figure") + SEPARATE + end + r("<w:t>1</w:t>"))
+    assert refusal(seq) == "stale-field"
+    separate = _after_hidden_space(
+        '<w:fldChar w:fldCharType="begin"/><w:instrText> SEQ Figure </w:instrText>'
+        '<w:fldChar w:fldCharType="separate"/>',
+        same_run,
+    )
+    assert text_of(p(figure + separate + r("<w:t>1</w:t>") + END)) == ["Figure 1"]
+    stale_ref = p(_marked("t", r("<w:t>12</w:t>"))) + p(
+        BEGIN + _code("REF t") + SEPARATE + r("<w:t>1</w:t>") + end + r("<w:t>2</w:t>")
+    )
+    assert refusal(stale_ref) == "stale-field"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        # Two separators: the text between them would be shown and never checked.
+        p(
+            BEGIN
+            + _code("SEQ Table")
+            + SEPARATE
+            + r("<w:t>WRONG</w:t>")
+            + SEPARATE
+            + r("<w:t>1</w:t>")
+            + END
+        ),
+        p(_marked("t", r("<w:t>abc</w:t>")))
+        + p(
+            BEGIN
+            + _code("REF t")
+            + SEPARATE
+            + r("<w:t>STALE</w:t>")
+            + SEPARATE
+            + r("<w:t>abc</w:t>")
+            + END
+        ),
+        p(r("<w:t>a</w:t>") + SEPARATE),
+        p(r("<w:t>a</w:t>") + END),
+        p(
+            BEGIN
+            + _code("DOCPROPERTY x")
+            + r('<w:fldChar w:fldCharType="other"/>')
+            + SEPARATE
+            + r("<w:t>x</w:t>")
+            + END
+        ),
+    ],
+    ids=["seq-separate-twice", "ref-separate-twice", "stray-separate", "stray-end", "unknown"],
+)
+def test_field_characters_out_of_place_are_refused(body: str) -> None:
+    assert refusal(body) == "unbalanced-field"
+
+
+def _nested(outer: str, inner: str, stored: str, after: str = "") -> str:
+    """A field whose code holds another field (``inner``, showing ``stored``)."""
+    return (
+        BEGIN
+        + _code(outer)
+        + BEGIN
+        + _code(inner)
+        + SEPARATE
+        + r(f"<w:t>{stored}</w:t>")
+        + END
+        + (_code(after) if after else "")
+    )
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        # The identifier is a field: which counter Word counts is not the reader's to guess.
+        p(_field("SEQ Figure", "1"))
+        + p(_nested("SEQ", 'QUOTE "Figure"', "Figure") + SEPARATE + r("<w:t>1</w:t>") + END),
+        p(_nested("SEQ", "QUOTE Figure", "Figure", "\\h") + END),
+        # A SEQ in another field's code is neither shown nor counted by the reader.
+        p(_nested('HYPERLINK "x" \\o "', "SEQ Figure", "5", '"') + SEPARATE)
+        + p(r("<w:t>link</w:t>") + END)
+        + p(_field("SEQ Figure", "1")),
+        p(
+            BEGIN
+            + _code("IF 1 = 1")
+            + '<w:fldSimple w:instr=" SEQ Figure ">'
+            + r("<w:t>1</w:t>")
+            + "</w:fldSimple>"
+            + SEPARATE
+            + r("<w:t>x</w:t>")
+            + END
+        ),
+    ],
+    ids=["nested-identifier", "nested-identifier-hidden", "in-a-tooltip", "simple-in-a-code"],
+)
+def test_a_computed_field_with_a_field_in_its_code_or_in_another_code_is_refused(body: str) -> None:
+    assert refusal(body) == "computed-field"
+
+
+@pytest.mark.parametrize(
+    ("code", "placed"),
+    [
+        ("PAGEREF _Ref1 \\h", True),
+        ("PAGE \\* MERGEFORMAT", True),
+        # On record: Word shows the page number (ema-templates, a footer).
+        ("PAGE \\* Arabic \\* MERGEFORMAT", True),
+        ("NUMPAGES", True),
+        # Word shows "above" or "below" for \p, the picture's text for \#, words for CardText.
+        ("PAGEREF _Ref1 \\p \\h", False),
+        ("PAGE \\# \"'Page '0\"", False),
+        ("PAGE \\* CardText", False),
+        ("NUMPAGES \\* roman", False),
+        ("PAGE x", False),
+        ("PAGEREF", False),
+    ],
+)
+def test_page_fields_with_switches_word_has_not_answered_are_refused(
+    code: str, placed: bool
+) -> None:
+    body = p(_marked("_Ref1", r("<w:t>Table 1</w:t>"))) + p(
+        r('<w:t xml:space="preserve">See </w:t>') + _field(code, "above")
+    )
+    if placed:
+        assert [x.pages for x in read_docx(docx(body))] == [(), (4,)]
+    else:
+        assert refusal(body) == "computed-field"
+
+
+def test_a_page_reference_to_a_bookmark_it_cannot_find_is_refused() -> None:
+    # Word shows the stored number; what it prints is not on record.
+    entry = r("<w:t>2</w:t><w:tab/><w:t>Stability</w:t><w:tab/>")
+    assert refusal(p(entry + _field("PAGEREF _Toc999 \\h", "9"))) == "computed-field"
+    across = (
+        p('<w:bookmarkStart w:id="1" w:name="_Toc1"/>' + r("<w:t>a</w:t>"))
+        + p(r("<w:t>b</w:t>") + '<w:bookmarkEnd w:id="1"/>')
+        + p(entry + _field("PAGEREF _Toc1 \\h", "9"))
+    )
+    assert refusal(across) == "computed-field"
+    in_note = fnote(1, p(r("<w:footnoteRef/>") + _field("PAGEREF _Toc1 \\h", "9")))
+    with pytest.raises(DocxRefusedError) as caught:
+        read(p(_marked("_Toc1", r("<w:t>a</w:t>")) + ref(1)), in_note)
+    assert caught.value.code == "computed-field"
+
+
+@pytest.mark.parametrize(
+    "marked",
+    [
+        _marked("_Ref1", r("<w:t>abc</w:t>")) + ref(1),
+        ref(1) + _marked("_Ref1", r("<w:t>abc</w:t>")),
+        r("<w:t>abc</w:t>") + _marked("_Ref1", "") + ref(1),
+    ],
+    ids=["mark-after-end", "mark-before-start", "empty-bookmark-before-mark"],
+)
+def test_a_note_reference_counts_only_a_note_inside_its_bookmark(marked: str) -> None:
+    # Word prints "Error! Bookmark not defined." for the mark just after the bookmark.
+    body = p(marked) + p(
+        r('<w:t xml:space="preserve">see note </w:t>') + _field("NOTEREF _Ref1 \\h", "1")
+    )
+    with pytest.raises(DocxRefusedError) as caught:
+        read(body, fnote(1))
+    assert caught.value.code == "computed-field"
+    inside = p(_marked("_Ref1", ref(1))) + p(_field("NOTEREF _Ref1 \\h", "1"))
+    assert read(inside, fnote(1)).body[1].text == "1"
+
+
+def test_a_locked_page_field_is_refused() -> None:
+    # Word shows a locked field's stored number, which the reader would set aside as a page.
+    locked = p(_marked("_Ref1", r("<w:t>x</w:t>"))) + p(
+        r('<w:fldChar w:fldCharType="begin" w:fldLock="1"/>')
+        + _code("PAGEREF _Ref1 \\h")
+        + SEPARATE
+        + r("<w:t>5</w:t>")
+        + END
+    )
+    assert refusal(locked) == "computed-field"
+    simple = p(
+        '<w:fldSimple w:instr=" PAGE " w:fldLock="1">' + r("<w:t>7</w:t>") + "</w:fldSimple>"
+    )
+    assert refusal(simple) == "computed-field"
+
+
+@pytest.mark.parametrize(
+    ("character", "code"),
+    [
+        ("\u202e", "format-character"),  # RIGHT-TO-LEFT OVERRIDE: "10\u202e9" draws "109" reversed
+        ("\u200b", "format-character"),
+        ("\u200e", "format-character"),
+        ("\ufeff", "format-character"),
+        ("\u00ad", "format-character"),  # Word writes a soft hyphen as w:softHyphen
+        ("\u0085", "format-character"),  # a C1 control
+        ("\ufe0f", "format-character"),  # a variation selector: default-ignorable
+        ("\U000e0041", "format-character"),
+        ("\u0378", "unassigned-character"),
+        ("\ufdd0", "unassigned-character"),
+    ],
+)
+def test_invisible_control_and_unassigned_characters_are_refused(character: str, code: str) -> None:
+    assert refusal(p(r(f"<w:t>10{character}9 mg</w:t>"))) == code
+
+
+def test_the_ignorable_table_is_the_epi_readers() -> None:
+    from label_docx import epi, reader
+
+    assert reader.DEFAULT_IGNORABLE == epi.DEFAULT_IGNORABLE
+
+
+def test_a_hidden_inline_picture_is_refused() -> None:
+    # Word does not draw it: an additional-monitoring triangle that is hidden is not there.
+    hidden = PICTURE.replace("<a:graphic ", "<wp:docPr id='1' name='p' hidden='1'/><a:graphic ")
+    assert refusal(p(r("<w:t>a</w:t>") + r(hidden))) == "unsupported-element"
+    shown = PICTURE.replace("<a:graphic ", "<wp:docPr id='1' name='p' hidden='0'/><a:graphic ")
+    assert text_of(p(r(shown))) == ["\ufffc"]
+
+
+@pytest.mark.parametrize("where", ["rPr", "pPr"])
+def test_properties_in_an_unknown_namespace_are_refused(where: str) -> None:
+    unknown = '<x:hide xmlns:x="urn:x"/>'
+    body = p(r("<w:t>a</w:t>", unknown)) if where == "rPr" else p(r("<w:t>a</w:t>"), unknown)
+    assert refusal(body) == "unsupported-element"
+    # Word's own extensions (w14 and later) are known to it and change no text.
+    w14 = '<w14:ligatures xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"/>'
+    body = p(r("<w:t>a</w:t>", w14)) if where == "rPr" else p(r("<w:t>a</w:t>"), w14)
+    assert text_of(body) == ["a"]

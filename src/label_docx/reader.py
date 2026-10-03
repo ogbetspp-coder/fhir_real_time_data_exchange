@@ -76,26 +76,31 @@ Fields keep their stored result and drop their instruction, however deeply neste
 are read: HYPERLINK, DOCPROPERTY and TOC (a table of contents, whose entries Word prints as stored
 until someone updates it). Page numbers (PAGEREF, as in a table of contents' entries, PAGE,
 NUMPAGES, SECTIONPAGES) Word sets from the page layout when it prints; their stored text is left out
-of ``text`` and their place recorded in ``pages``. SEQ (caption numbers), STYLEREF (a heading's
-number or text), REF (a cross-reference: a bookmark's text) and NOTEREF (the mark of the note a
-bookmark holds) Word shows as stored but recomputes when it prints or saves as PDF, so the reader
-computes them as Word does and reads them only where the stored result is the computed one;
-otherwise screen and print disagree, and the document is refused (``stale-field``). A REF or NOTEREF
-to a bookmark that is not there (Word prints an error), that runs across paragraphs, or over a note
-mark (REF) is refused. SEQ counts each identifier in document order: one more than the last, ``\r``
-n sets the count, ``\c`` repeats it, ``\h`` counts and shows nothing, ``\s`` n restarts it after any
+of ``text`` and their place recorded in ``pages``. Only the switches Word has answered are placed
+(PAGEREF's ``\h``, and ``\*`` MERGEFORMAT, CHARFORMAT or Arabic; ``\p`` shows "above", ``\#`` a
+picture's text), a PAGEREF only to a bookmark REF could read, and never a locked one (``fldLock``),
+whose stored text Word shows. SEQ (caption numbers), STYLEREF (a heading's number or text), REF (a
+cross-reference: a bookmark's text) and NOTEREF (the mark of the note a bookmark holds) Word shows
+as stored but recomputes when it prints or saves as PDF, so the reader computes them as Word does
+and reads them only where the stored result is the computed one; otherwise screen and print
+disagree, and the document is refused (``stale-field``). A REF or NOTEREF to a bookmark that is not
+there (Word prints an error), that runs across paragraphs, or over a note mark (REF) is refused;
+NOTEREF counts only a note mark between the bookmark's start and end, not one next to it (Word
+prints an error). SEQ counts each identifier in document order: one more than the last, ``\r`` n
+sets the count, ``\c`` repeats it, ``\h`` counts and shows nothing, ``\s`` n restarts it after any
 paragraph in a built-in style "heading 1" to "heading n" (Word goes by the style's name, not its
 outline level), and ``\*`` shows it in ARABIC, ROMAN, roman, ALPHABETIC or alphabetic. STYLEREF
 finds the nearest paragraph of the style (a number n is "heading n") before the field, else after
 it, and shows its text, or with ``\s`` its list label without the final period. Each rule is Word's
-answer to a case in ``corpus/numbering-cases``. Other switches, a SEQ or STYLEREF in a note or
-nested in another field's code, and a result that runs past its paragraph are refused. Any other
-field whose result would be shown (DATE, IF, a formula...) is refused, because Word recomputes it on
-display or print. The code is the first word of the instruction; a field nested in the instruction
-ahead of or inside that word makes the code unknown, and the field is refused. So are a field with
-no stored result (no ``separate``, such as a form checkbox or a SYMBOL field, or an empty
-``fldSimple``), a form field, a field marked for update, any field in a document whose settings ask
-Word to update fields on open, and field code outside an instruction.
+answer to a case in ``corpus/numbering-cases``. Other switches, a SEQ or STYLEREF in a note, any of
+the four with a field in its own code or nested in another field's code, and a result that runs past
+its paragraph are refused. Any other field whose result would be shown (DATE, IF, a formula...) is
+refused, because Word recomputes it on display or print. The code is the first word of the
+instruction; a field nested in the instruction ahead of or inside that word makes the code unknown,
+and the field is refused. So are a field with no stored result (no ``separate``, such as a form
+checkbox or a SYMBOL field, or an empty ``fldSimple``), a form field, a field marked for update, any
+field in a document whose settings ask Word to update fields on open, and field code outside an
+instruction.
 
 List labels. Word draws "4.8", "b)" or a bullet before a numbered paragraph from the numbering
 part; the reader computes that label by Word's rules, each of which is Word's own answer to a case
@@ -137,25 +142,33 @@ What it refuses (``DocxRefusedError.code``):
 - ``tracked-change``: any revision, in the body, a note, a header, a footer, a comment, a style
   or a list. Such a document has more than one text: ``tracked`` makes its two views, each read
   by these rules, and refuses what it cannot undo (see ``tracked``).
-- ``hidden-text``: a run with text, or a note mark, that is hidden, directly or at any level of
-  the style hierarchy (hiding is treated as a fact as soon as any level asserts it, unless the
-  run itself says it is visible).
+- ``hidden-text``: a run with text, a note mark or a comment mark that is hidden, directly or at
+  any level of the style hierarchy (hiding is treated as a fact as soon as any level asserts it,
+  unless the run itself says it is visible).
 - ``unmapped-symbol``: a Symbol-font code the table does not hold, a malformed code, or a symbol
   in any other font.
 - ``symbol-font``: text in a dingbat font, or a Symbol font the reader cannot place.
 - ``private-use-character``: a private-use code point outside a Symbol-font run.
+- ``format-character``: in ``<w:t>``, an invisible formatting character (category Cf: zero-width
+  characters, bidirectional controls, a soft hyphen, which Word writes as ``w:softHyphen``), any
+  other code point Unicode says to ignore (Default_Ignorable_Code_Point, as the ePI reader), or a
+  C1 control.
+- ``unassigned-character``: in ``<w:t>``, a code point Unicode 16.0 does not assign (Cn).
 - ``reserved-character``: U+FFFC in ``<w:t>``, which the reader uses for a picture.
 - ``unpreserved-whitespace``: ``<w:t>`` text with leading or trailing spaces without
   ``xml:space="preserve"`` (a consumer may drop them), or a tab or line break inside ``<w:t>``
   (Word writes those as elements).
-- ``unbalanced-field``: a paragraph that ends inside a field instruction.
+- ``unbalanced-field``: a paragraph that ends inside a field instruction, or a field character out
+  of place: a second separator, a separator or end with no field open, or an unknown kind.
 - ``field-without-result``: a field with no stored result, but a hidden SEQ (``\h``).
 - ``computed-field``: a shown field whose value Word computes rather than stores, or any field
   in a document set to update fields on open.
 - ``stale-field``: a field marked for update, or a SEQ or STYLEREF field whose stored result is
   not what Word prints.
 - ``unsupported-element``: anything that can carry text and is not read above, and any element
-  the reader does not know: text boxes, a note mark in a field code or inside a note, a note's
+  the reader does not know: text boxes, a note or comment mark in a field code, a note mark
+  inside a note, a hidden picture in line (``wp:docPr hidden``), a run or paragraph property in
+  a namespace that is neither WordprocessingML nor one of Word's extensions (w14 on), a note's
   echo of its mark outside that note, embedded objects, charts and other non-picture drawings,
   alternate content, math, ``altChunk``, form fields, alternate content in the styles, theme,
   font table, settings or lists (but a list level's own child), content marked for markup
@@ -212,6 +225,7 @@ import io
 import itertools
 import posixpath
 import re
+import unicodedata
 import xml.etree.ElementTree as ET
 import zipfile
 from collections.abc import Iterator
@@ -307,6 +321,31 @@ WINGDINGS_BULLETS: dict[int, str] = {
 # Symbol but the exact one, and symbol-encoded fonts Word ships (Bookshelf Symbol 7, Monotype
 # Sorts...), refused even where no font table declares them.
 _DINGBAT_FONTS = ("wingdings", "webdings", "dingbat", "marlett", "mtextra", "symbol", "sorts")
+
+# Unicode's Default_Ignorable_Code_Point (Unicode 16.0, DerivedCoreProperties.txt): code points
+# drawn as nothing. The ePI reader's table (epi.DEFAULT_IGNORABLE), kept equal by a test.
+DEFAULT_IGNORABLE = (
+    (0x00AD, 0x00AD),
+    (0x034F, 0x034F),
+    (0x061C, 0x061C),
+    (0x115F, 0x1160),
+    (0x17B4, 0x17B5),
+    (0x180B, 0x180F),
+    (0x200B, 0x200F),
+    (0x202A, 0x202E),
+    (0x2060, 0x206F),
+    (0x3164, 0x3164),
+    (0xFE00, 0xFE0F),
+    (0xFEFF, 0xFEFF),
+    (0xFFA0, 0xFFA0),
+    (0xFFF0, 0xFFF8),
+    (0x1BCA0, 0x1BCA3),
+    (0x1D173, 0x1D17A),
+    (0xE0000, 0xE0FFF),
+)
+_IGNORABLE = frozenset(code for low, high in DEFAULT_IGNORABLE for code in range(low, high + 1))
+# Word's own extensions (w14 and later): namespaces Word knows, whose properties change no text.
+_WORD_EXTENSIONS = "{http://schemas.microsoft.com/office/word/"
 
 _TRACKED = {
     _w(name)
@@ -662,6 +701,13 @@ class _Package:
                 # Content a consumer must process or understand by rules the reader does not
                 # apply (ECMA-376 Part 3).
                 raise DocxRefusedError("unsupported-element", f"{name}: markup compatibility")
+
+            if element.tag in (_w("rPr"), _w("pPr")) and any(
+                not c.tag.startswith((f"{{{W}}}", _WORD_EXTENSIONS)) for c in element
+            ):
+                # A property Word does not know could hide or change the text; Word does not
+                # open a document with one it must understand.
+                raise DocxRefusedError("unsupported-element", f"an unknown property in {name}")
             stack.extend((child, depth + 1) for child in element)
         self.parsed[name] = root
         return root
@@ -1149,6 +1195,12 @@ def _characters(text: str, symbol: bool) -> str:
             raise DocxRefusedError("private-use-character", f"U+{code:04X}")
         elif character == OBJECT:
             raise DocxRefusedError("reserved-character", "U+FFFC stands for a picture")
+        elif unicodedata.category(character) in ("Cf", "Cc") or code in _IGNORABLE:
+            # Drawn as nothing, or reordering what is drawn around it (a bidirectional control),
+            # or a control drawn as a blank or a box; Word writes a soft hyphen as w:softHyphen.
+            raise DocxRefusedError("format-character", f"U+{code:04X}")
+        elif unicodedata.category(character) == "Cn":
+            raise DocxRefusedError("unassigned-character", f"U+{code:04X}")
         else:
             out.append(character)
     return "".join(out)
@@ -1187,6 +1239,10 @@ def _placed(drawing: ET.Element) -> str:
     """
     frames = [c.tag for c in drawing]
     if frames == [f"{{{WP}}}inline"]:
+        properties = drawing[0].find(f"{{{WP}}}docPr")
+        if properties is not None and properties.get("hidden") in ("1", "true"):
+            # Not drawn; whether Word's text shows it is not on record.
+            raise DocxRefusedError("unsupported-element", "a hidden drawing")
         return OBJECT
     if frames == [f"{{{WP}}}anchor"]:
         return ""
@@ -1273,8 +1329,11 @@ class _ParagraphReader:
         table_style: str | None,
         runs: set[ET.Element],
         story: tuple[str, int] | None,
+        carried: int = 0,
     ) -> None:
         self.styles = styles
+        # Fields an earlier paragraph left open in their results, which an end here may close.
+        self.carried = carried
         self.paragraph_style = paragraph_style
         self.table_style = table_style
         # Every run read, shared across the body, for the accounting in read_docx.
@@ -1297,9 +1356,13 @@ class _ParagraphReader:
         self.pages: list[int] = []
         self.layout = 0
         self.layout_open: list[bool] = []
-        # Bookmark starts (id, name, offset) and ends (id, offset), for REF and NOTEREF.
-        self.bookmark_starts: list[tuple[str, str, int]] = []
-        self.bookmark_ends: list[tuple[str, int]] = []
+        # Whether each open field is locked (fldLock): Word does not update it.
+        self.locked: list[bool] = []
+        # Bookmark starts (id, name, offset) and ends (id, offset), for REF and NOTEREF, each
+        # with the number of note marks before it: a mark has no width, so its offset alone
+        # cannot tell inside a bookmark from next to it.
+        self.bookmark_starts: list[tuple[str, str, int, int]] = []
+        self.bookmark_ends: list[tuple[str, int, int]] = []
         self.parts: list[str] = []
         self.length = 0
         self.marks: list[Mark] = []
@@ -1323,8 +1386,8 @@ class _ParagraphReader:
                 if child.get(_w("dirty")) in ("1", "true", "on"):
                     raise DocxRefusedError("stale-field", "a field marked for update")
                 instruction = child.get(_w("instr"), "")
-                code = None if self.in_instruction() else _check_field(instruction)
                 before = self.length
+                code = self._shown(instruction, self.in_instruction(), _locked(child), before)
                 if code in _LAYOUT_FIELDS and not self.layout:
                     self.pages.append(self.length)
                     self.layout += 1
@@ -1350,10 +1413,15 @@ class _ParagraphReader:
                     self.container(content)
             elif tag == _w("bookmarkStart"):
                 self.bookmark_starts.append(
-                    (child.get(_w("id"), ""), child.get(_w("name"), ""), self.length)
+                    (
+                        child.get(_w("id"), ""),
+                        child.get(_w("name"), ""),
+                        self.length,
+                        len(self.notes),
+                    )
                 )
             elif tag == _w("bookmarkEnd"):
-                self.bookmark_ends.append((child.get(_w("id"), ""), self.length))
+                self.bookmark_ends.append((child.get(_w("id"), ""), self.length, len(self.notes)))
             elif tag in _PROPERTIES or tag in _MARKERS:
                 continue
             else:
@@ -1365,7 +1433,14 @@ class _ParagraphReader:
             self.styles, run.find(_w("rPr")), self.paragraph_style, self.table_style
         )
         symbol = _in_symbol(self.styles, properties, self.table_style)
+        # A hidden run's text is whitespace (or refused) and dropped, so a mark or field
+        # character in it stands where the run starts.
+        hidden = properties.toggle("vanish")
         emitted: list[str] = []
+
+        def here() -> int:
+            return self.length if hidden else self.length + sum(len(part) for part in emitted)
+
         # Page-number text, left out of the text but still drawn: it must not be hidden.
         placed: list[str] = []
         references: list[NoteReference] = []
@@ -1375,9 +1450,12 @@ class _ParagraphReader:
             if tag == _w("commentReference"):
                 if self.story is not None and self.story[0] == "comment":
                     raise DocxRefusedError("unsupported-element", "a comment mark in a comment")
-                offset = self.length + sum(len(part) for part in emitted)
+                if self.in_instruction():
+                    raise DocxRefusedError("unsupported-element", "a comment mark in a field code")
+                if hidden:
+                    raise DocxRefusedError("hidden-text", "a hidden comment mark")
                 comments.append(
-                    CommentReference(offset, _int(child.get(_w("id"), ""), "comment id"))
+                    CommentReference(here(), _int(child.get(_w("id"), ""), "comment id"))
                 )
                 continue
             if tag == _w("annotationRef"):
@@ -1388,11 +1466,10 @@ class _ParagraphReader:
             if tag in _NOTE_REFERENCES:
                 if self.in_instruction():
                     raise DocxRefusedError("unsupported-element", "a note mark in a field code")
-                offset = self.length + sum(len(part) for part in emitted)
-                references.append(self._note(child, offset))
+                references.append(self._note(child, here()))
                 continue
             if tag == _w("fldChar"):
-                self._field(child, self.length + sum(len(part) for part in emitted))
+                self._field(child, here())
                 continue
             if tag == _w("instrText"):
                 if not (self.fields and self.fields[-1]):
@@ -1413,15 +1490,15 @@ class _ParagraphReader:
             elif self.fields[-1]:
                 self.instructions[-1].append(produced)
         text = "".join(emitted)
-        if references and properties.toggle("vanish"):
+        if references and hidden:
             raise DocxRefusedError("hidden-text", "a hidden note mark")
-        if "".join(placed).strip() and properties.toggle("vanish"):
+        if "".join(placed).strip() and hidden:
             raise DocxRefusedError("hidden-text", "a hidden page number")
         self.notes += references
         self.comments += comments
         if not text:
             return
-        if properties.toggle("vanish"):
+        if hidden:
             if text.strip():
                 raise DocxRefusedError("hidden-text", "a hidden run carries text")
             return
@@ -1463,10 +1540,12 @@ class _ParagraphReader:
             self.instructions.append([])
             self.results.append(None)
             self.layout_open.append(False)
-        elif kind == "separate" and self.fields:
+            self.locked.append(_locked(child))
+        elif kind == "separate" and self.fields and self.fields[-1]:
             # The result is shown, so it must be one Word shows as stored, one the reader
             # computes and checks, or a page number.
-            code = None if any(self.fields[:-1]) else _check_field("".join(self.instructions[-1]))
+            instruction = "".join(self.instructions[-1])
+            code = self._shown(instruction, any(self.fields[:-1]), self.locked[-1], offset)
             if code in _COMPUTED_FIELDS:
                 self.results[-1] = offset
             elif code in _LAYOUT_FIELDS and not self.layout:
@@ -1474,6 +1553,8 @@ class _ParagraphReader:
                 self.layout += 1
                 self.layout_open[-1] = True
             self.fields[-1] = False
+        elif kind == "end" and not self.fields and self.carried:
+            self.carried -= 1
         elif kind == "end" and self.fields:
             if self.fields[-1]:
                 # No separate: the field stores no result, and what Word shows is computed. A
@@ -1483,6 +1564,7 @@ class _ParagraphReader:
                 words = instruction.upper().split()
                 if any(self.fields[:-1]) or words[:1] != ["SEQ"] or "\\H" not in words:
                     raise DocxRefusedError("field-without-result", "a field with no stored result")
+                _check_field(instruction)
                 self.results[-1] = offset
                 self.fields[-1] = False
             start = self.results.pop()
@@ -1492,6 +1574,29 @@ class _ParagraphReader:
                 self.layout -= 1
             self.fields.pop()
             self.instructions.pop()
+            self.locked.pop()
+        else:
+            # A second separator would show text no check covers; a stray one, or a kind Word
+            # does not write, leaves the field's extent unknown.
+            raise DocxRefusedError("unbalanced-field", f"a field character {kind!r} out of place")
+
+    def _shown(self, instruction: str, nested: bool, locked: bool, offset: int) -> str | None:
+        """The code of a field whose result is shown, or None for one in another field's code.
+
+        A field in another's code shows nothing, so one the reader computes there would go
+        uncounted and is refused. A PAGEREF's bookmark is checked with the computed fields.
+        """
+        if nested:
+            if _code(instruction) in _COMPUTED_FIELDS:
+                raise DocxRefusedError("computed-field", "a computed field in another field's code")
+            return None
+        code = _check_field(instruction)
+        if locked and code in _LAYOUT_FIELDS:
+            # Word shows a locked field's stored text; what it prints is not on record.
+            raise DocxRefusedError("computed-field", f"a locked {code} field")
+        if code == "PAGEREF":
+            self.computed.append((instruction, offset, offset))
+        return code
 
     def _special(self, child: ET.Element) -> str:
         tag = child.tag
@@ -1625,12 +1730,33 @@ _LAYOUT_FIELDS = {"PAGEREF", "PAGE", "NUMPAGES", "SECTIONPAGES"}
 _COMPUTED_FIELDS = {"SEQ", "STYLEREF", "REF", "NOTEREF"}
 
 
-def _check_field(instruction: str) -> str:
-    """The field's code, if its result is one the reader can vouch for; refused otherwise."""
+def _code(instruction: str) -> str:
     words = instruction.split()
-    code = words[0].upper() if words else ""
+    return words[0].upper() if words else ""
+
+
+def _locked(element: ET.Element) -> bool:
+    return element.get(_w("fldLock")) in ("1", "true", "on")
+
+
+def _check_field(instruction: str) -> str:
+    r"""The field's code, if its result is one the reader can vouch for; refused otherwise.
+
+    A field nested in the code of one the reader computes or places (a NUL stands for it) makes
+    its arguments unknown. A page number is placed only with the switches Word has answered:
+    PAGEREF's ``\h``, and ``\*`` MERGEFORMAT, CHARFORMAT or Arabic; ``\p`` shows "above" or
+    "below", ``\#`` a picture's text and other formats words.
+    """
+    code = _code(instruction)
     if code not in _STORED_FIELDS | _COMPUTED_FIELDS | _LAYOUT_FIELDS:
         raise DocxRefusedError("computed-field", f"a {code or 'blank'} field")
+    if code in _COMPUTED_FIELDS | _LAYOUT_FIELDS and "\x00" in instruction:
+        raise DocxRefusedError("computed-field", f"a {code} field with a field in its code")
+    if code in _LAYOUT_FIELDS:
+        flags = {"h"} if code == "PAGEREF" else set()
+        arguments, switches = _switches(_tokens(instruction)[1:], set(), flags)
+        if len(arguments) != (code == "PAGEREF") or switches.get("*", "ARABIC").upper() != "ARABIC":
+            raise DocxRefusedError("computed-field", f"a {code} field the reader cannot place")
     return code
 
 
@@ -1688,15 +1814,18 @@ class _Context:
     # notes whose marks are custom.
     section: int = 0
     custom: frozenset[tuple[str, int]] = frozenset()
-    # The fields the reader computes: instruction, and the stored result's start and end in text.
+    # The fields the reader computes, and PAGEREFs: instruction, and the stored result's start
+    # and end in text (a PAGEREF's result is set aside: both are its place).
     fields: tuple[tuple[str, int, int], ...] = ()
-    # Bookmark starts (id, name, offset) and ends (id, offset) in the paragraph.
-    bookmark_starts: tuple[tuple[str, str, int], ...] = ()
-    bookmark_ends: tuple[tuple[str, int], ...] = ()
+    # Bookmark starts (id, name, offset, notes before) and ends (id, offset, notes before).
+    bookmark_starts: tuple[tuple[str, str, int, int], ...] = ()
+    bookmark_ends: tuple[tuple[str, int, int], ...] = ()
     # Whether any of its characters is read through the Symbol table.
     symbolic: bool = False
     # How many table rows, in any table, ended before the paragraph in its story.
     rows_ended: int = 0
+    # How many fields are open in their results when the paragraph ends (a table of contents).
+    fields_open: int = 0
 
 
 def _paragraph(
@@ -1707,6 +1836,7 @@ def _paragraph(
     runs: set[ET.Element],
     story: tuple[str, int] | None = None,
     section: int = 0,
+    carried: int = 0,
 ) -> tuple[Paragraph, _Context]:
     ppr = element.find(_w("pPr"))
     style = None
@@ -1716,7 +1846,7 @@ def _paragraph(
     mark_rpr = ppr.find(_w("rPr")) if ppr is not None else None
     mark = _Properties(styles, mark_rpr, style, table_style)
     mark_hidden = mark.toggle("vanish") or mark.toggle("specVanish")
-    reader = _ParagraphReader(styles, style, table_style, runs, story)
+    reader = _ParagraphReader(styles, style, table_style, runs, story, carried)
     reader.container(element)
     if reader.in_instruction():
         raise DocxRefusedError("unbalanced-field", "a paragraph ends inside a field instruction")
@@ -1748,6 +1878,7 @@ def _paragraph(
         fields=tuple(reader.computed),
         bookmark_starts=tuple(reader.bookmark_starts),
         bookmark_ends=tuple(reader.bookmark_ends),
+        fields_open=reader.carried + len(reader.fields),
     )
     return Paragraph(
         text="".join(reader.parts),
@@ -2411,7 +2542,7 @@ def _read_notes(
         _check_accounted(element, reader.runs)
         if any(c.fields for c in reader.contexts):
             # Whether Word counts a SEQ in a note with the body's is not yet on record.
-            raise DocxRefusedError("computed-field", f"a SEQ or STYLEREF field in a {kind}")
+            raise DocxRefusedError("computed-field", f"a computed field or PAGEREF in a {kind}")
         if any(p.numbering is not None and p.numbering.num_id for p in reader.out):
             # Whether a list in a note counts with the body's lists is not yet on record.
             raise _refuse_numbering(f"a list in a {kind}")
@@ -2499,6 +2630,14 @@ def _verify_fields(
         for instruction, start, end in context.fields:
             tokens = _tokens(instruction)
             code = tokens[0].upper()
+            if code == "PAGEREF":
+                # A bookmark REF could read; Word's print of one it cannot find is not on record.
+                (name,), _ = _switches(tokens[1:], set(), {"h"})
+                if bookmarks.get(name) is None:
+                    raise DocxRefusedError(
+                        "computed-field", "a PAGEREF to a bookmark it cannot read"
+                    )
+                continue
             if code == "SEQ":
                 shown = _seq(tokens[1:], index, counted, levels)
             elif code == "STYLEREF":
@@ -2512,32 +2651,32 @@ def _verify_fields(
                 )
 
 
-def _bookmarks(contexts: list[_Context], loose: set[str]) -> dict[str, tuple[int, int, int] | None]:
-    """Each bookmark's paragraph, start and end; None for one REF cannot be read from.
+type _Span = tuple[int, int, int, slice]
+
+
+def _bookmarks(contexts: list[_Context], loose: set[str]) -> dict[str, _Span | None]:
+    """Each bookmark's paragraph, start, end and the notes it holds; None for one REF cannot read.
 
     That is one that starts and ends in different paragraphs or between them, has no end, or
     shares its name with another.
     """
-    starts: dict[str, tuple[str, int, int]] = {}
-    ends: dict[str, tuple[int, int]] = {}
+    starts: dict[str, tuple[str, int, int, int]] = {}
+    ends: dict[str, tuple[int, int, int]] = {}
     for index, context in enumerate(contexts):
-        for key, name, offset in context.bookmark_starts:
-            starts[key] = (name, index, offset)
-        for key, offset in context.bookmark_ends:
-            ends[key] = (index, offset)
-    spans: dict[str, tuple[int, int, int] | None] = {}
-    for key, (name, index, start) in starts.items():
+        for key, name, offset, notes in context.bookmark_starts:
+            starts[key] = (name, index, offset, notes)
+        for key, offset, notes in context.bookmark_ends:
+            ends[key] = (index, offset, notes)
+    spans: dict[str, _Span | None] = {}
+    for key, (name, index, start, first) in starts.items():
         end = ends.get(key)
         whole = key not in loose and end is not None and end[0] == index and name not in spans
-        spans[name] = (index, start, end[1]) if whole and end is not None else None
+        spans[name] = (index, start, end[1], slice(first, end[2])) if whole and end else None
     return spans
 
 
 def _reference(
-    code: str,
-    tokens: list[str],
-    paragraphs: list[Paragraph],
-    bookmarks: dict[str, tuple[int, int, int] | None],
+    code: str, tokens: list[str], paragraphs: list[Paragraph], bookmarks: dict[str, _Span | None]
 ) -> str:
     """What REF (the bookmark's text) or NOTEREF (its note's mark) prints."""
     arguments, switches = _switches(tokens, set(), {"h", "f"} if code == "NOTEREF" else {"h"})
@@ -2550,11 +2689,13 @@ def _reference(
     span = bookmarks[name]
     if span is None:
         raise DocxRefusedError("computed-field", f"a {code} to a bookmark it cannot read")
-    index, start, end = span
+    index, start, end, held = span
     paragraph = paragraphs[index]
     inside = [n for n in paragraph.notes if start <= n.offset <= end]
     if code == "NOTEREF":
-        # The mark of the note referred to in the bookmark [fields-noteref].
+        # The mark of the note referred to in the bookmark [fields-noteref]: one between its
+        # start and end, not one next to it (Word prints an error for that).
+        inside = list(paragraph.notes[held])
         if len(inside) != 1 or inside[0].mark is None:
             raise DocxRefusedError("computed-field", "a NOTEREF to a bookmark without one note")
         return inside[0].mark
@@ -2672,6 +2813,7 @@ class _Body:
                     self.runs,
                     self.story,
                     len(self.sections),
+                    self.contexts[-1].fields_open if self.contexts else 0,
                 )
                 self.out.append(paragraph)
                 self.contexts.append(replace(context, rows_ended=self.rows_ended))
@@ -2942,7 +3084,7 @@ def _read_blocks(
     reader.blocks(root, None, None)
     _check_accounted(root, reader.runs)
     if any(c.fields for c in reader.contexts):
-        raise DocxRefusedError("computed-field", f"a SEQ, STYLEREF or REF field in a {story[0]}")
+        raise DocxRefusedError("computed-field", f"a computed field or PAGEREF in a {story[0]}")
     if any(p.numbering is not None and p.numbering.num_id for p in reader.out):
         raise _refuse_numbering(f"a list in a {story[0]}")
     return tuple(reader.out)

@@ -349,3 +349,45 @@ def test_the_check_never_reads_a_comment_mark_inside_a_comment() -> None:
     value["refusedParts"] = 0
     with pytest.raises(CertificationError):
         source.certify(value)
+
+
+_FIELD_CODE = r('<w:fldChar w:fldCharType="begin"/>') + r(
+    '<w:instrText xml:space="preserve"> DOCPROPERTY Title </w:instrText>'
+)
+_FIELD_REST = (
+    r('<w:fldChar w:fldCharType="separate"/>')
+    + r("<w:t>T</w:t>")
+    + r('<w:fldChar w:fldCharType="end"/>')
+)
+_NOTE = '<w:footnote w:id="1"><w:p><w:r><w:t>n</w:t></w:r></w:p></w:footnote>'
+
+
+@pytest.mark.parametrize(
+    ("mark", "code"),
+    [
+        (r('<w:commentReference w:id="0"/>', "<w:vanish/>"), "hidden-text"),
+        (_FIELD_CODE + r('<w:commentReference w:id="0"/>') + _FIELD_REST, "unsupported-element"),
+    ],
+    ids=["hidden", "in-a-field-code"],
+)
+def test_a_hidden_comment_mark_or_one_in_a_field_code_is_refused(mark: str, code: str) -> None:
+    # Whether and where Word draws it there is not on record.
+    with pytest.raises(DocxRefusedError) as caught:
+        read_document(_commented(p(r("<w:t>a</w:t>") + mark)))
+    assert caught.value.code == code
+
+
+@pytest.mark.parametrize("comment", [True, False], ids=["comment", "note"])
+@pytest.mark.parametrize("in_code", [True, False], ids=["in-a-field-code", "hidden"])
+def test_the_check_never_places_a_mark_hidden_or_in_a_field_code(
+    comment: bool, in_code: bool
+) -> None:
+    mark = '<w:commentReference w:id="0"/>' if comment else '<w:footnoteReference w:id="1"/>'
+    run = _FIELD_CODE + r(mark) + _FIELD_REST if in_code else r(mark, "<w:vanish/>")
+    body = p(r("<w:t>a</w:t>") + run)
+    data = _commented(body) if comment else docx(body, footnotes=_NOTE)
+    with pytest.raises(CertificationError):
+        DocxSource(data)
+    # The same mark shown and outside the code is placed.
+    shown = p(r("<w:t>a</w:t>") + r(mark))
+    DocxSource(_commented(shown) if comment else docx(shown, footnotes=_NOTE))

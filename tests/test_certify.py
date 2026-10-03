@@ -869,6 +869,37 @@ def test_each_page_number_field_is_set_aside_and_placed(code: str) -> None:
         DocxSource(data).certify(_value("p12"))
 
 
+@pytest.mark.parametrize(
+    ("code", "placed"),
+    [
+        ("PAGEREF \\h _Toc1", True),
+        ("PAGE \\* Arabic \\* MERGEFORMAT", True),
+        ("NUMPAGES \\* charformat", True),
+        ("PAGEREF _Ref1 \\p \\h", False),
+        ("PAGEREF \\p _Ref1", False),
+        ("PAGEREF \\h", False),
+        ("PAGE \\# 0", False),
+        ("PAGE \\* CardText", False),
+        ("PAGE \\*", False),
+        ("PAGE x", False),
+    ],
+)
+def test_a_page_field_with_a_switch_word_has_not_answered_is_never_certified(
+    code: str, placed: bool
+) -> None:
+    body = _p("<w:r><w:t>p</w:t></w:r>" + _field(code, "5"))
+    simple = _p(f'<w:r><w:t>p</w:t></w:r><w:fldSimple w:instr=" {code} ">{_RESULT}</w:fldSimple>')
+    for data in (docx(body), docx(simple)):
+        if placed:
+            DocxSource(data).certify(_value({"text": "p", "pages": [1]}))
+        else:
+            with pytest.raises(CertificationError):
+                DocxSource(data)
+
+
+_RESULT = "<w:r><w:t>5</w:t></w:r>"
+
+
 def test_a_field_in_another_fields_code_is_code() -> None:
     nested = (
         '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
@@ -896,6 +927,9 @@ def test_a_field_in_another_fields_code_is_code() -> None:
         '<w:fldChar w:fldCharType="begin"/><w:fldChar w:fldCharType="separate"/>'
         "<w:instrText>X</w:instrText>",
         '<w:sym w:font="Symbol"/>',
+        '<w:fldChar w:fldCharType="begin"/><w:instrText> SEQ Table </w:instrText>'
+        '<w:fldChar w:fldCharType="separate"/><w:t>WRONG</w:t>'
+        '<w:fldChar w:fldCharType="separate"/><w:t>1</w:t><w:fldChar w:fldCharType="end"/>',
     ],
     ids=[
         "code-outside-a-field",
@@ -903,6 +937,7 @@ def test_a_field_in_another_fields_code_is_code() -> None:
         "unknown-kind",
         "code-in-a-result",
         "sym-without-code",
+        "separate-twice",
     ],
 )
 def test_field_characters_out_of_place_are_never_certified(run: str) -> None:

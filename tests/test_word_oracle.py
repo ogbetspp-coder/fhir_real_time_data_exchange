@@ -30,7 +30,7 @@ from label_docx.word import (
     text_verdict,
     verdict,
 )
-from test_reader import docx
+from test_reader import _field, _marked, docx, p, r
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 RECORDS = sorted(CORPUS.glob("*/word.json"))
@@ -339,3 +339,16 @@ def test_the_reader_reads_the_body_text_word_shows(path: Path, word: list[str]) 
         assert result == f"reader refuses: {REFUSED[key]}"
     else:
         assert result == "agrees"
+
+
+def test_a_page_place_agrees_only_with_a_page_number(tmp_path: Path) -> None:
+    path = tmp_path / "a.docx"
+    see = r('<w:t xml:space="preserve">See page </w:t>') + _field("PAGEREF _Ref1 \\h", "12")
+    path.write_bytes(
+        docx(p(_marked("_Ref1", r("<w:t>Table 1</w:t>"))) + p(see + r("<w:t>.</w:t>")))
+    )
+    for page in ("12", "xiv", "IV"):
+        assert text_verdict(["Table 1", f"See page {page}."], path) == "agrees"
+    # PAGEREF \\p shows "above" or "below", which is not a page number.
+    for words in ("above", "belowXYZ", "five"):
+        assert text_verdict(["Table 1", f"See page {words}."], path).startswith("differs")
