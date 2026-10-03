@@ -848,8 +848,16 @@ def test_paragraph_shading_and_right_to_left_cover_the_paragraph() -> None:
     assert _kinds(p(r("<w:t>ab</w:t>"), '<w:pStyle w:val="Grey"/>'), styles) == [
         (0, 2, "shading-D9D9D9")
     ]
-    assert _kinds(p('<w:bdo w:val="rtl">' + r("<w:t>ab</w:t>") + "</w:bdo>")) == [(0, 2, "rtl")]
+    assert _kinds(p('<w:dir w:val="rtl">' + r("<w:t>ab</w:t>") + "</w:dir>")) == [(0, 2, "rtl")]
     assert _kinds(p(r("<w:t>ab</w:t>", "<w:rtl/>"))) == [(0, 2, "rtl")]
+
+
+def test_paragraph_marks_merge_with_run_marks_of_the_same_kind() -> None:
+    # One kind's marks are merged where they overlap or touch, as the Mark contract says.
+    shaded = '<w:shd w:val="clear" w:fill="D9D9D9"/>'
+    text = r('<w:t xml:space="preserve">Text </w:t>')
+    body = p(text + r("<w:t>(4)</w:t>", shaded + "<w:rtl/>"), shaded + "<w:bidi/>")
+    assert _kinds(body) == [(0, 8, "rtl"), (0, 8, "shading-D9D9D9")]
 
 
 @pytest.mark.parametrize(
@@ -1608,7 +1616,14 @@ def test_conditional_table_formatting_that_cannot_change_the_text_is_read() -> N
         '<w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="18"/><w:color w:val="1F497D"/>'
         '</w:rPr><w:tcPr><w:shd w:val="clear" w:fill="D9D9D9"/></w:tcPr>'
     )
-    assert text_of(_in_banded(r("<w:t>10</w:t>")), harmless) == ["10"]
+    # As in the ATMP template, the table turns its first row off (tblLook 0000), so Word
+    # shows no bold or italic there; with it on, or no look, it would (refused above).
+    off = _in_banded(r("<w:t>10</w:t>")).replace(
+        "</w:tblPr>", '<w:tblLook w:val="0000"/></w:tblPr>'
+    )
+    (paragraph,) = read_docx(docx(off, harmless))
+    assert (paragraph.text, paragraph.marks) == ("10", ())
+    assert refusal(_in_banded(r("<w:t>10</w:t>")), harmless) == "unsupported-element"
 
 
 @pytest.mark.parametrize(
@@ -1655,6 +1670,8 @@ def test_a_vml_picture_is_an_object_replacement_character() -> None:
         VML_PICTURE.replace(
             "<v:shape", '<v:group xmlns:v="urn:schemas-microsoft-com:vml"><v:shape'
         ).replace("</v:shape>", "</v:shape></v:group>"),
+        # An ActiveX control bound to the picture (a check box's caption, a text box's value).
+        VML_PICTURE.replace("</w:pict>", '<w:control xmlns:r="urn:r" r:id="rId9"/></w:pict>'),
     ],
 )
 def test_vml_that_holds_text_or_is_not_a_picture_is_refused(pict: str) -> None:
@@ -1977,3 +1994,359 @@ def test_document_defaults_turn_a_toggle_on_whatever_the_styles_give() -> None:
     assert "bold" in {m.kind for m in read_docx(docx(cancelled, styles))[0].marks}
     off = p(r("<w:t>x</w:t>", '<w:b w:val="0"/>'))
     assert "bold" not in {m.kind for m in read_docx(docx(off, styles))[0].marks}
+
+
+def _merged_away(inner: str) -> str:
+    """A table whose second row's cell is merged into the first's (vMerge continue)."""
+    return (
+        "<w:tbl><w:tr><w:tc><w:tcPr><w:vMerge w:val='restart'/></w:tcPr>"
+        + p(r("<w:t>top</w:t>"))
+        + "</w:tc></w:tr><w:tr><w:tc><w:tcPr><w:vMerge/></w:tcPr>"
+        + inner
+        + "</w:tc></w:tr></w:tbl>"
+    )
+
+
+@pytest.mark.parametrize(
+    "inner",
+    [
+        # Word draws "1.", "1.", "2.": the merged-away label is not drawn nor counted.
+        p("", '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="3"/></w:numPr>'),
+        p(r('<w:footnoteReference w:id="2"/>')),
+        p(r('<w:commentReference w:id="0"/>')),
+        p(r("<w:t>\u00a0</w:t>")),
+        p(r("<w:tab/>")),
+    ],
+    ids=["numbered", "note-mark", "comment-mark", "no-break-space", "tab"],
+)
+def test_anything_but_an_empty_unnumbered_paragraph_in_a_merged_away_cell_is_refused(
+    inner: str,
+) -> None:
+    body = p(r("<w:t>before</w:t>")) + _merged_away(inner) + p(r("<w:t>after</w:t>"))
+    footnotes = '<w:footnote w:id="2">' + p(r("<w:t>note</w:t>")) + "</w:footnote>"
+    with pytest.raises(DocxRefusedError) as caught:
+        read_document(docx(body, numbering=NUMBERING, footnotes=footnotes))
+    assert caught.value.code == "unsupported-element"
+    # An empty, unnumbered paragraph there is read: Word shows nothing for it either.
+    assert text_of(_merged_away(p(""))) == ["top", ""]
+
+
+def test_a_horizontally_merged_away_cell_is_read_as_its_own_cell() -> None:
+    # Word shows and prints the text of a legacy hMerge continue cell as its own paragraph.
+    body = (
+        "<w:tbl><w:tr><w:tc><w:tcPr><w:hMerge w:val='restart'/></w:tcPr>"
+        + p(r("<w:t>left</w:t>"))
+        + "</w:tc><w:tc><w:tcPr><w:hMerge/></w:tcPr>"
+        + p(r("<w:t>merged away</w:t>"))
+        + "</w:tc></w:tr></w:tbl>"
+        + p(r("<w:t>after</w:t>"))
+    )
+    assert [(x.text, x.table) for x in read_docx(docx(body))] == [
+        ("left", (0, 0, 0)),
+        ("merged away", (0, 0, 1)),
+        ("after", None),
+    ]
+
+
+_PLACEHOLDER = (
+    '<w:sdtPr><w:placeholder><w:docPart w:val="X"/></w:placeholder><w:showingPlcHdr/></w:sdtPr>'
+)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        p(
+            r('<w:t xml:space="preserve">Strength: </w:t>')
+            + f"<w:sdt>{_PLACEHOLDER}<w:sdtContent/></w:sdt>"
+        ),
+        p(r("<w:t>a</w:t>") + f"<w:sdt>{_PLACEHOLDER}<w:sdtContent><w:r/></w:sdtContent></w:sdt>"),
+        p(r("<w:t>a</w:t>") + f"<w:sdt>{_PLACEHOLDER}</w:sdt>"),
+        f"<w:sdt>{_PLACEHOLDER}<w:sdtContent><w:p/></w:sdtContent></w:sdt>"
+        + p(r("<w:t>after</w:t>")),
+    ],
+    ids=["inline-empty", "inline-empty-run", "inline-no-content", "block-empty-paragraph"],
+)
+def test_an_empty_content_control_with_a_placeholder_part_is_refused(body: str) -> None:
+    # Word shows the placeholder's building block, which the reader does not read.
+    assert refusal(body) == "unsupported-element"
+    # With no placeholder part Word shows nothing there, as the reader reads it.
+    plain = body.replace(_PLACEHOLDER, "<w:sdtPr><w:showingPlcHdr/></w:sdtPr>")
+    assert "".join(text_of(plain)) in ("Strength: ", "a", "after")
+
+
+_HIDING = (
+    '<w:style w:type="paragraph" w:styleId="HiddenBase"><w:rPr><w:vanish/></w:rPr></w:style>'
+    '<w:style w:type="paragraph" w:styleId="Shown"><w:basedOn w:val="HiddenBase"/>'
+    '<w:rPr><w:vanish w:val="0"/></w:rPr></w:style>'
+    '<w:style w:type="paragraph" w:styleId="PS"><w:rPr><w:vanish/></w:rPr></w:style>'
+    '<w:style w:type="character" w:styleId="CS"><w:rPr><w:vanish/></w:rPr></w:style>'
+)
+
+# The paragraph mark says it is shown, so only the run is in question.
+_SHOWN_MARK = '<w:rPr><w:vanish w:val="0"/></w:rPr>'
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        # A nearer style turns vanish off: Word's toggle rule shows the tab.
+        p(
+            r("<w:t>1</w:t>", '<w:vanish w:val="0"/>') + r("<w:tab/>"),
+            '<w:pStyle w:val="Shown"/>' + _SHOWN_MARK,
+        ),
+        # Paragraph and character styles both hide: they cancel, and Word shows the space.
+        p(
+            r("<w:t>10</w:t>", '<w:vanish w:val="0"/>')
+            + r('<w:t xml:space="preserve"> </w:t>', '<w:rStyle w:val="CS"/>')
+            + r("<w:t>mg</w:t>", '<w:vanish w:val="0"/>'),
+            '<w:pStyle w:val="PS"/>' + _SHOWN_MARK,
+        ),
+        # The paragraph mark: hidden by any level, shown by Word's rule.
+        p("", '<w:pStyle w:val="Shown"/>'),
+    ],
+    ids=["nearer-style-off", "two-kinds-cancel", "paragraph-mark"],
+)
+def test_hiding_that_words_toggle_rule_cancels_is_refused(body: str) -> None:
+    # Word's case: show the shown text with hidden text off, and whether paragraphs run on.
+    assert refusal(body, _HIDING) == "hidden-text"
+
+
+def test_spec_vanish_on_a_text_run_does_not_hide_it() -> None:
+    # Word shows and prints it: "Take not more than 2".
+    body = p(
+        r('<w:t xml:space="preserve">Take </w:t>')
+        + r('<w:t xml:space="preserve">not </w:t>', "<w:specVanish/>")
+        + r("<w:t>more than 2</w:t>")
+    )
+    assert text_of(body) == ["Take not more than 2"]
+
+
+_RTL_STYLES = (
+    '<w:style w:type="paragraph" w:styleId="RtlPara"><w:rPr><w:rtl/></w:rPr></w:style>'
+    '<w:style w:type="character" w:styleId="RtlChar"><w:rPr><w:rtl/></w:rPr></w:style>'
+    '<w:style w:type="paragraph" w:styleId="BoldPara"><w:rPr><w:b/></w:rPr></w:style>'
+)
+
+
+@pytest.mark.parametrize(
+    ("body", "code"),
+    [
+        # An override reverses every character ("10 mg" drawn "gm 01"); an embedding does not.
+        (p('<w:bdo w:val="rtl">' + r("<w:t>10 mg</w:t>") + "</w:bdo>"), "unsupported-element"),
+        (p('<w:bdo w:val="ltr">' + r("<w:t>10 mg</w:t>") + "</w:bdo>"), "unsupported-element"),
+        (p("<w:dir>" + r("<w:t>10 mg</w:t>") + "</w:dir>"), "unsupported-element"),
+        (p('<w:dir w:val="up">' + r("<w:t>10 mg</w:t>") + "</w:dir>"), "unsupported-element"),
+        # Word does not allow rtl in styles (MS-OI29500 17.7.5.4): not on record.
+        (p(r("<w:t>a !? b</w:t>"), '<w:pStyle w:val="RtlPara"/>'), "unsupported-formatting"),
+        (p(r("<w:t>a !? b</w:t>", '<w:rStyle w:val="RtlChar"/>')), "unsupported-formatting"),
+    ],
+)
+def test_bidi_overrides_and_right_to_left_from_a_style_are_refused(body: str, code: str) -> None:
+    assert refusal(body, _RTL_STYLES) == code
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        p(r("<w:t>abc</w:t>", "<w:rtl/><w:b/>")),
+        p(r("<w:t>abc</w:t>", "<w:rtl/><w:bCs/>")),
+        p(r("<w:t>abc</w:t>", "<w:cs/><w:i/><w:bCs/>")),  # ECMA's own example
+        p(r("<w:t>\u0645\u0631\u062d\u0628\u0627</w:t>", "<w:b/>")),  # Arabic, no rtl
+        p(r("<w:t>\u05e9\u05dc\u05d5\u05dd</w:t>", "<w:iCs/>")),  # Hebrew
+        p(r("<w:t>abc</w:t>", "<w:rtl/>"), '<w:pStyle w:val="BoldPara"/>'),
+        p('<w:dir w:val="rtl">' + r("<w:t>abc</w:t>", "<w:b/>") + "</w:dir>"),
+    ],
+)
+def test_complex_script_text_whose_two_emphasis_settings_differ_is_refused(body: str) -> None:
+    # Word draws complex script with bCs and iCs, and its Font object reports b and i:
+    # which is drawn is not on record.
+    assert refusal(body, _RTL_STYLES) == "unsupported-formatting"
+
+
+def test_complex_script_text_whose_emphasis_settings_agree_is_read() -> None:
+    arabic = "\u0645\u0631\u062d\u0628\u0627"
+    assert _kinds(p(r(f"<w:t>{arabic}</w:t>", "<w:b/><w:bCs/>"))) == [(0, 5, "bold")]
+    assert _kinds(p(r("<w:t>abc</w:t>", "<w:rtl/><w:i/><w:iCs/>"))) == [
+        (0, 3, "italic"),
+        (0, 3, "rtl"),
+    ]
+    # Latin and Greek text is not complex script: w:b alone is bold.
+    assert _kinds(p(r("<w:t>abc \u03b1</w:t>", "<w:b/>"))) == [(0, 5, "bold")]
+
+
+_W14 = "http://schemas.microsoft.com/office/word/2010/wordml"
+
+
+@pytest.mark.parametrize(
+    "fill", ["<w14:noFill/>", '<w14:solidFill><w14:srgbClr w14:val="FFFFFF"/></w14:solidFill>']
+)
+def test_text_filled_by_word_2010_text_effects_is_refused(fill: str) -> None:
+    # Word 2010 and later draw such text with no fill, or white; ask Word whether it is seen.
+    props = f'<w14:textFill xmlns:w14="{_W14}">{fill}</w14:textFill>'
+    assert refusal(p(r("<w:t>do not exceed 4 tablets</w:t>", props))) == "unsupported-formatting"
+    styles = f'<w:style w:type="character" w:styleId="Fx"><w:rPr>{props}</w:rPr></w:style>'
+    styled = p(r("<w:t>do not exceed 4 tablets</w:t>", '<w:rStyle w:val="Fx"/>'))
+    assert refusal(styled, styles) == "unsupported-formatting"
+
+
+def _styled_table(look: str, rows: list[list[str]], props: str = "<w:b/><w:i/>") -> tuple[str, str]:
+    """A table in style T, whose first row's formatting sets ``props``, and its styles."""
+    style = (
+        '<w:style w:type="table" w:styleId="T"><w:tblStylePr w:type="firstRow">'
+        f"<w:rPr>{props}</w:rPr></w:tblStylePr></w:style>"
+    )
+    cells = "".join(
+        "<w:tr>"
+        + "".join(f"<w:tc>{p(r(f'<w:t>{c}</w:t>') if c else '')}</w:tc>" for c in row)
+        + "</w:tr>"
+        for row in rows
+    )
+    return f'<w:tbl><w:tblPr><w:tblStyle w:val="T"/>{look}</w:tblPr>{cells}</w:tbl>', style
+
+
+@pytest.mark.parametrize(
+    "look",
+    [
+        '<w:tblLook w:val="04A0"/>',  # Word's default: first row and first column on
+        '<w:tblLook w:val="0000" w:firstRow="1"/>',
+        "",  # no tblLook: what Word turns on is not on record
+    ],
+)
+def test_conditional_emphasis_in_a_region_the_table_turns_on_is_refused(look: str) -> None:
+    # Word applies firstRow b+i where tblLook turns the first row on, and nothing where off.
+    body, styles = _styled_table(look, [["Frequency"], ["Very common"]])
+    assert refusal(body, styles) == "unsupported-element"
+
+
+def test_conditional_emphasis_is_read_where_the_table_turns_it_off_or_holds_no_text() -> None:
+    body, styles = _styled_table('<w:tblLook w:val="0000"/>', [["Frequency"], ["Very common"]])
+    assert [x.marks for x in read_docx(docx(body, styles))] == [(), ()]
+    attributes = '<w:tblLook w:firstRow="0" w:lastRow="1" w:firstColumn="1" w:noHBand="1"/>'
+    body, styles = _styled_table(attributes, [["Frequency"], ["Very common"]])
+    assert text_of(body, styles) == ["Frequency", "Very common"]
+    # Turned on over an empty first row: nothing there to mark.
+    body, styles = _styled_table('<w:tblLook w:val="04A0"/>', [[""], ["Very common"]])
+    assert text_of(body, styles) == ["", "Very common"]
+    # A row's own look that turns the first row on counts.
+    body, styles = _styled_table('<w:tblLook w:val="0000"/>', [["Frequency"], ["Very common"]])
+    exception = '<w:tr><w:tblPrEx><w:tblLook w:val="0020"/></w:tblPrEx>'
+    assert refusal(body.replace("<w:tr>", exception, 1), styles) == "unsupported-element"
+
+
+def _cell(inner: str, shading: str = "") -> str:
+    shd = f'<w:tcPr><w:shd w:val="clear" w:fill="{shading}"/></w:tcPr>' if shading else ""
+    return f"<w:tbl><w:tr><w:tc>{shd}{inner}</w:tc></w:tr></w:tbl>"
+
+
+@pytest.mark.parametrize(
+    ("body", "faint"),
+    [
+        (p(r("<w:t>ab</w:t>", '<w:color w:val="FEFEFE"/>')), True),
+        (p(r("<w:t>ab</w:t>", '<w:color w:val="FFFF00"/>')), True),  # Word's standard Yellow
+        (p(r("<w:t>ab</w:t>", '<w:color w:val="FFF2CC"/>')), True),  # Gold, Lighter 80%
+        # White, Background 1, Darker 50%: drawn mid-grey.
+        (
+            p(
+                r(
+                    "<w:t>ab</w:t>",
+                    '<w:color w:val="7F7F7F" w:themeColor="background1" w:themeShade="80"/>',
+                )
+            ),
+            False,
+        ),
+        (
+            p(
+                r("<w:t>ab</w:t>", '<w:color w:val="000000"/>'),
+                '<w:shd w:val="clear" w:fill="000000"/>',
+            ),
+            True,
+        ),
+        (
+            p(
+                r(
+                    "<w:t>ab</w:t>",
+                    '<w:color w:val="000000"/><w:shd w:val="solid" w:color="111111"/>',
+                )
+            ),
+            True,
+        ),
+        (p(r("<w:t>ab</w:t>", '<w:color w:val="FFFF00"/><w:highlight w:val="yellow"/>')), True),
+        (p(r("<w:t>ab</w:t>", '<w:color w:val="FFFFFF"/><w:highlight w:val="black"/>')), False),
+        (_cell(p(r("<w:t>ab</w:t>", '<w:color w:val="FFFFFF"/>')), "1F3864"), False),  # navy cell
+        (_cell(p(r("<w:t>ab</w:t>", '<w:color w:val="000000"/>')), "000000"), True),
+        (_cell(p(r("<w:t>ab</w:t>")), "000000"), False),  # automatic colour: Word draws it white
+    ],
+)
+def test_faint_is_decided_by_contrast_with_what_is_under_the_text(body: str, faint: bool) -> None:
+    assert ("faint" in [m.kind for m in read_docx(docx(body))[0].marks]) == faint
+
+
+def test_faint_under_conditional_or_unknown_colours_is_refused() -> None:
+    # A table style's first row shades black: under black text in it, or not, by tblLook.
+    style = (
+        '<w:style w:type="table" w:styleId="Dark"><w:tblStylePr w:type="firstRow">'
+        '<w:tcPr><w:shd w:val="clear" w:fill="000000"/></w:tcPr></w:tblStylePr></w:style>'
+    )
+    cell = _cell(p(r("<w:t>ab</w:t>", '<w:color w:val="000000"/>')))
+    table = cell.replace("<w:tbl>", '<w:tbl><w:tblPr><w:tblStyle w:val="Dark"/></w:tblPr>')
+    assert refusal(table, style) == "unsupported-formatting"
+    # A conditional colour faint on the page, by contrast as any other.
+    near_white = _banded('<w:rPr><w:color w:val="FEFEFE"/></w:rPr>')
+    assert refusal(_in_banded(r("<w:t>10</w:t>")), near_white) == "unsupported-element"
+    for props in ('<w:color w:val="white"/>', '<w:color w:themeColor="accent1"/>'):
+        assert refusal(p(r("<w:t>ab</w:t>", props))) == "unsupported-formatting"
+
+
+def _row(height: str, inner: str) -> str:
+    return f"<w:tbl><w:tr><w:trPr>{height}</w:trPr><w:tc>{inner}</w:tc></w:tr></w:tbl>"
+
+
+TEN_POINTS = '<w:sz w:val="20"/>'
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        # A row of exact height lower than its text: Word clips it.
+        _row('<w:trHeight w:hRule="exact" w:val="20"/>', p(r("<w:t>2 tablets</w:t>"))),
+        _row(
+            '<w:trHeight w:hRule="exact" w:val="240"/>',
+            p(r("<w:t>2 tablets</w:t>", TEN_POINTS)) + p(r("<w:t>daily</w:t>", TEN_POINTS)),
+        ),
+        # Exact line spacing lower than the text, and lines set to overprint.
+        p(r("<w:t>2 tablets</w:t>"), '<w:spacing w:line="20" w:lineRule="exact"/>'),
+        p(r("<w:t>2 tablets</w:t>"), '<w:spacing w:line="100"/>'),
+        # A frame far off the page, or too low for its text.
+        p(r("<w:t>2 tablets</w:t>"), '<w:framePr w:x="-20000" w:y="0"/>'),
+        p(r("<w:t>2 tablets</w:t>"), '<w:framePr w:h="40" w:hRule="exact"/>'),
+        # A floating table off the page; a table or paragraph indented far outward.
+        '<w:tbl><w:tblPr><w:tblpPr w:tblpX="-30000"/></w:tblPr><w:tr><w:tc>'
+        + p(r("<w:t>2 tablets</w:t>"))
+        + "</w:tc></w:tr></w:tbl>",
+        '<w:tbl><w:tblPr><w:tblInd w:w="-4000" w:type="dxa"/></w:tblPr><w:tr><w:tc>'
+        + p(r("<w:t>2 tablets</w:t>"))
+        + "</w:tc></w:tr></w:tbl>",
+        p(r("<w:t>2 tablets</w:t>"), '<w:ind w:left="-40000"/>'),
+        p(r("<w:t>2 tablets</w:t>"), '<w:ind w:left="0" w:hanging="3000"/>'),
+        # Characters drawn over one another.
+        p(r("<w:t>2 tablets</w:t>", TEN_POINTS + '<w:spacing w:val="-400"/>')),
+        p(r("<w:t>2 tablets</w:t>", '<w:fitText w:val="100" w:id="1"/>')),
+    ],
+)
+def test_layout_that_may_clip_or_overdraw_text_is_refused(body: str) -> None:
+    # Word's cases: each body above, saved as PDF; is every character drawn whole and apart?
+    assert refusal(body) == "unsupported-formatting"
+
+
+def test_layout_within_bounds_is_read() -> None:
+    for body in (
+        _row('<w:trHeight w:hRule="exact" w:val="240"/>', p(r("<w:t>2 tablets</w:t>", TEN_POINTS))),
+        _row('<w:trHeight w:hRule="exact" w:val="20"/>', p("")),  # nothing to clip
+        p(r("<w:t>2 tablets</w:t>", TEN_POINTS), '<w:spacing w:line="240" w:lineRule="exact"/>'),
+        p(r("<w:t>2 tablets</w:t>"), '<w:spacing w:line="120" w:lineRule="atLeast"/>'),
+        p(r("<w:t>2 tablets</w:t>"), '<w:framePr w:wrap="around" w:hAnchor="margin" w:y="273"/>'),
+        p(r("<w:t>2 tablets</w:t>"), '<w:ind w:left="-18" w:right="-595"/>'),
+        p(r("<w:t>2 tablets</w:t>", TEN_POINTS + '<w:spacing w:val="-31"/>')),
+    ):
+        assert text_of(body) in (["2 tablets"], [""])

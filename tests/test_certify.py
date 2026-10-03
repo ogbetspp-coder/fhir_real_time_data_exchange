@@ -985,7 +985,9 @@ def test_a_drawing_is_one_character_unless_it_holds_text(inner: str) -> None:
         DocxSource(data)
 
 
-@pytest.mark.parametrize("inner", ["", "<v:textbox/>", '<v:textpath string="x"/>'])
+@pytest.mark.parametrize(
+    "inner", ["", "<v:textbox/>", '<v:textpath string="x"/>', '<w:control w:name="CheckBox1"/>']
+)
 def test_a_vml_picture_is_one_character_unless_it_holds_text(inner: str) -> None:
     data = docx(_p(f"<w:r><w:pict><v:shape {_VML}><v:imagedata/>{inner}</v:shape></w:pict></w:r>"))
     if not inner:
@@ -1864,3 +1866,78 @@ def test_a_wingdings_bullet_is_drawn_through_its_closed_table_and_only_so() -> N
     ):
         with pytest.raises(CertificationError):
             _ = DocxSource(docx(_item(1, 0), numbering=numbering)).labels
+
+
+@pytest.mark.parametrize(
+    "inner",
+    [
+        "<w:p><w:r><w:t>\u00a0</w:t></w:r></w:p>",
+        '<w:p><w:pPr><w:numPr><w:numId w:val="1"/></w:numPr></w:pPr></w:p>',
+        '<w:p><w:r><w:commentReference w:id="0"/></w:r></w:p>',
+    ],
+)
+def test_the_check_holds_nothing_in_a_merged_away_cell(inner: str) -> None:
+    merged = (
+        "<w:tbl><w:tr><w:tc><w:p><w:r><w:t>top</w:t></w:r></w:p></w:tc></w:tr>"
+        f"<w:tr><w:tc><w:tcPr><w:vMerge/></w:tcPr>{inner}</w:tc></w:tr></w:tbl>"
+    )
+    with pytest.raises(CertificationError):
+        DocxSource(docx(merged))
+    DocxSource(docx(merged.replace(inner, "<w:p/>")))
+
+
+def test_hiding_that_words_toggle_rule_cancels_is_never_certified() -> None:
+    # Paragraph and character styles both hide: Word's toggle rule cancels them.
+    styles = (
+        '<w:style w:type="paragraph" w:styleId="PS"><w:rPr><w:vanish/></w:rPr></w:style>'
+        '<w:style w:type="character" w:styleId="CS"><w:rPr><w:vanish/></w:rPr></w:style>'
+    )
+    body = (
+        '<w:p><w:pPr><w:pStyle w:val="PS"/></w:pPr>'
+        '<w:r><w:rPr><w:vanish w:val="0"/></w:rPr><w:t>10</w:t></w:r>'
+        '<w:r><w:rPr><w:rStyle w:val="CS"/></w:rPr><w:t xml:space="preserve"> </w:t></w:r></w:p>'
+    )
+    with pytest.raises(CertificationError):
+        DocxSource(docx(body, styles=styles))
+    # Hidden by one kind of style alone, it is hidden by both rules: set aside.
+    one = docx(body.replace('<w:rStyle w:val="CS"/>', ""), styles=styles)
+    assert DocxSource(one).certify(_value("10"))["setAside"]["hiddenWhitespace"] == 1
+
+
+@pytest.mark.parametrize(
+    "run",
+    [
+        "<w:r><w:rPr><w:rtl/><w:b/></w:rPr><w:t>abc</w:t></w:r>",
+        "<w:r><w:rPr><w:cs/><w:i/><w:bCs/></w:rPr><w:t>abc</w:t></w:r>",
+        "<w:r><w:rPr><w:b/></w:rPr><w:t>مرحبا</w:t></w:r>",
+        '<w:dir w:val="rtl"><w:r><w:rPr><w:b/></w:rPr><w:t>abc</w:t></w:r></w:dir>',
+    ],
+)
+def test_complex_script_whose_emphasis_settings_differ_is_never_certified(run: str) -> None:
+    with pytest.raises(CertificationError):
+        DocxSource(docx(f"<w:p>{run}</w:p>"))
+    # Latin text with b alone, and complex script with both settings, are certified.
+    DocxSource(docx("<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>abc</w:t></w:r></w:p>"))
+    DocxSource(docx("<w:p><w:r><w:rPr><w:rtl/><w:b/><w:bCs/></w:rPr><w:t>abc</w:t></w:r></w:p>"))
+
+
+def test_conditional_emphasis_over_text_in_a_part_the_table_turns_on_is_never_certified() -> None:
+    styles = (
+        '<w:style w:type="table" w:styleId="T"><w:tblStylePr w:type="firstRow">'
+        "<w:rPr><w:b/></w:rPr></w:tblStylePr></w:style>"
+    )
+
+    def table(look: str, first: str) -> bytes:
+        return docx(
+            f'<w:tbl><w:tblPr><w:tblStyle w:val="T"/>{look}</w:tblPr>'
+            f"<w:tr><w:tc><w:p>{first}</w:p></w:tc></w:tr>"
+            "<w:tr><w:tc><w:p><w:r><w:t>Very common</w:t></w:r></w:p></w:tc></w:tr></w:tbl>",
+            styles=styles,
+        )
+
+    text = "<w:r><w:t>Frequency</w:t></w:r>"
+    for look in ('<w:tblLook w:val="04A0"/>', '<w:tblLook w:firstRow="1"/>', ""):
+        with pytest.raises(CertificationError):
+            DocxSource(table(look, text))
+    DocxSource(table('<w:tblLook w:val="0000"/>', text))
+    DocxSource(table('<w:tblLook w:val="04A0"/>', ""))
