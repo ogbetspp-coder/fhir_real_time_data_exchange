@@ -780,6 +780,7 @@ def test_a_package_the_check_cannot_open_is_never_certified() -> None:
     )
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w") as archive:
+        archive.writestr("[Content_Types].xml", "<Types/>")
         archive.writestr("_rels/.rels", rels)
         archive.writestr("word/document.xml", f'<w:document xmlns:w="{W}"/>')
     with pytest.raises(CertificationError):

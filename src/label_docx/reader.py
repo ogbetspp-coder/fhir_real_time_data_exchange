@@ -595,6 +595,26 @@ class _Package:
             raise DocxRefusedError("invalid-package", "bytes before the zip archive")
         if sum(info.file_size for info in self.zip.infolist()) > MAX_PACKAGE_BYTES:
             raise DocxRefusedError("invalid-package", f"parts over {MAX_PACKAGE_BYTES} bytes")
+        for info in self.zip.infolist():
+            name = info.filename
+            # zipfile reads a name other than the stored one from an Info-ZIP Unicode Path field
+            # (0x7075), and cuts one at a NUL: another zip reader finds another part there.
+            if name != info.orig_filename:
+                raise DocxRefusedError("invalid-package", "a part name other than the stored one")
+            # A backslash, a leading "/", or an empty, "." or ".." segment: not a part name, and
+            # maybe the same part as another to another zip reader (ECMA-376 Part 2).
+            if (
+                "\\" in name
+                or name.startswith("/")
+                or posixpath.normpath(name) != name
+                or ".." in name.split("/")
+            ):
+                raise DocxRefusedError("invalid-package", "a name that is not a part name")
+            # A package's parts are stored or deflated (ECMA-376 Part 2, its ZIP appendix).
+            if info.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
+                raise DocxRefusedError(
+                    "invalid-package", f"a part compressed by method {info.compress_type}"
+                )
         try:
             # Every part unpacked and its checksum compared, the ones the reader reads and the
             # ones it does not: a damaged package is not the document its author saved.
@@ -616,6 +636,8 @@ class _Package:
         for name in sorted(names):
             if name.endswith((".xml", ".rels")):
                 self.part(name)
+        if "[Content_Types].xml" not in self.names:
+            raise DocxRefusedError("invalid-package", "no [Content_Types].xml")
 
     def part(self, name: str) -> ET.Element | None:
         if name not in self.names:

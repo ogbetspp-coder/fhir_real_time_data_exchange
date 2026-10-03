@@ -67,7 +67,7 @@ The proof covers the text. How it is shown is held to the application that shows
 
 | What                                              | Held to | Where                                  |
 | ------------------------------------------------- | ------- | -------------------------------------- |
-| List labels, note marks, fields, text, emphasis, headers, footers, comments of a .docx | Word | `test_word_oracle.py` (corpus); `--word on` (every ingest) |
+| List labels, note marks, fields, text, emphasis, headers, footers, comments of a .docx | Word | `test_word_oracle.py` (corpus; comments by unit tests only, none in the corpus yet); `--word on` (every ingest) |
 | Text, marks and list markers of an ePI section    | Chrome  | `test_browser_oracle.py` (corpus); every ingest with Chrome |
 | Tracked views                                     | Word    | `test_tracked.py` (corpus); `--word on` |
 
