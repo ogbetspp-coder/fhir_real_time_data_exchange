@@ -202,6 +202,23 @@ write:
   up to four rows.
   - 6 packed documents: all 6 agreed, 1,219 list items, in 4 minutes;
   - 30 packed documents: all 30 agreed, 5,805 list items, in 16 minutes.
+
+  `--fields` adds captions numbered by SEQ in every number format, headings and STYLEREF, and
+  REF and NOTEREF to bookmarked captions and note references, with placeholder results. Word
+  then updates every field and saves the document (`word_oracle.py update`), so each result is
+  Word's own, in Word's own XML, as in a real label. The reader must compute each one as Word
+  did: a result it calls stale is a difference.
+  - 20 packed documents with 556 fields (265 SEQ, 82 REF, 171 STYLEREF, 38 NOTEREF): all read,
+    every field as Word computed it, and all 20 agreed.
+
+  The first of them showed a fault in Word's side of the comparison. The emphasis check took a
+  paragraph's whole range, which in Word holds each field's hidden code, with formatting of its
+  own. So a paragraph struck through looked "not struck" wherever a field's code was not.
+  Asked for each field's result alone, Word showed what the reader read. The check now measures
+  only what a paragraph shows: the text between fields, and each field's result. Built cases
+  confirm it still tells struck from not struck in either place. It also measures every
+  paragraph of a document up to 600, not 150 sampled. Word's recorded answers for every corpus
+  document with fields were taken again with it, and none changed.
   - Every one the reader reads must be certified, key marks included (R-35).
   - Word's own judgment of them (`word_oracle.py compare`) runs in batches on a Mac with Word,
     since Word takes up to a minute a document.

@@ -108,6 +108,29 @@ on run argv
 end run
 """
 
+# The document with every field updated, saved in place: Word's own results, in Word's XML.
+UPDATE = """
+on run argv
+  set target to (POSIX file (item 1 of argv)) as string
+  with timeout of 300 seconds
+    tell application "Microsoft Word"
+      open file name target
+      repeat 600 times
+        try
+          if (name of every document) contains {item 2 of argv} then exit repeat
+        end try
+        delay 0.1
+      end repeat
+      repeat with f in (get fields of document (item 2 of argv))
+        update field f
+      end repeat
+      save document (item 2 of argv)
+      close document (item 2 of argv) saving no
+    end tell
+  end timeout
+end run
+"""
+
 SUFFIXES = {"tab": "\t", "legacy": "\t", "space": " ", "nothing": ""}
 
 # The document saved as text.
@@ -247,6 +270,29 @@ def _ask_word(path: Path) -> str:
             if attempt == 2:
                 raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
     raise AssertionError  # pragma: no cover
+
+
+def word_updated(path: Path) -> bytes:
+    """``path`` as Word saves it after updating every field in it.
+
+    Word writes the whole package again, in its own XML, with each field's result its own: the
+    reader is then held to a document Word wrote, as a label is.
+    """
+    CONTAINER.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=CONTAINER) as folder:
+        copy = Path(folder) / path.name
+        shutil.copyfile(path, copy)
+        done = _osascript(
+            ["osascript", "-", str(copy), path.name],
+            input=UPDATE,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+        if done.returncode != 0:
+            raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
+        return copy.read_bytes()
 
 
 def word_labels(path: Path) -> list[str]:
@@ -461,10 +507,11 @@ on run argv
         delay 0.1
       end repeat
       set d to document (item 2 of argv)
-      -- Every paragraph of a short document; about 150, evenly spaced, of a long one, since
-      -- each takes Word several requests.
+      -- Every paragraph of a document up to 600; about 150, evenly spaced, of a longer one,
+      -- since each takes Word several requests.
       set total to count of paragraphs of d
-      set stepBy to (total div 150) + 1
+      set stepBy to 1
+      if total > 600 then set stepBy to (total div 150) + 1
       repeat with i from 1 to total by stepBy
         set r to text object of paragraph i of d
         set t to content of r
@@ -475,9 +522,34 @@ on run argv
           set fromHere to (start of content of r) + (length of n) + 4
           set toHere to (end of content of r) - 1
           if toHere > fromHere then
-            set f to font object of (create range d start fromHere end toHere)
-            set out to out & (text 2 thru -1 of n) & "," & (bold of f) & "," & (italic of f) ¬
-              & "," & (all caps of f) & "," & (strike through of f) & linefeed
+            -- What the paragraph shows: the text between its fields and each field's result,
+            -- never a field's code, which has formatting of its own.
+            set pieces to {}
+            set doneTo to fromHere
+            repeat with f in (get fields of r)
+              set g to contents of f
+              set shown to result range of g
+              set code to field code of g
+              set codeStart to (start of content of code) - 1
+              set shownStart to start of content of shown
+              set shownEnd to end of content of shown
+              if codeStart > doneTo then set end of pieces to {doneTo, codeStart}
+              if shownEnd > shownStart then set end of pieces to {shownStart, shownEnd}
+              set doneTo to shownEnd + 1
+            end repeat
+            if toHere > doneTo then set end of pieces to {doneTo, toHere}
+            set {isBold, isItalic, isCaps, isStruck} to {true, true, true, true}
+            repeat with piece in pieces
+              set f to font object of (create range d start (item 1 of piece) end (item 2 of piece))
+              if (bold of f) is not true then set isBold to false
+              if (italic of f) is not true then set isItalic to false
+              if (all caps of f) is not true then set isCaps to false
+              if (strike through of f) is not true then set isStruck to false
+            end repeat
+            if (count of pieces) > 0 then
+              set out to out & (text 2 thru -1 of n) & "," & isBold & "," & isItalic ¬
+                & "," & isCaps & "," & isStruck & linefeed
+            end if
           end if
         end if
       end repeat

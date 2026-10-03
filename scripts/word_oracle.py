@@ -2,13 +2,16 @@
 
     uv run --frozen python scripts/word_oracle.py record corpus/numbering-cases
     uv run --frozen python scripts/word_oracle.py compare path/to/label.docx [...]
+    uv run --frozen python scripts/word_oracle.py update FOLDER path/to/generated.docx [...]
 
 The questions asked and how each answer is judged are ``label_docx.word``. ``record`` asks Word
 about every .docx in a corpus set and writes the answers to the set's ``word.json``, which
 ``tests/test_word_oracle.py`` holds the reader to without Word. ``compare`` prints the verdict
 for any files and writes nothing, so a confidential label can be checked on one machine and
 never enter the repository. Both print, for each file, whether the reader agrees with Word,
-differs (where), or refuses; never the paragraphs' text.
+differs (where), or refuses; never the paragraphs' text. ``update`` has Word update every field
+of each file and save it into FOLDER, in Word's own XML: generated documents hold placeholder
+field results, and Word's are the ones the reader must then compute.
 """
 
 from __future__ import annotations
@@ -20,7 +23,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from label_docx.word import ask, judge, word_version
+from label_docx.word import ask, judge, word_updated, word_version
 
 
 def main() -> int:
@@ -38,7 +41,16 @@ def main() -> int:
     commands.add_parser("compare", help="compare files, writing nothing").add_argument(
         "files", type=Path, nargs="+"
     )
+    updating = commands.add_parser("update", help="have Word update the fields, save copies")
+    updating.add_argument("folder", type=Path)
+    updating.add_argument("files", type=Path, nargs="+")
     args = parser.parse_args()
+    if args.command == "update":
+        args.folder.mkdir(parents=True, exist_ok=True)
+        for path in args.files:
+            (args.folder / path.name).write_bytes(word_updated(path))
+            sys.stdout.write(f"{path.name}: updated\n")
+        return 0
     paths = sorted(args.folder.glob("*.docx")) if args.command == "record" else args.files
     answers: dict[str, list[str]] = {}
     note_answers: dict[str, dict[str, list[str]]] = {}

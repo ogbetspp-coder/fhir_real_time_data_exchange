@@ -2,6 +2,8 @@
 
     uv run --frozen python scripts/fuzz_docx.py --documents 40 --seed 1 FOLDER
     uv run --frozen python scripts/fuzz_docx.py --documents 6 --chapters 10 --seed 1 FOLDER
+    uv run --frozen python scripts/fuzz_docx.py --documents 6 --chapters 10 --fields --seed 1 IN
+    uv run --frozen python scripts/word_oracle.py update OUT IN/*.docx
     uv run --frozen python scripts/word_oracle.py compare FOLDER/*.docx
 
 The numbering cases (``scripts/numbering_cases.py``) put one question each to Word; these mix
@@ -19,6 +21,12 @@ Word takes about half a minute a document, most of it for the document rather th
 so ``--chapters N`` puts N generated documents' worth in one: each chapter with its own styles
 and lists, under shared document defaults and footnotes. Word judges the whole document as
 exactly as a small one.
+
+``--fields`` adds what labels cross-refer with: captions numbered by SEQ, in each number format,
+headings and STYLEREF to them, and REF and NOTEREF to bookmarked captions and note references.
+Their results are placeholders; ``word_oracle.py update`` has Word update every field and save
+the document, so the results are Word's own, in Word's own XML. The reader must then compute
+each one as Word did: a result it calls stale there is a difference from Word.
 """
 
 from __future__ import annotations
@@ -30,13 +38,18 @@ import sys
 from pathlib import Path
 
 from label_docx import output
-from numbering_cases import Case, abstract, lvl, notes, num, package, para, words
+from numbering_cases import Case, abstract, bookmark, field, lvl, notes, num, package, para, words
 
 TOGGLES = ("b", "i", "caps", "smallCaps", "strike", "dstrike")
 FORMATS = ("decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman", "decimalZero")
 NOTE_FORMATS = ("decimal", "lowerRoman", "upperRoman", "lowerLetter", "upperLetter", "chicago")
 # Chapters drawn, at most, for one the reader reads.
 _TRIES = 200
+SEQ_FORMATS = ("", " \\* ARABIC", " \\* ROMAN", " \\* roman", " \\* ALPHABETIC", " \\* alphabetic")
+HEADINGS = (
+    '<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/></w:style>'
+    '<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/></w:style>'
+)
 WORDS = ("Store", "below", "25", "C", "Take", "one", "tablet", "daily", "with", "water")
 
 
@@ -44,7 +57,11 @@ class Document:
     """One generated document."""
 
     def __init__(
-        self, rng: random.Random, chapter: int = 0, notes: list[int] | None = None
+        self,
+        rng: random.Random,
+        chapter: int = 0,
+        notes: list[int] | None = None,
+        fields: bool = False,
     ) -> None:
         self.rng = rng
         # A chapter's styles, table style and list ids are its own (chapter 0's as before).
@@ -52,8 +69,12 @@ class Document:
         self.base = 10 * chapter
         self.paragraph_styles = [f"{self.prefix}P{i}" for i in range(rng.randint(1, 4))]
         self.character_styles = [f"{self.prefix}C{i}" for i in range(rng.randint(1, 3))]
-        # The notes so far, in every chapter: one count, as one document has.
-        self.counter = [0] if notes is None else notes
+        # The notes and bookmarks so far, in every chapter: one count each, as one document has.
+        self.counter = [0, 0] if notes is None else notes
+        self.fields = fields
+        # Bookmarks a REF or NOTEREF can name: captions, and note references.
+        self.captions: list[str] = []
+        self.marked_notes: list[str] = []
 
     def toggles(self, capitals: bool = True) -> str:
         """A random setting, on or off, of some of the toggles.
@@ -154,9 +175,40 @@ class Document:
         if rng.random() < 0.08:
             self.counter[0] += 1
             reference = f'<w:r><w:footnoteReference w:id="{self.counter[0]}"/></w:r>'
+            if self.fields and rng.random() < 0.5:
+                name = self.bookmark("_Note")
+                self.marked_notes.append(name)
+                reference = bookmark(self.counter[1], name, reference)
             return words(text) + reference
         prefix = f"<w:rPr>{properties}</w:rPr>" if properties else ""
         return f'<w:r>{prefix}<w:t xml:space="preserve">{text} </w:t></w:r>'
+
+    def bookmark(self, kind: str) -> str:
+        """A new bookmark's name, its id the count so far."""
+        self.counter[1] += 1
+        return f"{kind}{self.prefix}x{self.counter[1]}"
+
+    def field_paragraph(self) -> str | None:
+        """A caption, a heading, or a paragraph with a REF, NOTEREF or STYLEREF; or None."""
+        rng = self.rng
+        roll = rng.random()
+        if roll < 0.06:
+            identifier = rng.choice(["Table", "Figure"])
+            name = self.bookmark("_Ref")
+            self.captions.append(name)
+            number = field(f"SEQ {identifier}{rng.choice(SEQ_FORMATS)}", "0")
+            return para(bookmark(self.counter[1], name, words(f"{identifier} "), number))
+        if roll < 0.10:
+            level = rng.randint(1, 2)
+            return para(words(rng.choice(WORDS)), props=f'<w:pStyle w:val="Heading{level}"/>')
+        if roll < 0.14 and self.captions:
+            return para(words("See "), field(f"REF {rng.choice(self.captions)} \\h", "x"))
+        if roll < 0.16:
+            return para(field(f"STYLEREF {rng.randint(1, 2)}", "x"))
+        if roll < 0.18 and self.marked_notes:
+            name = rng.choice(self.marked_notes)
+            return para(words("see note "), field(f"NOTEREF {name} \\h", "0"))
+        return None
 
     def level(self) -> int:
         """The next list level: mostly one step from the last, as authors write lists."""
@@ -189,9 +241,14 @@ class Document:
     def body(self, numbers: list[int]) -> str:
         """Paragraphs, some in tables of one to four rows in the table style."""
         rng = self.rng
-        out = ""
+        # With fields, a chapter opens with a heading of each level, so STYLEREF finds one.
+        out = para(words("Part"), props='<w:pStyle w:val="Heading1"/>') if self.fields else ""
+        out += para(words("Section"), props='<w:pStyle w:val="Heading2"/>') if self.fields else ""
         for _ in range(rng.randint(12, 30)):
-            if rng.random() < 0.15:
+            extra = self.field_paragraph() if self.fields else None
+            if extra is not None:
+                out += extra
+            elif rng.random() < 0.15:
                 count = rng.randint(1, 2)
                 rows = ""
                 for _ in range(rng.randint(1, 4)):
@@ -209,19 +266,23 @@ class Document:
         return out
 
 
-def _certified(case: Case) -> bool:
-    """Whether the reader reads ``case`` and the check certifies it."""
-    return "refusal" not in json.loads(output.read(package(case))[0])
+def _certified(case: Case, fields: bool = False) -> bool:
+    """Whether the reader reads ``case`` and the check certifies it.
+
+    With fields, a result refused as stale is let through: Word will compute them.
+    """
+    value = json.loads(output.read(package(case))[0])
+    return "refusal" not in value or (fields and value["refusal"]["code"] == "stale-field")
 
 
-def generated(rng: random.Random, chapters: int = 1) -> Case:
+def generated(rng: random.Random, chapters: int = 1, fields: bool = False) -> Case:
     """One document of ``chapters`` chapters, as a numbering case for ``package``.
 
     With more than one chapter, each is one the reader reads and the check certifies on its
     own: one refused would refuse the whole document, and Word would have nothing to judge.
     """
-    counter = [0]
-    styles = Document(rng, 0, counter).defaults()
+    counter = [0, 0]
+    styles = Document(rng, 0, counter).defaults() + (HEADINGS if fields else "")
     fmt = rng.choice(NOTE_FORMATS)
     start = rng.randint(1, 4)
     final = (
@@ -231,17 +292,17 @@ def generated(rng: random.Random, chapters: int = 1) -> Case:
     abstracts = nums = body = ""
     for chapter in range(chapters):
         for _ in range(_TRIES):
-            before = counter[0]
-            part = Document(rng, chapter, counter)
+            before, marks = counter
+            part = Document(rng, chapter, counter, fields)
             definitions, lists, numbers = part.numbering()
             own_styles = part.styles()
             # An empty paragraph between chapters, so no table runs on into the next.
             own_body = ("<w:p/>" if chapter else "") + part.body(numbers)
             own_notes = notes("footnote", *range(before + 1, counter[0] + 1))
             alone = Case("chapter", definitions + lists, own_body, styles + own_styles, own_notes)
-            if chapters == 1 or _certified(alone._replace(final=final)):
+            if chapters == 1 or _certified(alone._replace(final=final), fields):
                 break
-            counter[0] = before
+            counter[:] = [before, marks]
         else:
             raise SystemExit(f"no chapter the reader reads in {_TRIES} tries")
         abstracts, nums = abstracts + definitions, nums + lists
@@ -251,10 +312,10 @@ def generated(rng: random.Random, chapters: int = 1) -> Case:
     return Case("generated", abstracts + nums, body, styles, footnotes=footnotes, final=final)
 
 
-def documents(seed: int, count: int, chapters: int = 1) -> list[bytes]:
+def documents(seed: int, count: int, chapters: int = 1, fields: bool = False) -> list[bytes]:
     """``count`` documents of ``chapters`` chapters, the same ones for the same seed."""
     rng = random.Random(seed)
-    return [package(generated(rng, chapters)) for _ in range(count)]
+    return [package(generated(rng, chapters, fields)) for _ in range(count)]
 
 
 def main() -> int:
@@ -264,9 +325,10 @@ def main() -> int:
     parser.add_argument("--documents", type=int, default=20)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--chapters", type=int, default=1, help="generated documents in each")
+    parser.add_argument("--fields", action="store_true", help="captions and cross-references")
     args = parser.parse_args()
     args.folder.mkdir(parents=True, exist_ok=True)
-    for index, data in enumerate(documents(args.seed, args.documents, args.chapters)):
+    for index, data in enumerate(documents(args.seed, args.documents, args.chapters, args.fields)):
         (args.folder / f"generated-{args.seed}-{index:03d}.docx").write_bytes(data)
     sys.stdout.write(f"wrote {args.documents} documents to {args.folder}\n")
     return 0
