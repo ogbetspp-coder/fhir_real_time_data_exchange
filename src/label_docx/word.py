@@ -64,10 +64,11 @@ import sys
 import tempfile
 import time
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from label_docx.reader import SYMBOL_FONT, DocxRefusedError, read_document, read_docx
+from label_docx.reader import SYMBOL_FONT, DocxRefusedError, Paragraph, read_document, read_docx
 
 WORD = Path("/Applications/Microsoft Word.app")
 
@@ -271,29 +272,36 @@ _NOTE_RUN = {
 }
 
 
-def _osascript(
-    command: list[str],
-    *,
-    input: str,  # noqa: A002 - subprocess.run's name for it
-    capture_output: bool,
-    text: bool,
-    check: bool,
-    **_: object,
-) -> subprocess.CompletedProcess[str]:
+def _osascript(command: list[str], script: str) -> subprocess.CompletedProcess[str]:
     """Run an AppleScript for Word, failing after 15 minutes rather than waiting on a hung Word.
 
     Word quits now and then in a long recording ("Connection is invalid", -609; "not running",
     -600): it is started again and the script run again, twice at most.
     """
+    # Word's scripts find the document by its name: one of that name already open would be the
+    # one asked about.
+    try:
+        opened = subprocess.run(
+            ["osascript", "-e", 'tell application "Microsoft Word" to get name of every document'],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired as hung:
+        raise SystemExit("Word did not answer within 2 minutes") from hung
+    if Path(command[2]).name in opened.stdout.rstrip("\n").split(", "):
+        raise SystemExit(f"a document named {Path(command[2]).name} is already open in Word")
     for attempt in (1, 2, 3):
         try:
             done = subprocess.run(
                 command,
-                input=input,
-                capture_output=capture_output,
-                text=text,
+                input=script,
+                capture_output=True,
+                text=True,
                 encoding="utf-8",
-                check=check,
+                check=False,
                 timeout=900,
             )
         except subprocess.TimeoutExpired as hung:
@@ -328,14 +336,7 @@ def _ask_word(path: Path) -> str:
         shutil.copyfile(path, copy)
         # Word's scripting fails now and then while it is still loading; one retry is enough.
         for attempt in (1, 2):
-            done = _osascript(
-                ["osascript", "-", str(copy), path.name],
-                input=SCRIPT,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                check=False,
-            )
+            done = _osascript(["osascript", "-", str(copy), path.name], SCRIPT)
             if done.returncode == 0:
                 return done.stdout
             if attempt == 2:
@@ -353,22 +354,10 @@ def word_updated(path: Path) -> bytes:
     with tempfile.TemporaryDirectory(dir=CONTAINER) as folder:
         copy = Path(folder) / path.name
         shutil.copyfile(path, copy)
-        done = _osascript(
-            ["osascript", "-", str(copy), path.name],
-            input=UPDATE,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            check=False,
-        )
+        done = _osascript(["osascript", "-", str(copy), path.name], UPDATE)
         if done.returncode != 0:
             raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
         return copy.read_bytes()
-
-
-def word_labels(path: Path) -> list[str]:
-    """What Word draws before each of ``path``'s list items, in document order."""
-    return _labels(path, _ask_word(path))
 
 
 def word_text_and_labels(path: Path) -> tuple[list[str], list[str]]:
@@ -378,10 +367,12 @@ def word_text_and_labels(path: Path) -> tuple[list[str], list[str]]:
 
 
 def _paragraphs_shown(stored: str) -> list[str]:
-    """Word's text of the body as its paragraphs, empty ones left out.
+    """Word's text of the body or of a story as its paragraphs, empty ones left out.
 
-    A paragraph ends at a paragraph mark or a cell's end mark. U+000C is kept: Word's text shows
-    both a section break, which ends a paragraph, and a page break, which does not, as it.
+    A paragraph ends at a paragraph mark or at a table cell's end mark (U+0007), which Word's
+    text shows after the cell's last paragraph with or without a paragraph mark. U+000C is kept:
+    Word's text shows both a section break, which ends a paragraph, and a page break, which does
+    not, as it.
     """
     return [piece for piece in re.split(r"[\r\n\x07]", stored) if piece]
 
@@ -436,6 +427,20 @@ def _probe(data: bytes) -> bytes | None:
     return out.getvalue() if references else None
 
 
+def _with_document(path: Path, rewrite: Callable[[str], str]) -> bytes:
+    """``path``'s package with ``word/document.xml`` rewritten by ``rewrite``, the rest as is."""
+    with zipfile.ZipFile(path) as source:
+        parts = [(info, source.read(info)) for info in source.infolist()]
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as target:
+        for info, content in parts:
+            written = content
+            if info.filename == "word/document.xml":
+                written = rewrite(content.decode("utf-8")).encode("utf-8")
+            target.writestr(info.filename, written)
+    return out.getvalue()
+
+
 def word_fields(path: Path) -> dict[str, list[str]] | None:
     """The results Word shows and prints for the document's fields.
 
@@ -443,30 +448,23 @@ def word_fields(path: Path) -> dict[str, list[str]] | None:
     DOCPROPERTY, HYPERLINK).
     """
     with zipfile.ZipFile(path) as source:
-        parts = [(info, source.read(info)) for info in source.infolist()]
-    xml = {info.filename: content for info, content in parts}["word/document.xml"]
-    if not _COMPUTED.search(xml.decode("utf-8")):
+        xml = source.read("word/document.xml").decode("utf-8")
+    if not _COMPUTED.search(xml):
         return None
-    marked = _FIELD.sub(
-        lambda f: f"<w:r><w:t>@@F@@</w:t></w:r>{f.group(0)}<w:r><w:t>@@/@@</w:t></w:r>",
-        xml.decode("utf-8"),
-    )
     CONTAINER.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=CONTAINER) as folder:
         copy = Path(folder) / path.name
-        with zipfile.ZipFile(copy, "w", zipfile.ZIP_DEFLATED) as target:
-            for info, content in parts:
-                target.writestr(
-                    info.filename,
-                    marked.encode("utf-8") if info.filename == "word/document.xml" else content,
-                )
+        copy.write_bytes(
+            _with_document(
+                path,
+                lambda xml: _FIELD.sub(
+                    lambda f: f"<w:r><w:t>@@F@@</w:t></w:r>{f.group(0)}<w:r><w:t>@@/@@</w:t></w:r>",
+                    xml,
+                ),
+            )
+        )
         done = _osascript(
-            ["osascript", "-", str(copy), str(copy.with_suffix(".pdf")), copy.name],
-            input=PRINT,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            check=False,
+            ["osascript", "-", str(copy), str(copy.with_suffix(".pdf")), copy.name], PRINT
         )
     if done.returncode != 0:
         raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
@@ -547,24 +545,12 @@ def _set_page_numbers_aside(xml: str) -> str:
 
 def word_prints_what_it_shows(path: Path) -> bool:
     """Whether the text Word prints (saved as PDF) is the text it shows, page numbers aside."""
-    with zipfile.ZipFile(path) as source:
-        parts = [(info, source.read(info)) for info in source.infolist()]
     CONTAINER.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=CONTAINER) as folder:
         copy = Path(folder) / path.name
-        with zipfile.ZipFile(copy, "w", zipfile.ZIP_DEFLATED) as target:
-            for info, content in parts:
-                written = content
-                if info.filename == "word/document.xml":
-                    written = _set_page_numbers_aside(content.decode("utf-8")).encode("utf-8")
-                target.writestr(info.filename, written)
+        copy.write_bytes(_with_document(path, _set_page_numbers_aside))
         done = _osascript(
-            ["osascript", "-", str(copy), str(copy.with_suffix(".pdf")), copy.name],
-            input=PRINT,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            check=False,
+            ["osascript", "-", str(copy), str(copy.with_suffix(".pdf")), copy.name], PRINT
         )
     if done.returncode != 0:
         raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
@@ -655,8 +641,6 @@ TOGGLES = ("bold", "italic", "caps", "strike")
 
 def word_emphasis(path: Path) -> dict[str, list[bool]]:
     """Word's bold, italic, caps and strike for each body paragraph, by the reader's index."""
-    with zipfile.ZipFile(path) as source:
-        parts = [(info, source.read(info)) for info in source.infolist()]
     count = itertools.count()
 
     def mark(start: re.Match[str]) -> str:
@@ -669,20 +653,8 @@ def word_emphasis(path: Path) -> dict[str, list[bool]]:
     CONTAINER.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=CONTAINER) as folder:
         copy = Path(folder) / path.name
-        with zipfile.ZipFile(copy, "w", zipfile.ZIP_DEFLATED) as target:
-            for info, content in parts:
-                written = content
-                if info.filename == "word/document.xml":
-                    written = _PARAGRAPH_START.sub(mark, content.decode("utf-8")).encode("utf-8")
-                target.writestr(info.filename, written)
-        done = _osascript(
-            ["osascript", "-", str(copy), copy.name],
-            input=EMPHASIS,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            check=False,
-        )
+        copy.write_bytes(_with_document(path, lambda xml: _PARAGRAPH_START.sub(mark, xml)))
+        done = _osascript(["osascript", "-", str(copy), copy.name], EMPHASIS)
     if done.returncode != 0:
         raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
     answers: dict[str, list[bool]] = {}
@@ -720,14 +692,7 @@ def word_note_marks(path: Path) -> dict[str, list[str]] | None:
         copy = Path(folder) / path.name
         text = copy.with_suffix(".txt")
         copy.write_bytes(probe)
-        done = _osascript(
-            ["osascript", "-", str(copy), str(text), copy.name, text.name],
-            input=EXPORT,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            check=False,
-        )
+        done = _osascript(["osascript", "-", str(copy), str(text), copy.name, text.name], EXPORT)
         if done.returncode != 0:
             raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
         saved = text.read_bytes().decode("mac_roman")
@@ -814,6 +779,21 @@ _CAPS_KEPT = frozenset("\u00b5" + "".join(chr(code) for code in range(0x2170, 0x
 _CAPS_OWN = {"\u0390": "\u03aa", "\u03b0": "\u03ab"}
 
 
+def _capitalised(paragraph: Paragraph) -> str:
+    """The paragraph's text as Word shows it: its caps marks in Word's capitals.
+
+    Word's text shows text in capitals as capitals, where the reader keeps the letters and marks
+    them: so the marks are held to Word too.
+    """
+    text = paragraph.text
+    for mark in paragraph.marks:
+        if mark.kind == "caps":
+            text = (
+                text[: mark.start] + _word_capitals(text[mark.start : mark.end]) + text[mark.end :]
+            )
+    return text
+
+
 def _word_capitals(text: str) -> str:
     """``text`` as Word shows it in capitals."""
     out: list[str] = []
@@ -841,14 +821,7 @@ def word_stories(path: Path) -> dict[str, list[list[Any]]] | None:
     with tempfile.TemporaryDirectory(dir=CONTAINER) as folder:
         copy = Path(folder) / path.name
         shutil.copyfile(path, copy)
-        done = _osascript(
-            ["osascript", "-", str(copy), path.name],
-            input=STORIES,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            check=False,
-        )
+        done = _osascript(["osascript", "-", str(copy), path.name], STORIES)
     if done.returncode != 0:
         raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
     stories: list[list[Any]] = []
@@ -863,15 +836,6 @@ def word_stories(path: Path) -> dict[str, list[list[Any]]] | None:
             pages = fields[4].split(SEPARATOR) if fields[4] else []
             stories.append([fields[0], int(fields[1]), fields[2], fields[3], pages])
     return {"stories": stories, "comments": comments}
-
-
-def _shown(text: str) -> list[str]:
-    """Word's text of a story as its paragraphs, empty ones left out.
-
-    A paragraph ends at a paragraph mark, or at a table cell's end mark (U+0007), which Word's
-    text shows after the cell's last paragraph with or without a paragraph mark.
-    """
-    return [piece for piece in re.split(r"[\r\n\x07]", text) if piece]
 
 
 def story_verdict(word: dict[str, list[list[Any]]], path: Path) -> str:
@@ -900,13 +864,7 @@ def story_verdict(word: dict[str, list[list[Any]]], path: Path) -> str:
             mine: list[str] = []
             left = list(pages)
             for paragraph in story.paragraphs:
-                # Word's text shows text in capitals as capitals, where the reader keeps the
-                # letters and marks them: so the marks are held to Word too.
-                filled = paragraph.text
-                for mark in paragraph.marks:
-                    if mark.kind == "caps":
-                        upper = _word_capitals(filled[mark.start : mark.end])
-                        filled = filled[: mark.start] + upper + filled[mark.end :]
+                filled = _capitalised(paragraph)
                 # Word's text shows an inline picture as "/", where the reader writes one U+FFFC
                 # (the conservation check holds each to a picture in the source).
                 filled = filled.replace("\ufffc", "/")
@@ -917,9 +875,9 @@ def story_verdict(word: dict[str, list[list[Any]]], path: Path) -> str:
                     filled = filled[:offset] + number + filled[offset:]
                 if filled:
                     mine.append(filled)
-            if mine != _shown(text) or left:
+            if mine != _paragraphs_shown(text) or left:
                 return f"differs in the {story.kind} {type_} of section {section + 1}"
-    theirs = sorted((author, "".join(_shown(text))) for author, text in word["comments"])
+    theirs = sorted((author, "".join(_paragraphs_shown(text))) for author, text in word["comments"])
     readers = sorted(
         (comment.author or "", "".join(p.text for p in comment.paragraphs))
         for comment in document.comments
@@ -948,14 +906,7 @@ def text_verdict(word: list[str], path: Path) -> str:
         return f"reader refuses: {refused.code}"
     mine: list[str] = []
     for paragraph in paragraphs:
-        text = paragraph.text
-        for mark in paragraph.marks:
-            if mark.kind == "caps":
-                text = (
-                    text[: mark.start]
-                    + _word_capitals(text[mark.start : mark.end])
-                    + text[mark.end :]
-                )
+        text = _capitalised(paragraph)
         inserts = [(note.offset, "\x02") for note in paragraph.notes]
         inserts += [(offset, "\x00") for offset in paragraph.pages]
         for offset, code in sorted(inserts, reverse=True):
