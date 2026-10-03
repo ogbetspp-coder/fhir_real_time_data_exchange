@@ -227,15 +227,7 @@ EQUIVALENT: dict[tuple[str, str, str], str] = {
         "def mark(self, kind: str, value: Any, custom: bool = False) -> None:",
         "bool",
     ): ("the custom flag is read only on a body's note reference, which always passes it"),
-    ("<module>", "in_table: bool = False", "bool"): (
-        "the one place a paragraph is made sets whether it is in a table"
-    ),
     ("<module>", "section: int = 0", "int:0"): "the one place a paragraph is made sets its section",
-    (
-        "_Fonts.style_ids",
-        'style_id = None if kind == "character" else self.defaults.get(kind)',
-        "str:'character'",
-    ): "style_ids is asked only for paragraph and table styles: kind is never 'character'",
     (
         "_note_marks",
         "section = sections[min(paragraph.section, len(sections) - 1)] if sections else None",

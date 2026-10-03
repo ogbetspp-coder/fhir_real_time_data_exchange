@@ -30,10 +30,8 @@ import tempfile
 import zipfile
 from pathlib import Path
 
+from label_docx.word import CONTAINER, WORD
 from numbering_cases import HEADINGS, OUTLINE_NUMBERING, Case, heading, package, para, words
-
-WORD = Path("/Applications/Microsoft Word.app")
-CONTAINER = Path.home() / "Library/Containers/com.microsoft.Word/Data"
 
 # Insert a table of contents, with page numbers, at the first paragraph; save as .docx.
 TABLE_OF_CONTENTS = """

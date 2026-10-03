@@ -29,6 +29,7 @@ import re
 import sys
 import zipfile
 from collections.abc import Callable
+from functools import partial
 from pathlib import Path
 from typing import NamedTuple
 from xml.sax.saxutils import escape, unescape
@@ -171,11 +172,6 @@ def _with_property(xml: str, rng: random.Random, prop: str, absent: str) -> str 
     return xml[: match.start()] + changed + xml[match.end() :]
 
 
-def superscript(xml: str, rng: random.Random) -> str | None:
-    """A run of text is raised to superscript."""
-    return _with_property(xml, rng, '<w:vertAlign w:val="superscript"/>', "vertAlign")
-
-
 def _flip(xml: str, rng: random.Random, tag: str) -> str | None:
     """A run's toggle ``tag`` turned the other way, so that Word shows a change.
 
@@ -208,16 +204,6 @@ def _flip(xml: str, rng: random.Random, tag: str) -> str | None:
     else:
         changed = re.sub(r"(<w:r(?:\s[^>]*)?>)", rf"\1<w:rPr><w:{tag}/></w:rPr>", run, count=1)
     return xml[: match.start()] + changed + xml[match.end() :]
-
-
-def strike(xml: str, rng: random.Random) -> str | None:
-    """A run of text is struck through, or no longer."""
-    return _flip(xml, rng, "strike")
-
-
-def hide(xml: str, rng: random.Random) -> str | None:
-    """A run of text is hidden."""
-    return _with_property(xml, rng, "<w:vanish/>", "vanish")
 
 
 def symbol(xml: str, rng: random.Random) -> str | None:
@@ -287,43 +273,35 @@ def proofing(xml: str, rng: random.Random) -> str | None:
     return xml[: match.start()] + '<w:proofErr w:type="spellStart"/>' + xml[match.start() :]
 
 
-def language(xml: str, rng: random.Random) -> str | None:
-    """A run's proofing language changes."""
-    return _with_property(xml, rng, '<w:lang w:val="fr-FR"/>', "<w:lang")
-
-
-def bold(xml: str, rng: random.Random) -> str | None:
-    """A run of text is made bold, or no longer."""
-    return _flip(xml, rng, "b")
-
-
-def italic(xml: str, rng: random.Random) -> str | None:
-    """A run of text is made italic, or no longer."""
-    return _flip(xml, rng, "i")
-
-
-def size(xml: str, rng: random.Random) -> str | None:
-    """A run of text is set in 14 points."""
-    return _with_property(xml, rng, '<w:sz w:val="28"/>', "<w:sz ")
-
-
 MUTATIONS = [
     Mutation("change a character", "change", change_character),
     Mutation("delete a word", "change", delete_word),
     Mutation("insert a word", "change", insert_word),
     Mutation("delete a paragraph", "change", delete_paragraph),
-    Mutation("superscript", "change", superscript),
-    Mutation("strike through", "change", strike),
-    Mutation("hide text", "change", hide),
+    Mutation(
+        "superscript",
+        "change",
+        partial(_with_property, prop='<w:vertAlign w:val="superscript"/>', absent="vertAlign"),
+    ),
+    Mutation("strike through", "change", partial(_flip, tag="strike")),
+    Mutation("hide text", "change", partial(_with_property, prop="<w:vanish/>", absent="vanish")),
     Mutation("change a symbol", "change", symbol),
     Mutation("change a list level", "change", list_level),
     Mutation("revision bookkeeping", "same", rsid),
     Mutation("split a run", "same", split_run),
     Mutation("proofing mark", "same", proofing),
-    Mutation("proofing language", "same", language),
-    Mutation("bold", "change", bold),
-    Mutation("italic", "change", italic),
-    Mutation("font size", "unreported", size),
+    Mutation(
+        "proofing language",
+        "same",
+        partial(_with_property, prop='<w:lang w:val="fr-FR"/>', absent="<w:lang"),
+    ),
+    Mutation("bold", "change", partial(_flip, tag="b")),
+    Mutation("italic", "change", partial(_flip, tag="i")),
+    Mutation(
+        "font size",
+        "unreported",
+        partial(_with_property, prop='<w:sz w:val="28"/>', absent="<w:sz "),
+    ),
 ]
 
 

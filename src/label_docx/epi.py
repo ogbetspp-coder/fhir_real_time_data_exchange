@@ -143,7 +143,7 @@ from label_docx.reader import Mark, Numbering, Paragraph
 # default lines (a sup styled sub is lowered only), sizes text by the cascade (faint under 2pt),
 # and draws a link styled inherit or currentcolor in the colour around it: each found by
 # generated sections held to Chrome (scripts/fuzz_epi.py).
-READER_VERSION = "epi-reader/1.2.0"
+READER_VERSION = "epi-reader/1.2.1"
 XHTML = "http://www.w3.org/1999/xhtml"
 OBJECT = "\ufffc"
 _COLLAPSIBLE = " \t\n\r\f"
@@ -662,9 +662,8 @@ _DROPPED: Final[dict[str, frozenset[str]]] = {
 }
 
 
-def _style(style: str) -> set[str]:
-    """The mark kinds a style attribute asks for, or a refusal."""
-    kinds: set[str] = set()
+def _style(style: str) -> None:
+    """Refuse a style attribute with a declaration the reader cannot read as a browser does."""
     for name, value in _declarations(style):
         if name == "font-family":
             # A symbol-encoded font draws other glyphs for the same code points (Wingdings "J"
@@ -706,7 +705,6 @@ def _style(style: str) -> set[str]:
                 raise _RefusedError("unsupported-style", f"text-decoration: {value}")
         else:
             raise _RefusedError("unsupported-style", f"{name}: {value}")
-    return kinds
 
 
 # A relative shift moves text off its line by at most half the smallest line the reader allows
@@ -1187,7 +1185,8 @@ def _check_attributes(element: ET.Element, name: str) -> set[str]:
             raise _RefusedError("embedded-comment", f"{name} class {value!r}")
     style = element.get("style", "")
     _refuse_overprint(name, style)
-    return _style(style) | _shift(name, style)
+    _style(style)
+    return _shift(name, style)
 
 
 # How deep elements may nest (the fidelity scanner allows 32 below the root), and how far left of

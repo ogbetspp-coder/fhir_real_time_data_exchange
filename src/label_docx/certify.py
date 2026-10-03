@@ -130,11 +130,10 @@ class _Paragraph:
     segments: list[_Segment] = field(default_factory=list)
     table: tuple[int, int, int] | None = None
     # What the list and note numbering need: the paragraph's properties, its style, its
-    # table's style, whether it is in a table, and its section (counted from 0).
+    # table's style, and its section (counted from 0).
     properties: ET.Element | None = None
     style: str | None = None
     table_style: str | None = None
-    in_table: bool = False
     section: int = 0
 
 
@@ -217,6 +216,8 @@ class _Fonts:
     def style_ids(self, style_id: str | None, kind: str) -> list[str]:
         """``style_id`` (or its kind's default, never for text) and its basedOn chain."""
         if style_id is None or style_id not in self.kind:
+            # No style named, or none there: the default one of the kind, except for text,
+            # which Word gives no default character style.
             style_id = None if kind == "character" else self.defaults.get(kind)
         out: list[str] = []
         while style_id is not None and style_id in self.kind and style_id not in out:
@@ -225,19 +226,8 @@ class _Fonts:
         return out
 
     def chain(self, style_id: str | None, kind: str) -> list[ET.Element]:
-        if style_id is None or style_id not in self.kind:
-            # No style named, or none there: the default one of the kind, except for text,
-            # which Word gives no default character style.
-            style_id = None if kind == "character" else self.defaults.get(kind)
-        out: list[ET.Element] = []
-        seen: set[str] = set()
-        while style_id is not None and style_id in self.kind and style_id not in seen:
-            seen.add(style_id)
-            rpr = self.rpr[style_id]
-            if rpr is not None:
-                out.append(rpr)
-            style_id = self.based[style_id]
-        return out
+        """The run properties of each style in ``style_ids``, nearest first."""
+        return [rpr for i in self.style_ids(style_id, kind) if (rpr := self.rpr[i]) is not None]
 
     def levels(
         self, run: ET.Element, paragraph_style: str | None, table_style: str | None, in_table: bool
@@ -405,15 +395,11 @@ class _Story:
             properties=properties,
             style=None if style is None else style.get(_w("val")),
             table_style=table_style,
-            in_table=table is not None,
             section=self.section,
         )
         if properties is not None and properties.find(_w("sectPr")) is not None:
             self.section += 1
         self.current = here
-        self.paragraph_style = None if style is None else style.get(_w("val"))
-        self.table_style = table_style
-        self.in_table = table is not None
         self.inline(element)
         self.paragraphs.append(here)
 
@@ -447,10 +433,12 @@ class _Story:
         self.current.segments.append(_Segment(marker=(kind, value), custom=custom))
 
     def run(self, run: ET.Element) -> None:
-        levels = self.fonts.levels(run, self.paragraph_style, self.table_style, self.in_table)
+        here = self.current
+        in_table = here.table is not None
+        levels = self.fonts.levels(run, here.style, here.table_style, in_table)
         symbol = self.fonts.symbol(levels)
         hidden = self.fonts.hidden(levels, run.find(_w("rPr")))
-        kinds = self.fonts.marks(run, self.paragraph_style, self.table_style, self.in_table)
+        kinds = self.fonts.marks(run, here.style, here.table_style, in_table)
         shown: list[str] = []
         for child in run:
             local = _local(child.tag)
@@ -938,7 +926,11 @@ class _Numbering:
                 look.rpr,
                 None if paragraph.properties is None else paragraph.properties.find(_w("rPr")),
                 *self.fonts.chain(paragraph.style, "paragraph"),
-                *(self.fonts.chain(paragraph.table_style, "table") if paragraph.in_table else []),
+                *(
+                    self.fonts.chain(paragraph.table_style, "table")
+                    if paragraph.table is not None
+                    else []
+                ),
                 self.fonts.doc_rpr,
             )
             if x is not None
@@ -955,7 +947,11 @@ def _numbering_of(fonts: _Fonts, paragraph: _Paragraph) -> tuple[int, int] | Non
         *(fonts.ppr.get(i) for i in fonts.style_ids(paragraph.style, "paragraph")),
         *(
             fonts.ppr.get(i)
-            for i in (fonts.style_ids(paragraph.table_style, "table") if paragraph.in_table else [])
+            for i in (
+                fonts.style_ids(paragraph.table_style, "table")
+                if paragraph.table is not None
+                else []
+            )
         ),
         fonts.doc_ppr,
     ]

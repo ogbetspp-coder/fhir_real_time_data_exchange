@@ -49,16 +49,15 @@ def service_main(argv: list[str] | None = None) -> int:
     serving.add_argument("--store", type=Path, required=True)
     serving.add_argument("--host", default="127.0.0.1")
     serving.add_argument("--port", type=int, default=8080)
-    for command in (serving,):
-        command.add_argument(
-            "--browser",
-            choices=("auto", "on", "require", "off"),
-            default="auto",
-            help=(
-                "hold every ePI to Chrome: where installed (auto), always (on), always and serve "
-                "no read Chrome has not checked (require), never (off)"
-            ),
-        )
+    serving.add_argument(
+        "--browser",
+        choices=("auto", "on", "require", "off"),
+        default="auto",
+        help=(
+            "hold every ePI to Chrome: where installed (auto), always (on), always and serve "
+            "no read Chrome has not checked (require), never (off)"
+        ),
+    )
     ingesting = commands.add_parser("ingest", help="ingest files; print one receipt each")
     ingesting.add_argument("--store", type=Path, required=True)
     ingesting.add_argument("--browser", choices=("auto", "on", "require", "off"), default="auto")

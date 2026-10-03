@@ -36,6 +36,7 @@ or states as a residual.
 from __future__ import annotations
 
 import argparse
+import collections
 import datetime
 import json
 import sys
@@ -54,6 +55,7 @@ from label_docx.browser import (
     reader_lines,
     reader_markers,
 )
+from lock import MANIFESTS
 
 
 def sections(path: Path) -> list[epi.Section]:
@@ -122,7 +124,7 @@ def main() -> int:
     )
     args = parser.parse_args()
     paths = (
-        sorted(p for p in args.folder.glob("*.json") if p.stem not in _NOT_EPI)
+        sorted(p for p in args.folder.glob("*.json") if p.stem not in MANIFESTS)
         if args.command == "record"
         else args.files
     )
@@ -135,9 +137,7 @@ def main() -> int:
             sys.stdout.write(f"{path.name}: reader refuses the document: {refused}\n")
             continue
         answers[path.name] = digests
-        counts: dict[str, int] = {}
-        for verdict in verdicts:
-            counts[verdict.split(":")[0]] = counts.get(verdict.split(":")[0], 0) + 1
+        counts = collections.Counter(verdict.split(":")[0] for verdict in verdicts)
         sys.stdout.write(f"{path.name}: {json.dumps(counts, sort_keys=True)}\n")
         for index, verdict in enumerate(verdicts):
             if not verdict.startswith(("agrees", "reader refuses")):
@@ -160,8 +160,6 @@ def main() -> int:
         sys.stdout.write(f"wrote {target}\n")
     return 1 if differs else 0
 
-
-_NOT_EPI = {"sources", "expected", "word", "browser"}
 
 if __name__ == "__main__":
     raise SystemExit(main())

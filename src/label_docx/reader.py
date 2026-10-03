@@ -202,6 +202,7 @@ import posixpath
 import re
 import xml.etree.ElementTree as ET
 import zipfile
+from collections.abc import Iterator
 from dataclasses import dataclass, field, replace
 
 # The version of the rules above. A change to this file changes its hash in versions.lock.json,
@@ -224,7 +225,7 @@ from dataclasses import dataclass, field, replace
 # above, or a level with lvlRestart counted first by a deeper one, is refused; 1.15.0 restarts
 # a level as the list whose paragraph restarted it says (its startOverride, else the start), and
 # refuses a level that never restarts shown in a deeper level's label.
-READER_VERSION = "docx-reader/1.17.0"
+READER_VERSION = "docx-reader/1.17.1"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -637,34 +638,34 @@ class _Package:
         except ET.ParseError as error:
             raise DocxRefusedError("invalid-package", f"{name} is not well-formed") from error
 
-    def target(self, source: str, relationship: str | None, kind: str) -> str:
-        """The part ``source``'s relationship ``relationship`` names; refused unless a ``kind``."""
+    def _relationships(self, source: str) -> Iterator[tuple[ET.Element, str]]:
+        """Each of ``source``'s relationships, with the part name its target resolves to."""
         folder, base = posixpath.split(source)
         rels = self.part(posixpath.join(folder, "_rels", base + ".rels"))
         for rel in [] if rels is None else rels.findall(f"{{{PR}}}Relationship"):
-            if rel.get("Id") != relationship:
-                continue
-            if rel.get("TargetMode") == "External" or not rel.get("Type", "").endswith("/" + kind):
-                raise DocxRefusedError("invalid-package", f"{relationship} is not a {kind} part")
             target = rel.get("Target", "")
             resolved = target[1:] if target.startswith("/") else posixpath.join(folder, target)
-            return posixpath.normpath(resolved)
+            yield rel, posixpath.normpath(resolved)
+
+    @staticmethod
+    def _is(rel: ET.Element, kind: str) -> bool:
+        """Whether ``rel`` is an internal relationship whose type ends in ``kind``."""
+        return rel.get("TargetMode") != "External" and rel.get("Type", "").endswith("/" + kind)
+
+    def target(self, source: str, relationship: str | None, kind: str) -> str:
+        """The part ``source``'s relationship ``relationship`` names; refused unless a ``kind``."""
+        for rel, name in self._relationships(source):
+            if rel.get("Id") == relationship:
+                if not self._is(rel, kind):
+                    raise DocxRefusedError(
+                        "invalid-package", f"{relationship} is not a {kind} part"
+                    )
+                return name
         raise DocxRefusedError("invalid-package", f"no relationship {relationship}")
 
     def related(self, source: str, kind: str) -> list[str]:
         """Target part names of ``source``'s internal relationships whose type ends in ``kind``."""
-        folder, base = posixpath.split(source)
-        rels = self.part(posixpath.join(folder, "_rels", base + ".rels"))
-        if rels is None:
-            return []
-        out: list[str] = []
-        for rel in rels.findall(f"{{{PR}}}Relationship"):
-            if rel.get("TargetMode") == "External" or not rel.get("Type", "").endswith("/" + kind):
-                continue
-            target = rel.get("Target", "")
-            resolved = target[1:] if target.startswith("/") else posixpath.join(folder, target)
-            out.append(posixpath.normpath(resolved))
-        return out
+        return [name for rel, name in self._relationships(source) if self._is(rel, kind)]
 
 
 # --- styles --------------------------------------------------------------------------------
@@ -727,9 +728,7 @@ class _Styles:
 
     def resolve_named(self, style_id: str | None, kind: str) -> list[_Style]:
         """The chain of ``style_id`` if it names a style there, else none (no default)."""
-        if style_id is None or style_id not in self.styles:
-            return []
-        return self.chain(self.effective(style_id, kind))
+        return self.resolve(style_id, kind) if style_id in self.styles else []
 
     def chain(self, style_id: str | None) -> list[_Style]:
         out: list[_Style] = []
@@ -1541,14 +1540,14 @@ def _paragraph(
         )
     if reader.layout:
         raise DocxRefusedError("unbalanced-field", "a page number runs past its paragraph")
-    numbering = _numbering(
-        [
-            ppr,
-            *(s.ppr for s in styles.resolve(style, "paragraph")),
-            *(s.ppr for s in styles.chain(table_style)),
-            styles.default_ppr,
-        ]
-    )
+    # The paragraph's properties, then its style's, its table style's and the defaults.
+    levels = [
+        ppr,
+        *(s.ppr for s in styles.resolve(style, "paragraph")),
+        *(s.ppr for s in styles.chain(table_style)),
+        styles.default_ppr,
+    ]
+    numbering = _numbering(levels)
     context = _Context(
         style=styles.effective(style, "paragraph"),
         table_style=table_style,
@@ -1565,15 +1564,7 @@ def _paragraph(
         style=style,
         numbering=numbering,
         table=table,
-        marks=_paragraph_marks(
-            reader,
-            [
-                ppr,
-                *(s.ppr for s in styles.resolve(style, "paragraph")),
-                *(s.ppr for s in styles.chain(table_style)),
-                styles.default_ppr,
-            ],
-        ),
+        marks=_paragraph_marks(reader, levels),
         mark_hidden=mark_hidden,
         notes=tuple(reader.notes),
         pages=tuple(reader.pages),
@@ -1664,7 +1655,6 @@ class _Level:
     legal: bool
     suffix: str
     rpr: ET.Element | None
-    style: str | None
     # Why the level cannot be drawn, if it cannot; refused only when a paragraph uses it.
     unsupported: str | None
 
@@ -1705,7 +1695,6 @@ def _level(element: ET.Element) -> _Level:
         legal=bool(_on(element.find(_w("isLgl")))),
         suffix=suffix,
         rpr=element.find(_w("rPr")),
-        style=value("pStyle"),
         unsupported=unsupported,
     )
 
@@ -2206,10 +2195,9 @@ def _read_notes(
         note = _int(element.get(_w("id"), ""), f"{kind} id")
         if note in notes:
             raise DocxRefusedError("invalid-package", f"{kind} {note} is defined twice")
-        runs: set[ET.Element] = set()
-        reader = _Body(styles, runs, (kind, note))
+        reader = _Body(styles, (kind, note))
         reader.blocks(element, None, None)
-        _check_accounted(element, runs)
+        _check_accounted(element, reader.runs)
         if any(c.fields for c in reader.contexts):
             # Whether Word counts a SEQ in a note with the body's is not yet on record.
             raise DocxRefusedError("computed-field", f"a SEQ or STYLEREF field in a {kind}")
@@ -2277,13 +2265,6 @@ def _switches(
     return arguments, switches
 
 
-def _heading_level(style: str | None, styles: _Styles) -> int | None:
-    """The level of a built-in heading style: Word goes by the name, not the outline level."""
-    name = styles.styles[style].name if style in styles.styles else None
-    match = _HEADING.fullmatch((name or "").lower())
-    return int(match.group(1)) if match else None
-
-
 def _verify_fields(
     paragraphs: list[Paragraph], contexts: list[_Context], styles: _Styles, loose: set[str]
 ) -> None:
@@ -2298,7 +2279,8 @@ def _verify_fields(
         (styles.styles[c.style].name or "").lower() if c.style in styles.styles else ""
         for c in contexts
     ]
-    levels = [_heading_level(c.style, styles) for c in contexts]
+    # A built-in heading style's level: Word goes by the name, not the outline level.
+    levels = [int(m.group(1)) if (m := _HEADING.fullmatch(name)) else None for name in names]
     bookmarks = _bookmarks(contexts, loose)
     # Per SEQ identifier: its value, and the paragraph of its last field.
     counted: dict[str, tuple[int, int]] = {}
@@ -2451,16 +2433,15 @@ def _styleref(
 class _Body:
     """Reads the blocks of one story: the body, or one note."""
 
-    def __init__(
-        self, styles: _Styles, runs: set[ET.Element], story: tuple[str, int] | None = None
-    ) -> None:
+    def __init__(self, styles: _Styles, story: tuple[str, int] | None = None) -> None:
         self.styles = styles
         self.story = story
         self.out: list[Paragraph] = []
         self.contexts: list[_Context] = []
         self.tables = 0
         self.rows_ended = 0
-        self.runs = runs
+        # Every run read, so that the part's every run is known to be accounted for.
+        self.runs: set[ET.Element] = set()
         # The sectPr closing each section so far; a paragraph holding one ends its section.
         self.sections: list[ET.Element] = []
         # Ids of bookmarks that start or end between paragraphs, which REF cannot be read from.
@@ -2589,10 +2570,9 @@ def read_document(data: bytes) -> Document:
     body = document.find(_w("body"))
     if body is None:
         raise DocxRefusedError("invalid-package", "no w:body")
-    runs: set[ET.Element] = set()
-    reader = _Body(styles, runs)
+    reader = _Body(styles)
     reader.blocks(body, None, None)
-    _check_accounted(document, runs)
+    _check_accounted(document, reader.runs)
     paragraphs = _labelled(reader.out, reader.contexts, lists)
     sections: list[ET.Element | None] = [*reader.sections, body.find(_w("sectPr"))]
     marks = _note_marks(paragraphs, reader.contexts, sections)
@@ -2729,10 +2709,9 @@ def _read_blocks(
     body is not on record. A page number is placed, as in the body.
     """
     _check_part(root)
-    runs: set[ET.Element] = set()
-    reader = _Body(styles, runs, story)
+    reader = _Body(styles, story)
     reader.blocks(root, None, None)
-    _check_accounted(root, runs)
+    _check_accounted(root, reader.runs)
     if any(c.fields for c in reader.contexts):
         raise DocxRefusedError("computed-field", f"a SEQ, STYLEREF or REF field in a {story[0]}")
     if any(p.numbering is not None and p.numbering.num_id for p in reader.out):

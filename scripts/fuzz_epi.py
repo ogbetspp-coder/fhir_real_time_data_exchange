@@ -19,6 +19,7 @@ tests hold every later reader to them without a browser.
 from __future__ import annotations
 
 import argparse
+import collections
 import hashlib
 import json
 import random
@@ -38,7 +39,7 @@ from label_docx.browser import (
     reader_markers,
 )
 
-XHTML = "http://www.w3.org/1999/xhtml"
+XHTML = epi.XHTML
 WORDS = [
     "Store",
     "below",
@@ -264,10 +265,9 @@ def run(divs: list[str]) -> dict[str, int]:
     read = [(i, epi.read_div(div)) for i, div in enumerate(divs)]
     readable = [(i, paragraphs) for i, (paragraphs, refusal, _) in read if refusal is None]
     counts = {"cases": len(divs), "read": len(readable), "agree": 0, "differ": 0}
-    refused: dict[str, int] = {}
-    for _, (_, refusal, _) in read:
-        if refusal is not None:
-            refused[refusal.code] = refused.get(refusal.code, 0) + 1
+    refused = collections.Counter(
+        refusal.code for _, (_, refusal, _) in read if refusal is not None
+    )
     for start in range(0, len(readable), 250):
         batch = readable[start : start + 250]
         shown = browser_sections([divs[i] for i, _ in batch])

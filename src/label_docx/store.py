@@ -149,8 +149,8 @@ class Store:
                 verdict = canonical(verifier(data, value))
             except BrowserError, WordError:
                 # The application could not be asked: nothing is verified, and nothing kept.
-                verdict = None
-            if verdict is not None:
+                pass
+            else:
                 application = json.loads(verdict)["application"]
                 name = re.sub(r"[^A-Za-z0-9.]+", "-", application).strip("-")
                 _write_once(path.parent / folder / f"{name}.json", verdict)
