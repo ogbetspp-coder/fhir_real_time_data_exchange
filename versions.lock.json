@@ -1,8 +1,12 @@
 {
+  "browser-verifier": {
+    "browser-verifier/1.0.0": "a7ef42467460483b111204f7b02b9b162ebb7a77c101407c3277b6f1e79ed259"
+  },
   "epi-format": {
     "label-epi-json/1.0.0": "04a1a22d95b7570feebe380292650de5983c44f4e6da7d0616d234ca68a891f6",
     "label-epi-json/1.1.0": "772c266a695a6511512e0057103b203a461a3531432ca4d10a894c9b7e2806e3",
     "label-epi-json/1.10.0": "96eaac757204369b400079ded12f33869097adadbfa25038e2a9c73e9ba8ec52",
+    "label-epi-json/1.11.0": "974d319f120cfeed1f13c471a44cceac0d749fc57815223ca4d0978cd50b185d",
     "label-epi-json/1.2.0": "9ca56ae701d6b7a34354347a7ffa37cc71ac61d8fa9267d96fafab062bee1c7b",
     "label-epi-json/1.3.0": "26adc7f56e2f9f8e029c50acc1fcc6035e91d5a94439cdf46d2b6596cabbe363",
     "label-epi-json/1.4.0": "b10698f27f841948381165801702ceffafa6984613b7aa56cd686a0510674d6c",
@@ -18,7 +22,8 @@
     "epi-reader/1.1.0": "f337c648a32711d25f07630df5c2a00c84b02f12337e2e5bde7649d3c88e24cc",
     "epi-reader/1.2.0": "8f8cca3a75a5adb6296944edcd4042fa77304620888a953b6b7a790d6d3a6da5",
     "epi-reader/1.2.1": "a3fd1c4839c28c565a38c0609ab247375022c4085474f9a541f0cfaed7a1608a",
-    "epi-reader/1.2.2": "eca6579afe5980ca0cbb310495e9f7cdc72d93fca2d28ca44538200e5868015f"
+    "epi-reader/1.2.2": "eca6579afe5980ca0cbb310495e9f7cdc72d93fca2d28ca44538200e5868015f",
+    "epi-reader/1.3.0": "72e7c729d4a13e6841203f388ed3d959adc5303610b515f0532eff7aab262606"
   },
   "format": {
     "label-docx-json/1.0.0": "5f1aa016f095c2975f647d1c0e03eb547b25ae493571e21b7a171a8c86f320ab",
@@ -27,6 +32,7 @@
     "label-docx-json/1.11.0": "c94708becdfa2368f991c83b85d3f552e87072b5e11e6d424ee66f0ec0fea399",
     "label-docx-json/1.12.0": "ab337e914bab72740bf6d8a2d57adef43b350a06f8c3a81bc60d6f1ac14e01f9",
     "label-docx-json/1.13.0": "85566dd1af78c7d650dc00da039a2e8702463c0b90f2b400b207663b6f1a953a",
+    "label-docx-json/1.14.0": "a4d4dbbfdaed6cb63e4a4c419f641f7200181362919cece4d4ec0fca2177875f",
     "label-docx-json/1.2.0": "3c10d5388ab9d2750826a2f30eef16087fc90e58fa12b0fb9fa4f9b428b985fc",
     "label-docx-json/1.3.0": "a56e25eb39a051df80b9661f2fcc7ff1c7240f96f9862a6dc23d707dc8407de8",
     "label-docx-json/1.4.0": "266c709e28a4814eb78248a2dd818f67881b8f9af7155730c760c9aad6716e92",
@@ -52,6 +58,7 @@
     "docx-reader/1.2.0": "30afaa0572818196075e4e720c9cefd642c7008b014637fa1b19b2d51e730b9a",
     "docx-reader/1.20.0": "2d0963ecf51b752e2b3243ecc996fe80e4e0537df54cd1e2ea32a281b48f16f0",
     "docx-reader/1.21.0": "819c35b80a49013d64b9f93f8668984d9142cb079b95bc45531193e3be1d8469",
+    "docx-reader/1.22.0": "8e82b848b516566102836275f3fcda9183839ee9abdf6a5bbf0476e1e578213c",
     "docx-reader/1.3.0": "2fb96f3f5c5eb998d8f2de35ba9669b14a335f68d6119f6f1dcfcac01c380c6f",
     "docx-reader/1.4.0": "61a7b3ee186589dae63fa6c08da961d420aafba9291cdb14dc4a319c3e7cf84e",
     "docx-reader/1.5.0": "143615f93641f66881cc38eac2345064db4e3917d7c172361bf6350b70bf5648",
@@ -59,5 +66,8 @@
     "docx-reader/1.7.0": "d39e71badeff33917735a96f0d442ecfdc133aaf718833ac477e8d651888562f",
     "docx-reader/1.8.0": "f1478152b6ba8844334c74af2cbff3829fee9892f2c817e3e645e3e7f149947f",
     "docx-reader/1.9.0": "c7bfc0234b6c1ecbe6101ce7ac0295ad9ce936dfb7ffe282cb1fdf55d270fcdd"
+  },
+  "word-verifier": {
+    "word-verifier/1.0.0": "4a6eb9cd9f45e499e53481137cf68e7043bd54dbb3b8391976adbab615ee0649"
   }
 }

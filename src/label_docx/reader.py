@@ -300,7 +300,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 # The version of the rules above; versions.lock.json ties it to this file (tests/test_locks.py).
-READER_VERSION = "docx-reader/1.21.0"
+READER_VERSION = "docx-reader/1.22.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -1350,6 +1350,8 @@ def _font_class(name: str | None) -> str:
         return "symbol"
     if name == "Wingdings":
         return "wingdings"
+    if name == "Segoe UI Symbol":  # a Unicode font: Word draws each character as stored
+        return "text"
     key = name.lower().replace(" ", "")
     if any(part in key for part in _DINGBAT_FONTS):
         return "dingbat"

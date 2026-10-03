@@ -81,7 +81,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT, WINGDINGS_BULLETS
 
-CHECKER_VERSION = "conservation-check/1.9.0"
+CHECKER_VERSION = "conservation-check/1.10.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -500,7 +500,14 @@ def _drawn_complex(character: str) -> bool:
 
 def _is_symbol(name: str | None) -> bool:
     """Whether a font is Symbol, by its exact name; another spelling of it is not on record."""
-    if name is not None and name != "Symbol" and "symbol" in name.lower().replace(" ", ""):
+    # Segoe UI Symbol is a Unicode font, whose characters are drawn as stored.
+    unicode_font = name == "Segoe UI Symbol"
+    if (
+        name is not None
+        and name != "Symbol"
+        and not unicode_font
+        and "symbol" in name.lower().replace(" ", "")
+    ):
         raise CertificationError(f"the font {name!r}")
     return name == "Symbol"
 

@@ -7,6 +7,7 @@ reads the four pinned EMA files in corpus/ema-qrd, which is where the rules were
 from __future__ import annotations
 
 import io
+import json
 import struct
 import zipfile
 import zlib
@@ -14,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from label_docx import read as served
 from label_docx.certify import CertificationError, DocxSource
 from label_docx.reader import (
     Document,
@@ -2971,3 +2973,16 @@ def test_layout_within_bounds_is_read() -> None:
         p(r("<w:t>2 tablets</w:t>", TEN_POINTS + '<w:spacing w:val="-31"/>')),
     ):
         assert text_of(body) in (["2 tablets"], [""])
+
+
+def test_segoe_ui_symbol_is_a_unicode_font_read_as_stored() -> None:
+
+    # A Unicode font whose name holds "Symbol" (the FDA SPL rendering uses it): read as stored.
+    name = "Segoe UI Symbol"
+    run = p(r("<w:t>☐ a</w:t>", f'<w:rFonts w:ascii="{name}" w:hAnsi="{name}"/>'))
+    assert text_of(run) == ["☐ a"]
+    # Any other name holding "Symbol" stays refused.
+    other = p(r("<w:t>a</w:t>", '<w:rFonts w:ascii="Segoe Symbol" w:hAnsi="Segoe Symbol"/>'))
+    assert refusal(other) == "symbol-font"
+    value = json.loads(served(docx(run))[0])
+    assert value["paragraphs"][0]["text"] == "☐ a"
