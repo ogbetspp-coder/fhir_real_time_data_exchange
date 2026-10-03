@@ -10,17 +10,28 @@ Word's answer is not taken.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+import word_oracle
+from label_docx import word as word_module
+from label_docx.reader import DocxRefusedError, read_document
 from label_docx.word import (
+    _has_computed_fields,
     _has_stories,
     _label_fonts,
+    _mark_fields,
+    _mark_paragraphs,
+    _set_page_numbers_aside,
     emphasis_verdict,
     field_verdict,
+    judge,
     label_as_drawn,
     note_verdict,
     print_verdict,
@@ -29,8 +40,10 @@ from label_docx.word import (
     story_verdict,
     text_verdict,
     verdict,
+    word_stories,
 )
-from test_reader import _field, _marked, docx, p, r
+from test_headers_comments import COMMENT, _commented, _document, header, reference
+from test_reader import W, _field, _marked, document_xml, docx, p, r
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 RECORDS = sorted(CORPUS.glob("*/word.json"))
@@ -80,11 +93,16 @@ def _record(path: Path) -> dict[str, Any]:
     return data
 
 
-def _cases() -> list[tuple[Path, list[str], list[str | None]]]:
-    out: list[tuple[Path, list[str], list[str | None]]] = []
+def _cases() -> list[tuple[Path, list[str], list[str | None], list[int] | None]]:
+    out: list[tuple[Path, list[str], list[str | None], list[int] | None]] = []
     for record in RECORDS:
         labels, fonts = _record(record)["drawn"], _record(record)["fonts"]
-        out += [(record.parent / name, word, fonts[name]) for name, word in sorted(labels.items())]
+        # Where each label is, on record since Word was asked for it (None: in order only).
+        at = _record(record).get("at", {})
+        out += [
+            (record.parent / name, word, fonts[name], at.get(name))
+            for name, word in sorted(labels.items())
+        ]
     return out
 
 
@@ -116,13 +134,13 @@ def test_words_label_fonts_are_on_record_for_every_label() -> None:
 
 
 @pytest.mark.parametrize(
-    ("path", "word", "fonts"), _cases(), ids=lambda value: getattr(value, "stem", "")
+    ("path", "word", "fonts", "at"), _cases(), ids=lambda value: getattr(value, "stem", "")
 )
 def test_the_reader_draws_words_labels_or_refuses_as_listed(
-    path: Path, word: list[str], fonts: list[str | None]
+    path: Path, word: list[str], fonts: list[str | None], at: list[int] | None
 ) -> None:
     key = f"{path.parent.name}/{path.name}"
-    result = verdict(word, reader_labels(path), fonts)
+    result = verdict(word, reader_labels(path), fonts, at)
     if key in REFUSED:
         assert result == f"reader refuses: {REFUSED[key]}"
     else:
@@ -235,11 +253,23 @@ def test_a_label_is_drawn_in_the_font_word_gave_it() -> None:
     assert label_as_drawn("\u00b7", "Symbol") == "\u2022"  # Symbol's code, stored as itself
     assert label_as_drawn("\uf0a7\t", "Wingdings") == "\u25aa\t"
     assert label_as_drawn("\u00a7", "Wingdings") == "\u25aa"
-    # In any other font, or a code in no table: as stored, so the reader's mapping must match it.
+    # In any other font: as stored, so the reader's mapping must match it.
     assert label_as_drawn("\u00a7", "Arial") == label_as_drawn("\u00a7", None) == "\u00a7"
-    assert label_as_drawn("\uf0d8", "Wingdings") == "\uf0d8"
-    assert verdict(["\u00a7\t"], ["\u25aa\t"], ["Wingdings"]) == "agrees"
-    assert verdict(["\u00a7\t"], ["\u25aa\t"], ["Arial"]).startswith("differs")
+    assert verdict(["\u00a7\t"], {0: "\u25aa\t"}, ["Wingdings"]) == "agrees"
+    assert verdict(["\u00a7\t"], {0: "\u25aa\t"}, ["Arial"]).startswith("differs")
+
+
+def test_a_code_no_table_holds_in_a_symbol_font_is_never_agreement() -> None:
+    # Word draws "c." in Symbol as chi and a period, "l" in Wingdings as a disc: a reader that
+    # read them as text has misjudged the font, which is what Word's answer is there to catch.
+    assert label_as_drawn("\uf0d8", "Wingdings") is None
+    for label, font in (("c.\t", "Symbol"), ("iii.", "Symbol"), ("l\t", "Wingdings")):
+        assert label_as_drawn(label, font) is None
+        assert verdict([label], {0: label}, [font]).startswith("differs")
+    assert verdict(["a.\t"], {0: "a.\t"}, ["Symbol"]).startswith("differs")
+    # Two fonts named for one label: which one draws it is not known.
+    assert verdict(["1.\t"], {0: "1.\t"}, ["mixed"]).startswith("differs")
+    assert verdict(["\t"], {0: "\t"}, ["mixed"]) == "agrees"
 
 
 def test_label_fonts_are_read_from_words_saved_copy_and_must_be_its_labels(tmp_path: Path) -> None:
@@ -258,14 +288,14 @@ def test_label_fonts_are_read_from_words_saved_copy_and_must_be_its_labels(tmp_p
         f"<w:p>{square}<w:r><w:tab/></w:r><w:r><w:t>one</w:t></w:r>{box}</w:p>"
         f"<w:p>{number}<w:r><w:t>two</w:t></w:r></w:p>"
     )
-    assert _label_fonts(original, saved, ["\uf0a7\t", "1."]) == ["Wingdings", "mixed"]
+    assert _label_fonts(original, saved, ["\uf0a7\t", "1."]) == (["Wingdings", "mixed"], [0, 1])
     with pytest.raises(SystemExit):
         _label_fonts(original, saved, ["\uf0a7\t"])  # not the labels Word drew
     with pytest.raises(SystemExit):
         _label_fonts(original, docx("<w:p><w:r><w:t>one</w:t></w:r></w:p>"), [])  # one less
     # Word's empty paragraph after a closing table is no paragraph of the document's.
     body = "<w:p><w:r><w:t>one</w:t></w:r></w:p><w:p><w:r><w:t>two</w:t></w:r></w:p>"
-    assert _label_fonts(original, docx(body + "<w:p/>"), []) == []
+    assert _label_fonts(original, docx(body + "<w:p/>"), []) == ([], [])
     with pytest.raises(SystemExit):
         _label_fonts(original, docx(body + "<w:p><w:r><w:t>x</w:t></w:r></w:p>"), [])
 
@@ -352,3 +382,303 @@ def test_a_page_place_agrees_only_with_a_page_number(tmp_path: Path) -> None:
     # PAGEREF \\p shows "above" or "below", which is not a page number.
     for words in ("above", "belowXYZ", "five"):
         assert text_verdict(["Table 1", f"See page {words}."], path).startswith("differs")
+
+
+def test_a_label_on_another_paragraph_than_words_is_not_agreement() -> None:
+    # Word's label on the first paragraph, the reader's on the second: the same sequence.
+    assert verdict(["1.\t"], {1: "1.\t"}, [None], [0]).startswith("differs at list item 1")
+    assert verdict(["1.\t"], {1: "1.\t"}, [None], [1]) == "agrees"
+    # A record made before Word was asked where: the labels in order only.
+    assert verdict(["1.\t"], {1: "1.\t"}, [None]) == "agrees"
+
+
+def test_a_label_word_shows_otherwise_than_its_copy_holds_gets_no_font(tmp_path: Path) -> None:
+    # A character style on the paragraph mark: Word's text shows "A)" and U+F0B7 where its copy
+    # holds "a)" and U+00B7 with no font named. Recorded, but no table vouches for either.
+    original = tmp_path / "a.docx"
+    original.write_bytes(docx(p(r("<w:t>one</w:t>")) + p(r("<w:t>two</w:t>"))))
+    saved = docx(
+        p(r("<w:t>a)</w:t><w:tab/>") + r("<w:t>one</w:t>"))
+        + p(r("<w:t>\u00b7</w:t><w:tab/>") + r("<w:t>two</w:t>"))
+    )
+    assert _label_fonts(original, saved, ["A)\t", "\uf0b7\t"]) == ([None, None], [0, 1])
+    with pytest.raises(SystemExit):
+        _label_fonts(original, saved, ["B)\t", "\uf0b7\t"])
+    with pytest.raises(SystemExit):
+        _label_fonts(original, saved, ["A)\t"])
+    assert verdict(["A)\t"], {0: "a)\t"}, [None], [0]).startswith("differs")
+
+
+def _answers(**changes: Any) -> dict[str, Any]:
+    answers: dict[str, Any] = {
+        "drawn": [],
+        "fonts": [],
+        "at": [],
+        "text": None,
+        "notes": None,
+        "fields": None,
+        "prints": True,
+        "emphasis": {},
+        "stories": None,
+    }
+    return answers | changes
+
+
+def test_what_word_was_not_asked_about_is_not_agreement(tmp_path: Path) -> None:
+    path = tmp_path / "a.docx"
+    note = (
+        '<w:footnote w:id="1"><w:p><w:r><w:footnoteRef/></w:r><w:r><w:t>N</w:t></w:r></w:p>'
+        "</w:footnote>"
+    )
+    path.write_bytes(
+        docx(p(r("<w:t>Take 5 mg</w:t>") + r('<w:footnoteReference w:id="1"/>')), footnotes=note)
+    )
+    assert judge(path, _answers(text=["Take 5 mg\x02"])) == (
+        "differs: Word was not asked about note marks"
+    )
+    assert judge(path, _answers()).startswith("differs: Word was not asked about the text")
+    # A header named by a relationship in single quotes: still a header.
+    body = p(r("<w:t>Body</w:t>"), f"<w:sectPr>{reference('header', 'h1')}</w:sectPr>")
+    data = _document(body, {"header1.xml": header(p(r("<w:t>Product</w:t>")))}, [])
+    rels = (
+        "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>"
+        "<Relationship Id='h1' Type='http://schemas.openxmlformats.org/officeDocument/2006/"
+        "relationships/header' Target='header1.xml'/></Relationships>"
+    )
+    path.write_bytes(_replaced(data, "word/_rels/document.xml.rels", rels))
+    assert read_document(path.read_bytes()).headers
+    assert _has_stories(path)
+    answers = _answers(text=["Body"], emphasis={"0": [False] * 4})
+    assert judge(path, answers) == "differs: Word was not asked about headers, footers and comments"
+    shown = [["header", 0, "default", "Product\r", []]]
+    assert judge(path, answers | {"stories": {"stories": shown, "comments": []}}) == "agrees"
+
+
+def _replaced(data: bytes, name: str, content: str) -> bytes:
+    import io
+    import zipfile
+
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(out, "w") as target:
+        for info in source.infolist():
+            target.writestr(info, content if info.filename == name else source.read(info))
+    return out.getvalue()
+
+
+def test_every_comment_read_is_one_of_words_and_word_has_no_more(tmp_path: Path) -> None:
+    hidden = COMMENT.replace('w:id="0"', 'w:id="1"').replace(
+        "<w:t>Check this dose.</w:t>", "<w:rPr><w:vanish/></w:rPr><w:t>x</w:t>"
+    )
+    body = p(r('<w:commentReference w:id="0"/>') + r('<w:commentReference w:id="1"/>'))
+    path = tmp_path / "a.docx"
+    path.write_bytes(_commented(body, COMMENT + hidden))
+    assert [c.refusal is not None for c in read_document(path.read_bytes()).comments] == [
+        False,
+        True,
+    ]
+
+    def judged(*comments: list[str]) -> str:
+        return story_verdict({"stories": [], "comments": [list(c) for c in comments]}, path)
+
+    assert judged(["Reviewer", "Check this dose.\r"], ["Reviewer", "x\r"]) == "agrees"
+    # One refused, the one read wrong, or Word's count otherwise: never agreement.
+    assert judged(["Reviewer", "Check this dose twice.\r"], ["Reviewer", "x\r"]).startswith(
+        "differs"
+    )
+    assert judged(["Someone else", "Check this dose.\r"], ["Reviewer", "x\r"]).startswith("differs")
+    assert judged().startswith("differs")
+    assert judged(["Reviewer", "Check this dose.\r"]).startswith("differs")
+    # Paragraphs are paragraphs: Word's two are not the reader's one.
+    assert judged(["Reviewer", "Check this\rdose.\r"], ["Reviewer", "x\r"]).startswith("differs")
+
+
+def test_words_story_answer_is_parsed_whole_and_its_own_codes_mapped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    body = p(r("<w:t>Body</w:t>"), f"<w:sectPr>{reference('header', 'h1')}</w:sectPr>")
+    hyphenated = p(r("<w:t>Co</w:t><w:noBreakHyphen/><w:t>amoxiclav</w:t>"))
+    path = tmp_path / "a.docx"
+    path.write_bytes(
+        _document(body, {"header1.xml": header(hyphenated)}, [("h1", "header", "header1.xml")])
+    )
+    monkeypatch.setattr(word_module, "CONTAINER", tmp_path / "container")
+    answer = "header\x1c0\x1cdefault\x1cCo\x1eamoxiclav\r\x1c\x1b"
+    answer += "comment\x1cReviewer\x1cAmoxi\x1fcillin\r\x1b"
+
+    def word_answers(text: str) -> None:
+        done = subprocess.CompletedProcess(["osascript"], 0, text + "\n", "")
+        monkeypatch.setattr(word_module, "_osascript", lambda _command, _script: done)
+
+    word_answers(answer)
+    stories = word_stories(path)
+    assert stories == {
+        "stories": [["header", 0, "default", "Co\x1eamoxiclav\r", []]],
+        "comments": [["Reviewer", "Amoxi\x1fcillin\r"]],
+    }
+    assert story_verdict(stories | {"comments": []}, path) == "agrees"
+    for broken in ("header\x1c0\x1cdefault\x1b", "comment\x1cA\x1cB\x1cC\x1b"):
+        word_answers(broken)
+        with pytest.raises(SystemExit):
+            word_stories(path)
+
+
+def test_fields_are_marked_element_by_element_or_not_at_all() -> None:
+    def fld(kind: str) -> str:
+        return f'<w:fldChar w:fldCharType="{kind}"/>'
+
+    def code(text: str) -> str:
+        return f'<w:instrText xml:space="preserve"> {text} </w:instrText>'
+
+    # A run that ends one field and begins the next: no marker can go between them.
+    shared = p(
+        r(fld("begin"))
+        + r(code("PAGE"))
+        + r(fld("separate"))
+        + r("<w:t>1</w:t>")
+        + r(fld("end") + fld("begin"))
+        + r(code("SEQ Table"))
+        + r(fld("separate"))
+        + r("<w:t>1</w:t>")
+        + r(fld("end"))
+    )
+    for marking in (_set_page_numbers_aside, _mark_fields):
+        with pytest.raises(SystemExit):
+            marking(document_xml(shared))
+    # An empty simple field is one field: what follows it is not inside it.
+    xml = document_xml(
+        p('<w:fldSimple w:instr="PAGE"/>')
+        + p(r("<w:t>Para two</w:t>"))
+        + p('<w:fldSimple w:instr="SEQ Table">' + r("<w:t>1</w:t>") + "</w:fldSimple>")
+    )
+    aside = _set_page_numbers_aside(xml)
+    assert aside.count("@@P@@") == 1
+    assert aside.index("@@/P@@") < aside.index("Para two")
+    marked = _mark_fields(xml)
+    assert marked.count("@@F@@") == 2
+    assert marked.index("@@/@@") < marked.index("Para two") < marked.rindex("@@F@@")
+    # A field Python's XML parser finds and the scan does not (another prefix): not marked.
+    other = xml.replace("<w:fldSimple", "<v:fldSimple").replace("</w:fldSimple>", "</v:fldSimple>")
+    other = other.replace("<w:document ", f'<w:document xmlns:v="{W}" ')
+    with pytest.raises(SystemExit):
+        _mark_fields(other)
+
+
+def test_a_document_named_like_one_open_in_word_is_not_asked_about(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+    open_count = "1"
+
+    def run(command: list[str], **_: Any) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        stdout = open_count if command[1] == "-" and len(command) == 3 else "done"
+        return subprocess.CompletedProcess(command, 0, stdout + "\n", "")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    command = ["osascript", "-", "/tmp/x/SmPC, v2.docx", "SmPC, v2.docx"]
+    with pytest.raises(SystemExit):
+        word_module._run_alone(command, "script")
+    # The name goes to Word whole, and Word compares it: no list of names is split here.
+    assert calls == [["osascript", "-", "SmPC, v2.docx"]]
+    open_count = "0"
+    assert word_module._run_alone(command, "script").stdout == "done\n"
+
+
+def test_every_paragraph_is_marked_after_its_properties_or_none_is() -> None:
+    xml = document_xml(
+        '<w:p>\n  <w:pPr><w:pStyle w:val="x"/></w:pPr><w:r><w:t>a</w:t></w:r></w:p>'
+        "<w:p><w:pPr/></w:p><w:p/>"
+    )
+    marked = _mark_paragraphs(xml)
+    assert marked.index("@@Q0@@") > marked.index("</w:pPr>")
+    assert marked.index("@@Q1@@") > marked.index("<w:pPr/>")
+    assert "@@Q2@@" in marked
+    other = xml.replace("<w:p/>", "<v:p/>").replace("<w:document ", f'<w:document xmlns:v="{W}" ')
+    with pytest.raises(SystemExit):
+        _mark_paragraphs(other)
+
+
+def test_words_note_marks_and_fields_are_on_record_for_every_document_with_them() -> None:
+    for record in RECORDS:
+        answers = _record(record)
+        for path in sorted(record.parent.glob("*.docx")):
+            if _has_computed_fields(path):
+                assert path.name in answers["fields"], path.name
+            try:
+                document = read_document(path.read_bytes())
+            except DocxRefusedError:
+                continue  # a refusal reads no notes
+            if any(paragraph.notes for paragraph in document.body):
+                assert path.name in answers["notes"], path.name
+
+
+@pytest.mark.parametrize("record", RECORDS, ids=lambda path: path.parent.name)
+def test_words_answers_are_for_the_bytes_of_the_files_on_record(record: Path) -> None:
+    answers = _record(record)
+    if "sha256" not in answers:
+        pytest.skip(f"{record.parent.name}: recorded before digests; run word_oracle.py record")
+    present = {path.name: path for path in record.parent.glob("*.docx")}
+    assert set(answers["sha256"]) == set(present)
+    for name, digest in answers["sha256"].items():
+        assert hashlib.sha256(present[name].read_bytes()).hexdigest() == digest, name
+
+
+def _stand_in_answers(path: Path) -> dict[str, Any]:
+    return _answers(text=[], emphasis={}, asked=path.name)
+
+
+def test_a_recording_reuses_an_answer_only_for_the_same_bytes_word_and_questions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    for name in ("a.docx", "b.docx", "c.docx"):
+        (tmp_path / name).write_bytes(docx(p(r(f"<w:t>{name}</w:t>"))))
+    digest = {
+        n: hashlib.sha256((tmp_path / n).read_bytes()).hexdigest()
+        for n in ("a.docx", "b.docx", "c.docx")
+    }
+    on_record = {"application": "Word 1", "verifier": word_module.VERIFIER}
+    progress = {
+        "a.docx": _answers(asked="kept") | on_record | {"sha256": digest["a.docx"]},
+        "b.docx": _answers(asked="kept") | on_record | {"sha256": "0" * 64},  # other bytes
+        "c.docx": _answers(asked="kept")
+        | on_record
+        | {"sha256": digest["c.docx"], "verifier": "old"},
+    }
+    (tmp_path / ".word-progress.json").write_text(json.dumps(progress), "utf-8")
+    asked: list[str] = []
+
+    def ask(path: Path) -> dict[str, Any]:
+        asked.append(path.name)
+        return _stand_in_answers(path)
+
+    monkeypatch.setattr(word_oracle, "ask", ask)
+    monkeypatch.setattr(word_oracle, "judge", lambda _path, _answers: "agrees")
+    monkeypatch.setattr(word_oracle, "word_version", lambda: "Word 1")
+    monkeypatch.setattr(sys, "argv", ["word_oracle.py", "record", str(tmp_path)])
+    assert word_oracle.main() == 0
+    assert asked == ["b.docx", "c.docx"]
+    assert "a.docx: Word's answers on record reused" in capsys.readouterr().out
+    written = json.loads((tmp_path / "word.json").read_text("utf-8"))
+    assert written["sha256"] == digest
+    assert written["verifier"] == word_module.VERIFIER
+    assert not (tmp_path / ".word-progress.json").exists()
+    # --only naming no file of the set is refused, not taken as nothing to ask.
+    monkeypatch.setattr(
+        sys, "argv", ["word_oracle.py", "record", str(tmp_path), "--only", "tmp/a.docx"]
+    )
+    with pytest.raises(SystemExit):
+        word_oracle.main()
+
+
+def test_a_comparison_word_did_not_judge_whole_does_not_exit_zero(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "a.docx"
+    path.write_bytes(docx(p(r("<w:t>x</w:t>"))))
+
+    def fails(_path: Path) -> dict[str, Any]:
+        raise SystemExit("a.docx: Word failed")
+
+    monkeypatch.setattr(word_oracle, "ask", fails)
+    monkeypatch.setattr(sys, "argv", ["word_oracle.py", "compare", str(path)])
+    assert word_oracle.main() == 2

@@ -34,6 +34,9 @@ from label_docx.reader import Paragraph
 
 # How long Chrome may take over one document's page.
 TIMEOUT_SECONDS = 300
+# What Chrome is asked and how its answers are judged: a change to this file changes it
+# (``scripts/lock.py``). A kept verdict of another version does not count as Chrome's now.
+VERIFIER = "browser-verifier/1.0.0"
 
 
 class BrowserError(Exception):

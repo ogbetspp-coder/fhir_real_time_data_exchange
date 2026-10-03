@@ -7,11 +7,14 @@ reads the four pinned EMA files in corpus/ema-qrd, which is where the rules were
 from __future__ import annotations
 
 import io
+import struct
 import zipfile
+import zlib
 from pathlib import Path
 
 import pytest
 
+from label_docx.certify import CertificationError, DocxSource
 from label_docx.reader import (
     Document,
     DocxRefusedError,
@@ -34,6 +37,10 @@ ROOT_RELS = (
 RELATIONSHIP = (
     '<Relationship Id="{kind}" Type="http://schemas.openxmlformats.org/officeDocument/2006/'
     'relationships/{kind}" Target="{target}"/>'
+)
+CONTENT_TYPES = (
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    '<Default Extension="xml" ContentType="application/xml"/></Types>'
 )
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 THEME = (
@@ -83,6 +90,7 @@ def docx(
     )
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as package:
+        package.writestr("[Content_Types].xml", CONTENT_TYPES)
         package.writestr("_rels/.rels", ROOT_RELS.format(target="word/document.xml"))
         package.writestr(
             "word/_rels/document.xml.rels",
@@ -568,6 +576,7 @@ def test_formatting_revisions_and_deleted_paragraph_marks_are_refused(body: str)
 def test_the_main_part_is_found_through_the_relationships() -> None:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as package:
+        package.writestr("[Content_Types].xml", CONTENT_TYPES)
         package.writestr("_rels/.rels", ROOT_RELS.format(target="word/main.xml"))
         package.writestr("word/document.xml", document_xml(p(r("<w:t>DECOY</w:t>"))))
         package.writestr("word/main.xml", document_xml(p(r("<w:t>REAL</w:t>"))))
@@ -591,6 +600,81 @@ def test_duplicate_part_names_and_non_utf8_parts_are_refused() -> None:
     with pytest.raises(DocxRefusedError) as caught:
         read_docx(buffer.getvalue())
     assert caught.value.code == "invalid-package"
+
+
+def _with_entry(data: bytes, info: zipfile.ZipInfo, content: bytes) -> bytes:
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(out, "w") as target:
+        for kept in source.infolist():
+            target.writestr(kept, source.read(kept))
+        target.writestr(info, content)
+    return out.getvalue()
+
+
+def _refused_by_both(data: bytes) -> None:
+    with pytest.raises(DocxRefusedError) as caught:
+        read_docx(data)
+    assert caught.value.code == "invalid-package"
+    with pytest.raises(CertificationError):
+        DocxSource(data)
+
+
+def test_a_part_renamed_by_a_unicode_path_field_is_refused() -> None:
+    # Stored as word/decoy.xml, with an Info-ZIP Unicode Path field (0x7075) naming it
+    # word/document.xml: zipfile reads it under that name; unzip, and the stored name, do not.
+    good = docx(p(r("<w:t>5 mg</w:t>")))
+    with zipfile.ZipFile(io.BytesIO(good)) as source:
+        parts = {name: source.read(name) for name in source.namelist()}
+    stored, shown = b"word/decoy.xml", b"word/document.xml"
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as target:
+        for name, content in parts.items():
+            target.writestr(name, content)
+        info = zipfile.ZipInfo(stored.decode())
+        info.extra = struct.pack("<HHBL", 0x7075, 5 + len(shown), 1, zlib.crc32(stored)) + shown
+        target.writestr(info, document_xml(p(r("<w:t>50 mg</w:t>"))))
+    data = out.getvalue()
+    assert zipfile.ZipFile(io.BytesIO(data)).namelist().count("word/document.xml") == 2
+    _refused_by_both(data)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "word\\document.xml",
+        "/word/document.xml",
+        "word//document.xml",
+        "./word/document.xml",
+        "word/../word/document.xml",
+        "../document.xml",
+        "word/",
+    ],
+)
+def test_a_part_name_that_is_not_a_canonical_part_name_is_refused(name: str) -> None:
+    # Each may be word/document.xml to another zip reader (or to zipfile on Windows), holding a
+    # second body; none is a part name.
+    good = docx(p(r("<w:t>5 mg</w:t>")))
+    second = document_xml(p(r("<w:t>50 mg</w:t>"))).encode()
+    _refused_by_both(_with_entry(good, zipfile.ZipInfo(name), second))
+
+
+def test_a_package_without_content_types_or_in_another_compression_is_refused() -> None:
+    good = docx(p(r("<w:t>5 mg</w:t>")))
+    assert [x.text for x in read_docx(good)] == ["5 mg"]
+    with zipfile.ZipFile(io.BytesIO(good)) as source:
+        parts = {name: source.read(name) for name in source.namelist()}
+    for method in (zipfile.ZIP_BZIP2, zipfile.ZIP_LZMA):
+        out = io.BytesIO()
+        with zipfile.ZipFile(out, "w", method) as target:
+            for name, content in parts.items():
+                target.writestr(name, content)
+        _refused_by_both(out.getvalue())
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as target:
+        for name, content in parts.items():
+            if name != "[Content_Types].xml":
+                target.writestr(name, content)
+    _refused_by_both(out.getvalue())
 
 
 # --- structure --------------------------------------------------------------------------
@@ -1086,6 +1170,7 @@ def test_fields_in_a_document_that_updates_them_on_open_are_refused() -> None:
     field = p('<w:fldSimple w:instr=" HYPERLINK x ">' + r("<w:t>1</w:t>") + "</w:fldSimple>")
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as package:
+        package.writestr("[Content_Types].xml", CONTENT_TYPES)
         package.writestr("_rels/.rels", ROOT_RELS.format(target="word/document.xml"))
         package.writestr(
             "word/_rels/document.xml.rels",

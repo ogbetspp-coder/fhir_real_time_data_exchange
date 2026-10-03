@@ -758,6 +758,16 @@ def _match(paragraph: _Paragraph, value: dict[str, Json], where: str) -> None:
 
 def _docx_parts(data: bytes) -> tuple[zipfile.ZipFile, str, dict[str, str]]:
     archive = zipfile.ZipFile(io.BytesIO(data))
+    for info in archive.infolist():
+        stored = info.orig_filename
+        # The stored name, segment by segment: zipfile may read another one, and another zip
+        # reader may find another part under a near spelling.
+        if info.filename != stored or "\\" in stored or {"", ".", ".."} & set(stored.split("/")):
+            raise CertificationError("a zip entry whose name is not a part name")
+        if info.compress_type not in (0, 8):
+            raise CertificationError("a part neither stored nor deflated")
+    if "[Content_Types].xml" not in archive.namelist():
+        raise CertificationError("no [Content_Types].xml")
     main = _relations(archive, "", "officeDocument")
     if len(main) != 1:
         raise CertificationError("not one main document part")
