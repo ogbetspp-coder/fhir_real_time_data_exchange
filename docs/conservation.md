@@ -227,6 +227,26 @@ write:
     footers, comments and lists): 3,100 list items, 581 headers and footers, 569 comments;
     all 20 agreed.
 
+  Labels are not only English, so generated text now holds Greek, Cyrillic and accented words,
+  units and signs (µg, °C, ≤, ±, ®, ™, ½), no-break spaces and hyphens, soft hyphens, tabs, line
+  breaks and Symbol characters. The first 20 such documents showed two things:
+  - **Capitals.** Word shows text in capitals (w:caps) by its own rule, not Unicode's: the
+    micro sign stays "µ" where Unicode would make it the Greek capital "Μ" (so "5 µg" shows as
+    "5 µG", never "5 ΜG"). ß, ŉ and ﬁ stay as they are, as do small roman numerals; ΐ and ΰ lose
+    their tonos. The reader keeps the letters as stored and marks the capitals, so its text is
+    right. The comparison now shows capitals by Word's rule, taken from Word's answers. Anyone
+    who draws the reader's capitals marks must draw them by the same rule: turning a "µg" dose
+    into "ΜG" changes a unit.
+  - **STYLEREF copies a heading otherwise than REF does.** Asked for each character, Word's
+    STYLEREF shows a no-break space as a space, a no-break hyphen as a hyphen, and leaves out
+    soft hyphens and Symbol characters. REF copies them all as they are. The reader had
+    copied the heading as is, so it refused one Word-updated document as stale: safe, but not
+    Word. It now applies the three conversions (`fields-styleref-characters`). It refuses a
+    STYLEREF to a heading with a Symbol character (`fields-styleref-symbol`), since its text
+    does not keep which characters those were.
+
+  With both corrected, all 20 agreed.
+
   The first of them showed a fault in Word's side of the comparison. The emphasis check took a
   paragraph's whole range, which in Word holds each field's hidden code, with formatting of its
   own. So a paragraph struck through looked "not struck" wherever a field's code was not.

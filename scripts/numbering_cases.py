@@ -638,6 +638,34 @@ CASES: dict[str, Case] = {
         para(field("STYLEREF 1", "Late")) + heading(1, "Late"),
         HEADINGS,
     ),
+    "fields-styleref-characters": Case(
+        "STYLEREF to a heading with a no-break space, a no-break hyphen and a soft hyphen: Word "
+        "shows a space, a hyphen and nothing.",
+        OUTLINE_NUMBERING,
+        para(
+            words("5\u00a0\u00b5g"),
+            "<w:r><w:noBreakHyphen/></w:r>",
+            words("once"),
+            "<w:r><w:softHyphen/></w:r>",
+            words("daily"),
+            props='<w:pStyle w:val="Heading1"/>',
+        )
+        + para(field("STYLEREF 1", "5 \u00b5g-oncedaily")),
+        HEADINGS,
+    ),
+    "fields-styleref-symbol": Case(
+        "STYLEREF to a heading with a Symbol character, which Word leaves out (the reader "
+        "refuses).",
+        OUTLINE_NUMBERING,
+        para(
+            words("dose "),
+            '<w:r><w:sym w:font="Symbol" w:char="F0B3"/></w:r>',
+            words(" 5"),
+            props='<w:pStyle w:val="Heading1"/>',
+        )
+        + para(field("STYLEREF 1", "dose  5")),
+        HEADINGS,
+    ),
     "fields-ref": Case(
         "A cross-reference (REF) to bookmarked text prints that text.",
         "",

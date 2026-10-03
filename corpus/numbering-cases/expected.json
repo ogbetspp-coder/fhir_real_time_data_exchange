@@ -115,10 +115,19 @@
     "paragraphsSha256": "92c3a8266e5923bcffc97b830b10cba12aca068635d79a110e8a31b15a164dec",
     "sha256": "ff92577f32a18cb195acc09176557962df0ef46a58a81b2c8c721053f03cd866"
   },
+  "fields-styleref-characters.docx": {
+    "certificateSha256": "086e4654662c6b2b2b28711d98fe9878ebfe213ca400d13f80a325008e8e72cc",
+    "paragraphsSha256": "139c2ad6cbab924b03640bc09414414d975cce9d43ecff4a2e54b51266a81117",
+    "sha256": "88c47ad4033e1cdd2b53d9287e1982d36dacab2c6ad4d787d8c71fceb001ef50"
+  },
   "fields-styleref-forward.docx": {
     "certificateSha256": "e09b8db6dbaf0505f805c8462a67e3d277c00b2a829af3f243317f8c54b95e3d",
     "paragraphsSha256": "fce4b75e4efe43981ecb92c6e9a0501ea07f34c4c89d33a9279c7556da30b593",
     "sha256": "9ace8ecefeaf3e37c11eebe462c49eaffc068396ed8ed47512b126f4b1bf32e5"
+  },
+  "fields-styleref-symbol.docx": {
+    "refusal": "computed-field",
+    "sha256": "f46e5f03ecda14776b2d3967fca0cddf5d50eab87e2b0edd0d95346301356c6d"
   },
   "formats.docx": {
     "certificateSha256": "53c4fe84c6e2b3e60d0ef2a47ee1917e0af5aefab282b78e1e8e16d347e0683f",

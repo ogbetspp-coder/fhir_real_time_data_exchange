@@ -55,7 +55,13 @@
     "fields-seq.docx": [],
     "fields-stale.docx": [],
     "fields-stored.docx": [],
+    "fields-styleref-characters.docx": [
+      "1\t"
+    ],
     "fields-styleref-forward.docx": [
+      "1\t"
+    ],
+    "fields-styleref-symbol.docx": [
       "1\t"
     ],
     "formats.docx": [
@@ -1078,7 +1084,37 @@
         false
       ]
     },
+    "fields-styleref-characters.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
     "fields-styleref-forward.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-styleref-symbol.docx": {
       "": [],
       "0": [
         false,
@@ -2442,12 +2478,28 @@
         "the agency's page"
       ]
     },
+    "fields-styleref-characters.docx": {
+      "printed": [
+        "5 \u00b5g-oncedaily"
+      ],
+      "shown": [
+        "5 \u00b5g-oncedaily"
+      ]
+    },
     "fields-styleref-forward.docx": {
       "printed": [
         "Late"
       ],
       "shown": [
         "Late"
+      ]
+    },
+    "fields-styleref-symbol.docx": {
+      "printed": [
+        "dose  5"
+      ],
+      "shown": [
+        "dose  5"
       ]
     }
   },
@@ -2657,7 +2709,9 @@
     "fields-seq.docx": true,
     "fields-stale.docx": false,
     "fields-stored.docx": true,
+    "fields-styleref-characters.docx": true,
     "fields-styleref-forward.docx": true,
+    "fields-styleref-symbol.docx": true,
     "formats.docx": true,
     "legal.docx": true,
     "level-override-first.docx": true,
@@ -2881,9 +2935,17 @@
       "a stored title",
       "the agency's page"
     ],
+    "fields-styleref-characters.docx": [
+      "5\u00a0\u00b5g\u001eonce\u001fdaily",
+      "5 \u00b5g-oncedaily"
+    ],
     "fields-styleref-forward.docx": [
       "Late",
       "Late"
+    ],
+    "fields-styleref-symbol.docx": [
+      "dose ( 5",
+      "dose  5"
     ],
     "formats.docx": [
       "item 1",

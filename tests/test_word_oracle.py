@@ -55,6 +55,8 @@ REFUSED = {
     "numbering-cases/override-implicit-rows.docx": "ambiguous-numbering",
     # A level with lvlRestart first counted by a deeper item: Word draws it otherwise later.
     "numbering-cases/restart-skipped-ancestor.docx": "ambiguous-numbering",
+    # A STYLEREF to a heading with a Symbol character: Word leaves it out of the result.
+    "numbering-cases/fields-styleref-symbol.docx": "computed-field",
     # A REF to a bookmark that is not there: Word prints "Error! Reference source not found."
     "numbering-cases/fields-ref-missing.docx": "computed-field",
     # Captions stored as 7 and 7, which Word shows on screen and prints as 1 and 2.

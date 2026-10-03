@@ -806,6 +806,28 @@ def _has_stories(path: Path) -> bool:
     return any(f'/{kind}"'.encode() in rels for kind in ("header", "footer", "comments"))
 
 
+# How Word shows text in capitals (w:caps), as Word answered for each case: a character's one
+# capital where it has one; but the micro sign and the small roman numerals stay as they are, a
+# character whose capital is more than one character (ß, ŉ, ﬁ) stays, and Greek iota and upsilon
+# with dialytika and tonos lose the tonos.
+_CAPS_KEPT = frozenset("\u00b5" + "".join(chr(code) for code in range(0x2170, 0x2180)))
+_CAPS_OWN = {"\u0390": "\u03aa", "\u03b0": "\u03ab"}
+
+
+def _word_capitals(text: str) -> str:
+    """``text`` as Word shows it in capitals."""
+    out: list[str] = []
+    for character in text:
+        capital = character.upper()
+        if character in _CAPS_OWN:
+            out.append(_CAPS_OWN[character])
+        elif character in _CAPS_KEPT or len(capital) != 1:
+            out.append(character)
+        else:
+            out.append(capital)
+    return "".join(out)
+
+
 def word_stories(path: Path) -> dict[str, list[list[Any]]] | None:
     """Word's headers, footers and comments; None if the document has none of them.
 
@@ -883,7 +905,7 @@ def story_verdict(word: dict[str, list[list[Any]]], path: Path) -> str:
                 filled = paragraph.text
                 for mark in paragraph.marks:
                     if mark.kind == "caps":
-                        upper = filled[mark.start : mark.end].upper()
+                        upper = _word_capitals(filled[mark.start : mark.end])
                         filled = filled[: mark.start] + upper + filled[mark.end :]
                 # Word's text shows an inline picture as "/", where the reader writes one U+FFFC
                 # (the conservation check holds each to a picture in the source).
@@ -929,7 +951,11 @@ def text_verdict(word: list[str], path: Path) -> str:
         text = paragraph.text
         for mark in paragraph.marks:
             if mark.kind == "caps":
-                text = text[: mark.start] + text[mark.start : mark.end].upper() + text[mark.end :]
+                text = (
+                    text[: mark.start]
+                    + _word_capitals(text[mark.start : mark.end])
+                    + text[mark.end :]
+                )
         inserts = [(note.offset, "\x02") for note in paragraph.notes]
         inserts += [(offset, "\x00") for offset in paragraph.pages]
         for offset, code in sorted(inserts, reverse=True):

@@ -261,6 +261,18 @@
       "bytes": 3590
     },
     {
+      "name": "STYLEREF to a heading with a no-break space, a no-break hyphen and a soft hyphen: Word shows a space, a hyphen and nothing.",
+      "file": "fields-styleref-characters.docx",
+      "sha256": "88c47ad4033e1cdd2b53d9287e1982d36dacab2c6ad4d787d8c71fceb001ef50",
+      "bytes": 3753
+    },
+    {
+      "name": "STYLEREF to a heading with a Symbol character, which Word leaves out (the reader refuses).",
+      "file": "fields-styleref-symbol.docx",
+      "sha256": "f46e5f03ecda14776b2d3967fca0cddf5d50eab87e2b0edd0d95346301356c6d",
+      "bytes": 3688
+    },
+    {
       "name": "A cross-reference (REF) to bookmarked text prints that text.",
       "file": "fields-ref.docx",
       "sha256": "48d644b4a225777e38a0f775da0d1015005881acc3045b9e1a2ba14075d40e30",

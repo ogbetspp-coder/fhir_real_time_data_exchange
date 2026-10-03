@@ -224,7 +224,7 @@ from dataclasses import dataclass, field, replace
 # above, or a level with lvlRestart counted first by a deeper one, is refused; 1.15.0 restarts
 # a level as the list whose paragraph restarted it says (its startOverride, else the start), and
 # refuses a level that never restarts shown in a deeper level's label.
-READER_VERSION = "docx-reader/1.16.0"
+READER_VERSION = "docx-reader/1.17.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -1107,6 +1107,8 @@ class _ParagraphReader:
         self.story = story
         self.notes: list[NoteReference] = []
         self.custom: set[tuple[str, int]] = set()
+        # Whether any character is read through the Symbol table (w:sym, or text in Symbol).
+        self.symbolic = False
         # Where each comment's mark stands, and which comment it is.
         self.comments: list[CommentReference] = []
         # Fields whose result the reader checks against its own computation: the instruction and
@@ -1227,6 +1229,7 @@ class _ParagraphReader:
                 text = child.text or ""
                 _check_whitespace(child, text)
                 produced = _characters(text, symbol)
+                self.symbolic = self.symbolic or (symbol and bool(text))
             else:
                 produced = self._special(child)
             if not self.in_instruction():
@@ -1325,6 +1328,7 @@ class _ParagraphReader:
             char = child.get(_w("char"), "")
             if not re.fullmatch(r"[0-9A-Fa-f]{1,4}", char):
                 raise DocxRefusedError("unmapped-symbol", "w:sym without a hex code")
+            self.symbolic = True
             return _symbol(int(char, 16), "w:sym")
         if tag == _w("drawing"):
             return _drawing(child)
@@ -1504,6 +1508,8 @@ class _Context:
     # Bookmark starts (id, name, offset) and ends (id, offset) in the paragraph.
     bookmark_starts: tuple[tuple[str, str, int], ...] = ()
     bookmark_ends: tuple[tuple[str, int], ...] = ()
+    # Whether any of its characters is read through the Symbol table.
+    symbolic: bool = False
     # How many table rows, in any table, ended before the paragraph in its story.
     rows_ended: int = 0
 
@@ -1549,6 +1555,7 @@ def _paragraph(
         mark=mark_rpr,
         section=section,
         custom=frozenset(reader.custom),
+        symbolic=reader.symbolic,
         fields=tuple(reader.computed),
         bookmark_starts=tuple(reader.bookmark_starts),
         bookmark_ends=tuple(reader.bookmark_ends),
@@ -2302,7 +2309,7 @@ def _verify_fields(
             if code == "SEQ":
                 shown = _seq(tokens[1:], index, counted, levels)
             elif code == "STYLEREF":
-                shown = _styleref(tokens[1:], index, paragraphs, names)
+                shown = _styleref(tokens[1:], index, paragraphs, names, contexts)
             else:
                 shown = _reference(code, tokens[1:], paragraphs, bookmarks)
             stored = paragraph.text[start:end]
@@ -2397,7 +2404,13 @@ def _seq(
     return _number(value, _SEQ_FORMATS[key])
 
 
-def _styleref(tokens: list[str], index: int, paragraphs: list[Paragraph], names: list[str]) -> str:
+def _styleref(
+    tokens: list[str],
+    index: int,
+    paragraphs: list[Paragraph],
+    names: list[str],
+    contexts: list[_Context],
+) -> str:
     arguments, switches = _switches(tokens, set(), {"s"})
     if len(arguments) != 1:
         raise DocxRefusedError("computed-field", "a STYLEREF field without one style")
@@ -2418,7 +2431,13 @@ def _styleref(tokens: list[str], index: int, paragraphs: list[Paragraph], names:
     if target.notes:
         raise DocxRefusedError("computed-field", "a STYLEREF to a paragraph with a note mark")
     if "s" not in switches:
-        return target.text
+        if contexts[(before or after)[0]].symbolic:
+            # Word leaves a Symbol character out of the result [fields-styleref-symbol]; which
+            # of the paragraph's characters were Symbol ones, its text does not keep.
+            raise DocxRefusedError("computed-field", "a STYLEREF to a Symbol character")
+        # Word copies the text but a no-break space as a space, a no-break hyphen as a hyphen,
+        # and no soft hyphen [fields-styleref-characters].
+        return target.text.replace("\u00a0", " ").replace("\u2011", "-").replace("\u00ad", "")
     label = target.numbering.text if target.numbering is not None else None
     if label is None or not re.fullmatch(r"[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*\.?", label):
         raise DocxRefusedError("computed-field", "a STYLEREF \\s to a label it cannot read")
