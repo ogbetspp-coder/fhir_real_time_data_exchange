@@ -257,12 +257,6 @@ EQUIVALENT: dict[tuple[str, str, str], str] = {
         'paragraph.section if value("numRestart", "continuous") == "eachSect" else None,',
         "str:'continuous'",
     ): "the default is only compared with 'eachSect', which 'Xontinuous' is not either",
-    (
-        "DocxSource.certify",
-        "for index, (label, theirs) in enumerate("
-        'zip(self.labels, value["paragraphs"], strict=True)):',
-        "bool",
-    ): _STRICT,
     **{
         ("_Numbering.label", f"{name} = self.{name}.setdefault(key, [None] * 9)", "int:9"): (
             "a tenth place is never used: list levels are 0 to 8"

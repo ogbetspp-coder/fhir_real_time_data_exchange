@@ -52,8 +52,10 @@ result, was_read = read(data)
 
 `--browser` (ePI, default `auto`) and `--word` (.docx, macOS with Word, default `off`) hold each
 ingested document to the application: `auto` where installed, `on` always, `require` always and
-serve nothing it has not checked, `off` never. A verdict is kept once per application version;
-a result the application shows otherwise is never served.
+serve nothing it has not checked, `off` never. A verdict is kept once per application version
+and verifier version (the code that asks and judges); `require` counts only the current
+verifier's agreement. A result the application shows otherwise, or that two answers at once
+judge differently, is never served.
 
 The store is write-once and content-addressed: a document is named by its SHA-256, each reader
 version's result is kept beside the earlier ones, and nothing kept is rewritten. Bound to a

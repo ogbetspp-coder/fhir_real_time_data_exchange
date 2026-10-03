@@ -23,8 +23,10 @@ after ``_QuietHandler.timeout`` seconds; documents are read at most ``READING`` 
 from __future__ import annotations
 
 import importlib.resources
+import ipaddress
 import json
 import re
+import socket
 import sys
 import threading
 import traceback
@@ -53,7 +55,6 @@ type Environ = dict[str, object]
 _DOCUMENT = re.compile(r"/v1/documents/([0-9a-f]{64})(/source|/verification)?")
 # Reading is bound to one core (the reader is pure Python), so more at once only costs memory.
 READING = threading.BoundedSemaphore(2)
-_LOOPBACK = ("127.0.0.1", "localhost", "::1")
 
 
 def check_environment() -> None:
@@ -188,10 +189,16 @@ class Service:
         reading = self.store.kind_of(document)
         strict = reading is not None and reading.name in self.require
         if strict and "refusal" not in json.loads(body):
+            # Agreement counts only from the verifier as it is now: an older one may have
+            # compared less.
+            checker = self.store.browser if reading is documents.EPI else self.store.word
             agreed = [
                 v
                 for v in self.store.verifications(document)
-                if isinstance(v, dict) and v.get("differs") == []
+                if isinstance(v, dict)
+                and v.get("differs") == []
+                and checker is not None
+                and v.get("verifier") == checker.verifier
             ]
             if not agreed:
                 # Strict: a read no application has checked is not served.
@@ -260,6 +267,7 @@ def browser_verifier(choice: str) -> Checker | None:
     return Checker(
         lambda: browser.chrome_version(chrome),
         lambda data, result: browser.verify_epi(data, result, chrome),
+        browser.VERIFIER,
     )
 
 
@@ -274,7 +282,22 @@ def word_verifier(choice: str) -> Checker | None:
         if choice in ("on", "require"):
             raise SystemExit("label-docx: --word on, but Microsoft Word is not installed")
         return None
-    return Checker(word.word_version, word.verify_docx)
+    return Checker(word.word_version, word.verify_docx, word.VERIFIER)
+
+
+def _hosts(host: str, port: int) -> frozenset[str] | None:
+    """The Host headers answered when serving on ``host``, or None for any.
+
+    A loopback address, however spelled (``127.1``, ``localhost``), answers only its address and
+    ``localhost``, with the port; any other address answers any host.
+    """
+    try:
+        address = ipaddress.ip_address(socket.gethostbyname(host))
+    except OSError, ValueError:
+        return frozenset()  # an address the server cannot bind answers nothing
+    if not address.is_loopback:
+        return None
+    return frozenset(f"{name}:{port}" for name in (str(address), "localhost"))
 
 
 def serve(
@@ -287,11 +310,7 @@ def serve(
 ) -> None:
     """Serve the store at ``root`` until interrupted."""
     check_environment()
-    hosts = (
-        frozenset(f"{name}:{port}" for name in ("127.0.0.1", "localhost", "[::1]"))
-        if host in _LOOPBACK
-        else None
-    )
+    hosts = _hosts(host, port)
     service = Service(Store(root, browser=verifier, word=word_check), require, hosts)
     with make_server(
         host, port, service, server_class=_ThreadingServer, handler_class=_QuietHandler

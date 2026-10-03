@@ -12,8 +12,9 @@ What Word is asked, each by a script on a copy of the document:
 
 - **List labels:** Word's "convert numbers to text" writes each label into its paragraph; what
   each paragraph gained is the label and the tab or space after it. Word then saves the copy, and
-  the font it gave each label's text is read from its XML: a Symbol or Wingdings label is stored
-  as codes (a bullet as U+F0B7), mapped through that font's table by ``label_as_drawn``.
+  the font it gave each label's text, and the paragraph it is on, are read from its XML: a Symbol
+  or Wingdings label is stored as codes (a bullet as U+F0B7), mapped through that font's table
+  by ``label_as_drawn``; a code in no table is never agreement.
 - **Text:** the body's text as Word shows it, paragraph by paragraph (``text_verdict`` maps
   Word's own codes for hyphens, breaks, note references and pictures).
 - **Note marks:** markers around every note reference; Word saves the copy as text, and what it
@@ -25,9 +26,14 @@ What Word is asked, each by a script on a copy of the document:
 - **Emphasis:** whether each body paragraph is bold, italic, in capitals and struck through,
   over the text it shows (between its own fields, and each field's result). Word answers false
   for a paragraph that is partly so, so a paragraph is held only where the reader finds it
-  wholly so or wholly not.
+  wholly so or wholly not. Paragraphs with a note reference or a page number, and those a hidden
+  paragraph mark joins, are not held (Word's answer would count the mark or the number).
 - **Headers, footers and comments:** each section's by type, and each comment's author and text.
 - **Tracked changes:** Word's own Accept All and Reject All files (``word_views``).
+
+Markers go in by scanning the XML, and each scan must find what Python's XML parser finds, or
+Word is not asked. A story, note or field the reader reads that Word was not asked about is not
+agreement (``judge``).
 
 Word runs sandboxed: each file is copied into Word's container, where it opens without a
 permission prompt, and removed after. One script runs at a time (``_osascript``).
@@ -66,6 +72,9 @@ from label_docx.reader import (
 )
 
 WORD = Path("/Applications/Microsoft Word.app")
+# What Word is asked and how its answers are judged: a change to this file changes it
+# (``scripts/lock.py``). A kept verdict or recorded answer of another version is not reused.
+VERIFIER = "word-verifier/1.0.0"
 
 
 class WordError(Exception):
@@ -183,8 +192,10 @@ end pageResults
 on run argv
   set target to (POSIX file (item 1 of argv)) as string
   set out to ""
-  set unit to (character id 31)
-  set record_ to (character id 30)
+  -- Neither can be in Word's text: XML holds no such character, and neither is one of Word's own
+  -- codes (U+001E and U+001F are its no-break and soft hyphens).
+  set unit to (character id 28)
+  set record_ to (character id 27)
   with timeout of 600 seconds
     tell application "Microsoft Word"
       open file name target
@@ -226,6 +237,7 @@ end run
 """
 
 SUFFIXES = {"tab": "\t", "legacy": "\t", "space": " ", "nothing": ""}
+_UNIT, _RECORD = "\x1c", "\x1b"
 
 # The document saved as text.
 EXPORT = """
@@ -270,15 +282,12 @@ on run argv
 end run
 """
 
-# A complex field (from the run that begins it to the run that ends it; fields here are not
-# nested) or a simple one, which the markers go around.
-_FIELD = re.compile(
-    r"<w:r(?:\s[^>]*)?>(?:(?!</w:r>).)*?w:fldCharType=\"begin\".*?"
-    r"w:fldCharType=\"end\"(?:(?!</w:r>).)*?</w:r>|<w:fldSimple\b.*?</w:fldSimple>",
+# A run (not one that closes itself), and a simple field's start and end tags.
+_ANY_RUN = re.compile(r"<w:r(?:\s[^>]*)?(?<!/)>(?:(?!</w:r>).)*?</w:r>", re.S)
+_FIELD_TOKEN = re.compile(
+    r"(?P<simple><w:fldSimple\b(?:[^>\"']|\"[^\"]*\"|'[^']*')*>)|(?P<close></w:fldSimple>)|"
+    + _ANY_RUN.pattern,
     re.S,
-)
-_COMPUTED = re.compile(
-    r"(?:instr=\"|<w:instrText[^>]*>)\s*(?:SEQ|STYLEREF|REF|NOTEREF|DOCPROPERTY|HYPERLINK)\b"
 )
 
 # A run holding a note reference (in the body) or a note's echo of its mark (in a note).
@@ -308,12 +317,29 @@ def _osascript(command: list[str], script: str) -> subprocess.CompletedProcess[s
         return _run_alone(command, script)
 
 
+# How many documents open in Word have the name ``item 1 of argv``, compared in AppleScript, as
+# Word's scripts find a document by name.
+OPEN_NAMED = """
+on run argv
+  set found to 0
+  tell application "Microsoft Word"
+    repeat with d in (get documents)
+      if (name of d) is (item 1 of argv) then set found to found + 1
+    end repeat
+  end tell
+  return found
+end run
+"""
+
+
 def _run_alone(command: list[str], script: str) -> subprocess.CompletedProcess[str]:
     # Word's scripts find the document by its name: one of that name already open would be the
     # one asked about.
+    name = Path(command[2]).name
     try:
         opened = subprocess.run(
-            ["osascript", "-e", 'tell application "Microsoft Word" to get name of every document'],
+            ["osascript", "-", name],
+            input=OPEN_NAMED,
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -322,8 +348,8 @@ def _run_alone(command: list[str], script: str) -> subprocess.CompletedProcess[s
         )
     except subprocess.TimeoutExpired as hung:
         raise SystemExit("Word did not answer within 2 minutes") from hung
-    if Path(command[2]).name in opened.stdout.rstrip("\n").split(", "):
-        raise SystemExit(f"a document named {Path(command[2]).name} is already open in Word")
+    if opened.returncode != 0 or opened.stdout.strip() != "0":
+        raise SystemExit(f"a document named {name} may be open in Word ({opened.stdout.strip()})")
     for attempt in (1, 2, 3):
         try:
             done = subprocess.run(
@@ -472,12 +498,12 @@ def is_tracked(path: Path) -> bool:
     return "tracked" in json.loads(read(path.read_bytes())[0])
 
 
-def word_text_and_labels(path: Path) -> tuple[list[str], list[str], list[str | None]]:
-    """Word's body text, paragraph by paragraph, its list labels, and the font of each label."""
+def word_text_and_labels(path: Path) -> tuple[list[str], list[str], list[str | None], list[int]]:
+    """Word's body text, paragraph by paragraph, its list labels, each one's font and paragraph."""
     answer, saved = _ask_word(path)
     labels = _labels(path, answer)
     shown = _paragraphs_shown(answer.partition(SEPARATOR)[0])
-    return shown, labels, _label_fonts(path, saved, labels)
+    return shown, labels, *_label_fonts(path, saved, labels)
 
 
 def _paragraphs_shown(stored: str) -> list[str]:
@@ -565,12 +591,25 @@ def _body_paragraphs(package: bytes) -> list[list[tuple[str, str | None]]]:
     return out
 
 
-def _label_fonts(path: Path, saved: bytes, labels: list[str]) -> list[str | None]:
-    """The font Word gave each label when it wrote it in: Word's own XML, paragraph by paragraph.
+def _loose(label: str) -> str:
+    """``label`` with each U+F0xx code as its low code, casefolded.
+
+    Word's text of a label whose formatting comes from a character style on the paragraph mark
+    shows it in capitals and its Symbol characters as U+F0xx; its saved copy holds it as written.
+    """
+    return "".join(
+        chr(ord(c) - 0xF000) if 0xF000 <= ord(c) <= 0xF0FF else c for c in label
+    ).casefold()
+
+
+def _label_fonts(path: Path, saved: bytes, labels: list[str]) -> tuple[list[str | None], list[int]]:
+    """The font Word gave each label when it wrote it in, and the body paragraph it is on.
 
     What a paragraph of Word's saved copy gained at its start, against the document, is its label;
-    those must be ``labels``, in order. A label's font is its runs' (``_body_paragraphs``), the
-    tab or space after it aside: one name, "mixed", or None where Word named none.
+    those must be ``labels``, in order (``_loose``ly: a label Word's text shows otherwise than
+    its copy holds gets no font, so no symbol table vouches for it). A label's font is its runs'
+    (``_body_paragraphs``), the tab or space after it aside: one name, "mixed", or None where
+    Word named none. Paragraphs are counted as the reader counts the body's.
     """
     before, after = _body_paragraphs(path.read_bytes()), _body_paragraphs(saved)
     # Word ends a body that ends in a table with an empty paragraph.
@@ -580,10 +619,12 @@ def _label_fonts(path: Path, saved: bytes, labels: list[str]) -> list[str | None
         raise SystemExit(f"{path.name}: Word saved other paragraphs than the document's")
     found: list[str] = []
     fonts: list[str | None] = []
-    for old, new in zip(before, after, strict=True):
+    at: list[int] = []
+    for index, (old, new) in enumerate(zip(before, after, strict=True)):
         was, now = "".join(t for t, _ in old), "".join(t for t, _ in new)
         if now == was:
             continue
+        at.append(index)
         if not now.endswith(was):
             raise SystemExit(f"{path.name}: Word changed a paragraph other than by a list label")
         found.append(now[: len(now) - len(was)])
@@ -596,9 +637,11 @@ def _label_fonts(path: Path, saved: bytes, labels: list[str]) -> list[str | None
                 named.add(font)
                 drawn = drawn[len(text) :]
         fonts.append(named.pop() if len(named) == 1 else ("mixed" if named else None))
-    if found != labels:
+    if len(found) != len(labels) or any(
+        _loose(a) != _loose(b) for a, b in zip(found, labels, strict=False)
+    ):
         raise SystemExit(f"{path.name}: Word's saved labels are not the ones it drew")
-    return fonts
+    return [f if a == b else None for f, a, b in zip(fonts, found, labels, strict=True)], at
 
 
 def _marked(xml: str, kind: str, tag: str, count: itertools.count[int]) -> tuple[str, int]:
@@ -651,22 +694,12 @@ def word_fields(path: Path) -> dict[str, list[str]] | None:
     None if the document has no field the reader reads (SEQ, STYLEREF, REF, NOTEREF,
     DOCPROPERTY, HYPERLINK).
     """
-    with zipfile.ZipFile(path) as source:
-        xml = source.read("word/document.xml").decode("utf-8")
-    if not _COMPUTED.search(xml):
+    if not _has_computed_fields(path):
         return None
     CONTAINER.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=CONTAINER) as folder:
         copy = Path(folder) / path.name
-        copy.write_bytes(
-            _with_document(
-                path,
-                lambda xml: _FIELD.sub(
-                    lambda f: f"<w:r><w:t>@@F@@</w:t></w:r>{f.group(0)}<w:r><w:t>@@/@@</w:t></w:r>",
-                    xml,
-                ),
-            )
-        )
+        copy.write_bytes(_with_document(path, _mark_fields))
         done = _osascript(
             ["osascript", "-", str(copy), str(copy.with_suffix(".pdf")), copy.name], PRINT
         )
@@ -713,38 +746,90 @@ def field_verdict(word: dict[str, list[str]], path: Path) -> str:
     return "agrees"
 
 
-_ANY_RUN = re.compile(r"<w:r(?:\s[^>]*)?>(?:(?!</w:r>).)*?</w:r>", re.S)
 _LAYOUT = {"PAGEREF", "PAGE", "NUMPAGES", "SECTIONPAGES"}
+
+
+def _field_spans(xml: str) -> list[tuple[int, int, str, int]]:
+    """Each field in ``xml``: where it starts and ends, its instruction and how deeply nested.
+
+    A complex field runs from the run that begins it to the run that ends it, a simple one is
+    its element (empty or not). Markers go between runs, so a run holding two field characters,
+    or a field character in a run that holds other runs (a text box), cannot be marked; nor can
+    fields the scan does not find as the XML parser does. Each is a ``SystemExit``.
+    """
+    spans: list[tuple[int, int, str, int]] = []
+    complex_: list[tuple[int, list[str]]] = []
+    simple: list[tuple[int, str]] = []
+    characters = simples = 0
+    for token in _FIELD_TOKEN.finditer(xml):
+        if token.group("simple"):
+            simples += 1
+            tag = token.group("simple")
+            instruction = re.search(r"\bw:instr=(?:\"([^\"]*)\"|'([^']*)')", tag)
+            code = "" if instruction is None else instruction.group(1) or instruction.group(2) or ""
+            if tag.endswith("/>"):
+                spans.append((token.start(), token.end(), code, len(complex_) + len(simple)))
+            else:
+                simple.append((token.start(), code))
+            continue
+        if token.group("close"):
+            if not simple:
+                raise SystemExit("a simple field that ends and does not begin")
+            start, code = simple.pop()
+            spans.append((start, token.end(), code, len(complex_) + len(simple)))
+            continue
+        run = token.group(0)
+        kinds = re.findall(r"<w:fldChar\b[^>]*?\bw:fldCharType=[\"'](\w+)[\"']", run)
+        characters += len(kinds)
+        if len(kinds) > 1 or (kinds and re.search(r"<w:r[\s>]", run[1:])):
+            raise SystemExit("field characters that cannot be marked run by run")
+        if kinds == ["begin"]:
+            complex_.append((token.start(), []))
+        for instruction in re.findall(r"<w:instrText[^>]*>([^<]*)</w:instrText>", run):
+            if complex_:
+                complex_[-1][1].append(instruction)
+        if kinds == ["end"]:
+            if not complex_:
+                raise SystemExit("a field that ends and does not begin")
+            start, parts = complex_.pop()
+            spans.append((start, token.end(), "".join(parts), len(complex_) + len(simple)))
+    root = ET.fromstring(xml)
+    if (
+        complex_
+        or simple
+        or characters != sum(1 for _ in root.iter(f"{{{W}}}fldChar"))
+        or simples != sum(1 for _ in root.iter(f"{{{W}}}fldSimple"))
+    ):
+        raise SystemExit("fields the scan does not find as the XML parser does")
+    return spans
+
+
+def _around(xml: str, spans: list[tuple[int, int]], before: str, after: str) -> str:
+    """``xml`` with a run of ``before`` and of ``after`` around each span; spans may nest."""
+    marks = [(end, 0, -start, after) for start, end in spans]
+    marks += [(start, 1, -end, before) for start, end in spans]
+    out: list[str] = []
+    done = 0
+    for at, _, _, text in sorted(marks):
+        out += [xml[done:at], f"<w:r><w:t>{text}</w:t></w:r>"]
+        done = at
+    return "".join(out) + xml[done:]
+
+
+def _mark_fields(xml: str) -> str:
+    """``xml`` with ``@@F@@`` and ``@@/@@`` around every field not inside another."""
+    spans = [(start, end) for start, end, _, depth in _field_spans(xml) if depth == 0]
+    return _around(xml, spans, "@@F@@", "@@/@@")
 
 
 def _set_page_numbers_aside(xml: str) -> str:
     """``xml`` with ``@@P@@`` and ``@@/P@@`` around every page-number field."""
-    spans: list[tuple[int, int]] = []
-    stack: list[tuple[int, list[str]]] = []
-    for run in _ANY_RUN.finditer(xml):
-        body = run.group(0)
-        if 'fldCharType="begin"' in body:
-            stack.append((run.start(), []))
-        for instruction in re.findall(r"<w:instrText[^>]*>([^<]*)</w:instrText>", body):
-            if stack:
-                stack[-1][1].append(instruction)
-        if 'fldCharType="end"' in body and stack:
-            start, code = stack.pop()
-            words = "".join(code).split()
-            if words and words[0].upper() in _LAYOUT:
-                spans.append((start, run.end()))
-    for match in re.finditer(r"<w:fldSimple\b[^>]*w:instr=\"\s*(\w+).*?</w:fldSimple>", xml, re.S):
-        if match.group(1).upper() in _LAYOUT:
-            spans.append((match.start(), match.end()))
-    for start, end in sorted(spans, reverse=True):
-        xml = (
-            xml[:start]
-            + "<w:r><w:t>@@P@@</w:t></w:r>"
-            + xml[start:end]
-            + "<w:r><w:t>@@/P@@</w:t></w:r>"
-            + xml[end:]
-        )
-    return xml
+    spans = [
+        (start, end)
+        for start, end, code, _ in _field_spans(xml)
+        if code.split()[:1] and code.split()[0].upper() in _LAYOUT
+    ]
+    return _around(xml, spans, "@@P@@", "@@/P@@")
 
 
 def word_prints_what_it_shows(path: Path) -> bool:
@@ -845,25 +930,38 @@ on run argv
   return out
 end run
 """
-_PARAGRAPH_START = re.compile(r"<w:p(?:\s[^>]*)?/>|<w:p(?:\s[^>]*)?>(?:<w:pPr>.*?</w:pPr>)?", re.S)
+_PARAGRAPH_START = re.compile(
+    r"<w:p(?:\s[^>]*)?/>|<w:p(?:\s[^>]*)?>(?:\s*<w:pPr\b(?:[^>]*/>|[^>]*>.*?</w:pPr>))?", re.S
+)
 TOGGLES = ("bold", "italic", "caps", "strike")
 
 
-def word_emphasis(path: Path) -> dict[str, list[bool]]:
-    """Word's bold, italic, caps and strike for each body paragraph, by the reader's index."""
+def _mark_paragraphs(xml: str) -> str:
+    """``xml`` with ``@@Q<n>@@`` at the start of every paragraph, after its properties.
+
+    Every paragraph the XML parser finds must be marked, or the answers would be another's.
+    """
     count = itertools.count()
 
     def mark(start: re.Match[str]) -> str:
         marker = f"<w:r><w:t>@@Q{next(count)}@@</w:t></w:r>"
         tag = start.group(0)
-        if tag.endswith("/>"):
+        if tag.endswith("/>") and "<w:pPr" not in tag:  # an empty paragraph
             return tag[:-2] + ">" + marker + "</w:p>"
         return tag + marker
 
+    marked = _PARAGRAPH_START.sub(mark, xml)
+    if next(count) != sum(1 for _ in ET.fromstring(xml).iter(f"{{{W}}}p")):
+        raise SystemExit("paragraphs the scan does not find as the XML parser does")
+    return marked
+
+
+def word_emphasis(path: Path) -> dict[str, list[bool]]:
+    """Word's bold, italic, caps and strike for each body paragraph, by the reader's index."""
     CONTAINER.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=CONTAINER) as folder:
         copy = Path(folder) / path.name
-        copy.write_bytes(_with_document(path, lambda xml: _PARAGRAPH_START.sub(mark, xml)))
+        copy.write_bytes(_with_document(path, _mark_paragraphs))
         done = _osascript(["osascript", "-", str(copy), copy.name], EMPHASIS)
     if done.returncode != 0:
         raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
@@ -943,18 +1041,28 @@ def note_verdict(word: dict[str, list[str]], reader: dict[str, list[str]] | str)
     return "agrees"
 
 
-def reader_labels(path: Path) -> list[str] | str:
-    """What the reader draws before each of ``path``'s list items, or its refusal code."""
+def reader_labels(path: Path) -> dict[int, str] | str:
+    """What the reader draws before each of ``path``'s list items, by paragraph, or its refusal."""
     try:
         paragraphs = read_docx(path.read_bytes())
     except DocxRefusedError as refused:
         return refused.code
-    drawn = [
-        (p.numbering.text or "") + SUFFIXES[p.numbering.suffix or "nothing"]
-        for p in paragraphs
+    drawn = {
+        index: (p.numbering.text or "") + SUFFIXES[p.numbering.suffix or "nothing"]
+        for index, p in enumerate(paragraphs)
         if p.numbering is not None and p.numbering.num_id
-    ]
-    return [item for item in drawn if item]
+    }
+    return {index: item for index, item in drawn.items() if item}
+
+
+def _as_shown(text: str) -> str:
+    """Word's text with its own codes as the reader's characters.
+
+    U+001E is a no-break hyphen (U+2011), U+001F a soft hyphen (U+00AD), U+000B a line break; text
+    in the Symbol font shows as its stored code (U+F000 plus the code), as a bullet does, and
+    the reader refuses that code anywhere else, so mapping it hides nothing.
+    """
+    return as_drawn(text.replace("\x1e", "\u2011").replace("\x1f", "\u00ad").replace("\x0b", "\n"))
 
 
 def as_drawn(text: str) -> str:
@@ -967,44 +1075,78 @@ def as_drawn(text: str) -> str:
 _TABLES = {"Symbol": SYMBOL_FONT, "Wingdings": WINGDINGS_BULLETS}
 
 
-def label_as_drawn(label: str, font: str | None) -> str:
-    """Word's ``label`` as drawn in ``font``, the one Word gave it.
+def label_as_drawn(label: str, font: str | None) -> str | None:
+    """Word's ``label`` as drawn in ``font``, the one Word gave it, or None if not known.
 
     In Symbol or Wingdings each code (stored as U+F000 plus the code, or as the code) goes through
-    that font's table; a code in no table, and any label in another font, stays as stored.
+    that font's table, the tab or space after the label aside; a code in no table is not known.
+    In "mixed" fonts (Word named two) a label is not known. In another font, or none named, the
+    label stays as stored.
     """
+    body, suffix = (label[:-1], label[-1]) if label[-1:] in ("\t", " ") else (label, "")
+    if font == "mixed":
+        return None if body else label
     table = _TABLES.get(font or "")
     if table is None:
         return label
     out = []
-    for c in label:
+    for c in body:
         code = ord(c) - 0xF000 if 0xF000 <= ord(c) <= 0xF0FF else ord(c)
-        out.append(table.get(code, c))
-    return "".join(out)
+        if code not in table:
+            return None
+        out.append(table[code])
+    return "".join(out) + suffix
 
 
-def verdict(word: list[str], reader: list[str] | str, fonts: list[str | None]) -> str:
-    """Whether the reader agrees with Word: agrees, refuses (code) or differs (where)."""
+def verdict(
+    word: list[str],
+    reader: dict[int, str] | str,
+    fonts: list[str | None],
+    at: list[int] | None = None,
+) -> str:
+    """Whether the reader agrees with Word: agrees, refuses (code) or differs (where).
+
+    ``at`` is the body paragraph each of Word's labels is on; a record without it (made before
+    it was asked) holds the labels in order only.
+    """
     if isinstance(reader, str):
         return f"reader refuses: {reader}"
     if len(reader) != len(word):
         return f"differs: Word has {len(word)} list items, the reader {len(reader)}"
-    for index, (ours, theirs, font) in enumerate(zip(reader, word, fonts, strict=True)):
-        if ours != label_as_drawn(theirs, font):
-            return f"differs at list item {index + 1}: Word {theirs!r} in {font}, reader {ours!r}"
+    places = list(reader) if at is None else at
+    for index, (place, theirs, font) in enumerate(zip(places, word, fonts, strict=True)):
+        ours, drawn = reader.get(place), label_as_drawn(theirs, font)
+        if drawn is None or ours != drawn:
+            where = f"list item {index + 1} (paragraph {place + 1})"
+            return f"differs at {where}: Word {theirs!r} in {font}, reader {ours!r}"
     return "agrees"
 
 
 def _has_stories(path: Path) -> bool:
     """Whether the document names a header, footer or comments part."""
     with zipfile.ZipFile(path) as source:
-        names = source.namelist()
-        rels = (
-            source.read("word/_rels/document.xml.rels")
-            if "word/_rels/document.xml.rels" in names
-            else b""
-        )
-    return any(f'/{kind}"'.encode() in rels for kind in ("header", "footer", "comments"))
+        name = "word/_rels/document.xml.rels"
+        if name not in source.namelist():
+            return False
+        rels = ET.fromstring(source.read(name))
+    return any(
+        rel.get("Type", "").rsplit("/", 1)[-1] in ("header", "footer", "comments") for rel in rels
+    )
+
+
+_COMPUTED_CODES = re.compile(r"\s*(?:SEQ|STYLEREF|REF|NOTEREF|DOCPROPERTY|HYPERLINK)\b")
+
+
+def _has_computed_fields(path: Path) -> bool:
+    """Whether the body has a field the reader computes or reads stored, by its parsed code.
+
+    SEQ, STYLEREF, REF, NOTEREF, DOCPROPERTY or HYPERLINK.
+    """
+    with zipfile.ZipFile(path) as source:
+        root = ET.fromstring(source.read("word/document.xml"))
+    codes = [node.text or "" for node in root.iter(f"{{{W}}}instrText")]
+    codes += [node.get(f"{{{W}}}instr", "") for node in root.iter(f"{{{W}}}fldSimple")]
+    return any(_COMPUTED_CODES.match(code) for code in codes)
 
 
 # How Word shows text in capitals (w:caps), as Word answered for each case: a character's one
@@ -1062,15 +1204,17 @@ def word_stories(path: Path) -> dict[str, list[list[Any]]] | None:
         raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
     stories: list[list[Any]] = []
     comments: list[list[Any]] = []
-    for entry in done.stdout.rstrip("\n").split("\x1e"):
+    for entry in done.stdout.rstrip("\n").split(_RECORD):
         if not entry:
             continue
-        fields = entry.split("\x1f")
-        if fields[0] == "comment":
+        fields = entry.split(_UNIT)
+        if fields[0] == "comment" and len(fields) == 3:
             comments.append([fields[1], fields[2]])
-        else:
+        elif fields[0] in ("header", "footer") and len(fields) == 5 and fields[1].isdigit():
             pages = fields[4].split(SEPARATOR) if fields[4] else []
             stories.append([fields[0], int(fields[1]), fields[2], fields[3], pages])
+        else:
+            raise SystemExit(f"{path.name}: Word's headers, footers and comments do not parse")
     return {"stories": stories, "comments": comments}
 
 
@@ -1111,18 +1255,32 @@ def story_verdict(word: dict[str, list[list[Any]]], path: Path) -> str:
                     filled = filled[:offset] + number + filled[offset:]
                 if filled:
                     mine.append(filled)
-            if mine != _paragraphs_shown(text) or left:
+            if mine != [_as_shown(t) for t in _paragraphs_shown(text)] or left:
                 return f"differs in the {story.kind} {type_} of section {section + 1}"
-    theirs = sorted((author, "".join(_paragraphs_shown(text))) for author, text in word["comments"])
-    readers = sorted(
-        (comment.author or "", "".join(p.text for p in comment.paragraphs))
-        for comment in document.comments
-        if comment.refusal is None
-    )
-    unread = any(comment.refusal is not None for comment in document.comments)
-    if not unread and readers != theirs:
-        return "differs in the comments"
+    # Each comment read is one of Word's, author and paragraphs, each of Word's paired once;
+    # Word's left over are as many as the comments the reader refuses on its own.
+    theirs = [
+        (author, [_as_shown(t) for t in _paragraphs_shown(text)])
+        for author, text in word["comments"]
+    ]
+    unread = 0
+    for comment in document.comments:
+        if comment.refusal is not None:
+            unread += 1
+            continue
+        texts = [_capitalised(p).replace("\ufffc", "/") for p in comment.paragraphs]
+        mine_comment = (comment.author or "", [text for text in texts if text])
+        if mine_comment not in theirs:
+            return "differs in the comments: one the reader reads is none of Word's"
+        theirs.remove(mine_comment)
+    if len(theirs) != unread:
+        return f"differs in the comments: Word has {len(word['comments'])}"
     return "agrees"
+
+
+# What Word shows at a page place: a number in digits or roman numerals, or nothing (a hidden
+# page field with no result). Words such as PAGEREF \p's "above" are not a page number.
+_PAGE_NUMBER = "(?:[0-9]+|[ivxlcdm]+|[IVXLCDM]+)?"
 
 
 def text_verdict(word: list[str], path: Path) -> str:
@@ -1154,11 +1312,7 @@ def text_verdict(word: list[str], path: Path) -> str:
     # paragraph of Word's text, U+000C is a section break or a page break.
     parts: list[tuple[str, bool]] = []
     for piece in word:
-        shown = piece.replace("\x1e", "\u2011").replace("\x1f", "\u00ad").replace("\x0b", "\n")
-        # Text in the Symbol font shows as its stored code (U+F000 plus the code), as a bullet
-        # does; the reader refuses that code anywhere else, so mapping it hides nothing.
-        shown = as_drawn(shown)
-        for number, part in enumerate(shown.split("\x0c")):
+        for number, part in enumerate(_as_shown(piece).split("\x0c")):
             if part:
                 parts.append((part, number > 0))
     symbols = set(SYMBOL_FONT.values())
@@ -1166,7 +1320,7 @@ def text_verdict(word: list[str], path: Path) -> str:
     for index, ours in enumerate(mine):
         # Each character the Symbol table could have given is a group: it or Word's "(".
         pattern = "".join(
-            r"\w*"
+            _PAGE_NUMBER
             if c == "\x00"
             else f"({re.escape(c)}|\\()"
             if c in symbols and c != "("
@@ -1212,10 +1366,11 @@ def text_verdict(word: list[str], path: Path) -> str:
 
 def ask(path: Path) -> dict[str, Any]:
     """Word's answers for a .docx: labels, text, note marks, fields, print, emphasis, stories."""
-    text, drawn, fonts = word_text_and_labels(path)
+    text, drawn, fonts, at = word_text_and_labels(path)
     return {
         "drawn": drawn,
         "fonts": fonts,
+        "at": at,
         "text": text,
         "notes": word_note_marks(path),
         "fields": word_fields(path),
@@ -1232,7 +1387,7 @@ def judge(path: Path, answers: dict[str, Any]) -> str:
     labels first, then the text, note marks, emphasis, the print, the fields, and headers,
     footers and comments, each judged only where the ones before agree.
     """
-    result = verdict(answers["drawn"], reader_labels(path), answers["fonts"])
+    result = verdict(answers["drawn"], reader_labels(path), answers["fonts"], answers.get("at"))
     if answers.get("text") is not None and result == "agrees":
         result = text_verdict(answers["text"], path)
     if answers["notes"] is not None and result == "agrees":
@@ -1246,7 +1401,37 @@ def judge(path: Path, answers: dict[str, Any]) -> str:
         result = field_verdict(answers["fields"], path)
     if answers.get("stories") is not None and result == "agrees":
         result = story_verdict(answers["stories"], path)
+    if result == "agrees":
+        result = _unasked(path, answers)
     return result
+
+
+def _unasked(path: Path, answers: dict[str, Any]) -> str:
+    """``differs`` where the document has what Word was not asked about, else ``agrees``.
+
+    Whether Word is asked is decided from the document's bytes; whether something is there to be
+    asked about is the reader's reading: a story, note or field read and never held to Word is
+    not agreement.
+    """
+    try:
+        document = read_document(path.read_bytes())
+    except DocxRefusedError:
+        return "agrees"  # a refusal for a stale field, which Word's answers bear out
+    missing = [
+        what
+        for what, there, answer in (
+            ("the text", True, "text"),
+            ("note marks", any(p.notes for p in document.body), "notes"),
+            ("fields", _has_computed_fields(path), "fields"),
+            (
+                "headers, footers and comments",
+                bool(document.headers or document.footers or document.comments),
+                "stories",
+            ),
+        )
+        if there and answers.get(answer) is None
+    ]
+    return f"differs: Word was not asked about {', '.join(missing)}" if missing else "agrees"
 
 
 def verify_docx(data: bytes, result: dict[str, Any]) -> dict[str, Any]:

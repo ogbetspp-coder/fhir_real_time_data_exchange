@@ -4,10 +4,12 @@ Chrome parses each section's div as HTML (each into its own element of one page,
 inserts it), lays it out with its default style sheet, and reports the text a reader of the page
 would copy (the section selected whole) and, for each text node, where its text lands in that
 text and what Chrome computed for it: weight, slant, colour, size, the background under it, the
-decorations it inherits, the vertical alignment and shifts of the inline elements around it, and
-their borders. Those facts become the reader's mark kinds by the reader's own thresholds (bold at
-weight 600, faint under a contrast of 1.33:1...), and the two sides are compared line by line,
-character by character and mark by mark.
+decorations it inherits and their colours, the vertical alignment and shifts of the inline
+elements around it, and their borders and border colours. Those facts become the reader's mark
+kinds by the reader's own thresholds (bold at weight 600, faint under a contrast of 1.33:1, a line
+or border marked only where its colour can be seen...), and the two sides are compared line by
+line, character by character and mark by mark. A list marker drawn faint (its colour and size, on
+the background outside its item) is compared as none.
 
 ``verify_epi`` does this for one ePI and its result, as the service does for every ePI it
 ingests where Chrome is installed (``label-docx-service serve``); ``scripts/browser_oracle.py``
@@ -34,6 +36,9 @@ from label_docx.reader import Paragraph
 
 # How long Chrome may take over one document's page.
 TIMEOUT_SECONDS = 300
+# What Chrome is asked and how its answers are judged: a change to this file changes it
+# (``scripts/lock.py``). A kept verdict of another version does not count as Chrome's now.
+VERIFIER = "browser-verifier/1.0.0"
 
 
 class BrowserError(Exception):
@@ -77,18 +82,32 @@ function selected(range) {{
   return selection.toString();
 }}
 function points(value) {{ return value === "auto" ? 0 : parseFloat(value) * 0.75; }}
+// The background painted under an element: the nearest one, where an inline element above a
+// block paints nothing under the block.
+function backdrop(element, host) {{
+  let block = false;
+  for (let e = element; e && e !== host; e = e.parentElement) {{
+    const style = getComputedStyle(e);
+    const inline = style.display === "inline";
+    if (!(block && inline) && style.backgroundColor !== "rgba(0, 0, 0, 0)") {{
+      return style.backgroundColor;
+    }}
+    if (!inline) block = true;
+  }}
+  return null;
+}}
 function facts(element, host) {{
   const own = getComputedStyle(element);
   const out = {{
     weight: own.fontWeight, style: own.fontStyle, color: own.color, size: own.fontSize,
-    underline: false, strike: false, background: null, align: [], shift: 0, borders: []
+    decorations: [], background: backdrop(element, host), align: [], shift: 0, borders: []
   }};
   for (let e = element; e && e !== host; e = e.parentElement) {{
     const style = getComputedStyle(e);
-    if (style.textDecorationLine.includes("underline")) out.underline = true;
-    if (style.textDecorationLine.includes("line-through")) out.strike = true;
-    if (out.background === null && style.backgroundColor !== "rgba(0, 0, 0, 0)") {{
-      out.background = style.backgroundColor;
+    for (const kind of ["underline", "line-through"]) {{
+      if (style.textDecorationLine.includes(kind)) {{
+        out.decorations.push([kind, style.textDecorationColor]);
+      }}
     }}
   }}
   for (let e = element; e && e !== host; e = e.parentElement) {{
@@ -102,7 +121,7 @@ function facts(element, host) {{
       const kind = style["border" + side + "Style"];
       const width = parseFloat(style["border" + side + "Width"]);
       if (kind !== "none" && kind !== "hidden" && width > 0) {{
-        out.borders.push(side.toLowerCase());
+        out.borders.push([side.toLowerCase(), style["border" + side + "Color"], backdrop(e, host)]);
       }}
     }}
   }}
@@ -220,18 +239,31 @@ def _hex(colour: str) -> str | None:
     return "#" + "".join(f"{int(found.group(i)):02x}" for i in (1, 2, 3))
 
 
+def _seen(colour: str, background: str | None) -> bool:
+    """Whether a colour can be told from the background under it, by the reader's threshold."""
+    drawn = _hex(colour)
+    under = _hex(background) if background else None
+    return drawn is not None and not epi._faint(drawn, under)
+
+
 def _kinds(facts: dict[str, Any]) -> frozenset[str]:
-    """The reader's mark kinds for a text node, from what the browser computed for it."""
+    """The reader's mark kinds for a text node, from what the browser computed for it.
+
+    A decoration line or a border is a mark only where it can be seen: in its own colour, on the
+    background under the text (a line) or under the bordered element (a border).
+    """
     kinds: set[str] = set()
     if int(facts["weight"]) >= 600:
         kinds.add("bold")
     if facts["style"] != "normal":
         kinds.add("italic")
-    if facts["underline"] or "bottom" in facts["borders"]:
+    lines = {kind for kind, colour in facts["decorations"] if _seen(colour, facts["background"])}
+    sides = {side for side, colour, under in facts["borders"] if _seen(colour, under)}
+    if "underline" in lines or "bottom" in sides:
         kinds.add("underline")
-    if set(facts["borders"]) - {"bottom"}:
+    if sides - {"bottom"}:
         kinds.add("border")
-    if facts["strike"]:
+    if "line-through" in lines:
         kinds.add("strike")
     # Lengths come back in CSS pixels (1pt is 1.333...px): rounded to a thousandth of a point,
     # a one-point shift is one point, not 0.99999.
@@ -240,6 +272,9 @@ def _kinds(facts: dict[str, Any]) -> frozenset[str]:
         kinds.add("superscript")
     if "sub" in facts["align"] or shift >= epi._SHIFT_MARK_POINTS:
         kinds.add("subscript")
+    # Text moved otherwise (top, middle, bottom...): a kind the reader never gives, so a section
+    # it reads with such text differs.
+    kinds |= {f"vertical-align-{a}" for a in facts["align"] if a not in ("super", "sub")}
     colour = _hex(facts["color"])
     background = _hex(facts["background"]) if facts["background"] else None
     if background is not None and not epi._light(background):
@@ -273,12 +308,24 @@ def _split(characters: list[tuple[str, frozenset[str]]], separators: str) -> lis
 
 
 def browser_lines(section: dict[str, Any]) -> list[Line]:
-    """The browser's text in lines, each character with its marks."""
+    """The browser's text in lines, each character with its marks.
+
+    The page places each run in UTF-16 code units, as JavaScript counts; here they are counted
+    in code points, and a run that splits a character is not the browser's.
+    """
     text: str = section["text"]
+    # Each UTF-16 offset's code point; None inside a character outside the BMP.
+    at: list[int | None] = []
+    for index, character in enumerate(text):
+        at += [index, None] if ord(character) > 0xFFFF else [index]
+    at.append(len(text))
     kinds: list[frozenset[str]] = [frozenset()] * len(text)
     for start, end, facts in section["runs"]:
+        first, last = at[start], at[end]
+        if first is None or last is None:
+            raise BrowserError("a text node's piece splits a character")
         node = _kinds(facts)
-        for index in range(start, end):
+        for index in range(first, last):
             kinds[index] = node
     return _split(list(zip(text, kinds, strict=True)), "\n\t")
 
@@ -357,6 +404,16 @@ divs.forEach((div, section) => {{
   host.querySelectorAll("li").forEach((item, index) => {{
     item.setAttribute("data-oracle-item", section + ":" + index);
   }});
+}});
+// Each marker's colour and size, and the background outside its item, where it is drawn.
+document.querySelectorAll("[data-oracle-item]").forEach((item) => {{
+  const marker = getComputedStyle(item, "::marker");
+  let under = null;
+  for (let e = item.parentElement; e && under === null; e = e.parentElement) {{
+    const colour = getComputedStyle(e).backgroundColor;
+    if (colour !== "rgba(0, 0, 0, 0)") under = colour;
+  }}
+  item.setAttribute("data-oracle-marker", JSON.stringify([marker.color, marker.fontSize, under]));
 }});
 document.title = "ready";
 </script>
@@ -456,12 +513,15 @@ def browser_markers(divs: list[str], chrome: Path = CHROME) -> list[list[str]]:
         finally:
             tools.close()
     items: dict[int, str] = {}
+    drawn: dict[int, list[Any]] = {}
 
     def visit(node: dict[str, Any]) -> None:
         attributes = node.get("attributes", [])
         for name, value in zip(attributes[::2], attributes[1::2], strict=True):
             if name == "data-oracle-item":
                 items[node["backendNodeId"]] = value
+            elif name == "data-oracle-marker":
+                drawn[node["backendNodeId"]] = json.loads(value)
         for child in node.get("children", []):
             visit(child)
 
@@ -474,7 +534,8 @@ def browser_markers(divs: list[str], chrome: Path = CHROME) -> list[list[str]]:
         parent = by_id.get(node.get("parentId", ""), {})
         item = items.get(parent.get("backendDOMNodeId", -1))
         if item is not None:
-            found[item] = node.get("name", {}).get("value", "")
+            name = node.get("name", {}).get("value", "")
+            found[item] = _drawn_marker(name, drawn[parent["backendDOMNodeId"]])
     out: list[list[str]] = []
     for section in range(len(divs)):
         keys = sorted(
@@ -482,6 +543,16 @@ def browser_markers(divs: list[str], chrome: Path = CHROME) -> list[list[str]]:
         )
         out.append([found[k] for k in keys])
     return out
+
+
+def _drawn_marker(name: str, facts: list[Any]) -> str:
+    """The marker as a reader of the page sees it: none where it is faint.
+
+    ``facts``: its colour and size, and the background outside its item, as Chrome computed them.
+    """
+    colour, size, under = facts
+    seen = _seen(colour, under) and float(size.removesuffix("px")) * 0.75 >= epi._TINY_POINTS
+    return name if seen else ""
 
 
 def reader_markers(paragraphs: tuple[Paragraph, ...]) -> list[str]:
@@ -511,12 +582,9 @@ def verify_epi(data: bytes, result: dict[str, Any], chrome: Path = CHROME) -> di
     the ones the reader refused, and lists each section that differs with where (a line and
     character, or a list marker, never the text).
     """
-    bundle = json.loads(data.decode("utf-8"))
-    composition = next(
-        e["resource"]
-        for e in bundle["entry"]
-        if isinstance(e.get("resource"), dict) and "section" in e["resource"]
-    )
+    # Parsed as strictly as the reader parses it (one reading of each name, no NaN, the first
+    # entry's Composition): what Chrome is shown is what was read.
+    composition = epi.composition_of(epi.load_bundle(data))
     pairs: list[tuple[str, dict[str, Any]]] = []
     refused = 0
 

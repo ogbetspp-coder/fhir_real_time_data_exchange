@@ -10,8 +10,8 @@ and nothing stored is ever replaced.
     <root>/documents/<id[:2]>/<id>/source
     <root>/documents/<id[:2]>/<id>/<reader>/<format>/result.json      (docx-reader@1.20.0, ...)
     <root>/documents/<id[:2]>/<id>/<reader>/<format>/receipt.json     (the result's SHA-256)
-    <root>/documents/<id[:2]>/<id>/<reader>/<format>/browser/<version>.json  (an ePI's)
-    <root>/documents/<id[:2]>/<id>/<reader>/<format>/word/<version>.json     (a .docx's)
+    <root>/documents/<id[:2]>/<id>/<reader>/<format>/browser/<version>@<verifier>.json  (an ePI's)
+    <root>/documents/<id[:2]>/<id>/<reader>/<format>/word/<version>@<verifier>.json     (a .docx's)
 
 Every write creates a file that did not exist (a hard link from a written, synced temporary
 file), so two ingestions of the same document at once cannot interleave. Every write and every
@@ -23,14 +23,18 @@ store, however consistent, can pass.
 
 An ePI read is also held to a browser where one is given (``browser``), and a .docx read to Word
 where it is given (``word``): a ``Checker`` names the application's version and gives its verdict.
-The verdict is kept beside the result once per application version, before the receipt is
-written, so a result is never served while its check is still running; a version already kept is
-not asked again. ``disagreement`` names a kept verdict that found the document shown otherwise
-than the result reads; the service does not serve that result.
+The verdict is kept beside the result once per application version and verifier version (the
+code that asks and judges, ``word.VERIFIER``), which it records, before the receipt is written,
+so a result is never served while its check is still running; a pair already kept is not asked
+again. An application that answers otherwise when asked again at once is kept too, beside the
+first, under its digest. ``disagreement`` names a kept verdict that found the document shown
+otherwise than the result reads, or two kept verdicts of one pair that differ; the service does
+not serve that result.
 """
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
@@ -76,10 +80,50 @@ class Checker:
 
     application: Callable[[], str]
     verify: Verifier
+    # The version of the code that asks the application and judges its answers.
+    verifier: str = ""
 
 
-def _verdict_name(application: str) -> str:
-    return re.sub(r"[^A-Za-z0-9.]+", "-", application).strip("-") + ".json"
+def _verdict_name(application: str, verifier: str | None) -> str:
+    """The file a verdict is kept in; a verdict kept before verifiers were versioned has none."""
+
+    def safe(name: str) -> str:
+        return re.sub(r"[^A-Za-z0-9.]+", "-", name).strip("-")
+
+    return safe(application) + ("" if verifier is None else "@" + safe(verifier)) + ".json"
+
+
+def _second_name(first: str, verdict: bytes) -> str:
+    """The file of a verdict that differs from the one kept first under ``first``."""
+    return first.removesuffix(".json") + "+" + hashlib.sha256(verdict).hexdigest()[:16] + ".json"
+
+
+def _fsync(descriptor: int) -> None:
+    """Flush to the disk itself: on macOS, fsync reaches only the drive's cache."""
+    if hasattr(fcntl, "F_FULLFSYNC"):
+        fcntl.fcntl(descriptor, fcntl.F_FULLFSYNC)
+    else:  # pragma: no cover - not macOS
+        os.fsync(descriptor)
+
+
+def _durable_folder(folder: Path) -> None:
+    """Create ``folder`` and any missing parents, each made durable in its own parent."""
+    if folder.is_dir():
+        return
+    _durable_folder(folder.parent)
+    try:
+        folder.mkdir()
+    except FileExistsError:
+        return  # another ingestion made it
+    _sync_folder(folder.parent)
+
+
+def _sync_folder(folder: Path) -> None:
+    descriptor = os.open(folder, os.O_RDONLY)
+    try:
+        _fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def _version(version: str) -> str:
@@ -88,7 +132,7 @@ def _version(version: str) -> str:
 
 def _write_once(path: Path, data: bytes) -> bool:
     """Create ``path`` holding ``data``; if it exists, it must hold ``data``. True if created."""
-    path.parent.mkdir(parents=True, exist_ok=True)
+    _durable_folder(path.parent)
     if path.exists():
         _same(path, data)
         return False
@@ -97,7 +141,7 @@ def _write_once(path: Path, data: bytes) -> bool:
         with os.fdopen(descriptor, "wb") as handle:
             handle.write(data)
             handle.flush()
-            os.fsync(handle.fileno())
+            _fsync(handle.fileno())
         try:
             os.link(temporary, path)  # creates path, or fails if it exists
         except FileExistsError:
@@ -105,11 +149,7 @@ def _write_once(path: Path, data: bytes) -> bool:
             _same(path, data)
             return False
         # The new name is durable only once its directory is.
-        folder = os.open(path.parent, os.O_RDONLY)
-        try:
-            os.fsync(folder)
-        finally:
-            os.close(folder)
+        _sync_folder(path.parent)
     finally:
         Path(temporary).unlink(missing_ok=True)
     return True
@@ -173,20 +213,21 @@ class Store:
             return None
         verdicts = folder / ("browser" if reading is EPI else "word")
         try:
-            kept = verdicts / _verdict_name(checker.application())
+            kept = verdicts / _verdict_name(checker.application(), checker.verifier)
             if kept.exists():
                 return kept.read_bytes()
-            verdict = canonical(checker.verify(data, value))
+            verdict = canonical(checker.verify(data, value) | {"verifier": checker.verifier})
         except Exception as failure:  # noqa: BLE001 - an application that fails verifies nothing
             # Nothing is verified and nothing kept; the reason goes to the log, never the text.
             sys.stderr.write(f"label-docx: {type(failure).__name__}: {failure}\n")
             return None
-        name = verdicts / _verdict_name(json.loads(verdict)["application"])
+        name = verdicts / _verdict_name(json.loads(verdict)["application"], checker.verifier)
         try:
             _write_once(name, verdict)
         except StoreError:
-            # Asked twice at once, the application answered otherwise: the first verdict stands.
-            return name.read_bytes()
+            # Asked twice at once, the application answered otherwise: both are kept, and the
+            # two are a disagreement (``disagreement``); this ingestion answers its own.
+            _write_once(name.with_name(_second_name(name.name, verdict)), verdict)
         return verdict
 
     def verifications(self, document: str) -> list[Json]:
@@ -204,13 +245,21 @@ class Store:
     def disagreement(self, document: str) -> dict[str, Json] | None:
         """A kept verdict that found the document shown otherwise than the result reads, or None.
 
-        A kept verdict the store cannot read counts as one: nothing unchecked is served.
+        A kept verdict the store cannot read counts as one: nothing unchecked is served. So do two
+        verdicts of one application and verifier version that differ.
         """
+        first: dict[tuple[Json, Json], dict[str, Json]] = {}
         for verdict in self.verifications(document):
             if not isinstance(verdict, dict):
                 return {"differs": [{"where": "a kept verdict that is not one"}]}
             if verdict.get("differs"):
                 return verdict
+            pair = (verdict.get("application"), verdict.get("verifier"))
+            if first.setdefault(pair, verdict) != verdict:
+                return {
+                    "application": verdict.get("application"),
+                    "differs": [{"where": "the application answered otherwise when asked again"}],
+                }
         return None
 
     def documents(self) -> list[str]:
@@ -244,8 +293,11 @@ class Store:
                 not isinstance(value, dict)
                 or not isinstance(value.get("application"), str)
                 or not isinstance(value.get("differs"), list)
-                or verdict.name != _verdict_name(value["application"])
+                or not isinstance(value.get("verifier", ""), str)
             ):
+                raise StoreError(f"{verdict} is not a verdict")
+            name = _verdict_name(value["application"], value.get("verifier"))
+            if verdict.name not in (name, _second_name(name, verdict.read_bytes())):
                 raise StoreError(f"{verdict} is not a verdict")
 
     def result(self, document: str) -> bytes | None:

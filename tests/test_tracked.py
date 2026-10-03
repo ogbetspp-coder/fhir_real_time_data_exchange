@@ -609,3 +609,37 @@ def test_every_change_is_listed_and_only_a_formatting_copy_once() -> None:
     # Two insertions with one id are two changes; a run split in two holds one change twice.
     _, _, changes = tracked(docx(p(ins(t("a"), key=0) + t("b") + ins(t("c"), key=0))))
     assert [c.kind for c in changes] == ["insert", "insert"]
+
+
+@pytest.mark.parametrize("rows", ["first", "every"])
+def test_a_join_into_a_nested_row_the_view_drops_is_refused(rows: str) -> None:
+    # Word joins into the first paragraph in document order and cannot remove a row it joins
+    # into; for a nested table its answer is not on record (tracked-cases to record it).
+    second = _row("inner second", "del" if rows == "every" else "")
+    inner = f"<w:tbl>{_row('inner first', 'del')}{second}</w:tbl>"
+    outer = f"<w:tbl><w:tr><w:tc>{inner}{p(t('outer'))}</w:tc></w:tr></w:tbl>"
+    body = p(t("before"), mark("del")) + outer + p(t("after"))
+    with pytest.raises(DocxRefusedError, match="a row the view drops"):
+        tracked(docx(body))
+    with pytest.raises(CertificationError, match="meets a row the view drops"):
+        certify_tracked(docx(body), {"accepted": docx(p(t("x")))})
+
+
+@pytest.mark.parametrize(
+    "first",
+    [
+        '<w:footnotePr><w:numFmt w:val="lowerRoman"/><w:numStart w:val="3"/></w:footnotePr>',
+        '<w:endnotePr><w:numRestart w:val="eachSect"/></w:endnotePr>',
+        "<w:titlePg/>",
+    ],
+)
+def test_a_section_break_a_view_drops_between_sections_that_differ_in_what_is_read_is_refused(
+    first: str,
+) -> None:
+    # Which section's note numbering the joined section keeps is not on record (tracked-cases
+    # to record: section 1 lowerRoman from 3 with its break deleted, Accept All).
+    body = p(t("first"), f"<w:sectPr>{first}</w:sectPr>{mark('del')}") + p(t("second"))
+    with pytest.raises(DocxRefusedError, match="section"):
+        tracked(docx(body + "<w:sectPr/>"))
+    # The same settings on both sides: the join is read (mark-deleted-section-end).
+    tracked(docx(body + f"<w:sectPr>{first}</w:sectPr>"))
