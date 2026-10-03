@@ -34,9 +34,9 @@ from label_docx.certify import (
     certify_epi,
 )
 from label_docx.output import canonical
-from label_docx.word import SUFFIXES, as_drawn
+from label_docx.word import SUFFIXES, label_as_drawn
 from lock import MANIFESTS
-from test_reader import W, docx
+from test_reader import LINE, SHAPE, WP, W, _alternate, docx
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 # A character no document holds and no reading can produce: an inserted or substituted
@@ -880,6 +880,7 @@ def test_a_field_in_another_fields_code_is_code() -> None:
     certificate = DocxSource(docx(_p(nested))).certify(_value("x"))
     assert certificate["setAside"] == {
         "fieldCode": len(" IF ") + len(" PAGE ") + 1,
+        "floatingObjects": 0,
         "hiddenWhitespace": 0,
         "pageBreaks": 0,
         "pageNumbers": 0,
@@ -986,12 +987,62 @@ def test_a_drawing_is_one_character_unless_it_holds_text(inner: str) -> None:
 
 @pytest.mark.parametrize("inner", ["", "<v:textbox/>", '<v:textpath string="x"/>'])
 def test_a_vml_picture_is_one_character_unless_it_holds_text(inner: str) -> None:
-    data = docx(_p(f"<w:r><w:pict><v:shape {_VML}>{inner}</v:shape></w:pict></w:r>"))
+    data = docx(_p(f"<w:r><w:pict><v:shape {_VML}><v:imagedata/>{inner}</v:shape></w:pict></w:r>"))
     if not inner:
         DocxSource(data).certify(_value("\ufffc"))
         return
     with pytest.raises(CertificationError):
         DocxSource(data)
+
+
+@pytest.mark.parametrize(
+    "fallback",
+    [
+        LINE,
+        "<w:t>x</w:t>",
+        "<w:sym w:font='Symbol' w:char='F0B7'/>",
+        "<w:tab/>",
+        f"<w:pict><v:shape {_VML}><v:textbox/></v:shape></w:pict>",
+        _alternate(SHAPE),
+    ],
+)
+def test_alternate_content_is_read_as_its_drawing_unless_a_branch_holds_text_or_run_content(
+    fallback: str,
+) -> None:
+    data = docx(_p("<w:r>" + _alternate(SHAPE, fallback) + "</w:r>"))
+    if fallback == LINE:
+        # Anchored: set aside, as Word's text shows it.
+        assert DocxSource(data).certify(_value(""))["setAside"]["floatingObjects"] == 1
+        return
+    with pytest.raises(CertificationError):
+        DocxSource(data)
+
+
+def test_a_floating_drawing_is_set_aside_and_counted_and_one_in_line_is_one_character() -> None:
+    inline = _DRAWING.format(inner="")
+    anchored = inline.replace("wp:inline", "wp:anchor")
+    vml = f'<w:pict><v:shape {_VML} style="{{}}width:9pt"><v:imagedata/></v:shape></w:pict>'
+    shape = _alternate(SHAPE.replace("wp:anchor", "wp:inline"), LINE)
+    for drawing, in_line in (
+        (inline, True),
+        (anchored, False),
+        (vml.format(""), True),
+        (vml.format("position: ABSOLUTE;"), False),
+        (shape, True),
+    ):
+        source = DocxSource(docx(_p(f"<w:r><w:t>a</w:t>{drawing}<w:t>b</w:t></w:r>")))
+        right, wrong = ("a￼b", "ab") if in_line else ("ab", "a￼b")
+        assert source.certify(_value(right))["setAside"]["floatingObjects"] == (not in_line)
+        with pytest.raises(CertificationError):
+            source.certify(_value(wrong))
+    for drawing in (
+        inline.replace("</wp:inline>", f'</wp:inline><wp:anchor xmlns:wp="{WP}"/>'),
+        vml.format("position:relative;"),
+        vml.format("").replace("</w:pict>", f"<v:shape {_VML}><v:imagedata/></v:shape></w:pict>"),
+        _alternate(SHAPE, LINE, requires="wpg"),
+    ):
+        with pytest.raises(CertificationError):
+            DocxSource(docx(_p(f"<w:r>{drawing}</w:r>")))
 
 
 def test_paragraphs_in_block_containers_are_read_and_one_in_a_paragraph_is_not() -> None:
@@ -1485,7 +1536,9 @@ def test_the_checks_own_list_labels_and_note_marks_are_words() -> None:
                 for label in source.labels
                 if label is not None and label["numId"]
             ]
-            assert [d for d in drawn if d] == [as_drawn(w) for w in word], name
+            fonts = answers["fonts"][name]
+            mapped = [label_as_drawn(w, f) for w, f in zip(word, fonts, strict=True)]
+            assert [d for d in drawn if d] == mapped, name
             checked += 1
         for name, word_marks in sorted(answers["notes"].items()):
             source = read.get(record.parent / name)
@@ -1791,3 +1844,23 @@ def test_numbers_are_written_in_every_format_as_word_writes_them(
 def test_a_number_no_format_writes_is_never_written(value: int, fmt: str) -> None:
     with pytest.raises(CertificationError):
         _formatted(value, fmt)
+
+
+def test_a_wingdings_bullet_is_drawn_through_its_closed_table_and_only_so() -> None:
+    wingdings = '<w:rPr><w:rFonts w:ascii="Wingdings" w:hAnsi="Wingdings"/></w:rPr>'
+    square = _list(_level(0, "", "bullet", extra=wingdings)) + _NUM
+    data = docx(_item(1, 0), numbering=square)
+    assert _labels_certified(data) == [(1, "▪", "tab")]
+    # The label the reader would have drawn without the table is not the check's.
+    value = json.loads(output.read(data)[0])
+    value["paragraphs"][0]["numbering"]["text"] = ""
+    with pytest.raises(CertificationError):
+        DocxSource(data).certify(value)
+    # Wingdings in one Latin slot only, or a code outside the table, is never certified.
+    half = '<w:rPr><w:rFonts w:ascii="Wingdings" w:hAnsi="Arial"/></w:rPr>'
+    for numbering in (
+        _list(_level(0, "", "bullet", extra=half)) + _NUM,
+        _list(_level(0, "", "bullet", extra=wingdings)) + _NUM,
+    ):
+        with pytest.raises(CertificationError):
+            _ = DocxSource(docx(_item(1, 0), numbering=numbering)).labels

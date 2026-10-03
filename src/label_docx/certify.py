@@ -14,6 +14,7 @@ those of field instructions, ``E`` the elements that stand for one character: ta
 picture...; ``O`` the output characters)::
 
     |T| + |I| + |E| = |O| + field code + page numbers + hidden whitespace + page breaks
+                        + floating objects
 
 and, stronger than the count, the sequence: paragraph by paragraph, the output text equals the
 tokens not set aside, in order, each mapped by a fixed table (a ``w:t`` character to itself, or
@@ -30,7 +31,8 @@ through the Symbol table, counted as ``symbolMapped``), and whether it is hidden
 whitespace is left out, counted as ``hiddenWhitespace``; hidden text with characters to show is
 never certified). The set-aside reasons are fixed too: a field's instruction (code, not shown),
 a page number (set by the layout; its place must be in ``pages``), a page or column break
-(layout).
+(layout), a picture or shape anchored to its paragraph (it floats apart from the text, and
+Word's text shows none; one in line is U+FFFC).
 
 Its scope is the text the reader claims to read: for a .docx the body, footnotes, endnotes,
 headers, footers and comments (one the reader refuses on its own is listed under ``refused``);
@@ -56,7 +58,8 @@ Beyond the text, the check works out on its own, by Word's rules written apart f
 reader's, the key marks (``CHECKED_MARKS``), every list label and every note mark; the result's
 must be the check's. Other marks are held to Word and Chrome themselves
 (``tests/test_word_oracle.py``, ``tests/test_browser_oracle.py``). It shares one thing with the
-reader: the Symbol table (``SYMBOL_FONT``), 49 code points held to Word.
+reader: the Symbol table (``SYMBOL_FONT``), 49 code points held to Word, and the closed table of
+Wingdings bullets (``WINGDINGS_BULLETS``).
 """
 
 from __future__ import annotations
@@ -72,9 +75,9 @@ from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from typing import Any
 
-from label_docx.reader import SYMBOL_FONT
+from label_docx.reader import SYMBOL_FONT, WINGDINGS_BULLETS
 
-CHECKER_VERSION = "conservation-check/1.8.0"
+CHECKER_VERSION = "conservation-check/1.9.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -84,6 +87,8 @@ _NOTE_LAYOUT = {"separator", "continuationSeparator", "continuationNotice"}
 # Run children that hold no text and stand for none.
 _RUN_SILENT = {"rPr", "lastRenderedPageBreak"}
 _R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+_WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+_POSITION = re.compile(r"(?:^|;)\s*position\s*:\s*([^;]*)", re.IGNORECASE)
 _NOTE_MARKS = {"footnoteReference", "endnoteReference", "footnoteRef", "endnoteRef"}
 
 type Json = Any
@@ -113,13 +118,14 @@ class _Ledger:
     page_numbers: int = 0
     hidden: int = 0
     page_breaks: int = 0
+    floating: int = 0
     symbol: int = 0
     output: int = 0
 
     def balanced(self) -> bool:
         source = self.text + self.instruction + self.elements
         kept = self.output + self.field_code + self.page_numbers + self.hidden + self.page_breaks
-        return source == kept
+        return source == kept + self.floating
 
 
 # --- .docx: the source's tokens -----------------------------------------------------------
@@ -330,6 +336,13 @@ class _Fonts:
             raise CertificationError("Symbol set for only some of a run's characters")
         return slots["ascii"]
 
+    def wingdings(self, levels: list[ET.Element]) -> bool:
+        """Whether a list label is drawn in Wingdings: its ``ascii`` and ``hAnsi`` fonts both."""
+        slots = {slot: self.font(levels, slot) == "Wingdings" for slot in _THEME_SLOT}
+        if any(slots.values()) and not (slots["ascii"] and slots["hAnsi"]):
+            raise CertificationError("Wingdings set for only some of a label's characters")
+        return slots["ascii"]
+
     @staticmethod
     def hidden(levels: list[ET.Element], own: ET.Element | None) -> bool:
         direct = None if own is None else _on(own.find(_w("vanish")))
@@ -351,6 +364,46 @@ def _symbol_reading(text: str) -> str:
             raise CertificationError(f"a Symbol character outside the table: {code:#06x}")
         out.append(SYMBOL_FONT[low])
     return "".join(out)
+
+
+def _in_line(drawing: ET.Element) -> bool:
+    """Whether a picture or shape stands in the text, or floats apart from it (anchored).
+
+    DrawingML says so by its frame (``wp:inline`` or ``wp:anchor``), VML by the image's style
+    (``position:absolute`` floats); alternate content by the drawing of its one ``wps`` choice,
+    which Word draws.
+    """
+    if _local(drawing.tag) == "AlternateContent":
+        choices = [c for c in drawing if _local(c.tag) == "Choice"]
+        if len(choices) != 1 or choices[0].get("Requires") != "wps":
+            raise CertificationError("alternate content without one wps choice")
+        drawn = list(choices[0])
+        if [d.tag for d in drawn] != [_w("drawing")]:
+            raise CertificationError("alternate content whose choice is not one drawing")
+        drawing = drawn[0]
+    if drawing.tag == _w("drawing"):
+        frames = [c.tag for c in drawing]
+        if frames not in ([f"{{{_WP}}}inline"], [f"{{{_WP}}}anchor"]):
+            raise CertificationError("a drawing neither in line nor anchored")
+        return frames == [f"{{{_WP}}}inline"]
+    styles = [
+        n.get("style", "") for n in drawing.iter() if any(_local(c.tag) == "imagedata" for c in n)
+    ]
+    if len(styles) != 1:
+        raise CertificationError("a VML picture of other than one image")
+    position = _POSITION.search(styles[0])
+    if position is None:
+        return True
+    if position.group(1).strip().lower() != "absolute":
+        raise CertificationError(f"a VML picture positioned {position.group(1)!r}")
+    return False
+
+
+def _bullet_reading(code: int) -> str:
+    for low, reading in WINGDINGS_BULLETS.items():
+        if code in (low, 0xF000 + low):
+            return reading
+    raise CertificationError(f"a Wingdings label outside the table: {code:#06x}")
 
 
 class _Story:
@@ -506,6 +559,8 @@ class _Story:
                 self.ledger.page_numbers += length
             elif not token and local == "br":
                 self.ledger.page_breaks += 1
+            elif not token and local in ("drawing", "pict", "AlternateContent"):
+                self.ledger.floating += 1
             else:
                 shown.append(token)
         self.flush_run(shown, hidden, kinds)
@@ -543,13 +598,20 @@ class _Story:
                 raise CertificationError(f"a w:sym outside the Symbol table: {code:#06x}")
             self.ledger.symbol += 1
             return SYMBOL_FONT[low]
-        if local in ("drawing", "pict"):
-            # A picture stands for one character. Text inside one (a text box, WordArt, whose
-            # text is an attribute of its textpath) is text this check does not place.
-            texts = {"t", "txbx", "txbxContent", "textbox", "textpath"}
-            if any(_local(n.tag) in texts for n in child.iter()):
+        if local in ("drawing", "pict", "AlternateContent"):
+            # A picture or a drawn shape stands for one character, whichever branch of alternate
+            # content Word draws. Text inside one (a text box, WordArt, whose text is an
+            # attribute of its textpath) is text this check does not place.
+            texts = {"t", "txbx", "txbxContent", "textbox", "textpath", "AlternateContent"}
+            inner = [n for n in child.iter() if n is not child]
+            if any(_local(n.tag) in texts for n in inner):
                 raise CertificationError(f"text inside a {local}")
-            return _OBJECT
+            if local == "AlternateContent" and any(
+                n.tag.startswith(f"{{{W}}}") and _local(n.tag) not in ("drawing", "pict")
+                for n in inner
+            ):
+                raise CertificationError("run content inside alternate content")
+            return _OBJECT if _in_line(child) else ""
         raise CertificationError(f"a run holds {local}, which the check does not know")
 
     def field(self, child: ET.Element) -> None:
@@ -949,6 +1011,8 @@ class _Numbering:
         ]
         if self.fonts.symbol(label_levels):
             out = _symbol_reading(out)
+        elif self.fonts.wingdings(label_levels):
+            out = "".join(_bullet_reading(ord(c)) for c in out)
         return out, look.suffix
 
 
@@ -1315,6 +1379,7 @@ class DocxSource:
             "setAside": {
                 "fieldCode": ledger.field_code,
                 "hiddenWhitespace": ledger.hidden,
+                "floatingObjects": ledger.floating,
                 "pageBreaks": ledger.page_breaks,
                 "pageNumbers": ledger.page_numbers,
             },

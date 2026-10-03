@@ -16,9 +16,11 @@ What a paragraph carries:
 - ``text``: the characters as stored. ``<w:t>`` text is copied as is; nothing is normalised,
   straightened or trimmed. ``<w:tab/>`` and ``<w:ptab/>`` are U+0009; ``<w:br/>`` and
   ``<w:cr/>`` are U+000A, except a page or column break, which is layout and emits nothing;
-  ``<w:noBreakHyphen/>`` is U+2011, ``<w:softHyphen/>`` U+00AD, and a picture is U+FFFC OBJECT
-  REPLACEMENT CHARACTER at the place it stands, whether it is DrawingML (``w:drawing``) or VML
-  (``w:pict``, as documents from before Word 2007 hold it).
+  ``<w:noBreakHyphen/>`` is U+2011, ``<w:softHyphen/>`` U+00AD, and a picture or drawn shape in
+  line with the text is U+FFFC OBJECT REPLACEMENT CHARACTER at the place it stands, whether it is
+  DrawingML (``w:drawing``) or VML (``w:pict``, as documents from before Word 2007 hold it). One
+  anchored to the paragraph (floating) is not in the text: Word's text shows none, and the
+  check counts it (``floatingObjects``).
 - ``marks``: ranges of ``text`` whose appearance changes what a reader sees or means, set on the
   run, its styles or the document defaults (``Mark`` lists the kinds): bold, italic, superscript,
   subscript, raised or lowered text, capitals and small capitals, single and double strike-through,
@@ -109,9 +111,10 @@ none. ``lvlText`` is copied, with ``%1`` to ``%9`` replaced by the counter of th
 level's format (all decimal under ``isLgl``): decimal, decimalZero, upper and lower roman (1 to
 3999), upper and lower letter (a to z, then aa, bb...), or none; a bullet level's text is its
 bullet. The label is drawn in the level's run properties over the paragraph mark's, so its fonts
-are placed as a run's are: a Symbol bullet (U+F0B7) is mapped to "•", a Wingdings one is
-refused. ``suffix`` is ``tab``, ``space`` or ``nothing`` (``w:suff``), or ``legacy`` for a Word 6
-level, where the gap is layout and not a character.
+are placed as a run's are: a Symbol bullet (U+F0B7) is mapped to "•", a Wingdings bullet through
+``WINGDINGS_BULLETS`` (U+F0A7 to "▪"), and a bullet in any other dingbat font is refused.
+``suffix`` is ``tab``, ``space`` or ``nothing`` (``w:suff``), or ``legacy`` for a Word 6 level,
+where the gap is layout and not a character.
 
 Notes. ``read_document`` returns the footnotes and endnotes with the body, each note's
 paragraphs read by every rule above, in the order the body refers to them; ``read_docx``
@@ -142,7 +145,7 @@ What it refuses (``DocxRefusedError.code``):
   ``xml:space="preserve"`` (a consumer may drop them), or a tab or line break inside ``<w:t>``
   (Word writes those as elements).
 - ``unbalanced-field``: a paragraph that ends inside a field instruction.
-- ``field-without-result``: a field with no stored result.
+- ``field-without-result``: a field with no stored result, but a hidden SEQ (``\h``).
 - ``computed-field``: a shown field whose value Word computes rather than stores, or any field
   in a document set to update fields on open.
 - ``stale-field``: a field marked for update, or a SEQ or STYLEREF field whose stored result is
@@ -205,7 +208,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field, replace
 
 # The version of the rules above; versions.lock.json ties it to this file (tests/test_locks.py).
-READER_VERSION = "docx-reader/1.20.0"
+READER_VERSION = "docx-reader/1.21.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -214,6 +217,7 @@ PR = "http://schemas.openxmlformats.org/package/2006/relationships"
 R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 XML_SPACE = "{http://www.w3.org/XML/1998/namespace}space"
 PICTURE_URI = "http://schemas.openxmlformats.org/drawingml/2006/picture"
+WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
 OBJECT = "\ufffc"
 
 MAX_PART_BYTES = 20 * 1024 * 1024
@@ -276,6 +280,14 @@ SYMBOL_FONT: dict[int, str] = {
     0xB7: "\u2022",  # BULLET
     0xB9: "\u2260",  # NOT EQUAL TO
     0xBB: "\u2248",  # ALMOST EQUAL TO
+}
+
+# Wingdings list bullets as ISO/IEC JTC1/SC2/WG2 N4384 maps them to Unicode (its normative
+# "source references" table, index 1000 plus the code). Closed like the Symbol table: only the
+# bullets labels are found to use, each a reviewed change with a test. Bullets only: text in
+# Wingdings is refused.
+WINGDINGS_BULLETS: dict[int, str] = {
+    0xA7: "\u25aa"  # BLACK SMALL SQUARE (w-1167), Word's default third-level bullet
 }
 
 _DINGBAT_FONTS = ("wingdings", "webdings", "dingbat", "marlett", "mtextra")
@@ -988,6 +1000,8 @@ def _font_class(name: str | None) -> str:
     key = name.lower().replace(" ", "")
     if key in ("symbol", "symbolmt"):
         return "symbol"
+    if name == "Wingdings":  # exactly: another spelling is refused below, not guessed
+        return "wingdings"
     if any(part in key for part in _DINGBAT_FONTS):
         return "dingbat"
     return "text"
@@ -1006,7 +1020,7 @@ def _in_symbol(styles: _Styles, properties: _Properties, table_style: str | None
         slot: _font_kind(styles, properties.font(slot))
         for slot in ("ascii", "hAnsi", "eastAsia", "cs")
     }
-    if "dingbat" in kinds.values():
+    if "dingbat" in kinds.values() or "wingdings" in kinds.values():
         raise DocxRefusedError("symbol-font", "a run in a dingbat or symbol-encoded font")
     symbol = "symbol" in kinds.values()
     if symbol and (
@@ -1024,6 +1038,43 @@ def _in_symbol(styles: _Styles, properties: _Properties, table_style: str | None
         # another font over it.
         raise DocxRefusedError("symbol-font", "Symbol under conditional table fonts")
     return symbol
+
+
+def _label_font(styles: _Styles, properties: _Properties, table_style: str | None) -> str:
+    """The font a list label is drawn in: ``symbol``, ``wingdings`` or ``text``; refused if unsure.
+
+    As for a run (``_in_symbol``): a symbol font only where both Latin slots name it, with no
+    complex-script, right-to-left or hint to send a character elsewhere, and no conditional
+    table font over it.
+    """
+    kinds = {
+        slot: _font_kind(styles, properties.font(slot))
+        for slot in ("ascii", "hAnsi", "eastAsia", "cs")
+    }
+    if "dingbat" in kinds.values():
+        raise DocxRefusedError("symbol-font", "a list label in a dingbat or symbol-encoded font")
+    for font in ("symbol", "wingdings"):
+        if font not in kinds.values():
+            continue
+        if (
+            kinds["ascii"] != font
+            or kinds["hAnsi"] != font
+            or properties.toggle("cs")
+            or properties.toggle("rtl")
+            or properties.value("rFonts", "hint") not in (None, "default")
+        ):
+            raise DocxRefusedError("symbol-font", f"{font} set for only some of a list label")
+        if any(s.conditional_fonts for s in styles.chain(table_style)):
+            raise DocxRefusedError("symbol-font", f"{font} under conditional table fonts")
+        return font
+    return "text"
+
+
+def _bullet(code: int) -> str:
+    low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code
+    if low not in WINGDINGS_BULLETS:
+        raise DocxRefusedError("unmapped-symbol", f"Wingdings code {code:#06x}")
+    return WINGDINGS_BULLETS[low]
 
 
 def _characters(text: str, symbol: bool) -> str:
@@ -1059,29 +1110,100 @@ def _private_use(code: int) -> bool:
 
 
 def _drawing(element: ET.Element) -> str:
-    """A picture is one U+FFFC; a drawing that can hold text, or is not a picture, is refused."""
+    """A picture, placed by ``_placed``; one that can hold text, or is not a picture, is refused."""
     for node in element.iter():
         local = _local(node.tag)
         if local in ("t", "txbx", "txbxContent"):
             raise DocxRefusedError("unsupported-element", "drawing with text")
         if local == "graphicData" and node.get("uri") != PICTURE_URI:
             raise DocxRefusedError("unsupported-element", f"drawing of {node.get('uri')}")
-    return OBJECT
+    return _placed(element)
+
+
+def _placed(drawing: ET.Element) -> str:
+    """U+FFFC for a drawing in line with the text; nothing for one anchored to the paragraph.
+
+    Word's text shows a drawing in line ("/") and none anchored, which floats apart from the
+    text [drawing-inline-picture, drawing-anchored-picture, drawing-anchored-line].
+    """
+    frames = [c.tag for c in drawing]
+    if frames == [f"{{{WP}}}inline"]:
+        return OBJECT
+    if frames == [f"{{{WP}}}anchor"]:
+        return ""
+    raise DocxRefusedError("unsupported-element", "drawing neither in line nor anchored")
 
 
 def _vml_picture(element: ET.Element) -> str:
-    """A VML picture (``w:pict`` of an image) is one U+FFFC; any other VML is refused.
+    """A VML picture (``w:pict`` of one image): in line, one U+FFFC; positioned absolutely, none.
 
     Word writes pictures this way in documents from before Word 2007 and when saving for them.
-    A text box, WordArt, an embedded object or a drawn shape is refused: it holds text, or it is
-    not a picture.
+    Word's text shows one in line ("/") and none positioned absolutely, which floats apart from
+    the text [drawing-vml-inline-picture, drawing-vml-floating-picture]. A text box, WordArt, an
+    embedded object, a drawn shape, a group, a hidden shape or any other position is refused.
     """
     locals_ = {_local(node.tag) for node in element.iter()}
     if locals_ & {"textbox", "txbxContent", "textpath", "t", "OLEObject"}:
         raise DocxRefusedError("unsupported-element", "pict with text or an embedded object")
-    if "imagedata" not in locals_:
-        raise DocxRefusedError("unsupported-element", "pict that is not a picture")
-    return OBJECT
+    holders = [n for n in element.iter() if any(_local(c.tag) == "imagedata" for c in n)]
+    if len(holders) != 1 or "group" in locals_:
+        raise DocxRefusedError("unsupported-element", "pict that is not one picture")
+    style = {
+        key.strip().lower(): value.strip().lower()
+        for key, _, value in (
+            part.partition(":") for part in holders[0].get("style", "").split(";")
+        )
+        if key.strip()
+    }
+    if style.get("visibility", "visible") != "visible":
+        raise DocxRefusedError("unsupported-element", "pict that is hidden")
+    position = style.get("position")
+    if position is None:
+        return OBJECT
+    if position == "absolute":
+        return ""
+    raise DocxRefusedError("unsupported-element", f"pict positioned {position}")
+
+
+_SHAPE_URI = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+_ALTERNATE = f"{{{MC}}}AlternateContent"
+
+
+def _alternate(element: ET.Element) -> str:
+    """Alternate content in a run: a drawing that holds no text, read as a picture is (``_placed``).
+
+    Word draws the choice it supports (a DrawingML shape, ``wps``: a line, a box) and keeps the
+    fallback (VML) for older versions. Read only where no branch can hold text and the drawn
+    branch is one picture or shape; a text box, WordArt or anything else is refused.
+    [drawing-inline-shape, drawing-anchored-shape, drawing-anchored-line]
+    """
+    choices = [c for c in element if c.tag == f"{{{MC}}}Choice"]
+    if len(choices) != 1 or choices[0].get("Requires") != "wps":
+        raise DocxRefusedError("unsupported-element", "AlternateContent")
+    texts = {"t", "txbx", "txbxContent", "textbox", "textpath", "OLEObject", "AlternateContent"}
+    # Of Word's own elements, only the drawing and its VML fallback: no run content in any branch.
+    pictures = {_w("drawing"), _w("pict")}
+    if any(
+        _local(n.tag) in texts or (n.tag.startswith(f"{{{W}}}") and n.tag not in pictures)
+        for n in element.iter()
+        if n is not element
+    ):
+        raise DocxRefusedError("unsupported-element", "AlternateContent that can hold text")
+    drawn = list(choices[0])
+    graphics = [n for n in choices[0].iter() if _local(n.tag) == "graphicData"]
+    # Each graphic is what its uri names, in that namespace: a picture or a Word shape.
+    if (
+        [c.tag for c in drawn] != [_w("drawing")]
+        or not graphics
+        or any(
+            g.get("uri") not in (PICTURE_URI, _SHAPE_URI)
+            or [c.tag for c in g]
+            != [f"{{{g.get('uri')}}}{'pic' if g.get('uri') == PICTURE_URI else 'wsp'}"]
+            for g in graphics
+        )
+    ):
+        raise DocxRefusedError("unsupported-element", "AlternateContent that is not a drawing")
+    return _placed(drawn[0])
 
 
 class _ParagraphReader:
@@ -1295,8 +1417,15 @@ class _ParagraphReader:
             self.fields[-1] = False
         elif kind == "end" and self.fields:
             if self.fields[-1]:
-                # No separate: the field stores no result, and what Word shows is computed.
-                raise DocxRefusedError("field-without-result", "a field with no stored result")
+                # No separate: the field stores no result, and what Word shows is computed. A
+                # hidden SEQ (\h, as WordPerfect conversions leave "SEQ CHAPTER \h \r 1") shows
+                # nothing and counts: it is checked and counted as any SEQ, its result empty.
+                instruction = "".join(self.instructions[-1])
+                words = instruction.upper().split()
+                if any(self.fields[:-1]) or words[:1] != ["SEQ"] or "\\H" not in words:
+                    raise DocxRefusedError("field-without-result", "a field with no stored result")
+                self.results[-1] = offset
+                self.fields[-1] = False
             start = self.results.pop()
             if start is not None:
                 self.computed.append(("".join(self.instructions[-1]), start, offset))
@@ -1329,6 +1458,8 @@ class _ParagraphReader:
             return _drawing(child)
         if tag == _w("pict"):
             return _vml_picture(child)
+        if tag == _ALTERNATE:
+            return _alternate(child)
         raise DocxRefusedError("unsupported-element", _local(tag))
 
     def _mark(self, properties: _Properties, start: int, end: int) -> None:
@@ -2026,9 +2157,12 @@ class _Lists:
         )
         if properties.toggle("vanish") or properties.toggle("specVanish"):
             raise DocxRefusedError("ambiguous-numbering", "a hidden list label")
-        label = _characters(
-            "".join(pieces), _in_symbol(self.styles, properties, context.table_style)
-        )
+        font = _label_font(self.styles, properties, context.table_style)
+        drawn = "".join(pieces)
+        if font == "wingdings":
+            label = "".join(_bullet(ord(character)) for character in drawn)
+        else:
+            label = _characters(drawn, font == "symbol")
         if (properties.toggle("caps") or properties.toggle("smallCaps")) and label.upper() != label:
             raise _refuse_numbering("a list label in capitals")
         return label
@@ -2742,11 +2876,12 @@ def _read_comments(root: ET.Element | None, styles: _Styles) -> tuple[Comment, .
 
 
 def _check_part(root: ET.Element) -> None:
-    """Refuse a part with tracked changes, alternate content, or text outside text elements."""
+    """Refuse a part with tracked changes, alternate content not in a run, or stray text."""
+    in_runs = {id(c) for run in root.iter(_w("r")) for c in run if c.tag == _ALTERNATE}
     for element in root.iter():
         if element.tag in _TRACKED:
             raise DocxRefusedError("tracked-change", _local(element.tag))
-        if element.tag == f"{{{MC}}}AlternateContent":
+        if element.tag == _ALTERNATE and id(element) not in in_runs:
             raise DocxRefusedError("unsupported-element", "AlternateContent")
     _check_character_data(root)
 
@@ -2777,13 +2912,18 @@ def _check_accounted(document: ET.Element, runs: set[ET.Element]) -> None:
     paragraph and cell properties). This checks that walk against every element of the part, so
     a run in a place the walk does not go is refused instead of lost.
     """
-    for element in document.iter():
+    stack = [document]
+    while stack:
+        element = stack.pop()
+        if element.tag == _ALTERNATE:
+            continue  # read whole, as one character (_alternate)
         if element.tag == _w("r") and element not in runs:
             raise DocxRefusedError("unread-content", "a run the reader did not reach")
         if element.tag != _w("r"):
             for child in element:
                 if child.tag in _RUN_CONTENT:
                     raise DocxRefusedError("unread-content", f"{_local(child.tag)} outside a run")
+        stack.extend(element)
 
 
 # --- tracked changes -----------------------------------------------------------------------

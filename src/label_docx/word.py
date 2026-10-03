@@ -11,8 +11,9 @@ repository. Verdicts name where the reader differs, never the text.
 What Word is asked, each by a script on a copy of the document:
 
 - **List labels:** Word's "convert numbers to text" writes each label into its paragraph; what
-  each paragraph gained is the label and the tab or space after it. Word stores a Symbol-font
-  character as its code (a bullet as U+F0B7), mapped by ``as_drawn``.
+  each paragraph gained is the label and the tab or space after it. Word then saves the copy, and
+  the font it gave each label's text is read from its XML: a Symbol or Wingdings label is stored
+  as codes (a bullet as U+F0B7), mapped through that font's table by ``label_as_drawn``.
 - **Text:** the body's text as Word shows it, paragraph by paragraph (``text_verdict`` maps
   Word's own codes for hyphens, breaks, note references and pictures).
 - **Note marks:** markers around every note reference; Word saves the copy as text, and what it
@@ -46,6 +47,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import xml.etree.ElementTree as ET
 import zipfile
 from collections.abc import Callable
 from pathlib import Path
@@ -54,8 +56,10 @@ from typing import Any
 from label_docx.output import content, read
 from label_docx.reader import (
     SYMBOL_FONT,
+    WINGDINGS_BULLETS,
     DocxRefusedError,
     Paragraph,
+    W,
     read_document,
     read_docx,
     tracked,
@@ -94,7 +98,9 @@ on run argv
     set stored to content of text object of d
     convert numbers to text d
     set drawn to content of text object of d
-    close d saving no
+    -- Saved, so the font Word gave each label can be read from its own XML.
+    save document (item 2 of argv)
+    close document (item 2 of argv) saving no
   end tell
   return stored & (character id 29) & drawn
 end run
@@ -354,16 +360,17 @@ def word_version() -> str:
         return f"Microsoft Word {plistlib.load(info)['CFBundleShortVersionString']} (macOS)"
 
 
-def _ask_word(path: Path) -> str:
+def _ask_word(path: Path) -> tuple[str, bytes]:
+    """Word's text before and after it writes the list labels in, and the copy it then saved."""
     CONTAINER.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=CONTAINER) as folder:
         copy = Path(folder) / path.name
-        shutil.copyfile(path, copy)
         # Word's scripting fails now and then while it is still loading; one retry is enough.
         for attempt in (1, 2):
+            shutil.copyfile(path, copy)  # afresh: a failed attempt may have saved the copy
             done = _osascript(["osascript", "-", str(copy), path.name], SCRIPT)
             if done.returncode == 0:
-                return done.stdout
+                return done.stdout, copy.read_bytes()
             if attempt == 2:
                 raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
     raise AssertionError  # pragma: no cover
@@ -465,10 +472,12 @@ def is_tracked(path: Path) -> bool:
     return "tracked" in json.loads(read(path.read_bytes())[0])
 
 
-def word_text_and_labels(path: Path) -> tuple[list[str], list[str]]:
-    """Word's body text, paragraph by paragraph (``word_text``), and its list labels."""
-    answer = _ask_word(path)
-    return _paragraphs_shown(answer.partition(SEPARATOR)[0]), _labels(path, answer)
+def word_text_and_labels(path: Path) -> tuple[list[str], list[str], list[str | None]]:
+    """Word's body text, paragraph by paragraph, its list labels, and the font of each label."""
+    answer, saved = _ask_word(path)
+    labels = _labels(path, answer)
+    shown = _paragraphs_shown(answer.partition(SEPARATOR)[0])
+    return shown, labels, _label_fonts(path, saved, labels)
 
 
 def _paragraphs_shown(stored: str) -> list[str]:
@@ -500,6 +509,96 @@ def _labels(path: Path, answer: str) -> list[str]:
     ):
         raise SystemExit(f"{path.name}: Word changed a paragraph other than by a list label")
     return [a[: len(a) - len(b)] for b, a in zip(before, after, strict=True) if a != b]
+
+
+# What a run's child adds to the paragraph's text, for comparing the document with Word's copy.
+_PIECES = {"tab": "\t", "br": "\n", "cr": "\n", "noBreakHyphen": "\u2011", "softHyphen": "\u00ad"}
+# Where the paragraphs are not the body's: text boxes, shapes and their fallbacks.
+_ASIDE = {"drawing", "pict", "AlternateContent", "txbxContent", "object"}
+
+
+def _body_paragraphs(package: bytes) -> list[list[tuple[str, str | None]]]:
+    """Each body paragraph as (text, font) pieces, outside text boxes and shapes.
+
+    A run's font is the one its ``w:rFonts`` names for both Latin slots: None for none, "mixed"
+    where they differ.
+    """
+    root = ET.fromstring(zipfile.ZipFile(io.BytesIO(package)).read("word/document.xml"))
+    out: list[list[tuple[str, str | None]]] = []
+
+    def pieces(element: ET.Element, into: list[tuple[str, str | None]]) -> None:
+        for child in element:
+            local = child.tag.rsplit("}", 1)[-1]
+            if local in _ASIDE:
+                continue
+            if child.tag == f"{{{W}}}r":
+                fonts = child.find(f"{{{W}}}rPr/{{{W}}}rFonts")
+                pair = (
+                    (None, None)
+                    if fonts is None
+                    else (fonts.get(f"{{{W}}}ascii"), fonts.get(f"{{{W}}}hAnsi"))
+                )
+                font = pair[0] if pair[0] == pair[1] else "mixed"
+                for item in child:
+                    name = item.tag.rsplit("}", 1)[-1]
+                    if name == "t":
+                        into.append((item.text or "", font))
+                    elif name in _PIECES:
+                        into.append((_PIECES[name], font))
+                    elif name == "sym":
+                        into.append((chr(int(item.get(f"{{{W}}}char", "0"), 16)), font))
+                continue
+            pieces(child, into)
+
+    def walk(element: ET.Element) -> None:
+        for child in element:
+            if child.tag.rsplit("}", 1)[-1] in _ASIDE:
+                continue
+            if child.tag == f"{{{W}}}p":
+                paragraph: list[tuple[str, str | None]] = []
+                pieces(child, paragraph)
+                out.append(paragraph)
+            else:
+                walk(child)
+
+    walk(root)
+    return out
+
+
+def _label_fonts(path: Path, saved: bytes, labels: list[str]) -> list[str | None]:
+    """The font Word gave each label when it wrote it in: Word's own XML, paragraph by paragraph.
+
+    What a paragraph of Word's saved copy gained at its start, against the document, is its label;
+    those must be ``labels``, in order. A label's font is its runs' (``_body_paragraphs``), the
+    tab or space after it aside: one name, "mixed", or None where Word named none.
+    """
+    before, after = _body_paragraphs(path.read_bytes()), _body_paragraphs(saved)
+    # Word ends a body that ends in a table with an empty paragraph.
+    while len(after) > len(before) and not "".join(t for t, _ in after[-1]):
+        after.pop()
+    if len(before) != len(after):
+        raise SystemExit(f"{path.name}: Word saved other paragraphs than the document's")
+    found: list[str] = []
+    fonts: list[str | None] = []
+    for old, new in zip(before, after, strict=True):
+        was, now = "".join(t for t, _ in old), "".join(t for t, _ in new)
+        if now == was:
+            continue
+        if not now.endswith(was):
+            raise SystemExit(f"{path.name}: Word changed a paragraph other than by a list label")
+        found.append(now[: len(now) - len(was)])
+        drawn = found[-1].rstrip("\t ")
+        named: set[str | None] = set()
+        for text, font in new:
+            if not drawn:
+                break
+            if text:
+                named.add(font)
+                drawn = drawn[len(text) :]
+        fonts.append(named.pop() if len(named) == 1 else ("mixed" if named else None))
+    if found != labels:
+        raise SystemExit(f"{path.name}: Word's saved labels are not the ones it drew")
+    return fonts
 
 
 def _marked(xml: str, kind: str, tag: str, count: itertools.count[int]) -> tuple[str, int]:
@@ -782,9 +881,16 @@ def emphasis_verdict(word: dict[str, list[bool]], path: Path) -> str:
     except DocxRefusedError as refused:
         return f"reader refuses: {refused.code}"
     for index, paragraph in enumerate(paragraphs):
-        answer = word.get(str(index))
-        if answer is None or not paragraph.text.strip() or paragraph.notes or paragraph.pages:
+        if not paragraph.text.strip() or paragraph.notes or paragraph.pages:
             continue
+        # Word joins a paragraph whose mark is hidden to the next, so neither is measured on its
+        # own (their marks are held by the conservation check, R-35).
+        if paragraph.mark_hidden or (index and paragraphs[index - 1].mark_hidden):
+            continue
+        answer = word.get(str(index))
+        if answer is None:
+            # Word measures every paragraph with text: one it did not is not judged as agreeing.
+            return f"differs at paragraph {index + 1}: Word measured no emphasis there"
         for kind, shown in zip(TOGGLES, answer, strict=True):
             covered = [m for m in paragraph.marks if m.kind == kind]
             whole = any(m.start == 0 and m.end == len(paragraph.text) for m in covered)
@@ -851,22 +957,41 @@ def reader_labels(path: Path) -> list[str] | str:
     return [item for item in drawn if item]
 
 
-def as_drawn(label: str) -> str:
-    """Word's ``label`` with each stored Symbol code (U+F000 plus the code) as its character."""
+def as_drawn(text: str) -> str:
+    """Word's ``text`` with each stored Symbol code (U+F000 plus the code) as its character."""
     return "".join(
-        SYMBOL_FONT.get(ord(c) - 0xF000, c) if 0xF000 <= ord(c) <= 0xF0FF else c for c in label
+        SYMBOL_FONT.get(ord(c) - 0xF000, c) if 0xF000 <= ord(c) <= 0xF0FF else c for c in text
     )
 
 
-def verdict(word: list[str], reader: list[str] | str) -> str:
+_TABLES = {"Symbol": SYMBOL_FONT, "Wingdings": WINGDINGS_BULLETS}
+
+
+def label_as_drawn(label: str, font: str | None) -> str:
+    """Word's ``label`` as drawn in ``font``, the one Word gave it.
+
+    In Symbol or Wingdings each code (stored as U+F000 plus the code, or as the code) goes through
+    that font's table; a code in no table, and any label in another font, stays as stored.
+    """
+    table = _TABLES.get(font or "")
+    if table is None:
+        return label
+    out = []
+    for c in label:
+        code = ord(c) - 0xF000 if 0xF000 <= ord(c) <= 0xF0FF else ord(c)
+        out.append(table.get(code, c))
+    return "".join(out)
+
+
+def verdict(word: list[str], reader: list[str] | str, fonts: list[str | None]) -> str:
     """Whether the reader agrees with Word: agrees, refuses (code) or differs (where)."""
     if isinstance(reader, str):
         return f"reader refuses: {reader}"
     if len(reader) != len(word):
         return f"differs: Word has {len(word)} list items, the reader {len(reader)}"
-    for index, (ours, theirs) in enumerate(zip(reader, word, strict=True)):
-        if ours != as_drawn(theirs):
-            return f"differs at list item {index + 1}: Word {theirs!r}, reader {ours!r}"
+    for index, (ours, theirs, font) in enumerate(zip(reader, word, fonts, strict=True)):
+        if ours != label_as_drawn(theirs, font):
+            return f"differs at list item {index + 1}: Word {theirs!r} in {font}, reader {ours!r}"
     return "agrees"
 
 
@@ -1087,9 +1212,10 @@ def text_verdict(word: list[str], path: Path) -> str:
 
 def ask(path: Path) -> dict[str, Any]:
     """Word's answers for a .docx: labels, text, note marks, fields, print, emphasis, stories."""
-    text, drawn = word_text_and_labels(path)
+    text, drawn, fonts = word_text_and_labels(path)
     return {
         "drawn": drawn,
+        "fonts": fonts,
         "text": text,
         "notes": word_note_marks(path),
         "fields": word_fields(path),
@@ -1106,7 +1232,7 @@ def judge(path: Path, answers: dict[str, Any]) -> str:
     labels first, then the text, note marks, emphasis, the print, the fields, and headers,
     footers and comments, each judged only where the ones before agree.
     """
-    result = verdict(answers["drawn"], reader_labels(path))
+    result = verdict(answers["drawn"], reader_labels(path), answers["fonts"])
     if answers.get("text") is not None and result == "agrees":
         result = text_verdict(answers["text"], path)
     if answers["notes"] is not None and result == "agrees":

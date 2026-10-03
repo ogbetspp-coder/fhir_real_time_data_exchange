@@ -201,6 +201,12 @@
       "bytes": 3721
     },
     {
+      "name": "Word's third-level bullet, the Wingdings square, stored as U+F0A7 and as \u00a7.",
+      "file": "bullets-wingdings.docx",
+      "sha256": "6f082fc46d4249770ab8059c02be357bd4d770955a756225d98e195fb3d9fc99",
+      "bytes": 3367
+    },
+    {
       "name": "SEQ captions count 1, 2, 3, stored as Word prints them.",
       "file": "fields-seq.docx",
       "sha256": "fb03611eb720cb2673f7f88bacffdb92d38df0e0a1f440269ed11d0ba4918eed",
@@ -313,6 +319,18 @@
       "file": "fields-stored.docx",
       "sha256": "ff92577f32a18cb195acc09176557962df0ef46a58a81b2c8c721053f03cd866",
       "bytes": 3155
+    },
+    {
+      "name": "A hidden SEQ with no stored result shows nothing and still counts: \\r 3, then 4.",
+      "file": "fields-seq-hidden-no-result.docx",
+      "sha256": "db657909d02c4ecde2230027e643c498b9ddde48ec4e946cef27fb9b7b9b9903",
+      "bytes": 3367
+    },
+    {
+      "name": "A SEQ with no stored result that would show a number (the reader refuses it).",
+      "file": "fields-seq-shown-no-result.docx",
+      "sha256": "35f989a1c7b640e55b9c66c289125b87531dc59db189c0686a9d0b11c585cc22",
+      "bytes": 2792
     },
     {
       "name": "Captions stored as 7 and 7, which Word prints as 1 and 2 (the reader refuses).",
@@ -469,6 +487,54 @@
       "file": "notes-section-format.docx",
       "sha256": "be84d1f0183a7217f07c1783c5979a2e367866a5398b09a5dee2e24b38b59c5a",
       "bytes": 4071
+    },
+    {
+      "name": "A picture in line with the text: Word's text shows it as '/'.",
+      "file": "drawing-inline-picture.docx",
+      "sha256": "f3cce2aad2510916e04eee9dd73ba6dee49fa8b653fcf0e93e29368f7d77e996",
+      "bytes": 4179
+    },
+    {
+      "name": "A picture anchored to the paragraph (floating): what Word's text shows for it.",
+      "file": "drawing-anchored-picture.docx",
+      "sha256": "a42be95767a36a3cd4afe4a29758d00f89c1dcaf3bba28d109b79893083b0099",
+      "bytes": 4575
+    },
+    {
+      "name": "A drawn line anchored to the paragraph, as the FDA template's rules: Word's text.",
+      "file": "drawing-anchored-line.docx",
+      "sha256": "831bd598649e83a84c4edd3c9dc135e256288d910221b0fbe1474deedf520ae2",
+      "bytes": 4667
+    },
+    {
+      "name": "A paragraph holding only an anchored drawn line, then text.",
+      "file": "drawing-anchored-line-alone.docx",
+      "sha256": "b7cbe3ed781b1064aca4d8ef5490e173c1c491087b5de72c72476a472bddc937",
+      "bytes": 4638
+    },
+    {
+      "name": "A drawn square in line with the text: Word's text.",
+      "file": "drawing-inline-shape.docx",
+      "sha256": "3dd60e1af142e6f18d1f69139062e00a2db13cc09d1aac1b6d8ec8672d72ee01",
+      "bytes": 4356
+    },
+    {
+      "name": "A drawn square anchored to the paragraph: Word's text.",
+      "file": "drawing-anchored-shape.docx",
+      "sha256": "750b0013e7fce81a82b98c78a73661362e97b615de68d825705ed0780b025c04",
+      "bytes": 4729
+    },
+    {
+      "name": "A VML picture in line with the text: Word's text.",
+      "file": "drawing-vml-inline-picture.docx",
+      "sha256": "66608d645ed50fcbdaa7f7d128b6f17b8d66a3089e5655351fc4d37ed584d0c3",
+      "bytes": 3721
+    },
+    {
+      "name": "A VML picture positioned absolutely (floating): Word's text.",
+      "file": "drawing-vml-floating-picture.docx",
+      "sha256": "f8d5a4e96fa7e285690698c77fee83e672a992335572a196760353cd32b6d4ae",
+      "bytes": 3776
     }
   ]
 }

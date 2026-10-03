@@ -14,12 +14,24 @@
       "2.\t",
       "2.1.1\t"
     ],
+    "bullets-wingdings.docx": [
+      "\uf0a7\t",
+      "\u00a7\t"
+    ],
     "bullets.docx": [
       "\uf0b7\t",
       "o\t",
       "\uf0b7\t"
     ],
     "default-character-style.docx": [],
+    "drawing-anchored-line-alone.docx": [],
+    "drawing-anchored-line.docx": [],
+    "drawing-anchored-picture.docx": [],
+    "drawing-anchored-shape.docx": [],
+    "drawing-inline-picture.docx": [],
+    "drawing-inline-shape.docx": [],
+    "drawing-vml-floating-picture.docx": [],
+    "drawing-vml-inline-picture.docx": [],
     "emphasis-defaults-off.docx": [],
     "emphasis-defaults.docx": [],
     "emphasis-toggles.docx": [],
@@ -50,7 +62,9 @@
     "fields-ref-stale.docx": [],
     "fields-ref.docx": [],
     "fields-seq-formats.docx": [],
+    "fields-seq-hidden-no-result.docx": [],
     "fields-seq-identifiers.docx": [],
+    "fields-seq-shown-no-result.docx": [],
     "fields-seq-switches.docx": [],
     "fields-seq.docx": [],
     "fields-stale.docx": [],
@@ -352,6 +366,21 @@
         false
       ]
     },
+    "bullets-wingdings.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
     "bullets.docx": {
       "": [],
       "0": [
@@ -382,6 +411,84 @@
         false
       ],
       "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "drawing-anchored-line-alone.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "drawing-anchored-line.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "drawing-anchored-picture.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "drawing-anchored-shape.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "drawing-inline-picture.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "drawing-inline-shape.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "drawing-vml-floating-picture.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "drawing-vml-inline-picture.docx": {
+      "": [],
+      "0": [
         false,
         false,
         false,
@@ -967,6 +1074,27 @@
         false
       ]
     },
+    "fields-seq-hidden-no-result.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
     "fields-seq-identifiers.docx": {
       "": [],
       "0": [
@@ -988,6 +1116,15 @@
         false
       ],
       "3": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-seq-shown-no-result.docx": {
+      "": [],
+      "0": [
         false,
         false,
         false,
@@ -2414,6 +2551,18 @@
         "6"
       ]
     },
+    "fields-seq-hidden-no-result.docx": {
+      "printed": [
+        "",
+        "",
+        "4"
+      ],
+      "shown": [
+        "",
+        "",
+        "4"
+      ]
+    },
     "fields-seq-identifiers.docx": {
       "printed": [
         "1",
@@ -2426,6 +2575,14 @@
         "1",
         "2",
         "2"
+      ]
+    },
+    "fields-seq-shown-no-result.docx": {
+      "printed": [
+        "1"
+      ],
+      "shown": [
+        ""
       ]
     },
     "fields-seq-switches.docx": {
@@ -2503,7 +2660,312 @@
       ]
     }
   },
-  "method": "list labels: convert numbers to text, what each list item gained; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text",
+  "fonts": {
+    "ancestor-never-counted.docx": [
+      null,
+      null,
+      null,
+      null
+    ],
+    "ancestor-two-levels.docx": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "bullets-wingdings.docx": [
+      "Wingdings",
+      "Wingdings"
+    ],
+    "bullets.docx": [
+      "Symbol",
+      "Courier New",
+      "Symbol"
+    ],
+    "default-character-style.docx": [],
+    "drawing-anchored-line-alone.docx": [],
+    "drawing-anchored-line.docx": [],
+    "drawing-anchored-picture.docx": [],
+    "drawing-anchored-shape.docx": [],
+    "drawing-inline-picture.docx": [],
+    "drawing-inline-shape.docx": [],
+    "drawing-vml-floating-picture.docx": [],
+    "drawing-vml-inline-picture.docx": [],
+    "emphasis-defaults-off.docx": [],
+    "emphasis-defaults.docx": [],
+    "emphasis-toggles.docx": [],
+    "fields-chapter-captions.docx": [
+      null,
+      null
+    ],
+    "fields-chapter-dotted.docx": [
+      null,
+      null
+    ],
+    "fields-chapter-reset-level-2.docx": [
+      null,
+      null,
+      null,
+      null
+    ],
+    "fields-chapter-reset.docx": [
+      null,
+      null,
+      null
+    ],
+    "fields-heading-by-name.docx": [],
+    "fields-noteref-stale.docx": [],
+    "fields-noteref.docx": [],
+    "fields-ref-caption.docx": [],
+    "fields-ref-missing.docx": [],
+    "fields-ref-stale.docx": [],
+    "fields-ref.docx": [],
+    "fields-seq-formats.docx": [],
+    "fields-seq-hidden-no-result.docx": [],
+    "fields-seq-identifiers.docx": [],
+    "fields-seq-shown-no-result.docx": [],
+    "fields-seq-switches.docx": [],
+    "fields-seq.docx": [],
+    "fields-stale.docx": [],
+    "fields-stored.docx": [],
+    "fields-styleref-characters.docx": [
+      null
+    ],
+    "fields-styleref-forward.docx": [
+      null
+    ],
+    "fields-styleref-symbol.docx": [
+      null
+    ],
+    "formats.docx": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "legal.docx": [
+      null,
+      null
+    ],
+    "level-override-first.docx": [
+      null,
+      null,
+      null
+    ],
+    "level-override-shared.docx": [
+      null,
+      null,
+      null,
+      null
+    ],
+    "level-override-start.docx": [
+      null,
+      null,
+      null,
+      null
+    ],
+    "level-override.docx": [
+      null,
+      null
+    ],
+    "missing-start.docx": [
+      null,
+      null
+    ],
+    "multilevel.docx": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "notes-chicago.docx": [],
+    "notes-continuous.docx": [],
+    "notes-custom-mark.docx": [],
+    "notes-document-format.docx": [],
+    "notes-each-section.docx": [],
+    "notes-endnotes.docx": [],
+    "notes-in-table.docx": [],
+    "notes-mixed.docx": [],
+    "notes-section-chicago.docx": [],
+    "notes-section-format.docx": [],
+    "notes-section-rules.docx": [],
+    "notes-section-start-continuous.docx": [],
+    "notes-start-format.docx": [],
+    "numbering-style-link-one-way.docx": [
+      null,
+      null,
+      null
+    ],
+    "numbering-style-link.docx": [
+      null,
+      null,
+      null
+    ],
+    "override-ancestor.docx": [
+      null,
+      null,
+      null,
+      null
+    ],
+    "override-deeper-level.docx": [
+      null,
+      null,
+      null,
+      null
+    ],
+    "override-implicit-ancestor.docx": [
+      null,
+      null,
+      null
+    ],
+    "override-implicit-continued.docx": [
+      null,
+      null,
+      null,
+      null
+    ],
+    "override-implicit-levels.docx": [
+      null,
+      null,
+      null,
+      null
+    ],
+    "override-implicit-reused.docx": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "override-implicit-rows.docx": [
+      null,
+      null,
+      null
+    ],
+    "override-restart-within.docx": [
+      null,
+      null,
+      null,
+      null
+    ],
+    "override-return.docx": [
+      null,
+      null,
+      null,
+      null
+    ],
+    "plain-after-restart.docx": [
+      null,
+      null
+    ],
+    "restart-after-first.docx": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "restart-level-above.docx": [
+      null,
+      null,
+      null
+    ],
+    "restart-never-rows.docx": [
+      null,
+      null,
+      null
+    ],
+    "restart-never-shown-deeper.docx": [
+      null,
+      null,
+      null
+    ],
+    "restart-never.docx": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "restart-skipped-ancestor.docx": [
+      null,
+      null,
+      null
+    ],
+    "restart-source-cells.docx": [
+      null,
+      null,
+      null,
+      null
+    ],
+    "restart-source-override.docx": [
+      null,
+      null,
+      null
+    ],
+    "restart-source-plain.docx": [
+      null,
+      null,
+      null
+    ],
+    "restart-source-rows.docx": [
+      null,
+      null,
+      null,
+      null
+    ],
+    "restart-source-unused.docx": [
+      null,
+      null,
+      null
+    ],
+    "return-after-restart.docx": [
+      null,
+      null,
+      null
+    ],
+    "shared-continue.docx": [
+      null,
+      null,
+      null
+    ],
+    "start-override-first.docx": [
+      null,
+      null
+    ],
+    "start-override-restart.docx": [
+      null,
+      null,
+      null,
+      null
+    ],
+    "style-tied-deeper-level.docx": [
+      null,
+      null,
+      null
+    ],
+    "style-tied-level-zero.docx": [
+      null,
+      null
+    ],
+    "two-definitions.docx": [
+      null,
+      null,
+      null
+    ]
+  },
+  "method": "list labels: convert numbers to text, what each list item gained; fonts: the font Word gave each label, from its copy saved after; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text",
   "notes": {
     "fields-noteref-stale.docx": {
       "body": [
@@ -2687,8 +3149,17 @@
   "prints": {
     "ancestor-never-counted.docx": true,
     "ancestor-two-levels.docx": true,
+    "bullets-wingdings.docx": true,
     "bullets.docx": true,
     "default-character-style.docx": true,
+    "drawing-anchored-line-alone.docx": true,
+    "drawing-anchored-line.docx": true,
+    "drawing-anchored-picture.docx": true,
+    "drawing-anchored-shape.docx": true,
+    "drawing-inline-picture.docx": true,
+    "drawing-inline-shape.docx": true,
+    "drawing-vml-floating-picture.docx": true,
+    "drawing-vml-inline-picture.docx": true,
     "emphasis-defaults-off.docx": true,
     "emphasis-defaults.docx": true,
     "emphasis-toggles.docx": true,
@@ -2704,7 +3175,9 @@
     "fields-ref-stale.docx": false,
     "fields-ref.docx": true,
     "fields-seq-formats.docx": true,
+    "fields-seq-hidden-no-result.docx": true,
     "fields-seq-identifiers.docx": true,
+    "fields-seq-shown-no-result.docx": false,
     "fields-seq-switches.docx": true,
     "fields-seq.docx": true,
     "fields-stale.docx": false,
@@ -2780,6 +3253,10 @@
       "item 4",
       "item 5"
     ],
+    "bullets-wingdings.docx": [
+      "item 1",
+      "item 2"
+    ],
     "bullets.docx": [
       "item 1",
       "item 2",
@@ -2788,6 +3265,30 @@
     "default-character-style.docx": [
       "plain",
       "unknown style"
+    ],
+    "drawing-anchored-line-alone.docx": [
+      "after"
+    ],
+    "drawing-anchored-line.docx": [
+      "ab"
+    ],
+    "drawing-anchored-picture.docx": [
+      "ab"
+    ],
+    "drawing-anchored-shape.docx": [
+      "ab"
+    ],
+    "drawing-inline-picture.docx": [
+      "a/b"
+    ],
+    "drawing-inline-shape.docx": [
+      "a/b"
+    ],
+    "drawing-vml-floating-picture.docx": [
+      "ab"
+    ],
+    "drawing-vml-inline-picture.docx": [
+      "a/b"
     ],
     "emphasis-defaults-off.docx": [
       "x",
@@ -2908,11 +3409,19 @@
       "Table e",
       "Table 6"
     ],
+    "fields-seq-hidden-no-result.docx": [
+      "Text after a hidden chapter count.",
+      "Before ",
+      "Table 4"
+    ],
     "fields-seq-identifiers.docx": [
       "Table 1",
       "Figure 1",
       "Table 2",
       "Figure 2"
+    ],
+    "fields-seq-shown-no-result.docx": [
+      "Table "
     ],
     "fields-seq-switches.docx": [
       "Table 1",

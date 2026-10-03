@@ -14,22 +14,23 @@ For a document `D` and the reader's result `R`:
 > exactly once: in the output or set aside.
 
 - **Token:** one character of a text element (`w:t`, or `w:instrText` for field code), or one
-  element that stands for a character (`w:tab`, `w:br`, `w:sym`, a picture). For an ePI: one
+  element that stands for a character (`w:tab`, `w:br`, `w:sym`, a picture or shape). For an ePI: one
   character of a section's HTML text, a `br` or an `img`.
 - **Set aside**, each for a reason the check works out from `D` itself: field code (never
   shown), page numbers (set by layout; their places must be in `pages`), page and column breaks,
-  hidden whitespace; for an ePI, whitespace CSS collapses and a break ending a paragraph.
+  hidden whitespace, floating pictures and shapes (anchored to a paragraph: Word's text shows
+  none); for an ePI, whitespace CSS collapses and a break ending a paragraph.
 - **Character:** a text character is itself, or its Symbol-table character in a Symbol-font run;
-  `w:tab` is U+0009, `w:br` U+000A, a picture U+FFFC.
+  `w:tab` is U+0009, `w:br` U+000A, a picture or shape in line with the text U+FFFC.
 
 The check verifies the sequence (string equality per paragraph), the structure (paragraphs,
 table cells, notes, sections and note and page places are `D`'s) and the ledger:
 `text + instructions + elements = output + field code + page numbers + page breaks + hidden
-whitespace`. Equality is all or nothing, so a dropped, added, changed, repeated, swapped or moved
+whitespace + floating objects`. Equality is all or nothing, so a dropped, added, changed, repeated, swapped or moved
 character, and a dropped, split or merged paragraph, all fail it.
 
-`tests/test_certify.py` applies 20 kinds of change to the results of all 196 corpus documents
-read (10,528 changed results): every one is refused, and every unchanged result is certified.
+`tests/test_certify.py` applies 20 kinds of change to the results of all 200 corpus documents
+read (10,768 changed results): every one is refused, and every unchanged result is certified.
 
 ## Why it is independent
 
@@ -37,7 +38,8 @@ read (10,528 changed results): every one is refused, and every unchanged result 
   HTML parser, where the reader uses an XML parser.
 - Every text element of every part it reads is read twice: by Python's XML parser and by a
   tokenizer written in the check without any XML library (`_raw_texts`). The two must agree.
-- It shares no code with the readers, only data: the 49-entry Symbol table, held to Word.
+- It shares no code with the readers, only data: the 49-entry Symbol table and the Wingdings bullet
+  table, held to Word.
 - It treats the result as untrusted: a wrong result can only fail.
 - Each token has one reading. Whether a run is in the Symbol font, or hidden, the check decides
   itself by Word's precedence (run, character style, paragraph style, table style, defaults).

@@ -53,6 +53,7 @@ def main() -> int:
         return 0
     paths = sorted(args.folder.glob("*.docx")) if args.command == "record" else args.files
     answers: dict[str, list[str]] = {}
+    font_answers: dict[str, list[str | None]] = {}
     note_answers: dict[str, dict[str, list[str]]] = {}
     field_answers: dict[str, dict[str, list[str]]] = {}
     print_answers: dict[str, bool] = {}
@@ -72,6 +73,7 @@ def main() -> int:
                     name,
                     {
                         "drawn": kept["drawn"][name],
+                        "fonts": kept["fonts"][name],
                         "notes": kept["notes"].get(name),
                         "fields": kept["fields"].get(name),
                         "prints": kept["prints"][name],
@@ -112,6 +114,7 @@ def main() -> int:
             continue
         word = kept["drawn"]
         answers[path.name] = word
+        font_answers[path.name] = kept["fonts"]
         if kept["notes"] is not None:
             note_answers[path.name] = kept["notes"]
         print_answers[path.name] = kept["prints"]
@@ -132,7 +135,8 @@ def main() -> int:
         record = {
             "application": word_version(),
             "method": (
-                "list labels: convert numbers to text, what each list item gained; text: the "
+                "list labels: convert numbers to text, what each list item gained; fonts: the "
+                "font Word gave each label, from its copy saved after; text: the "
                 "body's text as Word shows it, paragraph by paragraph; note marks: "
                 "saved as text, what Word wrote between markers around each mark; fields: the "
                 "text between markers around each, as shown and after saving as PDF; prints: the "
@@ -144,6 +148,7 @@ def main() -> int:
             ),
             "recorded": datetime.date.today().isoformat(),
             "drawn": answers,
+            "fonts": font_answers,
             "notes": note_answers,
             "fields": field_answers,
             "prints": print_answers,

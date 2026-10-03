@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.0.0",
+  "page": "https://www.fda.gov/drugs/fdas-labeling-resources-human-prescription-drugs/prescribing-information-resources",
+  "note": "FDA labeling templates, US Government works (public domain), downloaded 2026-10-03.",
+  "sources": [
+    {
+      "name": "Sample Prescribing Information Template (PLR/PLLR format)",
+      "file": "fda-prescribing-information-template.docx",
+      "url": "https://www.fda.gov/media/162415/download",
+      "sha256": "6b9ae21fae9183418e05688cb3e826c7cabd050ceed564a5d177d8119cb64561",
+      "bytes": 87068
+    },
+    {
+      "name": "Sample Template for Medication Guides",
+      "file": "fda-medication-guide-template.docx",
+      "url": "https://www.fda.gov/media/168366/download",
+      "sha256": "435c5e9d5c10722e78db6bb90c7489a5b4ede8e08fb08334b7bb9e5ec2c5511c",
+      "bytes": 22379
+    },
+    {
+      "name": "Sample Template for Patient Package Inserts",
+      "file": "fda-patient-package-insert-template.docx",
+      "url": "https://www.fda.gov/media/168367/download",
+      "sha256": "3442be0483c834bb3d178a56857c9d93f4d17e817629a18c5204e2c0eeaf12c2",
+      "bytes": 22330
+    }
+  ]
+}

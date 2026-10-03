@@ -257,8 +257,47 @@ def test_elements_that_may_carry_text_elsewhere_are_refused(body: str) -> None:
     assert refusal(body) == "unsupported-element"
 
 
+def _alternate(choice: str, fallback: str = "", requires: str = "wps") -> str:
+    return (
+        f'<mc:AlternateContent><mc:Choice Requires="{requires}">{choice}</mc:Choice>'
+        f"<mc:Fallback>{fallback}</mc:Fallback></mc:AlternateContent>"
+    )
+
+
+WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+WPS = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+SHAPE = (
+    f"<w:drawing><wp:anchor xmlns:wp='{WP}'><a:graphic xmlns:a='{A}'>"
+    f"<a:graphicData uri='{WPS}'><wps:wsp xmlns:wps='{WPS}'><wps:spPr/></wps:wsp>"
+    "</a:graphicData></a:graphic></wp:anchor></w:drawing>"
+)
+LINE = "<w:pict><v:line xmlns:v='urn:schemas-microsoft-com:vml'/></w:pict>"
+
+
+def test_a_drawn_shape_with_no_text_reads_as_a_picture_does() -> None:
+    # Anchored, as the FDA's Prescribing Information template draws its rules: not in the text.
+    assert text_of(p(r("<w:t>a</w:t>") + r(_alternate(SHAPE, LINE)) + r("<w:t>b</w:t>"))) == ["ab"]
+    in_line = SHAPE.replace("wp:anchor", "wp:inline")
+    assert text_of(p(r("<w:t>a</w:t>") + r(_alternate(in_line, LINE)) + r("<w:t>b</w:t>"))) == [
+        "a\ufffcb"
+    ]
+    textbox = SHAPE.replace("<wps:spPr/>", "<wps:txbx><w:txbxContent/></wps:txbx>")
+    for body in (
+        p(r(_alternate(SHAPE.replace(f"xmlns:wps='{WPS}'", "xmlns:wps='urn:wps'"), LINE))),
+        p(r(_alternate(textbox, LINE))),  # a text box
+        p(r(_alternate(SHAPE, "<w:pict><v:textbox xmlns:v='urn:v'/></w:pict>"))),  # in VML
+        p(r(_alternate(SHAPE, "<w:sym w:font='Symbol' w:char='F0B7'/>"))),  # run content
+        p(r(_alternate(SHAPE, "<w:tab/>"))),
+        p(r(_alternate(SHAPE, LINE, requires="wpg"))),  # another choice Word may draw
+        p(r(_alternate("<w:t>x</w:t>"))),  # not a drawing
+        p(r(_alternate(SHAPE + SHAPE))),  # two
+        _alternate(p(r("<w:t>x</w:t>"))),  # paragraphs, not in a run
+    ):
+        assert refusal(body) == "unsupported-element"
+
+
 PICTURE = (
-    "<w:drawing><wp:inline xmlns:wp='urn:wp'><a:graphic xmlns:a='" + A + "'>"
+    f"<w:drawing><wp:inline xmlns:wp='{WP}'><a:graphic xmlns:a='{A}'>"
     "<a:graphicData uri='http://schemas.openxmlformats.org/drawingml/2006/picture'/>"
     "</a:graphic></wp:inline></w:drawing>"
 )
@@ -268,6 +307,20 @@ def test_a_picture_is_an_object_replacement_character_where_it_stands() -> None:
     paragraphs = read_docx(docx(p(r("<w:t>a</w:t>") + r(PICTURE) + r("<w:t>b</w:t>"))))
     assert [paragraph.text for paragraph in paragraphs] == ["a\ufffcb"]
     assert paragraphs[0].has_drawing
+
+
+def test_a_floating_picture_is_not_in_the_text_as_word_shows_it() -> None:
+    anchored = PICTURE.replace("wp:inline", "wp:anchor")
+    absolute = VML_PICTURE.replace('style="', 'style="Position : Absolute;')
+    for floating in (anchored, absolute):
+        assert text_of(p(r("<w:t>a</w:t>") + r(floating) + r("<w:t>b</w:t>"))) == ["ab"]
+    for body in (
+        PICTURE.replace("</wp:inline>", f"</wp:inline><wp:anchor xmlns:wp='{WP}'/>"),  # two
+        PICTURE.replace(f"xmlns:wp='{WP}'", "xmlns:wp='urn:wp'"),  # not a drawing's frame
+        VML_PICTURE.replace('style="', 'style="position:relative;'),
+        VML_PICTURE.replace('style="', 'style="visibility:hidden;'),
+    ):
+        assert refusal(p(r(body))) == "unsupported-element"
 
 
 @pytest.mark.parametrize(
@@ -659,6 +712,36 @@ def test_a_font_the_font_table_declares_symbol_encoded_is_refused() -> None:
 
 
 # --- second review: fields with no stored result ---------------------------------------------
+
+
+def _bare(code: str) -> str:
+    return (
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r(f'<w:instrText xml:space="preserve"> {code} </w:instrText>')
+        + r('<w:fldChar w:fldCharType="end"/>')
+    )
+
+
+def _seq(stored: str) -> str:
+    return (
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r('<w:instrText xml:space="preserve"> SEQ Table </w:instrText>')
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + r(f"<w:t>{stored}</w:t>")
+        + r('<w:fldChar w:fldCharType="end"/>')
+    )
+
+
+def test_a_hidden_seq_with_no_stored_result_shows_nothing_and_counts() -> None:
+    # As WordPerfect conversions leave it ("SEQ CHAPTER \h \r 1"); Word's answer is on record
+    # (corpus/numbering-cases, fields-seq-hidden-no-result).
+    body = p(_bare("SEQ CHAPTER \\h \\r 1") + r("<w:t>a</w:t>")) + p(_bare("SEQ Table \\h \\r 3"))
+    assert text_of(body + p(_seq("4"))) == ["a", "", "4"]
+    # It counts: a caption after it stored as 1 is stale.
+    assert refusal(body + p(_seq("1"))) == "stale-field"
+    # One with no stored result that would show a number is still refused.
+    assert refusal(p(_bare("SEQ Table"))) == "field-without-result"
+    assert refusal(p(_bare("SEQ Table \\r 3"))) == "field-without-result"
 
 
 @pytest.mark.parametrize(
@@ -1243,6 +1326,9 @@ def test_the_suffix_is_reported(extra: str, suffix: str) -> None:
     assert read_docx(docx(li(1), numbering=numbering))[0].numbering == Numbering(1, 0, "1.", suffix)
 
 
+WINGDINGS = '<w:rPr><w:rFonts w:ascii="Wingdings" w:hAnsi="Wingdings"/></w:rPr>'
+
+
 def test_bullets_are_drawn_in_their_font() -> None:
     symbol = abstract(1, lvl(0, "bullet", "", extra=SYMBOL_BULLET)) + num(1, 1)
     assert labels(li(1), symbol) == ["•"]
@@ -1252,12 +1338,22 @@ def test_bullets_are_drawn_in_their_font() -> None:
     mark = '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr>'
     plain = abstract(1, lvl(0, "bullet", "")) + num(1, 1)
     assert labels(li(1, props=mark), plain) == ["•"]
+    # Word's default third-level bullet, the Wingdings square, at its code or in the U+F000 range.
+    for square in ("\uf0a7", "\u00a7"):
+        wingdings = abstract(1, lvl(0, "bullet", square, extra=WINGDINGS)) + num(1, 1)
+        assert labels(li(1), wingdings) == ["\u25aa"]
 
 
 @pytest.mark.parametrize(
     ("extra", "code"),
     [
-        ('<w:rPr><w:rFonts w:ascii="Wingdings" w:hAnsi="Wingdings"/></w:rPr>', "symbol-font"),
+        # A Wingdings code outside the table, Wingdings in one Latin slot only, another dingbat.
+        ('<w:rPr><w:rFonts w:ascii="Wingdings" w:hAnsi="Wingdings"/></w:rPr>', "unmapped-symbol"),
+        ('<w:rPr><w:rFonts w:ascii="Wingdings" w:hAnsi="Arial"/></w:rPr>', "symbol-font"),
+        ('<w:rPr><w:rFonts w:ascii="Webdings" w:hAnsi="Webdings"/></w:rPr>', "symbol-font"),
+        # Another spelling of the name: how Word draws it is not on record.
+        ('<w:rPr><w:rFonts w:ascii="wingdings" w:hAnsi="wingdings"/></w:rPr>', "symbol-font"),
+        ('<w:rPr><w:rFonts w:ascii="Wing dings" w:hAnsi="Wing dings"/></w:rPr>', "symbol-font"),
         ("", "private-use-character"),
         (
             '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="eastAsia"/></w:rPr>',
@@ -1266,7 +1362,8 @@ def test_bullets_are_drawn_in_their_font() -> None:
     ],
 )
 def test_bullets_in_fonts_the_reader_cannot_place_are_refused(extra: str, code: str) -> None:
-    numbering = abstract(1, lvl(0, "bullet", "", extra=extra)) + num(1, 1)
+    # The Wingdings arrowhead, a bullet the closed table does not hold.
+    numbering = abstract(1, lvl(0, "bullet", "\uf0d8", extra=extra)) + num(1, 1)
     assert refusal(li(1), numbering=numbering) == code
 
 
@@ -1554,6 +1651,10 @@ def test_a_vml_picture_is_an_object_replacement_character() -> None:
         VML_PICTURE.replace("<v:imagedata", "<v:textbox><w:txbxContent/></v:textbox><v:imagedata"),
         '<w:pict><v:rect xmlns:v="urn:schemas-microsoft-com:vml"/></w:pict>',
         '<w:pict><o:OLEObject xmlns:o="urn:schemas-microsoft-com:office:office"/></w:pict>',
+        VML_PICTURE.replace("</w:pict>", VML_PICTURE[len("<w:pict>") :]),  # two pictures
+        VML_PICTURE.replace(
+            "<v:shape", '<v:group xmlns:v="urn:schemas-microsoft-com:vml"><v:shape'
+        ).replace("</v:shape>", "</v:shape></v:group>"),
     ],
 )
 def test_vml_that_holds_text_or_is_not_a_picture_is_refused(pict: str) -> None:

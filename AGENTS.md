@@ -10,8 +10,8 @@ an EMA ePI) or refuse. Every rule below serves that.
   change or "cleanup" of text. Appearance that changes meaning is a mark over the text, never an
   edit to it.
 - **Every rule has a test.** A new rule or refusal comes with a minimal in-memory .docx in
-  `tests/test_reader.py` that fails without it. A new Symbol-font mapping is a reviewed change
-  with a test.
+  `tests/test_reader.py` that fails without it. A new Symbol or Wingdings mapping is a reviewed
+  change with a test.
 - **List numbering follows Word, not the specification.** A change to how labels are counted or
   drawn starts with a case in `scripts/numbering_cases.py` and Word's answer to it
   (`scripts/word_oracle.py record corpus/numbering-cases`, macOS with Word). Where Word's answer

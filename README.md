@@ -7,9 +7,11 @@ normalises or repairs.
 ## Guarantees
 
 - **Exact text.** Characters as stored. Tabs, breaks and special hyphens become their
-  characters; Symbol-font glyphs ("≥", "°", "μ") map through a closed table; a picture is
-  U+FFFC. Formatting that changes meaning (bold, italic, super/subscript, underline, strike,
-  caps, highlight, shading, faint text) is reported as marks over the text, never folded in.
+  characters; Symbol-font glyphs ("≥", "°", "μ") and Wingdings bullets ("▪") map through closed
+  tables. A picture or shape in line with the text is U+FFFC; a floating one is not in the text,
+  as in Word, and the certificate counts it. Formatting that changes meaning (bold, italic,
+  super/subscript, underline, strike, caps, highlight, shading, faint text) is reported as marks
+  over the text, never folded in.
 - **What Word shows.** List labels ("4.8", "b)", "•"), footnote marks and computed fields (SEQ,
   STYLEREF, REF, NOTEREF) follow Word's rules, each Word's own answer to a test document
   (`corpus/*/word.json`). Body, notes, headers, footers and comments are read.
@@ -62,11 +64,11 @@ from another web page.
 
 ```json
 {"certificate": {…}, "comments": [], "endnotes": [], "footers": [], "footnotes": [],
- "format": "label-docx-json/1.12.0", "headers": [],
+ "format": "label-docx-json/1.13.0", "headers": [],
  "paragraphs": [{"comments": [], "markHidden": false,
    "marks": [{"end": 5, "kind": "superscript", "start": 4}], "notes": [], "numbering": null,
    "pages": [], "style": "Heading2", "table": null, "text": "x 109/l"}],
- "reader": "docx-reader/1.20.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"}}
+ "reader": "docx-reader/1.21.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"}}
 ```
 
 - Offsets (`marks`, `notes`, `pages`, `comments`) count Unicode code points of `text`.
@@ -110,7 +112,8 @@ each document reads to, `word.json` and `browser.json` hold Word's and Chrome's 
 | ----------------- | --------: | ----------------------------------------------------------------- |
 | `ema-qrd`         |         4 | EMA QRD files the rules were first written from                   |
 | `ema-templates`   |        18 | EMA product-information templates                                 |
-| `numbering-cases` |        78 | one Word rule each, synthetic                                     |
+| `numbering-cases` |        89 | one Word rule each, synthetic                                     |
+| `fda-templates`   |         3 | FDA prescribing information, medication guide and patient insert templates |
 | `word-authored`   |         2 | written by Word itself (a table of contents)                      |
 | `tracked-cases`   |        39 | tracked changes, with Word's Accept All and Reject All files      |
 | `ema-epi`         |       108 | every ePI the EMA API listed on 2026-10-01: 3,355 sections, 3,258 read, 97 refused |

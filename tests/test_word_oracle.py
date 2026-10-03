@@ -18,8 +18,10 @@ import pytest
 
 from label_docx.word import (
     _has_stories,
+    _label_fonts,
     emphasis_verdict,
     field_verdict,
+    label_as_drawn,
     note_verdict,
     print_verdict,
     reader_labels,
@@ -28,6 +30,7 @@ from label_docx.word import (
     text_verdict,
     verdict,
 )
+from test_reader import docx
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 RECORDS = sorted(CORPUS.glob("*/word.json"))
@@ -65,6 +68,8 @@ REFUSED = {
     # for note 1: Word prints the bookmark's text and the mark 1.
     "numbering-cases/fields-ref-stale.docx": "stale-field",
     "numbering-cases/fields-noteref-stale.docx": "stale-field",
+    # A SEQ with no stored result: Word shows nothing on screen and prints 1.
+    "numbering-cases/fields-seq-shown-no-result.docx": "field-without-result",
     # EMA's stray U+F02D in Times New Roman, a code no font draws as the template means it.
     "ema-templates/qrd-product-information-template-version-104_es.docx": "private-use-character",
 }
@@ -75,11 +80,11 @@ def _record(path: Path) -> dict[str, Any]:
     return data
 
 
-def _cases() -> list[tuple[Path, list[str]]]:
-    out: list[tuple[Path, list[str]]] = []
+def _cases() -> list[tuple[Path, list[str], list[str | None]]]:
+    out: list[tuple[Path, list[str], list[str | None]]] = []
     for record in RECORDS:
-        labels = _record(record)["drawn"]
-        out += [(record.parent / name, word) for name, word in sorted(labels.items())]
+        labels, fonts = _record(record)["drawn"], _record(record)["fonts"]
+        out += [(record.parent / name, word, fonts[name]) for name, word in sorted(labels.items())]
     return out
 
 
@@ -104,10 +109,20 @@ def test_words_note_marks_are_on_record() -> None:
     assert len(_note_cases()) >= 15
 
 
-@pytest.mark.parametrize(("path", "word"), _cases(), ids=lambda value: getattr(value, "stem", ""))
-def test_the_reader_draws_words_labels_or_refuses_as_listed(path: Path, word: list[str]) -> None:
+def test_words_label_fonts_are_on_record_for_every_label() -> None:
+    for record in RECORDS:
+        labels, fonts = _record(record)["drawn"], _record(record)["fonts"]
+        assert {n: len(w) for n, w in labels.items()} == {n: len(f) for n, f in fonts.items()}
+
+
+@pytest.mark.parametrize(
+    ("path", "word", "fonts"), _cases(), ids=lambda value: getattr(value, "stem", "")
+)
+def test_the_reader_draws_words_labels_or_refuses_as_listed(
+    path: Path, word: list[str], fonts: list[str | None]
+) -> None:
     key = f"{path.parent.name}/{path.name}"
-    result = verdict(word, reader_labels(path))
+    result = verdict(word, reader_labels(path), fonts)
     if key in REFUSED:
         assert result == f"reader refuses: {REFUSED[key]}"
     else:
@@ -213,6 +228,61 @@ def test_the_reader_marks_bold_italic_caps_and_strike_as_word_shows_them(
         assert result == f"reader refuses: {REFUSED[key]}"
     else:
         assert result == "agrees"
+
+
+def test_a_label_is_drawn_in_the_font_word_gave_it() -> None:
+    assert label_as_drawn("\uf0b7\t", "Symbol") == "\u2022\t"
+    assert label_as_drawn("\u00b7", "Symbol") == "\u2022"  # Symbol's code, stored as itself
+    assert label_as_drawn("\uf0a7\t", "Wingdings") == "\u25aa\t"
+    assert label_as_drawn("\u00a7", "Wingdings") == "\u25aa"
+    # In any other font, or a code in no table: as stored, so the reader's mapping must match it.
+    assert label_as_drawn("\u00a7", "Arial") == label_as_drawn("\u00a7", None) == "\u00a7"
+    assert label_as_drawn("\uf0d8", "Wingdings") == "\uf0d8"
+    assert verdict(["\u00a7\t"], ["\u25aa\t"], ["Wingdings"]) == "agrees"
+    assert verdict(["\u00a7\t"], ["\u25aa\t"], ["Arial"]).startswith("differs")
+
+
+def test_label_fonts_are_read_from_words_saved_copy_and_must_be_its_labels(tmp_path: Path) -> None:
+    run = '<w:r><w:rPr><w:rFonts w:ascii="{0}" w:hAnsi="{1}"/></w:rPr><w:t>{2}</w:t></w:r>'
+    original = tmp_path / "a.docx"
+    original.write_bytes(
+        docx("<w:p><w:r><w:t>one</w:t></w:r></w:p><w:p><w:r><w:t>two</w:t></w:r></w:p>")
+    )
+    box = (
+        "<w:r><w:pict><w:txbxContent><w:p><w:r><w:t>boxed</w:t></w:r></w:p></w:txbxContent>"
+        "</w:pict></w:r>"
+    )
+    square = run.format("Wingdings", "Wingdings", "\uf0a7")
+    number = run.format("Symbol", "Arial", "1.")
+    saved = docx(
+        f"<w:p>{square}<w:r><w:tab/></w:r><w:r><w:t>one</w:t></w:r>{box}</w:p>"
+        f"<w:p>{number}<w:r><w:t>two</w:t></w:r></w:p>"
+    )
+    assert _label_fonts(original, saved, ["\uf0a7\t", "1."]) == ["Wingdings", "mixed"]
+    with pytest.raises(SystemExit):
+        _label_fonts(original, saved, ["\uf0a7\t"])  # not the labels Word drew
+    with pytest.raises(SystemExit):
+        _label_fonts(original, docx("<w:p><w:r><w:t>one</w:t></w:r></w:p>"), [])  # one less
+    # Word's empty paragraph after a closing table is no paragraph of the document's.
+    body = "<w:p><w:r><w:t>one</w:t></w:r></w:p><w:p><w:r><w:t>two</w:t></w:r></w:p>"
+    assert _label_fonts(original, docx(body + "<w:p/>"), []) == []
+    with pytest.raises(SystemExit):
+        _label_fonts(original, docx(body + "<w:p><w:r><w:t>x</w:t></w:r></w:p>"), [])
+
+
+def test_a_paragraph_word_did_not_measure_is_not_agreement(tmp_path: Path) -> None:
+    hidden_mark = "<w:pPr><w:rPr><w:vanish/></w:rPr></w:pPr>"
+    path = tmp_path / "a.docx"
+    path.write_bytes(
+        docx(
+            "<w:p><w:r><w:t>a</w:t></w:r></w:p>"
+            f"<w:p>{hidden_mark}</w:p><w:p><w:r><w:t>b</w:t></w:r></w:p>"
+        )
+    )
+    measured = [False] * 4
+    assert emphasis_verdict({}, path).startswith("differs at paragraph 1")
+    # Word joins "b" to the paragraph whose mark is hidden: not measured on its own.
+    assert emphasis_verdict({"0": measured}, path) == "agrees"
 
 
 def _story_cases() -> list[tuple[Path, dict[str, list[list[Any]]]]]:

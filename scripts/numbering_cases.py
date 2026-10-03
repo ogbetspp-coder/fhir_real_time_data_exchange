@@ -19,8 +19,10 @@ import argparse
 import hashlib
 import io
 import json
+import struct
 import sys
 import zipfile
+import zlib
 from pathlib import Path
 from typing import NamedTuple
 
@@ -45,6 +47,8 @@ class Case(NamedTuple):
     final: str = "<w:sectPr/>"
     # Headers, footers and comments: (relationship id, kind, content), each in its own part.
     stories: tuple[tuple[str, str, str], ...] = ()
+    # A picture part (PICTURE_ID) and the drawing namespaces, for the drawing cases.
+    media: bool = False
 
 
 def lvl(
@@ -109,6 +113,100 @@ def para(*pieces: str, props: str = "") -> str:
     return f"<w:p>{f'<w:pPr>{props}</w:pPr>' if props else ''}{''.join(pieces)}</w:p>"
 
 
+def _png() -> bytes:
+    """A one-pixel black PNG."""
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        crc = zlib.crc32(kind + data)
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", crc)
+
+    header = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+    pixels = zlib.compress(bytes(4), 9)
+    return (
+        b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", pixels) + chunk(b"IEND", b"")
+    )
+
+
+PICTURE_ID = "rIdPicture"
+DRAWING_NAMESPACES = (
+    f' xmlns:r="{OFFICE}"'
+    ' xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"'
+    ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"'
+    ' xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"'
+    ' xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"'
+    ' xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"'
+    ' xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"'
+)
+_SIZE = '<wp:extent cx="95250" cy="95250"/>'
+_PICTURE = (
+    '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">'
+    '<pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="dot.png"/><pic:cNvPicPr/></pic:nvPicPr>'
+    f'<pic:blipFill><a:blip r:embed="{PICTURE_ID}"/><a:stretch><a:fillRect/></a:stretch>'
+    '</pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="95250" cy="95250"/>'
+    '</a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>'
+    "</a:graphicData></a:graphic>"
+)
+
+
+def _frame(key: int, size: str, graphic: str, wrap: str | None) -> str:
+    """A drawing's frame: in line with the text, or (with a wrap) anchored to the paragraph."""
+    named = f'<wp:docPr id="{key}" name="Drawing {key}"/>'
+    if wrap is None:
+        return (
+            f'<wp:inline distT="0" distB="0" distL="0" distR="0">{size}{named}{graphic}</wp:inline>'
+        )
+    return (
+        '<wp:anchor distT="0" distB="0" distL="114300" distR="114300" simplePos="0" '
+        f'relativeHeight="{key}" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1">'
+        '<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>0'
+        '</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>0'
+        f'</wp:posOffset></wp:positionV>{size}<wp:effectExtent l="0" t="0" r="0" b="0"/>{wrap}'
+        f"{named}<wp:cNvGraphicFramePr/>{graphic}</wp:anchor>"
+    )
+
+
+def picture(key: int, anchored: bool = False) -> str:
+    """A run holding a DrawingML picture, in line or anchored to the paragraph."""
+    wrap = '<wp:wrapSquare wrapText="bothSides"/>' if anchored else None
+    return f"<w:r><w:drawing>{_frame(key, _SIZE, _PICTURE, wrap)}</w:drawing></w:r>"
+
+
+def shape(key: int, geometry: str, anchored: bool) -> str:
+    """A run holding a drawn shape (``line`` or ``rect``), as Word writes one: VML as fallback."""
+    line = geometry == "line"
+    width, height = (2000000, 0) if line else (95250, 95250)
+    graphic = (
+        '<a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/'
+        f'wordprocessingShape"><wps:wsp>{"<wps:cNvCnPr/>" if line else "<wps:cNvSpPr/>"}'
+        f'<wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{width}" cy="{height}"/></a:xfrm>'
+        f'<a:prstGeom prst="{geometry}"><a:avLst/></a:prstGeom>'
+        + ("" if line else '<a:solidFill><a:srgbClr val="000000"/></a:solidFill>')
+        + '<a:ln w="12700"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:ln>'
+        "</wps:spPr><wps:bodyPr/></wps:wsp></a:graphicData></a:graphic>"
+    )
+    size = f'<wp:extent cx="{width}" cy="{height}"/>'
+    frame = _frame(key, size, graphic, "<wp:wrapNone/>" if anchored else None)
+    fallback = (
+        '<v:line from="0,0" to="157.5pt,0" strokeweight="1pt"/>'
+        if line
+        else '<v:rect style="width:7.5pt;height:7.5pt" fillcolor="black"/>'
+    )
+    return (
+        f'<w:r><mc:AlternateContent><mc:Choice Requires="wps"><w:drawing>{frame}</w:drawing>'
+        f"</mc:Choice><mc:Fallback><w:pict>{fallback}</w:pict></mc:Fallback>"
+        "</mc:AlternateContent></w:r>"
+    )
+
+
+def vml_picture(key: int, floating: bool) -> str:
+    """A run holding a VML picture, in line or positioned absolutely (floating)."""
+    place = "position:absolute;margin-left:0;margin-top:0;z-index:1;" if floating else ""
+    return (
+        f'<w:r><w:pict><v:shape id="p{key}" style="{place}width:7.5pt;height:7.5pt" '
+        f'type="#_x0000_t75"><v:imagedata r:id="{PICTURE_ID}" o:title=""/></v:shape></w:pict></w:r>'
+    )
+
+
 def note(key: int, kind: str = "footnote") -> str:
     """A note: its mark's echo, then its text."""
     return (
@@ -143,6 +241,15 @@ def field(code: str, stored: str) -> str:
         '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
         f'<w:r><w:instrText xml:space="preserve"> {code} </w:instrText></w:r>'
         f'<w:r><w:fldChar w:fldCharType="separate"/></w:r>{words(stored) if stored else ""}'
+        '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
+    )
+
+
+def bare(code: str) -> str:
+    """A complex field with no stored result (no ``separate``), as WordPerfect conversions leave."""
+    return (
+        '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+        f'<w:r><w:instrText xml:space="preserve"> {code} </w:instrText></w:r>'
         '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
     )
 
@@ -299,6 +406,7 @@ FORMATS = [
 ]
 SYMBOL = '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/></w:rPr>'
 COURIER = '<w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/></w:rPr>'
+WINGDINGS = '<w:rPr><w:rFonts w:ascii="Wingdings" w:hAnsi="Wingdings" w:hint="default"/></w:rPr>'
 LEGACY = (
     '<w:lvlOverride w:ilvl="0"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/>'
     '<w:lvlText w:val="-"/><w:legacy w:legacy="1" w:legacySpace="0" w:legacyIndent="360"/>'
@@ -529,6 +637,14 @@ CASES: dict[str, Case] = {
             (1, 0), (2, 0), (3, 0, '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr>')
         ),
     ),
+    "bullets-wingdings": Case(
+        "Word's third-level bullet, the Wingdings square, stored as U+F0A7 and as \u00a7.",
+        abstract(1, lvl(0, "bullet", "\uf0a7", WINGDINGS))
+        + abstract(2, lvl(0, "bullet", "\u00a7", WINGDINGS))
+        + num(1, 1)
+        + num(2, 2),
+        items((1, 0), (2, 0)),
+    ),
     "fields-seq": Case(
         "SEQ captions count 1, 2, 3, stored as Word prints them.",
         "",
@@ -709,6 +825,18 @@ CASES: dict[str, Case] = {
         "",
         para(field("DOCPROPERTY Title", "a stored title"))
         + para(field('HYPERLINK "https://example.org"', "the agency's page")),
+    ),
+    "fields-seq-hidden-no-result": Case(
+        "A hidden SEQ with no stored result shows nothing and still counts: \\r 3, then 4.",
+        "",
+        para(bare("SEQ CHAPTER \\h \\r 1"), words("Text after a hidden chapter count."))
+        + para(words("Before "), bare("SEQ Table \\h \\r 3"))
+        + seq("4"),
+    ),
+    "fields-seq-shown-no-result": Case(
+        "A SEQ with no stored result that would show a number (the reader refuses it).",
+        "",
+        para(words("Table "), bare("SEQ Table")),
     ),
     "fields-stale": Case(
         "Captions stored as 7 and 7, which Word prints as 1 and 2 (the reader refuses).",
@@ -946,6 +1074,54 @@ CASES: dict[str, Case] = {
         footnotes=notes("footnote", 1, 2, 3),
         final=section('<w:numFmt w:val="upperLetter"/>'),
     ),
+    "drawing-inline-picture": Case(
+        "A picture in line with the text: Word's text shows it as '/'.",
+        "",
+        para(words("a"), picture(1), words("b")),
+        media=True,
+    ),
+    "drawing-anchored-picture": Case(
+        "A picture anchored to the paragraph (floating): what Word's text shows for it.",
+        "",
+        para(words("a"), picture(2, anchored=True), words("b")),
+        media=True,
+    ),
+    "drawing-anchored-line": Case(
+        "A drawn line anchored to the paragraph, as the FDA template's rules: Word's text.",
+        "",
+        para(words("a"), shape(3, "line", anchored=True), words("b")),
+        media=True,
+    ),
+    "drawing-anchored-line-alone": Case(
+        "A paragraph holding only an anchored drawn line, then text.",
+        "",
+        para(shape(4, "line", anchored=True)) + para(words("after")),
+        media=True,
+    ),
+    "drawing-inline-shape": Case(
+        "A drawn square in line with the text: Word's text.",
+        "",
+        para(words("a"), shape(5, "rect", anchored=False), words("b")),
+        media=True,
+    ),
+    "drawing-anchored-shape": Case(
+        "A drawn square anchored to the paragraph: Word's text.",
+        "",
+        para(words("a"), shape(6, "rect", anchored=True), words("b")),
+        media=True,
+    ),
+    "drawing-vml-inline-picture": Case(
+        "A VML picture in line with the text: Word's text.",
+        "",
+        para(words("a"), vml_picture(7, floating=False), words("b")),
+        media=True,
+    ),
+    "drawing-vml-floating-picture": Case(
+        "A VML picture positioned absolutely (floating): Word's text.",
+        "",
+        para(words("a"), vml_picture(8, floating=True), words("b")),
+        media=True,
+    ),
 }
 
 
@@ -971,14 +1147,15 @@ def package(case: Case) -> bytes:
     }
     # A story part is named by its relationship id; the document then declares the r: prefix.
     named = [(f"{key}.xml", kind, content) for key, kind, content in case.stories]
-    declare = f' xmlns:r="{OFFICE}"' if case.stories else ""
+    declare = DRAWING_NAMESPACES if case.media else f' xmlns:r="{OFFICE}"' if case.stories else ""
     parts = {
         "[Content_Types].xml": (
             '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
             '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.'
             'relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'
-            f'<Override PartName="/word/document.xml" ContentType="{MAIN}.document.main+xml"/>'
+            + ('<Default Extension="png" ContentType="image/png"/>' if case.media else "")
+            + f'<Override PartName="/word/document.xml" ContentType="{MAIN}.document.main+xml"/>'
             f'<Override PartName="/word/styles.xml" ContentType="{MAIN}.styles+xml"/>'
             f'<Override PartName="/word/numbering.xml" ContentType="{MAIN}.numbering+xml"/>'
             + "".join(
@@ -1007,6 +1184,11 @@ def package(case: Case) -> bytes:
             + "".join(
                 f'<Relationship Id="{key}" Type="{OFFICE}/{kind}" Target="{key}.xml"/>'
                 for key, kind, _ in case.stories
+            )
+            + (
+                f'<Relationship Id="{PICTURE_ID}" Type="{OFFICE}/image" Target="media/dot.png"/>'
+                if case.media
+                else ""
             )
             + "</Relationships>"
         ),
@@ -1040,6 +1222,10 @@ def package(case: Case) -> bytes:
             info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
             info.external_attr = 0o644 << 16
             archive.writestr(info, content.encode("utf-8"))
+        if case.media:
+            info = zipfile.ZipInfo("word/media/dot.png", date_time=(1980, 1, 1, 0, 0, 0))
+            info.external_attr = 0o644 << 16
+            archive.writestr(info, _png())
     return buffer.getvalue()
 
 
