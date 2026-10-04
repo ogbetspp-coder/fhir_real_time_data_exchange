@@ -312,6 +312,8 @@
     "table-style-charstyle-and-row.docx": [],
     "table-style-col-vs-row.docx": [],
     "table-style-col-vs-vband.docx": [],
+    "table-style-col2.docx": [],
+    "table-style-col3-after-first.docx": [],
     "table-style-corner-vs-row.docx": [],
     "table-style-default-1H.docx": [],
     "table-style-default-firstrow.docx": [],
@@ -328,6 +330,10 @@
     "table-style-no-look.docx": [],
     "table-style-parastyle-and-row.docx": [],
     "table-style-row-vs-col.docx": [],
+    "table-style-row1-lastrow-part.docx": [],
+    "table-style-row2-after-first.docx": [],
+    "table-style-row2-lastrow-part.docx": [],
+    "table-style-row3.docx": [],
     "table-style-sized-1H.docx": [],
     "table-style-sized-1V.docx": [],
     "table-style-sized-2H.docx": [],
@@ -673,6 +679,8 @@
     "table-style-charstyle-and-row.docx": [],
     "table-style-col-vs-row.docx": [],
     "table-style-col-vs-vband.docx": [],
+    "table-style-col2.docx": [],
+    "table-style-col3-after-first.docx": [],
     "table-style-corner-vs-row.docx": [],
     "table-style-default-1H.docx": [],
     "table-style-default-firstrow.docx": [],
@@ -689,6 +697,10 @@
     "table-style-no-look.docx": [],
     "table-style-parastyle-and-row.docx": [],
     "table-style-row-vs-col.docx": [],
+    "table-style-row1-lastrow-part.docx": [],
+    "table-style-row2-after-first.docx": [],
+    "table-style-row2-lastrow-part.docx": [],
+    "table-style-row3.docx": [],
     "table-style-sized-1H.docx": [],
     "table-style-sized-1V.docx": [],
     "table-style-sized-2H.docx": [],
@@ -3588,6 +3600,192 @@
         false
       ]
     },
+    "table-style-col2.docx": {
+      "": [],
+      "0": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "10": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "11": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "12": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "13": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "14": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "6": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "7": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "8": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "9": [
+        true,
+        false,
+        false,
+        false
+      ]
+    },
+    "table-style-col3-after-first.docx": {
+      "": [],
+      "0": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "1": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "10": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "11": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "12": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "13": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "14": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "6": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "7": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "8": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "9": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
     "table-style-corner-vs-row.docx": {
       "": [],
       "0": [
@@ -4662,6 +4860,378 @@
         false
       ],
       "8": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "table-style-row1-lastrow-part.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "10": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "11": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "12": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "13": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "14": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "6": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "7": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "8": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "9": [
+        true,
+        false,
+        false,
+        false
+      ]
+    },
+    "table-style-row2-after-first.docx": {
+      "": [],
+      "0": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "10": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "11": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "12": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "13": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "14": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "3": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "6": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "7": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "8": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "9": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "table-style-row2-lastrow-part.docx": {
+      "": [],
+      "0": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "10": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "11": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "12": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "13": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "14": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "2": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "6": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "7": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "8": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "9": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "table-style-row3.docx": {
+      "": [],
+      "0": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "10": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "11": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "12": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "13": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "14": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "6": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "7": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "8": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "9": [
         false,
         false,
         false,
@@ -6875,6 +7445,8 @@
     "table-style-charstyle-and-row.docx": [],
     "table-style-col-vs-row.docx": [],
     "table-style-col-vs-vband.docx": [],
+    "table-style-col2.docx": [],
+    "table-style-col3-after-first.docx": [],
     "table-style-corner-vs-row.docx": [],
     "table-style-default-1H.docx": [],
     "table-style-default-firstrow.docx": [],
@@ -6891,6 +7463,10 @@
     "table-style-no-look.docx": [],
     "table-style-parastyle-and-row.docx": [],
     "table-style-row-vs-col.docx": [],
+    "table-style-row1-lastrow-part.docx": [],
+    "table-style-row2-after-first.docx": [],
+    "table-style-row2-lastrow-part.docx": [],
+    "table-style-row3.docx": [],
     "table-style-sized-1H.docx": [],
     "table-style-sized-1V.docx": [],
     "table-style-sized-2H.docx": [],
@@ -7315,6 +7891,8 @@
     "table-style-charstyle-and-row.docx": true,
     "table-style-col-vs-row.docx": true,
     "table-style-col-vs-vband.docx": true,
+    "table-style-col2.docx": true,
+    "table-style-col3-after-first.docx": true,
     "table-style-corner-vs-row.docx": true,
     "table-style-default-1H.docx": true,
     "table-style-default-firstrow.docx": true,
@@ -7331,6 +7909,10 @@
     "table-style-no-look.docx": true,
     "table-style-parastyle-and-row.docx": true,
     "table-style-row-vs-col.docx": true,
+    "table-style-row1-lastrow-part.docx": true,
+    "table-style-row2-after-first.docx": true,
+    "table-style-row2-lastrow-part.docx": true,
+    "table-style-row3.docx": true,
     "table-style-sized-1H.docx": true,
     "table-style-sized-1V.docx": true,
     "table-style-sized-2H.docx": true,
@@ -7463,6 +8045,8 @@
     "table-style-charstyle-and-row.docx": "b74acbe1d19d8c4f04b043cc51543d48c625db5a8dd863eec58de10d37b3805d",
     "table-style-col-vs-row.docx": "0b29af76cafff707d1e7592af7bf6d25e64185f294b1cf75068014cf72f37c9e",
     "table-style-col-vs-vband.docx": "ad4f4262ff89f5890a05e132229207356419de4fd32c40d63d697353a75d1993",
+    "table-style-col2.docx": "f7b2d16a9d9c8bd403ea6f525aaf9354fb291a180c2c003135e73a0063419f00",
+    "table-style-col3-after-first.docx": "b68be8836a81a1e4deeef21614b273098ebb853d8020fc064e25ea53cd65272d",
     "table-style-corner-vs-row.docx": "62a44d974364b34930a854266d419e061e503aa87b7e23bceba91089a92007f3",
     "table-style-default-1H.docx": "95c969052941af3222204afaf3409090a718aca7fb3e12402bd41d54cafc318f",
     "table-style-default-firstrow.docx": "4ab38fa657f426523493e1fa2810a41bf80609ebbd09d0c58a3c01e2244e9834",
@@ -7479,6 +8063,10 @@
     "table-style-no-look.docx": "7dd0939a6fa9995e6e7fa0a2ecde891bcb50fa0397232a9d9ea6b5480e474b44",
     "table-style-parastyle-and-row.docx": "663ed6b2cad4265a5a2e1784642143f1d1947043de37993be4a2510abeb38c04",
     "table-style-row-vs-col.docx": "a030f6f94017822e62c9c04f0f26ddb25e266f906dfd863df90a0c164c5a8b05",
+    "table-style-row1-lastrow-part.docx": "52463eb118007c5ca140b661409fdf83af49852cd1be88334e2c5a1748c065c6",
+    "table-style-row2-after-first.docx": "5c8bd17e90d4188006dd8c50c9606a4949b3585071211aa77ef95ae0ebac0952",
+    "table-style-row2-lastrow-part.docx": "0ba04c8eb9b151d6d9fa13ad5011f598f1a0abbb065b818ab3a8af58c6ced5e1",
+    "table-style-row3.docx": "396c789d94edc72275452ffa5f82c4da5895148c93f70c6074dbb2cd5a015f41",
     "table-style-sized-1H.docx": "5a959e4a9c47a6008a9a51026f51c8fd466425d423ad44f3fa3055d1e990bd3f",
     "table-style-sized-1V.docx": "e2b63a6ae3dd871525b56e158a091fe24dd044546f2f31530aaf221b9631a787",
     "table-style-sized-2H.docx": "f6b2ac7481be1386cfe88787ec55629fb500cb622f7d914ee63059bb33ab7f05",
@@ -8135,6 +8723,40 @@
       "r3c2",
       "r3c3"
     ],
+    "table-style-col2.docx": [
+      "r0c0",
+      "r0c1",
+      "r0c2",
+      "r0c3",
+      "r0c4",
+      "r1c0",
+      "r1c1",
+      "r1c2",
+      "r1c3",
+      "r1c4",
+      "r2c0",
+      "r2c1",
+      "r2c2",
+      "r2c3",
+      "r2c4"
+    ],
+    "table-style-col3-after-first.docx": [
+      "r0c0",
+      "r0c1",
+      "r0c2",
+      "r0c3",
+      "r0c4",
+      "r1c0",
+      "r1c1",
+      "r1c2",
+      "r1c3",
+      "r1c4",
+      "r2c0",
+      "r2c1",
+      "r2c2",
+      "r2c3",
+      "r2c4"
+    ],
     "table-style-corner-vs-row.docx": [
       "r0c0",
       "r0c1",
@@ -8338,6 +8960,74 @@
       "r2c0",
       "r2c1",
       "r2c2"
+    ],
+    "table-style-row1-lastrow-part.docx": [
+      "r0c0",
+      "r0c1",
+      "r0c2",
+      "r1c0",
+      "r1c1",
+      "r1c2",
+      "r2c0",
+      "r2c1",
+      "r2c2",
+      "r3c0",
+      "r3c1",
+      "r3c2",
+      "r4c0",
+      "r4c1",
+      "r4c2"
+    ],
+    "table-style-row2-after-first.docx": [
+      "r0c0",
+      "r0c1",
+      "r0c2",
+      "r1c0",
+      "r1c1",
+      "r1c2",
+      "r2c0",
+      "r2c1",
+      "r2c2",
+      "r3c0",
+      "r3c1",
+      "r3c2",
+      "r4c0",
+      "r4c1",
+      "r4c2"
+    ],
+    "table-style-row2-lastrow-part.docx": [
+      "r0c0",
+      "r0c1",
+      "r0c2",
+      "r1c0",
+      "r1c1",
+      "r1c2",
+      "r2c0",
+      "r2c1",
+      "r2c2",
+      "r3c0",
+      "r3c1",
+      "r3c2",
+      "r4c0",
+      "r4c1",
+      "r4c2"
+    ],
+    "table-style-row3.docx": [
+      "r0c0",
+      "r0c1",
+      "r0c2",
+      "r1c0",
+      "r1c1",
+      "r1c2",
+      "r2c0",
+      "r2c1",
+      "r2c2",
+      "r3c0",
+      "r3c1",
+      "r3c2",
+      "r4c0",
+      "r4c1",
+      "r4c2"
     ],
     "table-style-sized-1H.docx": [
       "r0c0",
