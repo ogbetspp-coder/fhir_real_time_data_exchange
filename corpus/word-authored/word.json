@@ -1,5 +1,17 @@
 {
   "application": "Microsoft Word 16.113.3 (macOS)",
+  "at": {
+    "table-of-contents-stale.docx": [
+      3,
+      5,
+      7
+    ],
+    "table-of-contents.docx": [
+      3,
+      5,
+      7
+    ]
+  },
   "drawn": {
     "table-of-contents-stale.docx": [
       "1\t",
@@ -141,13 +153,17 @@
       null
     ]
   },
-  "method": "list labels: convert numbers to text, what each list item gained; fonts: the font Word gave each label, from its copy saved after; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text",
+  "method": "list labels: convert numbers to text, what each list item gained; fonts and at: the font Word gave each label and its body paragraph, from its copy saved after; sha256: the bytes each file's answers are for; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text",
   "notes": {},
   "prints": {
     "table-of-contents-stale.docx": true,
     "table-of-contents.docx": true
   },
   "recorded": "2026-10-03",
+  "sha256": {
+    "table-of-contents-stale.docx": "46415f5c5f5441fe1a614797a67c71cdc46bca7fd5410e7ae67c2176ecb9ba48",
+    "table-of-contents.docx": "d819dcff034ab633389ddb759dccc1b952c6e40874bd15f4fa5b5d70101db395"
+  },
   "stories": {},
   "text": {
     "table-of-contents-stale.docx": [
@@ -172,5 +188,6 @@
       "Stability",
       "Store below 25 C."
     ]
-  }
+  },
+  "verifier": "word-verifier/1.0.1"
 }

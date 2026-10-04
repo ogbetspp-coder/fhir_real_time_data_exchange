@@ -1,5 +1,84 @@
 {
   "application": "Microsoft Word 16.113.3 (macOS)",
+  "at": {
+    "fda-medication-guide-template.docx": [],
+    "fda-patient-package-insert-template.docx": [],
+    "fda-prescribing-information-template.docx": [
+      9,
+      10,
+      24,
+      25,
+      31,
+      32,
+      35,
+      36,
+      44,
+      45,
+      48,
+      49,
+      139,
+      140,
+      141,
+      142,
+      143,
+      144,
+      145,
+      146,
+      147,
+      152,
+      153,
+      167,
+      168,
+      191,
+      192,
+      193,
+      194,
+      254,
+      255,
+      256,
+      257,
+      262,
+      263,
+      264,
+      348,
+      352,
+      354,
+      379,
+      380,
+      381,
+      382,
+      383,
+      384,
+      388,
+      389,
+      390,
+      391,
+      392,
+      393,
+      394,
+      395,
+      396,
+      397,
+      412,
+      413,
+      414,
+      415,
+      416,
+      420,
+      421,
+      422,
+      423,
+      424,
+      425,
+      431,
+      432,
+      433,
+      434,
+      435,
+      438,
+      439
+    ]
+  },
   "drawn": {
     "fda-medication-guide-template.docx": [],
     "fda-patient-package-insert-template.docx": [],
@@ -2330,7 +2409,7 @@
       "Symbol"
     ]
   },
-  "method": "list labels: convert numbers to text, what each list item gained; fonts: the font Word gave each label, from its copy saved after; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text",
+  "method": "list labels: convert numbers to text, what each list item gained; fonts and at: the font Word gave each label and its body paragraph, from its copy saved after; sha256: the bytes each file's answers are for; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text",
   "notes": {
     "fda-prescribing-information-template.docx": {
       "body": [
@@ -2349,6 +2428,11 @@
     "fda-prescribing-information-template.docx": true
   },
   "recorded": "2026-10-03",
+  "sha256": {
+    "fda-medication-guide-template.docx": "435c5e9d5c10722e78db6bb90c7489a5b4ede8e08fb08334b7bb9e5ec2c5511c",
+    "fda-patient-package-insert-template.docx": "3442be0483c834bb3d178a56857c9d93f4d17e817629a18c5204e2c0eeaf12c2",
+    "fda-prescribing-information-template.docx": "6b9ae21fae9183418e05688cb3e826c7cabd050ceed564a5d177d8119cb64561"
+  },
   "stories": {
     "fda-prescribing-information-template.docx": {
       "comments": [],
@@ -2773,5 +2857,6 @@
       "The distributor\u2019s name and address may also be included. ",
       "If the distributor is included must include one of the following phrases: \u201cManufactured for Firm-D\u201d, \u201cDistributed by Firm-D\u201d, \u201cManufactured by Firm-M for Firm-D\u201d, \u201cManufactured for Firm-D by Firm-M\u201d, \u201cDistributor: Firm-D\u201d, or \u201cMarketed by Firm-D\u201d.]]"
     ]
-  }
+  },
+  "verifier": "word-verifier/1.0.1"
 }

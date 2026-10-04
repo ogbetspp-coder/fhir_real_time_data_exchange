@@ -1,5 +1,310 @@
 {
   "application": "Microsoft Word 16.113.3 (macOS)",
+  "at": {
+    "ancestor-never-counted.docx": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "ancestor-two-levels.docx": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "bullets-wingdings.docx": [
+      0,
+      1
+    ],
+    "bullets.docx": [
+      0,
+      1,
+      2
+    ],
+    "default-character-style.docx": [],
+    "drawing-anchored-line-alone.docx": [],
+    "drawing-anchored-line.docx": [],
+    "drawing-anchored-picture.docx": [],
+    "drawing-anchored-shape.docx": [],
+    "drawing-inline-picture.docx": [],
+    "drawing-inline-shape.docx": [],
+    "drawing-vml-floating-picture.docx": [],
+    "drawing-vml-inline-picture.docx": [],
+    "emphasis-defaults-off.docx": [],
+    "emphasis-defaults.docx": [],
+    "emphasis-toggles.docx": [],
+    "fields-chapter-captions.docx": [
+      0,
+      2
+    ],
+    "fields-chapter-dotted.docx": [
+      0,
+      1
+    ],
+    "fields-chapter-reset-level-2.docx": [
+      0,
+      1,
+      4,
+      6
+    ],
+    "fields-chapter-reset.docx": [
+      0,
+      3,
+      5
+    ],
+    "fields-heading-by-name.docx": [],
+    "fields-noteref-stale.docx": [],
+    "fields-noteref.docx": [],
+    "fields-ref-caption.docx": [],
+    "fields-ref-missing.docx": [],
+    "fields-ref-stale.docx": [],
+    "fields-ref.docx": [],
+    "fields-seq-formats.docx": [],
+    "fields-seq-hidden-no-result.docx": [],
+    "fields-seq-identifiers.docx": [],
+    "fields-seq-shown-no-result.docx": [],
+    "fields-seq-switches.docx": [],
+    "fields-seq.docx": [],
+    "fields-stale.docx": [],
+    "fields-stored.docx": [],
+    "fields-styleref-characters.docx": [
+      0
+    ],
+    "fields-styleref-forward.docx": [
+      1
+    ],
+    "fields-styleref-symbol.docx": [
+      0
+    ],
+    "formats.docx": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "legal.docx": [
+      0,
+      1
+    ],
+    "level-override-first.docx": [
+      0,
+      1,
+      2
+    ],
+    "level-override-shared.docx": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "level-override-start.docx": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "level-override.docx": [
+      0,
+      1
+    ],
+    "missing-start.docx": [
+      0,
+      1
+    ],
+    "multilevel.docx": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "notes-chicago.docx": [],
+    "notes-continuous.docx": [],
+    "notes-custom-mark.docx": [],
+    "notes-document-format.docx": [],
+    "notes-each-section.docx": [],
+    "notes-endnotes.docx": [],
+    "notes-in-table.docx": [],
+    "notes-mixed.docx": [],
+    "notes-section-chicago.docx": [],
+    "notes-section-format.docx": [],
+    "notes-section-rules.docx": [],
+    "notes-section-start-continuous.docx": [],
+    "notes-start-format.docx": [],
+    "numbering-style-link-one-way.docx": [
+      0,
+      1,
+      2
+    ],
+    "numbering-style-link.docx": [
+      0,
+      1,
+      2
+    ],
+    "override-ancestor.docx": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "override-deeper-level.docx": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "override-implicit-ancestor.docx": [
+      0,
+      1,
+      2
+    ],
+    "override-implicit-continued.docx": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "override-implicit-levels.docx": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "override-implicit-reused.docx": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "override-implicit-rows.docx": [
+      0,
+      1,
+      2
+    ],
+    "override-restart-within.docx": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "override-return.docx": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "plain-after-restart.docx": [
+      0,
+      1
+    ],
+    "restart-after-first.docx": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "restart-level-above.docx": [
+      0,
+      1,
+      2
+    ],
+    "restart-never-rows.docx": [
+      0,
+      1,
+      3
+    ],
+    "restart-never-shown-deeper.docx": [
+      0,
+      1,
+      2
+    ],
+    "restart-never.docx": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "restart-skipped-ancestor.docx": [
+      0,
+      1,
+      2
+    ],
+    "restart-source-cells.docx": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "restart-source-override.docx": [
+      0,
+      1,
+      2
+    ],
+    "restart-source-plain.docx": [
+      0,
+      1,
+      2
+    ],
+    "restart-source-rows.docx": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "restart-source-unused.docx": [
+      0,
+      1,
+      2
+    ],
+    "return-after-restart.docx": [
+      0,
+      1,
+      2
+    ],
+    "shared-continue.docx": [
+      0,
+      1,
+      2
+    ],
+    "start-override-first.docx": [
+      0,
+      1
+    ],
+    "start-override-restart.docx": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "style-tied-deeper-level.docx": [
+      0,
+      1,
+      2
+    ],
+    "style-tied-level-zero.docx": [
+      0,
+      1
+    ],
+    "two-definitions.docx": [
+      0,
+      1,
+      2
+    ]
+  },
   "drawn": {
     "ancestor-never-counted.docx": [
       "1.1\t",
@@ -2965,7 +3270,7 @@
       null
     ]
   },
-  "method": "list labels: convert numbers to text, what each list item gained; fonts: the font Word gave each label, from its copy saved after; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text",
+  "method": "list labels: convert numbers to text, what each list item gained; fonts and at: the font Word gave each label and its body paragraph, from its copy saved after; sha256: the bytes each file's answers are for; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text",
   "notes": {
     "fields-noteref-stale.docx": {
       "body": [
@@ -3238,6 +3543,97 @@
     "two-definitions.docx": true
   },
   "recorded": "2026-10-03",
+  "sha256": {
+    "ancestor-never-counted.docx": "617e136f80bd10bd5c208c4431e43acb31bbe05864cb6a3f4e8fc54efbfb7837",
+    "ancestor-two-levels.docx": "b9dc3744b284c81a68ab252f2050e17fcb331003cd10e5e9be8dbfa984f5d9a7",
+    "bullets-wingdings.docx": "6f082fc46d4249770ab8059c02be357bd4d770955a756225d98e195fb3d9fc99",
+    "bullets.docx": "62a355d1e912cb232cc60eacbd917ff31642219a2e0e428a88cb0cec3071b14b",
+    "default-character-style.docx": "9ef22c4d6a40ebc08d59963ccaba61a03c0c17d1bfdfcd0a6eed8413ac32537b",
+    "drawing-anchored-line-alone.docx": "b7cbe3ed781b1064aca4d8ef5490e173c1c491087b5de72c72476a472bddc937",
+    "drawing-anchored-line.docx": "831bd598649e83a84c4edd3c9dc135e256288d910221b0fbe1474deedf520ae2",
+    "drawing-anchored-picture.docx": "a42be95767a36a3cd4afe4a29758d00f89c1dcaf3bba28d109b79893083b0099",
+    "drawing-anchored-shape.docx": "750b0013e7fce81a82b98c78a73661362e97b615de68d825705ed0780b025c04",
+    "drawing-inline-picture.docx": "f3cce2aad2510916e04eee9dd73ba6dee49fa8b653fcf0e93e29368f7d77e996",
+    "drawing-inline-shape.docx": "3dd60e1af142e6f18d1f69139062e00a2db13cc09d1aac1b6d8ec8672d72ee01",
+    "drawing-vml-floating-picture.docx": "f8d5a4e96fa7e285690698c77fee83e672a992335572a196760353cd32b6d4ae",
+    "drawing-vml-inline-picture.docx": "66608d645ed50fcbdaa7f7d128b6f17b8d66a3089e5655351fc4d37ed584d0c3",
+    "emphasis-defaults-off.docx": "509d8f091ed179600ea38cd7a6ff0464e58f7c0285feec0f94eb62ad089877eb",
+    "emphasis-defaults.docx": "21c882458608d310f474348508cddaea519e01862017a6fd5d92ba24af8c7d68",
+    "emphasis-toggles.docx": "28b1f3f2e06c075a73097e4c17828214940f2edb65b8dd924afe9773ea4f427d",
+    "fields-chapter-captions.docx": "7ef7e7939ed5b8f081515b30657c59b4d5af685309507a994f23d5fa5c199ad5",
+    "fields-chapter-dotted.docx": "adea78c1b9715abdeccbfc3fd8e373dae6cf8ac7661ce152a9d6d0ded933432c",
+    "fields-chapter-reset-level-2.docx": "3bb60d3a0b7bfcfe0ed52e22bd767051a481e38cc6c001ba2e3deac38156a83b",
+    "fields-chapter-reset.docx": "6ac7a96f4521a6fd75259153a96d75647750fdc9571079f073beb177ea79950e",
+    "fields-heading-by-name.docx": "ee0a173064750f01fd51479ca2ff822123dd230fd1e118a466cfd345464ab2ec",
+    "fields-noteref-stale.docx": "2a13e4089d823427215772a3b7026f472ff6537733e72e1366e4d820267b07fc",
+    "fields-noteref.docx": "e3032ddf3d4fc689f0f98b2a280cea475861d352f8ba19a68cfe8f5fcc60da65",
+    "fields-ref-caption.docx": "22985d27fec53c65b992e2267841fedf0f04260d1e3807e077d229aed02ee724",
+    "fields-ref-missing.docx": "caec02bbde333b95b35c54951058e834f39344da16c644f07e1bc1bf3414f8c7",
+    "fields-ref-stale.docx": "aadaa74b16eed4f18115fb8c84f8d97ab8e8b8a7855f0e9c632e26b944f832ad",
+    "fields-ref.docx": "48d644b4a225777e38a0f775da0d1015005881acc3045b9e1a2ba14075d40e30",
+    "fields-seq-formats.docx": "09e3ebda048ab49e2a6b3bd947bc25c883a6768fa85a0ccfa0af2523ec048e05",
+    "fields-seq-hidden-no-result.docx": "db657909d02c4ecde2230027e643c498b9ddde48ec4e946cef27fb9b7b9b9903",
+    "fields-seq-identifiers.docx": "e19103afde4d87129ccbec4e508bb4213c4968bc10f17f8672d4201cd2299847",
+    "fields-seq-shown-no-result.docx": "35f989a1c7b640e55b9c66c289125b87531dc59db189c0686a9d0b11c585cc22",
+    "fields-seq-switches.docx": "3abf1d1951c0d83197eee8b6281befb3791d16e5ac6944f21b09455d75195259",
+    "fields-seq.docx": "fb03611eb720cb2673f7f88bacffdb92d38df0e0a1f440269ed11d0ba4918eed",
+    "fields-stale.docx": "22e42c8c0532dd985bb4a9df1848490495a1e6c1269ef09a0aab605032878861",
+    "fields-stored.docx": "ff92577f32a18cb195acc09176557962df0ef46a58a81b2c8c721053f03cd866",
+    "fields-styleref-characters.docx": "88c47ad4033e1cdd2b53d9287e1982d36dacab2c6ad4d787d8c71fceb001ef50",
+    "fields-styleref-forward.docx": "9ace8ecefeaf3e37c11eebe462c49eaffc068396ed8ed47512b126f4b1bf32e5",
+    "fields-styleref-symbol.docx": "f46e5f03ecda14776b2d3967fca0cddf5d50eab87e2b0edd0d95346301356c6d",
+    "formats.docx": "494ff88e90f40d1f4216752a2f4bf44c85b6f019a6e6471e139d2f53eab325e4",
+    "legal.docx": "be5983db03b9e8a1781f8b837617ba2798a07153b37cb3a6e645e30fd04b65fd",
+    "level-override-first.docx": "112a6938b56f6b3f93c30cd27869cc05cb0be1ca092e0de360bf8cfe5689385a",
+    "level-override-shared.docx": "b886c90c0ca7f51dbf1a26cdfbf257c51fc6ca0e8f70b8de61a9e5f942d4e551",
+    "level-override-start.docx": "46aa4382142654524821092aaf461a7f62df62cc25b7afdb6aa6eb783dc63ee3",
+    "level-override.docx": "9a345eee6dbd4ae92fca25235e2ec006f2fab5f3b82d806cc03608a188c4015e",
+    "missing-start.docx": "f4b020efcd8da3cec4d6d41cbd3538d5b310c3e8b10ddc5e9aec12078e8a49bc",
+    "multilevel.docx": "4190a564d1cc563a180fc6db24a5fa14ddf95902e65fd51872c13cd35b6447a5",
+    "notes-chicago.docx": "028d55ff20fb8ce1cef138b588cef733aede9e022e9f52c8a6c717295de3e559",
+    "notes-continuous.docx": "cefb0cc55bb723e6a71b6857618a833487bdbd7ae8eb581dea40498f8bdcec31",
+    "notes-custom-mark.docx": "697f8f35be0c31f75da2bb0aaf446c90bda6e1c45b72c29396f8a3abd6bb4269",
+    "notes-document-format.docx": "566a66f4c2e6a2f2449017a8db77d276cf2c08f64e876923578abf3dfe6e4ecf",
+    "notes-each-section.docx": "5787b5db07058aa972c2872c5f4b4494d629c2111956c56321609dc94ed29403",
+    "notes-endnotes.docx": "222872d0fc7fb674e0aebcd40d002bc9f753197a5bfaec70ea2a0fa280180925",
+    "notes-in-table.docx": "e4d9c36963916688854f9599bb14a0cb2a70940e826747de48e793c61f9c2399",
+    "notes-mixed.docx": "267a03b96efbdb67cf1243dbd8d2349573c25772b16558f8629e9ffa2150c1ef",
+    "notes-section-chicago.docx": "3fa4c70a131538b2ae05c68ed7f2fb5827a83a4d026829ca21363f2a2d587211",
+    "notes-section-format.docx": "be84d1f0183a7217f07c1783c5979a2e367866a5398b09a5dee2e24b38b59c5a",
+    "notes-section-rules.docx": "b9b25b7a8c607b1695508ae055c4687dfa9c47ed5625bae0dea071dbc0e62834",
+    "notes-section-start-continuous.docx": "bd2cec4279b10b43210780c61eba89761a59dc0740c2922aadf388268a953e6d",
+    "notes-start-format.docx": "bdbbdcb5e543123b4a659e7d37ddb867ba11d426e111973d05f6f258313efc10",
+    "numbering-style-link-one-way.docx": "04ef975df766eebdbff187c73fe89bde80804c79438ffc6bf8986b236b3644ac",
+    "numbering-style-link.docx": "b4c87364de3fb2c67610fc2dac0ad0e9fd0ba1c19f188af37ce9717bb49ea021",
+    "override-ancestor.docx": "0600d4876dc95c1b4aa8f01df4550a8f9c8a7581e8e2c6f31ce81bd9910fb224",
+    "override-deeper-level.docx": "11d58b08f224a041fbbce024fac1a5d03234294c19f196c74acdb073ece1e221",
+    "override-implicit-ancestor.docx": "e55961207231b8972fabbedfed9594e0eef2a7b2dce397c30e6d95ccbafd43e3",
+    "override-implicit-continued.docx": "a81b4c0bb973748a305cd0d93e0e2ed861e5cf34dc74803d806afb7b0a8d29d0",
+    "override-implicit-levels.docx": "1b52d3a2462dc552948cd4ca1553ec50818246c506c95c2133a17cdd9ebb83d0",
+    "override-implicit-reused.docx": "4753e9403efcb154918e0e636f493f10011da0cc69022e740b0c2e9d835c0679",
+    "override-implicit-rows.docx": "09dfca802aaebe99194446a0867fff2fbb8df7732a0144304ce61edb92989f47",
+    "override-restart-within.docx": "3612d10fe863e0f3486c9127efa08463052c4fdd0c8ef52be5c25e6f93c3d2fe",
+    "override-return.docx": "eb5f8c7b32b9764e6082aaf139160dfc79715edee6c84d5fea84e3aab27d513b",
+    "plain-after-restart.docx": "a0842636db8d397723bb68625e1b6f1609253af03e73d4d217ff656efe7ab9de",
+    "restart-after-first.docx": "aa48a48f3a8dca6613701ef7af8c0c88c40c514dcb15fd6d358e4f2cfe5fabfe",
+    "restart-level-above.docx": "0c42ffa7643a5269c103e4293c63f456b0b3c892250773a166dc1765dcd58d25",
+    "restart-never-rows.docx": "2c4f79dc2e195871516ea7cb35e1f29326a12a6821ff97dc0d3ed9fcaba938cf",
+    "restart-never-shown-deeper.docx": "d15465eb5893330dbfaf21acbd2f2af068103f093067cac4c00031d5313bccb9",
+    "restart-never.docx": "04b6b2a16e3313a51e521195aaefc5605eb517cef49b2a6066c5a51b37603c22",
+    "restart-skipped-ancestor.docx": "60f7bacef4f598dbf31714a1f89e32684820e53c9d5d58f067ca77090062d499",
+    "restart-source-cells.docx": "db9a5a3f7ffdab87cf5b6d5a0ec23774db3d10719806ba41435afdac7bf2e821",
+    "restart-source-override.docx": "25a23877dc276027b60b36f4a781364ff6cc0943915550c28772ec202a0d9096",
+    "restart-source-plain.docx": "d3696855c4976fd5d1ecc74e21bbff19a7f7fb1d32c5acb75079424c1ae0ed09",
+    "restart-source-rows.docx": "79c6d917ed2518af2f9659a1d6227001f91295ff25799e2a4c841b6a14bb626b",
+    "restart-source-unused.docx": "a7aca5dc84b209ef9871fee2566568fa4a5543ebf2d0fb20e8a3c278d6aa0ed2",
+    "return-after-restart.docx": "20a86c73e2af321d272d2bfa0a49ac70485b8afad9fe6fe3eb06337b3419f730",
+    "shared-continue.docx": "a408beea90ff48a64c408ef33b2587f2cd8d6d6e5c9d00eb9ccf0ed2cefcf462",
+    "start-override-first.docx": "c1d3b8a65704c41c3faa573cf97432eca280fb06f39a14029080182141b23c71",
+    "start-override-restart.docx": "00d5a7e5d691662c597f023d491b903fba6cdd3b9ef2e6f1844ecddaa791cd07",
+    "style-tied-deeper-level.docx": "73f18d5ea4c000816683ea221ec26d49664f6119af4def1308ff3c79f34adf33",
+    "style-tied-level-zero.docx": "11653d3f9bc4b19e5deac3399388b666050afa5c12e47424e37a13ae1ed8fece",
+    "two-definitions.docx": "a1c97b8fdf82d03e15f35ec89a2a88a129f35035c6af7088b64ae1ad73c68627"
+  },
   "stories": {},
   "text": {
     "ancestor-never-counted.docx": [
@@ -3720,5 +4116,6 @@
       "item 2",
       "item 3"
     ]
-  }
+  },
+  "verifier": "word-verifier/1.0.1"
 }

@@ -1,5 +1,28 @@
 {
   "application": "Microsoft Word 16.113.3 (macOS)",
+  "at": {
+    "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": [],
+    "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx": [],
+    "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx": [],
+    "qrd-product-information-template-version-104_en.docx": [
+      293,
+      300,
+      311,
+      316,
+      317,
+      321,
+      323,
+      581,
+      582,
+      584,
+      588,
+      589,
+      590,
+      591,
+      681,
+      682
+    ]
+  },
   "drawn": {
     "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": [],
     "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx": [],
@@ -4141,7 +4164,7 @@
       null
     ]
   },
-  "method": "list labels: convert numbers to text, what each list item gained; fonts: the font Word gave each label, from its copy saved after; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text",
+  "method": "list labels: convert numbers to text, what each list item gained; fonts and at: the font Word gave each label and its body paragraph, from its copy saved after; sha256: the bytes each file's answers are for; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text",
   "notes": {},
   "prints": {
     "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": true,
@@ -4150,6 +4173,12 @@
     "qrd-product-information-template-version-104_en.docx": true
   },
   "recorded": "2026-10-03",
+  "sha256": {
+    "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": "13031dfae722bfe2479cb9323be96adfe18941da1c489731ea805082e5f886b3",
+    "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx": "68a8026e6d99f22f9a380edf04df34bb5f29f35574f9e507fb4b5d5f16e996ae",
+    "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx": "10aed02c52b69740041841d09a3fca2239bc9839eb3317bc1c1dd732532a9215",
+    "qrd-product-information-template-version-104_en.docx": "6c9da03b2c72f055c81dc14f12c82da61a1609e7beffcc71f95e8046d7104fd1"
+  },
   "stories": {
     "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": {
       "comments": [],
@@ -5033,5 +5062,6 @@
       "<------------------------------------------------------------------------------------------------------------------------>",
       "<The following information is intended for healthcare professionals only:>"
     ]
-  }
+  },
+  "verifier": "word-verifier/1.0.1"
 }
