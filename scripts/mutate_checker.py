@@ -79,7 +79,6 @@ _LEDGER = (
     "the counts follow from the sequences, which are equal by then: the ledger is a second "
     "statement of the same fact, stated in the certificate"
 )
-_NOTE = "a marker's label is compared only with 'page'; any other is a note mark"
 _ROW_GROUP = (
     "a row group is always met beside a table or a row, which end the paragraph; text directly "
     "in one is refused by the reader"
@@ -140,7 +139,6 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
     ),
     # After a paragraph, and after run content.
     ("_run_tokens.walk", "continue", "statement", 0): _WALK_AGAIN,
-    ("_run_tokens.walk", "continue", "statement", 2): _WALK_AGAIN,
     (
         "_run_tokens.walk",
         'gone = dropped or (child.tag in dropping and element.tag != _w("rPr"))',
@@ -175,7 +173,6 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
     ("_Story.token", _SYMBOL_COUNT, "bool", 0): (
         "the Symbol table maps one character to one, so the two are the same length"
     ),
-    ("_Story.run", 'self.mark("note", (kind, self.story[1]))', "str:'note'", 0): _NOTE,
     ("_Story.flush_run", "return", "statement", 0): (
         "an empty run then adds an empty segment, or no hidden characters: nothing either way"
     ),
