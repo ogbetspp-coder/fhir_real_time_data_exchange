@@ -651,7 +651,14 @@ def fingerprint(root: Path = ROOT) -> str:
 
 def held_sha256(root: Path = ROOT) -> str:
     """SHA-256 of the check's tests and all they run on (the package, their helpers, corpus)."""
-    helpers = ["tests/test_reader.py", "scripts/fuzz_docx.py", "scripts/lock.py", "src"]
+    helpers = [
+        "tests/test_reader.py",
+        "scripts/fuzz_docx.py",
+        "scripts/lock.py",
+        "scripts/numbering_cases.py",
+        "pyproject.toml",
+        "src",
+    ]
     return _digest(root, [*TESTS, *helpers, "corpus", "tests/data"])
 
 

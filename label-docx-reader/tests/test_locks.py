@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 import os
 
+import pytest
+
+import lock
 from lock import CORPUS, VERSIONS, base, current_versions, expected, released, released_problems
 
 
@@ -46,3 +49,16 @@ def test_a_changed_or_dropped_released_entry_is_refused() -> None:
     (problem,) = released_problems(dropped, [("0" * 40, lock)])
     assert problem.startswith(f"reader {version} was released")
     assert released_problems(lock, [("0" * 40, lock)]) == []
+
+
+def test_each_version_is_tied_to_every_file_that_decides_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The ePI reader builds the reader's marks, numbering and paragraphs; the format is decided
+    # by documents too, which says which reader reads the bytes.
+    monkeypatch.setattr(lock, "_sha256", lambda *paths: ",".join(sorted(p.name for p in paths)))
+    files = {name: digest for name, (_, digest) in lock.current_versions().items()}
+    assert files["reader"] == "reader.py"
+    assert files["epi-reader"] == "epi.py,reader.py"
+    assert files["format"] == "certify.py,documents.py,output.py"
+    assert files["epi-format"] == "certify.py,documents.py,epi_output.py,output.py"
