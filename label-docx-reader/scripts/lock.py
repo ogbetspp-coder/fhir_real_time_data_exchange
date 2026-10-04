@@ -6,7 +6,8 @@
 ``versions.lock.json`` records, for every version of the reader and the output format, the
 SHA-256 of the source file that decides it. A change to the file leaves the current version
 locked to other code; ``tests/test_locks.py`` refuses that until the version is bumped. A version
-already in the lock is never re-locked to other code: bump it instead.
+already in the lock is never re-locked to other code: bump it instead. A version in any lock in
+main's first-parent history (in CI, LOCK_BASE's) is released, and is never changed or dropped.
 
 ``corpus/*/expected.json`` records, for every .docx and ePI in the corpus, its SHA-256 and the
 SHA-256 of the whole result served for it (``resultSha256``: everything but the source and the
@@ -25,6 +26,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -77,6 +80,57 @@ def locked_versions(lock: Lock) -> Lock:
             raise SystemExit(f"{name} {version} is locked to other code: bump the version")
         entries[version] = digest
     return out
+
+
+def _git(*arguments: str) -> str | None:
+    """A git command's output in this package's folder, or None when it fails."""
+    try:
+        return subprocess.run(
+            ["git", "-C", str(ROOT), *arguments],
+            check=True,
+            capture_output=True,
+            text=True,
+            stdin=subprocess.DEVNULL,
+        ).stdout.strip()
+    except OSError, subprocess.CalledProcessError:
+        return None
+
+
+def base() -> str:
+    """The commit whose history is released: LOCK_BASE in CI (scripts/ci/lock-base.sh at the
+    repository's root), else origin/main."""
+    return os.environ.get("LOCK_BASE", "origin/main")
+
+
+def released(base: str) -> list[tuple[str, Lock]] | None:
+    """Every version lock in the first-parent history of ``base``, with its commit; None without
+    that history.
+
+    Reading the whole history means neither a second push nor a hand edit of the lock can change
+    a released entry and pass: ``locked_versions`` refuses to re-lock a version, but a lock edited
+    by hand never goes through it.
+    """
+    commit = _git("rev-parse", "--verify", f"{base}^{{commit}}")
+    if commit is None:
+        return None
+    history = _git("log", "--first-parent", "--format=%H", commit, "--", VERSIONS.name) or ""
+    out: list[tuple[str, Lock]] = []
+    for each in filter(None, history.split("\n")):
+        text = _git("show", f"{each}:./{VERSIONS.name}")
+        if text is not None:  # the commit that deleted the lock, if any
+            out.append((each, json.loads(text)))
+    return out
+
+
+def released_problems(lock: Lock, history: list[tuple[str, Lock]]) -> list[str]:
+    """Every released entry ``lock`` no longer holds unchanged."""
+    return [
+        f"{name} {version} was released ({commit}): bump the version"
+        for commit, old in history
+        for name, entries in old.items()
+        for version, digest in entries.items()
+        if lock.get(name, {}).get(version) != digest
+    ]
 
 
 # A corpus set's own records, beside its documents.
@@ -186,10 +240,15 @@ def main() -> int:
         wanted[folder / "expected.json"] = _json(expected(folder))
     wanted[GENERATED] = _json(generated())
     stale = [p for p, text in wanted.items() if not p.exists() or p.read_text("utf-8") != text]
+    changed = released_problems(lock, released(base()) or [])
     if args.check:
         for path in stale:
             sys.stderr.write(f"out of date: {path.relative_to(ROOT)}\n")
-        return 1 if stale else 0
+        for problem in changed:
+            sys.stderr.write(f"{problem}\n")
+        return 1 if stale or changed else 0
+    if changed:
+        raise SystemExit("\n".join(changed))
     for path in stale:
         path.write_text(wanted[path], "utf-8")
         sys.stdout.write(f"wrote {path.relative_to(ROOT)}\n")

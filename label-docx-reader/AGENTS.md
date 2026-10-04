@@ -32,7 +32,7 @@ an EMA ePI) or refuse. Every rule below serves that.
   `certify.py` to `label-docx-json`; `epi.py` to the ePI reader; `epi_output.py`, `output.py`,
   `documents.py` and `certify.py` to `label-epi-json`. Bump every version whose files changed,
   run `scripts/lock.py` and review the diff of `corpus/*/expected.json`. Never re-lock a version
-  to other code.
+  to other code; a version in any lock on main (released) is never changed or dropped.
 - **Public or synthetic documents only** in `corpus/` and in tests, each set with a
   `sources.json`. No client or confidential labels in the repository.
 - **Tests never print label text.** A failure names a file, a code or a digest.

@@ -33,6 +33,8 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
+          # The version lock's check reads main's history as released (LOCK_BASE below).
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -58,6 +60,12 @@ jobs:
 
       - name: Type-check
         run: uv run --frozen mypy --strict
+
+      # The commit whose history is released: the commit before a push, main otherwise.
+      - name: Name the lock's base
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: bash ../scripts/ci/lock-base.sh
 
       - name: Locks
         run: uv run --frozen python scripts/lock.py --check
