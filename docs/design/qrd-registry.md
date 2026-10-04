@@ -47,9 +47,12 @@ new version, and adopting it is a reviewed change: new bytes, new lock entry, re
 
 ## The reader
 
-`zone-a/src/zone_a/docx/reader.py` reads the text of a Word body and refuses a document whose
-text it cannot produce exactly. It is the first component of the engine and is written to the
-same rule as the fidelity check: false refusals are acceptable, silent changes are not. Its
+The label reader (`label-docx-reader/src/label_docx/reader.py`) reads the text of a Word body
+and refuses a document whose text it cannot produce exactly. The registry takes only its
+certified read (`label_docx.output.read`, through `zone-a/src/zone_a/certified.py`): the reader's
+independent check accounts for every character, a result it cannot account for is refused
+(`uncertified`), and a document with tracked changes, which reads to two texts, is refused. It
+is the first component of the engine and is written to the same rule as the fidelity check: false refusals are acceptable, silent changes are not. Its
 module docstring lists every rule and every refusal. What the EMA files and the review forced:
 
 1. **Symbol-font glyphs.** Appendix II writes the "≥" of "Very common (≥ 1/10)" as
@@ -72,8 +75,9 @@ module docstring lists every rule and every refusal. What the EMA files and the 
    fifth) are reported as marks on the exact characters (`Paragraph.marks`), because `text`
    alone flattens "10" with a superscript "9" to "109". A caller that uses `text` must look at
    the marks. So is underline of any style (`docx-reader/1.1.0`), since an underlined "<" is
-   how "≤" is often typed. Other appearance (colour, size, bold, italic) is not reported. A
-   picture is U+FFFC OBJECT REPLACEMENT CHARACTER where it stands: the black triangle of the
+   how "≤" is often typed. Bold and italic are marked too (the label reader's
+   `docx-reader/1.25.0`; registry 1.1.0 lets them through, as they draw the same characters);
+   other appearance (colour, size) is not reported. A picture is U+FFFC OBJECT REPLACEMENT CHARACTER where it stands: the black triangle of the
    additional-monitoring statement is a picture in the template; a U+FFFC typed as text is
    refused.
 3. **Fields.** A field keeps its stored result and drops its instruction, however deeply

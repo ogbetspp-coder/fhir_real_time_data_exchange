@@ -1,13 +1,15 @@
 [project]
 name = "zone-a"
 version = "0.1.0"
-description = "Zone A: contract models, cross-language canonical-hash parity and the fidelity check against the golden vectors; the Word and ePI readers, the QRD template registry and the QRD conformance check"
+description = "Zone A: contract models, cross-language canonical-hash parity and the fidelity check against the golden vectors; the QRD template registry and the QRD conformance check, over labels read by the label reader"
 readme = "README.md"
 # ADR 0003 pins the Unicode Character Database, not just the language version: NFC output
 # depends on it. 3.14.x ships Unicode 16.0.0, the same version as the Zone B runtime image
 # (node:22.22.0, ICU 77.1). A different minor Python is a different UCD, so the range is closed.
 requires-python = ">=3.14,<3.15"
-dependencies = ["pydantic==2.13.5"]
+# label-docx is the label reader in this repository (label-docx-reader/, no runtime dependencies of
+# its own), read from its source tree: zone-a's reads of a .docx and an ePI are its certified ones.
+dependencies = ["label-docx", "pydantic==2.13.5"]
 
 [dependency-groups]
 dev = [
@@ -38,6 +40,9 @@ build-constraint-dependencies = [
   "tomlkit==0.15.1",
   "trove-classifiers==2026.9.21.13",
 ]
+
+[tool.uv.sources]
+label-docx = { path = "../label-docx-reader", editable = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/zone_a"]
@@ -110,6 +115,13 @@ files = ["src", "tests", "scripts"]
 mypy_path = "src"
 warn_unreachable = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+
+[[tool.mypy.overrides]]
+# The label reader (label-docx-reader/) is typed and passes mypy --strict on its own, but ships no
+# py.typed marker: adding one changes its source tree, which its mutation record hashes whole
+# (scripts/mutate_checker.py). Follow its imports as typed instead.
+module = ["label_docx", "label_docx.*"]
+follow_untyped_imports = true
 
 [[tool.mypy.overrides]]
 # Generated code: checked, but datamodel-code-generator emits no docstrings for fields and

@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from label_docx.reader import Mark, Numbering, Paragraph
 
-from zone_a.docx.reader import Mark, Numbering, Paragraph
 from zone_a.qrd.headings import HeadingPatternError, forms, index, match_heading
 from zone_a.qrd.pattern import UnbalancedTemplateError, parse, render
 from zone_a.qrd.registry import (

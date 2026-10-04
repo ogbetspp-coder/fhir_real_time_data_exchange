@@ -149,14 +149,18 @@
   "style": "font-weight: bold",
   "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"font-weight: bold\">9</span> C, not for clinical use.</p></div>",
   "reader": "read",
-  "marks": []
+  "marks": [
+   "bold"
+  ]
  },
  {
   "element": "span",
   "style": "font-style: italic",
   "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"font-style: italic\">9</span> C, not for clinical use.</p></div>",
   "reader": "read",
-  "marks": []
+  "marks": [
+   "italic"
+  ]
  },
  {
   "element": "span",
@@ -207,10 +211,7 @@
   "element": "span",
   "style": "vertical-align: top",
   "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"vertical-align: top\">9</span> C, not for clinical use.</p></div>",
-  "reader": "read",
-  "marks": [],
-  "t": "refused:css-value",
-  "why": "T takes baseline, super, sub or a length on inline text (T4); the reader also takes top, middle and bottom as layout"
+  "reader": "refused:unsupported-style"
  },
  {
   "element": "span",
@@ -395,9 +396,7 @@
   "style": "background: black; background: none",
   "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"background: black; background: none\">9</span> C, not for clinical use.</p></div>",
   "reader": "read",
-  "marks": [
-   "shading-black"
-  ],
+  "marks": [],
   "t": "refused:css-value",
   "why": "T takes only a colour as a background (T3a); the reader takes the shorthand's none, which a browser reads as no background (a colour keyword a browser drops refuses in both)"
  },
@@ -449,7 +448,7 @@
    "underline"
   ],
   "t": "refused:css-property",
-  "why": "T takes borders, widths and heights on table parts only (T3); the reader marks a hairline border on inline text as an underline or a border, and takes a block's border and a width as layout"
+  "why": "T takes borders, widths and heights on table parts only (T3); the reader marks a hairline border on inline text as an underline or a border, and takes a block's border as layout"
  },
  {
   "element": "span",
@@ -460,7 +459,7 @@
    "border"
   ],
   "t": "refused:css-property",
-  "why": "T takes borders, widths and heights on table parts only (T3); the reader marks a hairline border on inline text as an underline or a border, and takes a block's border and a width as layout"
+  "why": "T takes borders, widths and heights on table parts only (T3); the reader marks a hairline border on inline text as an underline or a border, and takes a block's border as layout"
  },
  {
   "element": "span",
@@ -518,10 +517,7 @@
   "element": "span",
   "style": "width: 10pt",
   "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"width: 10pt\">9</span> C, not for clinical use.</p></div>",
-  "reader": "read",
-  "marks": [],
-  "t": "refused:css-property",
-  "why": "T takes borders, widths and heights on table parts only (T3); the reader marks a hairline border on inline text as an underline or a border, and takes a block's border and a width as layout"
+  "reader": "refused:unsupported-style"
  },
  {
   "element": "p",
@@ -595,10 +591,7 @@
   "element": "p",
   "style": "width: 100pt",
   "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"width: 100pt\">Store at 9 C, not for clinical use.</p></div>",
-  "reader": "read",
-  "marks": [],
-  "t": "refused:css-property",
-  "why": "T takes borders, widths and heights on table parts only (T3); the reader marks a hairline border on inline text as an underline or a border, and takes a block's border and a width as layout"
+  "reader": "refused:unsupported-style"
  },
  {
   "element": "p",
@@ -628,7 +621,7 @@
   "reader": "read",
   "marks": [],
   "t": "refused:css-property",
-  "why": "T takes borders, widths and heights on table parts only (T3); the reader marks a hairline border on inline text as an underline or a border, and takes a block's border and a width as layout"
+  "why": "T takes borders, widths and heights on table parts only (T3); the reader marks a hairline border on inline text as an underline or a border, and takes a block's border as layout"
  },
  {
   "element": "p",

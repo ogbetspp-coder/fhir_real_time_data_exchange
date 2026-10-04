@@ -1,14 +1,18 @@
 {
   "docx-reader": {
-    "docx-reader/1.1.0": "fe8d2711b071d26ad210f9541ffa1d11ea13b49401f38d7ce77040f30d7cc572"
+    "docx-reader/1.1.0": "fe8d2711b071d26ad210f9541ffa1d11ea13b49401f38d7ce77040f30d7cc572",
+    "docx-reader/1.25.0": "f1bd44ec1759c6ee39e6c807258df528e7ed68e5b5d0a3a89c6976faa37edce8"
   },
   "epi-reader": {
-    "epi-reader/1.2.0": "740fee73e944f988373ed5823b136670ca85f5540c7b87c7f95dc39a9bfbfa45"
+    "epi-reader/1.2.0": "740fee73e944f988373ed5823b136670ca85f5540c7b87c7f95dc39a9bfbfa45",
+    "epi-reader/1.3.0": "8472b97178b5c8315f87f090828b158cf294a73025d3e6ef351e18b6f5c6a3e6"
   },
   "qrd-check": {
-    "qrd-check/1.2.0": "731151adfff83d6948e3269d090099b214af594e8ffee153a7621acf4fe920b2"
+    "qrd-check/1.2.0": "731151adfff83d6948e3269d090099b214af594e8ffee153a7621acf4fe920b2",
+    "qrd-check/1.3.0": "739a42528d6620118a42471714358d5c9451350adc7bb77dc259e38eefb44542"
   },
   "qrd-registry": {
-    "1.0.0": "fa7df5a8d2c5a3900eb6b34c0cd3071f67d51af25182e68da29b44e7a23c32e7"
+    "1.0.0": "fa7df5a8d2c5a3900eb6b34c0cd3071f67d51af25182e68da29b44e7a23c32e7",
+    "1.1.0": "2c0ed48822405ec23cdfa0a4e4bfa0522d567e4c4497811860c1a6141ed125ba"
   }
 }

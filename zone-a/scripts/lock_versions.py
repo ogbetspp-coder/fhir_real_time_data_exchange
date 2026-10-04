@@ -41,25 +41,21 @@ class Component(NamedTuple):
 
 # The files each version covers: the component's own module and every module of this package it
 # reads with (zone_a.underline and zone_a.fidelity.normalize decide which characters count).
+# The readers are the label reader's (label-docx-reader/), each tied to the file its own lock
+# ties its version to (label-docx-reader/scripts/lock.py), so a change it versions there is
+# versioned here. Its certified JSON (output.py, epi_output.py, certify.py) is versioned there as
+# label-docx-json and label-epi-json; zone_a.certified, which rebuilds the values the registry and
+# the check read from it, is theirs.
+_LABEL_DOCX = "../label-docx-reader/src/label_docx"
 COMPONENTS: dict[str, Component] = {
-    "docx-reader": Component(
-        "zone_a.docx.reader", "READER_VERSION", ("src/zone_a/docx/reader.py",)
-    ),
-    "epi-reader": Component(
-        "zone_a.epi.reader",
-        "READER_VERSION",
-        (
-            "src/zone_a/epi/reader.py",
-            # Its Paragraph, Mark and Numbering model.
-            "src/zone_a/docx/reader.py",
-            "src/zone_a/fidelity/normalize.py",
-        ),
-    ),
+    "docx-reader": Component("label_docx.reader", "READER_VERSION", (f"{_LABEL_DOCX}/reader.py",)),
+    "epi-reader": Component("label_docx.epi", "READER_VERSION", (f"{_LABEL_DOCX}/epi.py",)),
     "qrd-registry": Component(
         "zone_a.qrd.registry",
         "REGISTRY_VERSION",
         (
             "src/zone_a/qrd/registry.py",
+            "src/zone_a/certified.py",
             "src/zone_a/qrd/pattern.py",
             "src/zone_a/underline.py",
             "src/zone_a/fidelity/normalize.py",
@@ -70,6 +66,7 @@ COMPONENTS: dict[str, Component] = {
         "CHECKER_VERSION",
         (
             "src/zone_a/qrd/check.py",
+            "src/zone_a/certified.py",
             "src/zone_a/qrd/headings.py",
             "src/zone_a/qrd/pattern.py",
             "src/zone_a/underline.py",

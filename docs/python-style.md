@@ -33,7 +33,7 @@ power features such as metaclasses or import hacks (§2.19), comprehensions with
 - **Line length 100, not 80** (§3.2). The code is dense with regular expressions and Unicode
   tables, and the whole repository, TypeScript included, is formatted at 100. Changing it
   reflows every file and proves nothing.
-- **Names imported from modules** (`from zone_a.epi.reader import read_div`), not only modules
+- **Names imported from modules** (`from label_docx.epi import read_div`), not only modules
   (§2.2). The guide's rule prevents name clashes in a large shared codebase; here every package
   is small, mypy resolves each name, and ruff's `F811` refuses a redefinition.
 - **ruff and mypy instead of pylint** (§2.1). ruff implements the pylint checks we enable, and

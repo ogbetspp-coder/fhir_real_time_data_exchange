@@ -3,10 +3,10 @@
     uv run --frozen python scripts/check_labels.py          # write
     uv run --frozen python scripts/check_labels.py --check  # fail on drift
 
-Each pinned file in labels/ema-epi/sources/ is read with zone_a.epi.reader and checked with
-zone_a.qrd.check against the QRD registry and the SmPC mapping; the result is written to
-labels/ema-epi/checks/<file>. See docs/design/qrd-conformance-check.md.
-tests/test_qrd_check.py runs the same comparison as --check.
+Each pinned file in labels/ema-epi/sources/ is read with zone_a.certified (the label reader's
+certified ePI read) and checked with zone_a.qrd.check against the QRD registry and the SmPC
+mapping; the result is written to labels/ema-epi/checks/<file>. See
+docs/design/qrd-conformance-check.md. tests/test_qrd_check.py runs the same comparison as --check.
 """
 
 from __future__ import annotations
