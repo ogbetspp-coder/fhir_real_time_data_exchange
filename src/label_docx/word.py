@@ -74,7 +74,7 @@ from label_docx.reader import (
 WORD = Path("/Applications/Microsoft Word.app")
 # What Word is asked and how its answers are judged: a change to this file changes it
 # (``scripts/lock.py``). A kept verdict or recorded answer of another version is not reused.
-VERIFIER = "word-verifier/1.0.3"
+VERIFIER = "word-verifier/1.0.4"
 
 
 class WordError(Exception):
@@ -377,7 +377,9 @@ def _run_alone(command: list[str], script: str) -> subprocess.CompletedProcess[s
     # Word's scripts find the document by its name: one of that name already open would be the
     # one asked about.
     name = Path(command[2]).name
-    for attempt in (1, 2):
+    # Word answers a question now and then with an error while it closes the last document:
+    # asked again; a count of documents of that name, though, is final.
+    for attempt in (1, 2, 3):
         try:
             opened = subprocess.run(
                 ["osascript", "-", name],
@@ -390,11 +392,15 @@ def _run_alone(command: list[str], script: str) -> subprocess.CompletedProcess[s
             )
         except subprocess.TimeoutExpired as hung:
             raise SystemExit("Word did not answer within 2 minutes") from hung
-        if attempt == 2 or not _quit(opened):
+        if opened.returncode == 0 or attempt == 3:
             break
-        _restart()
+        if _quit(opened):
+            _restart()
+        else:
+            time.sleep(2)
     if opened.returncode != 0 or opened.stdout.strip() != "0":
-        raise SystemExit(f"a document named {name} may be open in Word ({opened.stdout.strip()})")
+        answer = opened.stdout.strip() or opened.stderr.strip()
+        raise SystemExit(f"a document named {name} may be open in Word ({answer})")
     for attempt in (1, 2, 3):
         try:
             done = subprocess.run(
