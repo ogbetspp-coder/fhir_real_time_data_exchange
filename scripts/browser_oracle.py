@@ -25,7 +25,9 @@ thresholds are definitions; the facts they are applied to are the browser's.
 
 ``record`` writes ``browser.json`` for a corpus set: for each document and each section (in the
 order ``walk`` gives), a SHA-256 of the browser's lines and of their marks, which
-``tests/test_browser_oracle.py`` holds the reader to without a browser. ``compare`` prints the
+``tests/test_browser_oracle.py`` holds the reader to without a browser; with them, the SHA-256
+of each document's bytes and the version of the code that asked and judged (``VERIFIER``), so
+answers for other bytes or older rules do not count. ``compare`` prints the
 verdict for any files and writes nothing, never the text itself.
 
 Each list item's marker ("1.", "\u2022"...) is read from Chrome's accessibility tree, the
@@ -38,6 +40,7 @@ from __future__ import annotations
 import argparse
 import collections
 import datetime
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -45,6 +48,7 @@ from typing import Any
 
 from label_docx import epi
 from label_docx.browser import (
+    VERIFIER,
     browser_lines,
     browser_markers,
     browser_sections,
@@ -129,6 +133,7 @@ def main() -> int:
         else args.files
     )
     answers: dict[str, list[dict[str, str] | None]] = {}
+    digests_of_files = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}
     differs = False
     for path in paths:
         try:
@@ -154,6 +159,8 @@ def main() -> int:
             ),
             "recorded": datetime.date.today().isoformat(),
             "sections": answers,
+            "sha256": digests_of_files,
+            "verifier": VERIFIER,
         }
         target = args.folder / "browser.json"
         target.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", "utf-8")
