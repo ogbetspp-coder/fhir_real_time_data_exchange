@@ -26,6 +26,8 @@ from pathlib import Path
 
 import pytest
 
+from label_docx.store import Ingested
+
 TESTS = Path(__file__).resolve().parent
 
 FORBIDDEN_CALLS = {"print", "breakpoint", "pprint", "pp"}
@@ -176,3 +178,11 @@ def test_every_way_to_print_is_caught(source: str) -> None:
 )
 def test_streams_of_other_objects_and_other_descriptors_are_allowed(source: str) -> None:
     assert _violations(source) == [], source
+
+
+def test_an_ingested_documents_repr_holds_no_result() -> None:
+    # pytest prints the object an attribute is taken from: `assert ingested.read` must not print
+    # the label.
+    ingested = Ingested("d", b"receipt", b"Take 5 mg", read=True, created=True)
+    shown = repr(ingested)
+    assert ("Take" in shown, "receipt" in shown) == (False, True)

@@ -42,7 +42,7 @@ import re
 import sys
 import tempfile
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -62,7 +62,8 @@ class Ingested:
 
     document: str
     receipt: bytes
-    result: bytes
+    # The label's text: never in a repr, which a failing test or a traceback would print.
+    result: bytes = field(repr=False)
     read: bool
     created: bool
     # The application's verdict on the read (canonical JSON), or None where none was asked.
