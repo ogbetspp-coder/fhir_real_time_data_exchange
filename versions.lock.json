@@ -1,6 +1,7 @@
 {
   "browser-verifier": {
-    "browser-verifier/1.0.0": "a7ef42467460483b111204f7b02b9b162ebb7a77c101407c3277b6f1e79ed259"
+    "browser-verifier/1.0.0": "a7ef42467460483b111204f7b02b9b162ebb7a77c101407c3277b6f1e79ed259",
+    "browser-verifier/1.0.1": "06cc1778561daf6318517e58679d2944b8a98f2af30c734ba897e6be792b73e3"
   },
   "epi-format": {
     "label-epi-json/1.0.0": "04a1a22d95b7570feebe380292650de5983c44f4e6da7d0616d234ca68a891f6",
