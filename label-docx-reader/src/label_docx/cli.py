@@ -1,24 +1,35 @@
 """``label-docx FILE``: read a .docx (or an ePI Bundle, JSON) and write its canonical JSON.
 
 Exit status 0 when the document was read, 2 when it was refused (the JSON names the code and the
-detail), 1 when the file could not be opened. The output is written to ``--output`` or to
-standard output, as bytes, so no platform newline or encoding translation touches it. A refusal's
-detail names elements, fonts and codes, never the document's text.
+detail), 3 when it was read in part (an ePI with sections, or a .docx with headers, footers or
+comments, refused on their own: the JSON says which and why), 1 when the file could not be
+opened. ``label-docx-service ingest`` exits the same way: 2 if any file was refused, else 3 if
+any was read in part. The output is written to ``--output`` or to standard output, as bytes, so
+no platform newline or encoding translation touches it. A refusal's detail names elements, fonts
+and codes, never the document's text.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
 from label_docx.documents import kind
+from label_docx.store import outcome
+
+# The exit status for each outcome (``store.outcome``).
+_EXIT = {"read": 0, "refused": 2, "read-in-part": 3}
+_STATUSES = "exit status: 0 read, 1 error, 2 refused, 3 read in part"
 
 
 def main(argv: list[str] | None = None) -> int:
     """Run the command line; the return value is the exit status."""
     parser = argparse.ArgumentParser(
-        prog="label-docx", description="Read a .docx or an ePI Bundle and write its canonical JSON."
+        prog="label-docx",
+        description="Read a .docx or an ePI Bundle and write its canonical JSON.",
+        epilog=_STATUSES,
     )
     parser.add_argument("file", type=Path, help="the .docx or ePI Bundle (JSON) to read")
     parser.add_argument("-o", "--output", type=Path, help="write here instead of standard output")
@@ -28,13 +39,13 @@ def main(argv: list[str] | None = None) -> int:
     except OSError as error:
         sys.stderr.write(f"label-docx: cannot read {args.file}: {error.strerror}\n")
         return 1
-    result, ok = kind(data).read(data)
+    result, _ = kind(data).read(data)
     if args.output is None:
         sys.stdout.buffer.write(result)
         sys.stdout.buffer.flush()
     else:
         args.output.write_bytes(result)
-    return 0 if ok else 2
+    return _EXIT[outcome(json.loads(result))]
 
 
 def service_main(argv: list[str] | None = None) -> int:
@@ -63,7 +74,9 @@ def service_main(argv: list[str] | None = None) -> int:
             "no read Chrome has not checked (require), never (off)"
         ),
     )
-    ingesting = commands.add_parser("ingest", help="ingest files; print one receipt each")
+    ingesting = commands.add_parser(
+        "ingest", help="ingest files; print one receipt each", epilog=_STATUSES
+    )
     ingesting.add_argument("--store", type=Path, required=True)
     ingesting.add_argument("--browser", choices=("auto", "on", "require", "off"), default="auto")
     for command in (serving, ingesting):
@@ -112,13 +125,14 @@ def service_main(argv: list[str] | None = None) -> int:
         verified = len(documents) - len(failures)
         sys.stdout.write(f"{verified} of {len(documents)} documents verified\n")
         return 1 if failures else 0
-    refused = False
+    outcomes: set[str] = set()
     for path in args.files:
         ingested = store.ingest(path.read_bytes())
-        refused = refused or not ingested.read
+        outcomes.add(json.loads(ingested.receipt)["outcome"])
         sys.stdout.buffer.write(ingested.receipt)
     sys.stdout.buffer.flush()
-    return 2 if refused else 0
+    # A refusal before a read in part, before a read.
+    return next((_EXIT[o] for o in ("refused", "read-in-part") if o in outcomes), 0)
 
 
 def _verified(job: tuple[Path, str]) -> str | None:

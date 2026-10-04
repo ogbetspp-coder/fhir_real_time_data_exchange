@@ -2598,6 +2598,7 @@ def test_a_locked_page_field_is_refused() -> None:
         ("\ufeff", "format-character"),
         ("\u00ad", "format-character"),  # Word writes a soft hyphen as w:softHyphen
         ("\u0085", "format-character"),  # a C1 control
+        ("\u007f", "format-character"),  # DEL: a control (Cc), neither C0 nor C1
         ("\ufe0f", "format-character"),  # a variation selector: default-ignorable
         ("\U000e0041", "format-character"),
         ("\u0378", "unassigned-character"),
@@ -2707,8 +2708,8 @@ _PLACEHOLDER = (
 def test_an_empty_content_control_with_a_placeholder_part_is_refused(body: str) -> None:
     # Word shows the placeholder's building block, which the reader does not read.
     assert refusal(body) == "unsupported-element"
-    # With no placeholder part Word shows nothing there, as the reader reads it.
-    plain = body.replace(_PLACEHOLDER, "<w:sdtPr><w:showingPlcHdr/></w:sdtPr>")
+    # With no placeholder part, and not showing one, Word shows nothing there, as read.
+    plain = body.replace(_PLACEHOLDER, "<w:sdtPr/>")
     assert "".join(text_of(plain)) in ("Strength: ", "a", "after")
 
 

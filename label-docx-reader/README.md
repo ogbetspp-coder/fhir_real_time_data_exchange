@@ -30,11 +30,16 @@ normalises or repairs.
 ## Use
 
 ```bash
-uv run --frozen label-docx label.docx       # JSON on stdout; exit 0 read, 2 refused, 1 unreadable
+uv run --frozen label-docx label.docx       # JSON on stdout
 uv run --frozen label-docx-service serve --store DIR          # http://127.0.0.1:8080, demo page at /
 uv run --frozen label-docx-service ingest --store DIR FILE... # the same, without HTTP
 uv run --frozen label-docx-service verify --store DIR         # re-read every kept document, compare
 ```
+
+`label-docx` and `ingest` exit 0 when read, 1 on an error (a file that cannot be opened), 2 when
+refused, and 3 when read in part (an ePI with sections, or a .docx with headers, footers or
+comments, the reader refused on their own; the receipt's outcome `read-in-part`). `ingest` exits
+2 if any file was refused, else 3 if any was read in part.
 
 ```python
 from label_docx import read  # canonical JSON bytes, and whether it was read
