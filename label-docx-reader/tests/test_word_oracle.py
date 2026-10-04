@@ -325,6 +325,11 @@ def test_a_paragraph_partly_so_that_word_finds_wholly_so_is_a_difference(tmp_pat
     assert emphasis_verdict({"0": [True, False, False, False]}, path).startswith(
         "differs at paragraph 1: Word bold True"
     )
+    # Word leaves white space out: letters all bold, a space before them not, is bold to it.
+    spaced = r('<w:t xml:space="preserve"> </w:t>') + r("<w:rPr><w:b/></w:rPr><w:t>Hello</w:t>")
+    path.write_bytes(docx(p(spaced)))
+    assert emphasis_verdict({"0": [True, False, False, False]}, path) == "agrees"
+    assert emphasis_verdict({"0": [False] * 4}, path).startswith("differs at paragraph 1")
 
 
 def test_which_headers_are_shown_is_held_both_ways_to_words_page_setup(tmp_path: Path) -> None:

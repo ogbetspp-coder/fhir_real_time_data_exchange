@@ -24,9 +24,9 @@ What Word is asked, each by a script on a copy of the document:
 - **Print:** the whole text as shown and after saving as PDF, page numbers aside: any field that
   Word reprints differently is caught.
 - **Emphasis:** whether each body paragraph is bold, italic, in capitals and struck through,
-  over the text it shows (between its own fields, and each field's result). Word answers false
-  for a paragraph that is partly so, so where the reader finds it partly so only Word's true is
-  a difference. Paragraphs with a note reference or a page number, and those a hidden
+  over the text it shows (between its own fields, and each field's result), its white space's
+  formatting aside. Word answers false for a paragraph that is partly so, so where the reader
+  finds it partly so only Word's true is a difference. Paragraphs with a note reference or a page number, and those a hidden
   paragraph mark joins, are not held (Word's answer would count the mark or the number).
 - **Headers, footers and comments:** each section's by type, and each comment's author and text.
 - **Tracked changes:** Word's own Accept All and Reject All files (``word_views``).
@@ -1055,12 +1055,16 @@ def emphasis_verdict(word: dict[str, list[bool]], path: Path) -> str:
         if answer is None:
             # Word measures every paragraph with text: one it did not is not judged as agreeing.
             return f"differs at paragraph {index + 1}: Word measured no emphasis there"
+        # Word's answer for a range leaves out how its white space is formatted: a paragraph
+        # whose letters are all bold is bold to it, with a space before them that is not.
+        letters = [at for at, character in enumerate(paragraph.text) if not character.isspace()]
         for kind, shown in zip(TOGGLES, answer, strict=True):
             covered = [m for m in paragraph.marks if m.kind == kind]
-            whole = any(m.start == 0 and m.end == len(paragraph.text) for m in covered)
+            inside = [any(m.start <= at < m.end for m in covered) for at in letters]
+            whole = all(inside)
             # Word's false is "not wholly so", which a part covered is; its true is "wholly so",
             # which no reading of a part covered is.
-            if whole != shown and (whole or shown or not covered):
+            if whole != shown and (whole or shown or not any(inside)):
                 return f"differs at paragraph {index + 1}: Word {kind} {shown}, reader {whole}"
     return "agrees"
 

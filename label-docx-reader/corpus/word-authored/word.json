@@ -160,7 +160,7 @@
     "table-of-contents-stale.docx": true,
     "table-of-contents.docx": true
   },
-  "recorded": "2026-10-03",
+  "recorded": "2026-10-04",
   "sha256": {
     "table-of-contents-stale.docx": "46415f5c5f5441fe1a614797a67c71cdc46bca7fd5410e7ae67c2176ecb9ba48",
     "table-of-contents.docx": "d819dcff034ab633389ddb759dccc1b952c6e40874bd15f4fa5b5d70101db395"
@@ -190,5 +190,5 @@
       "Store below 25 C."
     ]
   },
-  "verifier": "word-verifier/1.0.4"
+  "verifier": "word-verifier/1.0.5"
 }
