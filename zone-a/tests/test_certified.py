@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import label_docx.epi_output
 import label_docx.output
 import pytest
 from label_docx import read_docx as reader_read_docx
@@ -19,6 +20,11 @@ from zone_a import certified
 ROOT = Path(__file__).resolve().parents[2]
 QRD_SOURCES = sorted((ROOT / "qrd" / "sources").glob("*.docx"))
 EPI_SOURCES = sorted((ROOT / "labels" / "ema-epi" / "sources").glob("*.json"))
+# An EMA cover page whose body refers to a footnote.
+NOTED = (
+    "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products-"
+    "cover-page_en.docx"
+)
 
 
 @pytest.mark.parametrize("path", QRD_SOURCES, ids=lambda path: path.name)
@@ -47,6 +53,32 @@ def test_what_the_check_cannot_certify_is_refused(monkeypatch: pytest.MonkeyPatc
     with pytest.raises(DocxRefusedError) as refused:
         certified.read_docx(QRD_SOURCES[0].read_bytes())
     assert refused.value.code == "uncertified"
+
+
+def test_what_the_check_cannot_certify_in_an_epi_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Unaccounted:
+        def __init__(self, data: bytes) -> None:
+            pass
+
+        def certify(self, _value: object) -> object:
+            raise ValueError("a character not in the source")
+
+    monkeypatch.setattr(label_docx.epi_output, "EpiSource", Unaccounted)
+    with pytest.raises(EpiRefusedError) as refused:
+        certified.read_epi(EPI_SOURCES[0].read_bytes())
+    assert refused.value.code == "uncertified"
+
+
+def test_a_body_that_refers_to_a_note_is_refused() -> None:
+    # The reader reads the note; nothing in Zone A reads its text, so the body is not taken
+    # without it.
+    data = (ROOT / "label-docx-reader" / "corpus" / "ema-templates" / NOTED).read_bytes()
+    assert any(paragraph.notes for paragraph in reader_read_docx(data))
+    with pytest.raises(DocxRefusedError) as refused:
+        certified.read_docx(data)
+    assert refused.value.code == "note-reference"
 
 
 def test_a_refusal_is_the_readers() -> None:
