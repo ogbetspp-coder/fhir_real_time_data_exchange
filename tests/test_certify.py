@@ -3496,3 +3496,39 @@ def test_a_list_label_under_a_table_style_part_not_on_record_is_never_certified(
         DocxSource(labelled(1))
     # numId 0 takes the numbering off: nothing is drawn.
     DocxSource(labelled(0))
+
+
+# --- mutation survivors, last four
+
+
+@pytest.mark.parametrize("slot", ["eastAsia", "cs"])
+def test_symbol_in_the_latin_slots_and_wingdings_in_another_is_never_certified(slot: str) -> None:
+    fonts = f'<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:{slot}="Wingdings"/>'
+    with pytest.raises(CertificationError, match="dingbat or symbol-encoded font"):
+        DocxSource(docx(_p(f"<w:r><w:rPr>{fonts}</w:rPr><w:t>a</w:t></w:r>")))
+
+
+def test_rows_above_a_last_row_only_the_based_on_style_defines_are_banded() -> None:
+    # Over the last row, banding is not on record; it holds no text, and the rows above it
+    # are banded as ever.
+    look = '<w:tblLook w:val="0000" w:lastRow="1" w:noHBand="0" w:noVBand="1"/>'
+    body = _only_text(t_table(look), *(f"r{i}c{j}" for i in (0, 1) for j in (0, 1, 2)))
+    styles = t_style(
+        ("band1Horz", "<w:b/>"), base=_ON_U + SIZE_ONE, extra=_based_on(_shaded("lastRow"))
+    )
+    data = docx(body, styles=styles)
+    DocxSource(data).certify(_docx_value(data))
+    assert _checked_grid(body, styles) == "B B B|. . .|. . ."
+
+
+def test_column_banding_over_a_last_column_whose_look_is_unsaid_is_never_certified() -> None:
+    body = t_table('<w:tblLook w:noHBand="1" w:noVBand="0"/>')
+    styles = t_style(("band1Vert", "<w:b/>"), base=SIZE_ONE + _shaded("lastCol"))
+    with pytest.raises(
+        CertificationError,
+        match=r"^a table style's part over text: Vert banding over a lastCol not on record$",
+    ):
+        DocxSource(docx(body, styles=styles))
+    # Over no text in the last column, the columns before it are banded.
+    first_two = _only_text(body, *(f"r{i}c{j}" for i in range(3) for j in (0, 1)))
+    assert _checked_grid(first_two, styles) == "B . .|B . .|B . ."
