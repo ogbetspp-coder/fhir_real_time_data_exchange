@@ -535,6 +535,342 @@
       "file": "drawing-vml-floating-picture.docx",
       "sha256": "f8d5a4e96fa7e285690698c77fee83e672a992335572a196760353cd32b6d4ae",
       "bytes": 3776
+    },
+    {
+      "name": "firstRow",
+      "file": "table-style-type-firstRow.docx",
+      "sha256": "7eb3f0ea15c14f4ee0f455a185e22923fc2908368a90c7bd3fc726db73194db8",
+      "bytes": 3470
+    },
+    {
+      "name": "lastRow",
+      "file": "table-style-type-lastRow.docx",
+      "sha256": "5a5b4c83a9cbf58e2ef8db2d28a78eef866e92a8c2fbb9ad1cdb25163fa8b8b0",
+      "bytes": 3469
+    },
+    {
+      "name": "firstCol",
+      "file": "table-style-type-firstCol.docx",
+      "sha256": "1b725a970327d29b8fb559636b3a3ca3bb3f5615576be25122c2eb35e9f530fc",
+      "bytes": 3470
+    },
+    {
+      "name": "lastCol",
+      "file": "table-style-type-lastCol.docx",
+      "sha256": "8ace8aaaba76b06fb00b7d36d7e51ec2a9236c632b588e0af4247c43e485b2d5",
+      "bytes": 3469
+    },
+    {
+      "name": "band1Vert",
+      "file": "table-style-type-band1Vert.docx",
+      "sha256": "9bdae11617f8a30b310510fd49a3e77ee79a3f7f94b4c9ced0af72ccbd6341ed",
+      "bytes": 3471
+    },
+    {
+      "name": "band2Vert",
+      "file": "table-style-type-band2Vert.docx",
+      "sha256": "181e1899bb4c35d35249d4d4d9668b510303a0ada2a5fb4567ed5b5fa4309d6b",
+      "bytes": 3471
+    },
+    {
+      "name": "band1Horz",
+      "file": "table-style-type-band1Horz.docx",
+      "sha256": "716005c7362234a610ef97ab273d6737ada89f7cbd88e66fd6608dccae9756e6",
+      "bytes": 3471
+    },
+    {
+      "name": "band2Horz",
+      "file": "table-style-type-band2Horz.docx",
+      "sha256": "8e2f4a06408b47d78f0647ba5af3432e3eecf4742aa8181388b2ade461dd5d79",
+      "bytes": 3471
+    },
+    {
+      "name": "neCell",
+      "file": "table-style-type-neCell.docx",
+      "sha256": "16a6adb22c6c6f9dcf7efbb93806ca442794c31228fb20acc9a6ed43c51acec6",
+      "bytes": 3468
+    },
+    {
+      "name": "nwCell",
+      "file": "table-style-type-nwCell.docx",
+      "sha256": "330910d3811e7dd638409b0556b59fd46fb6768f1fc4ee28d6d22d5012f4eb5b",
+      "bytes": 3468
+    },
+    {
+      "name": "seCell",
+      "file": "table-style-type-seCell.docx",
+      "sha256": "9abc774034f3973c54f3c913817a6b75972e241b307164685f641b85b9e2dad9",
+      "bytes": 3468
+    },
+    {
+      "name": "swCell",
+      "file": "table-style-type-swCell.docx",
+      "sha256": "75dd006b1cc91d18c022219847760a126b7f3bab8c2496feff504503c48f8d2e",
+      "bytes": 3468
+    },
+    {
+      "name": "wholeTable",
+      "file": "table-style-type-wholeTable.docx",
+      "sha256": "6630d596bbc0e433f91d64b373cdaac59214f61ff73a3386fa0fd254b6c7933b",
+      "bytes": 3472
+    },
+    {
+      "name": "firstRow b, look all off",
+      "file": "table-style-look-off.docx",
+      "sha256": "61ae03807e11ee14cfbdce68d5d966af5b958a1f576098173c1806b5d4b82b9c",
+      "bytes": 3539
+    },
+    {
+      "name": "firstRow b, look by val bits only (0020 = firstRow)",
+      "file": "table-style-look-val-only.docx",
+      "sha256": "3e874e3cc98d1a19301208f784c47db6b434c896b8bc7def2711a1f9932ee7bf",
+      "bytes": 3378
+    },
+    {
+      "name": "firstRow b, no tblLook",
+      "file": "table-style-no-look.docx",
+      "sha256": "7dd0939a6fa9995e6e7fa0a2ecde891bcb50fa0397232a9d9ea6b5480e474b44",
+      "bytes": 3353
+    },
+    {
+      "name": "firstRow b, firstCol b=0",
+      "file": "table-style-row-vs-col.docx",
+      "sha256": "a030f6f94017822e62c9c04f0f26ddb25e266f906dfd863df90a0c164c5a8b05",
+      "bytes": 3548
+    },
+    {
+      "name": "firstCol b, firstRow b=0",
+      "file": "table-style-col-vs-row.docx",
+      "sha256": "0b29af76cafff707d1e7592af7bf6d25e64185f294b1cf75068014cf72f37c9e",
+      "bytes": 3548
+    },
+    {
+      "name": "wholeTable b, firstRow b=0",
+      "file": "table-style-whole-vs-row.docx",
+      "sha256": "3948e77de6c664c4c1a6f6a15ab648ce64d5627e14489239c09d31fd2f32a65c",
+      "bytes": 3550
+    },
+    {
+      "name": "band1Horz b, firstRow b=0",
+      "file": "table-style-band-vs-row.docx",
+      "sha256": "5731e1457adee191dd12118ef5dba82a8acb2e377318f639469de84af1f74af9",
+      "bytes": 3549
+    },
+    {
+      "name": "firstRow b, nwCell b=0",
+      "file": "table-style-corner-vs-row.docx",
+      "sha256": "62a44d974364b34930a854266d419e061e503aa87b7e23bceba91089a92007f3",
+      "bytes": 3546
+    },
+    {
+      "name": "firstRow b, run b=0",
+      "file": "table-style-direct-off.docx",
+      "sha256": "d6347469442b99fdaf7c241e6463393de0606e85c291efce0e36595227379f67",
+      "bytes": 3749
+    },
+    {
+      "name": "firstRow b, run b",
+      "file": "table-style-direct-on.docx",
+      "sha256": "9bbbeb9c8be5304e096c51a937619275b5d057c516e02ad9bf4fd11ff96aaf4a",
+      "bytes": 3659
+    },
+    {
+      "name": "table style base rPr b, firstRow b",
+      "file": "table-style-base-and-row.docx",
+      "sha256": "213dcbbe644bde2352fb06657e00a4dce80dda6f86f622dc53736ea1e84e2662",
+      "bytes": 3491
+    },
+    {
+      "name": "firstRow b, run in char style C (b)",
+      "file": "table-style-charstyle-and-row.docx",
+      "sha256": "b74acbe1d19d8c4f04b043cc51543d48c625db5a8dd863eec58de10d37b3805d",
+      "bytes": 3886
+    },
+    {
+      "name": "firstRow b, Normal style b",
+      "file": "table-style-parastyle-and-row.docx",
+      "sha256": "663ed6b2cad4265a5a2e1784642143f1d1947043de37993be4a2510abeb38c04",
+      "bytes": 3586
+    },
+    {
+      "name": "firstRow i, lastRow caps, firstCol strike",
+      "file": "table-style-italic-caps.docx",
+      "sha256": "c0c238409b590ef3610fb1a13bebf1b906d3bff3fb5e3c657ffa2af2f1c53eca",
+      "bytes": 3613
+    },
+    {
+      "name": "firstRow b, rows 0-1 marked tblHeader",
+      "file": "table-style-header-rows.docx",
+      "sha256": "a007a2690fcfcbcfa4dabad8e48bb70cadae7fd0b4ddb8dceb8ba3815502d909",
+      "bytes": 3532
+    },
+    {
+      "name": "band1Horz b, bands on (val 0, attrs 0)",
+      "file": "table-style-bands-on-1H.docx",
+      "sha256": "acf331b314f05838e8ef1eaa63c2517b0e7be51567b999c5e094421a52c1792c",
+      "bytes": 3471
+    },
+    {
+      "name": "band2Horz b, bands on",
+      "file": "table-style-bands-on-2H.docx",
+      "sha256": "74ac7d12cd4d2f5ad3bbc0372fd2217f76ca6b9192da02ac87c31dc7fd63ae73",
+      "bytes": 3471
+    },
+    {
+      "name": "band1Vert b, bands on",
+      "file": "table-style-bands-on-1V.docx",
+      "sha256": "bb95cc315059d94e4e28e51530b36dd3fc28d9c328701302318d181e45aaa029",
+      "bytes": 3471
+    },
+    {
+      "name": "band2Vert b, bands on",
+      "file": "table-style-bands-on-2V.docx",
+      "sha256": "730ecec5b44fb03ee13bfb1c9fd924d7cc5e7eb9fdbe96333d8b7c41471e345f",
+      "bytes": 3471
+    },
+    {
+      "name": "wholeTable b, look val 0",
+      "file": "table-style-whole-bands-on.docx",
+      "sha256": "f367817b51cf3967c2a8dcdeb7f1d2e17f457a5e3f989bb9195f1faf28601746",
+      "bytes": 3472
+    },
+    {
+      "name": "band1Horz b, Word's default look 04A0",
+      "file": "table-style-default-1H.docx",
+      "sha256": "95c969052941af3222204afaf3409090a718aca7fb3e12402bd41d54cafc318f",
+      "bytes": 3471
+    },
+    {
+      "name": "firstRow b, lastRow i, Word's default look",
+      "file": "table-style-default-firstrow.docx",
+      "sha256": "4ab38fa657f426523493e1fa2810a41bf80609ebbd09d0c58a3c01e2244e9834",
+      "bytes": 3537
+    },
+    {
+      "name": "firstRow b, val 0000 but firstRow=1",
+      "file": "table-style-attr-vs-val-row.docx",
+      "sha256": "5a98c09d4dd75a57930b221e7f20858991ea7db038a0cde6fb0bd154f72ab4c5",
+      "bytes": 3393
+    },
+    {
+      "name": "firstRow b, val 0020 but firstRow=0",
+      "file": "table-style-attr-off-val-on.docx",
+      "sha256": "f285d6fd4c1f9ca6f53a014e6c6441557ae333a368c51b239751adb61d8428d3",
+      "bytes": 3393
+    },
+    {
+      "name": "band1Horz b, firstRow b=0, bands and first row on",
+      "file": "table-style-band-vs-row-on.docx",
+      "sha256": "f1b325fe6be483bd58972ebb9769d5be3e975bf50ddd4fa93150d6a37cf766fc",
+      "bytes": 3500
+    },
+    {
+      "name": "band1Horz b, firstCol b=0, bands and first col on",
+      "file": "table-style-band-vs-col-on.docx",
+      "sha256": "f37c8ba4b179aef8acc718314e2811354ec4d0c516c849fbcae8cc9b820350b6",
+      "bytes": 3503
+    },
+    {
+      "name": "band1Vert b, band1Horz b=0, both bands on",
+      "file": "table-style-vband-vs-hband.docx",
+      "sha256": "e23a84d3709c4c9c279e5276c90cbec2432b567f4b9bc05def53da19ed2ce414",
+      "bytes": 3550
+    },
+    {
+      "name": "band1Horz b, band size 1",
+      "file": "table-style-sized-1H.docx",
+      "sha256": "5a959e4a9c47a6008a9a51026f51c8fd466425d423ad44f3fa3055d1e990bd3f",
+      "bytes": 3558
+    },
+    {
+      "name": "band2Horz b, band size 1",
+      "file": "table-style-sized-2H.docx",
+      "sha256": "f6b2ac7481be1386cfe88787ec55629fb500cb622f7d914ee63059bb33ab7f05",
+      "bytes": 3558
+    },
+    {
+      "name": "band1Vert b, band size 1",
+      "file": "table-style-sized-1V.docx",
+      "sha256": "e2b63a6ae3dd871525b56e158a091fe24dd044546f2f31530aaf221b9631a787",
+      "bytes": 3558
+    },
+    {
+      "name": "wholeTable b, band size 1",
+      "file": "table-style-sized-whole.docx",
+      "sha256": "cb107d34c36d4e3b6fc73340583b2177eb6676beb4a09984d86f8042ba989726",
+      "bytes": 3559
+    },
+    {
+      "name": "band1Horz b, row band size 2",
+      "file": "table-style-sized-row2.docx",
+      "sha256": "a6659dcbbb93228e6dce5313c0fb25994b12becaffc39e520e8bcdb6489b0a5d",
+      "bytes": 3524
+    },
+    {
+      "name": "band1Horz b, size 1, noHBand=1",
+      "file": "table-style-sized-hband-off-attr.docx",
+      "sha256": "8dae4638342da898e5a9a4082c43a7709723d7c5a677b9e042e082b9977fc47f",
+      "bytes": 3494
+    },
+    {
+      "name": "band1Horz b, size 1, val 0200 no attr",
+      "file": "table-style-sized-hband-off-val.docx",
+      "sha256": "3b029b06408b2d3b1654db5c106fdd2fdc7d6455f7f53a4e7aaa51c64b78e25b",
+      "bytes": 3466
+    },
+    {
+      "name": "band1Horz b, firstRow b=0, size 1, first row on",
+      "file": "table-style-sized-row-vs-band.docx",
+      "sha256": "565ea5a794d91e8e334c81ac105a1c335c6ec8c2ad2652b5bc24eb565c838bb5",
+      "bytes": 3587
+    },
+    {
+      "name": "band1Vert b, band1Horz b=0, size 1",
+      "file": "table-style-sized-v-vs-h.docx",
+      "sha256": "5944bac8dea2e6aba71ce1901d57bf7a0c654c24d1e03d15bf139e9b83de85c8",
+      "bytes": 3637
+    },
+    {
+      "name": "band1Vert b, first col on",
+      "file": "table-style-vband-firstcol.docx",
+      "sha256": "7e35402eda4192d21a1b92181f857abb3c650b416693eb7ec2bc802e2a93481f",
+      "bytes": 3898
+    },
+    {
+      "name": "band2Vert b, last col on",
+      "file": "table-style-vband-lastcol.docx",
+      "sha256": "0d8a035d9d90cfbb181a86987f5a4c0263f646b6673e77dfa5b6b665c69741ef",
+      "bytes": 3897
+    },
+    {
+      "name": "band2Horz b, last row on",
+      "file": "table-style-hband-lastrow.docx",
+      "sha256": "faa47b71c116bc68cc9e906d149ba431991df3bd2fa5756933eabd36550cbba2",
+      "bytes": 3894
+    },
+    {
+      "name": "band1Horz b, first+last row on",
+      "file": "table-style-hband-first-last.docx",
+      "sha256": "12b833c4954b8e7634d144516e23cba2c8acf0c1344802ed65737caff567cef1",
+      "bytes": 3909
+    },
+    {
+      "name": "band1Vert b, firstCol b=0, first col on",
+      "file": "table-style-col-vs-vband.docx",
+      "sha256": "ad4f4262ff89f5890a05e132229207356419de4fd32c40d63d697353a75d1993",
+      "bytes": 3976
+    },
+    {
+      "name": "lastCol b, lastRow b=0, both on",
+      "file": "table-style-lastcol-vs-row.docx",
+      "sha256": "6b420c85b629583a19182cf98c75d9e625171b1168876a52881c4c2489337ab2",
+      "bytes": 3986
+    },
+    {
+      "name": "firstRow i; Normal style i",
+      "file": "table-style-italic-toggle-para.docx",
+      "sha256": "0c85b83a53d478098476406831d4827c0eac7735cd836b557e9277ab1c2d9308",
+      "bytes": 3982
     }
   ]
 }

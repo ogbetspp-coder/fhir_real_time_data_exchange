@@ -1123,6 +1123,299 @@ CASES: dict[str, Case] = {
 }
 
 
+# Table styles' conditional formatting (tblStylePr): one table in style T per case, each cell
+# one run "r<row>c<column>", and a paragraph after it. Word's bold, italic, capitals and strike
+# per cell are its answer to how the parts apply: where, under which looks, banded how, and
+# which wins (the reader's _TableLayout, the check's _Applied).
+ALL_LOOKS = (
+    '<w:tblLook w:val="06A0" w:firstRow="1" w:lastRow="1" w:firstColumn="1" w:lastColumn="1" '
+    'w:noHBand="0" w:noVBand="0"/>'
+)
+NO_LOOKS = (
+    '<w:tblLook w:val="0000" w:firstRow="0" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" '
+    'w:noHBand="0" w:noVBand="0"/>'
+)
+DEFAULT_LOOK = (
+    '<w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" '
+    'w:noHBand="0" w:noVBand="1"/>'
+)
+BAND_SIZES = (
+    '<w:tblPr><w:tblStyleRowBandSize w:val="1"/><w:tblStyleColBandSize w:val="1"/></w:tblPr>'
+)
+OFF = '<w:b w:val="0"/>'
+
+
+def styled_table(look: str = ALL_LOOKS, cell_rpr: str = "", size: int = 3) -> str:
+    """A size-by-size table in style T with the look given, and a paragraph after it."""
+    out = (
+        f'<w:tbl><w:tblPr><w:tblStyle w:val="T"/>{look}</w:tblPr><w:tblGrid>'
+        + '<w:gridCol w:w="2000"/>' * size
+        + "</w:tblGrid>"
+    )
+    run = f"<w:rPr>{cell_rpr}</w:rPr>" if cell_rpr else ""
+    for i in range(size):
+        out += (
+            "<w:tr>"
+            + "".join(
+                f"<w:tc><w:p><w:r>{run}<w:t>r{i}c{j}</w:t></w:r></w:p></w:tc>" for j in range(size)
+            )
+            + "</w:tr>"
+        )
+    return out + "</w:tbl><w:p/>"
+
+
+def table_style(*parts: tuple[str, str], base: str = "") -> str:
+    """Table style T: ``base`` (its tblPr or rPr), then a part of each type with its rPr."""
+    body = "".join(
+        f'<w:tblStylePr w:type="{kind}"><w:rPr>{rpr}</w:rPr></w:tblStylePr>' for kind, rpr in parts
+    )
+    return f'<w:style w:type="table" w:styleId="T"><w:name w:val="T"/>{base}{body}</w:style>'
+
+
+CHARACTER_BOLD = (
+    '<w:style w:type="character" w:styleId="C"><w:name w:val="C"/><w:rPr><w:b/></w:rPr></w:style>'
+)
+
+
+def normal(rpr: str) -> str:
+    """The default paragraph style, Normal, setting ``rpr``."""
+    return (
+        '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/>'
+        f"<w:rPr>{rpr}</w:rPr></w:style>"
+    )
+
+
+def _ts(
+    question: str,
+    look: str,
+    *parts: tuple[str, str],
+    cell_rpr: str = "",
+    size: int = 3,
+    base: str = "",
+    extra: str = "",
+) -> Case:
+    """A table-style case: its table, and style T with ``extra`` styles after it."""
+    styles = table_style(*parts, base=base) + extra
+    return Case(question, "", styled_table(look, cell_rpr, size), styles=styles)
+
+
+PARTS = [
+    "firstRow",
+    "lastRow",
+    "firstCol",
+    "lastCol",
+    "band1Vert",
+    "band2Vert",
+    "band1Horz",
+    "band2Horz",
+    "neCell",
+    "nwCell",
+    "seCell",
+    "swCell",
+    "wholeTable",
+]
+LOOK_OFF = NO_LOOKS.replace('w:noHBand="0" w:noVBand="0"', 'w:noHBand="1" w:noVBand="1"')
+FOUR_LOOK = '<w:tblLook w:val="0000" {}/>'
+TABLE_STYLE_CASES: dict[str, Case] = {
+    **{f"type-{kind}": _ts(kind, ALL_LOOKS, (kind, "<w:b/>")) for kind in PARTS},
+    "look-off": _ts(
+        "firstRow b, look all off", LOOK_OFF, ("firstRow", "<w:b/>"), ("band1Horz", "<w:i/>")
+    ),
+    "look-val-only": _ts(
+        "firstRow b, look by val bits only (0020 = firstRow)",
+        '<w:tblLook w:val="0020"/>',
+        ("firstRow", "<w:b/>"),
+    ),
+    "no-look": _ts("firstRow b, no tblLook", "", ("firstRow", "<w:b/>")),
+    "row-vs-col": _ts(
+        "firstRow b, firstCol b=0", ALL_LOOKS, ("firstRow", "<w:b/>"), ("firstCol", OFF)
+    ),
+    "col-vs-row": _ts(
+        "firstCol b, firstRow b=0", ALL_LOOKS, ("firstCol", "<w:b/>"), ("firstRow", OFF)
+    ),
+    "whole-vs-row": _ts(
+        "wholeTable b, firstRow b=0", ALL_LOOKS, ("wholeTable", "<w:b/>"), ("firstRow", OFF)
+    ),
+    "band-vs-row": _ts(
+        "band1Horz b, firstRow b=0", ALL_LOOKS, ("band1Horz", "<w:b/>"), ("firstRow", OFF)
+    ),
+    "corner-vs-row": _ts(
+        "firstRow b, nwCell b=0", ALL_LOOKS, ("firstRow", "<w:b/>"), ("nwCell", OFF)
+    ),
+    "direct-off": _ts("firstRow b, run b=0", ALL_LOOKS, ("firstRow", "<w:b/>"), cell_rpr=OFF),
+    "direct-on": _ts("firstRow b, run b", ALL_LOOKS, ("firstRow", "<w:b/>"), cell_rpr="<w:b/>"),
+    "base-and-row": _ts(
+        "table style base rPr b, firstRow b",
+        ALL_LOOKS,
+        ("firstRow", "<w:b/>"),
+        base="<w:rPr><w:b/></w:rPr>",
+    ),
+    "charstyle-and-row": _ts(
+        "firstRow b, run in char style C (b)",
+        ALL_LOOKS,
+        ("firstRow", "<w:b/>"),
+        cell_rpr='<w:rStyle w:val="C"/>',
+        extra=CHARACTER_BOLD,
+    ),
+    "parastyle-and-row": _ts(
+        "firstRow b, Normal style b", ALL_LOOKS, ("firstRow", "<w:b/>"), extra=normal("<w:b/>")
+    ),
+    "italic-caps": _ts(
+        "firstRow i, lastRow caps, firstCol strike",
+        ALL_LOOKS,
+        ("firstRow", "<w:i/>"),
+        ("lastRow", "<w:caps/>"),
+        ("firstCol", "<w:strike/>"),
+    ),
+    "header-rows": Case(
+        "firstRow b, rows 0-1 marked tblHeader",
+        "",
+        styled_table().replace("<w:tr>", "<w:tr><w:trPr><w:tblHeader/></w:trPr>", 2),
+        styles=table_style(("firstRow", "<w:b/>")),
+    ),
+    **{
+        f"bands-on-{n}{way[0]}": _ts(
+            f"band{n}{way} b, bands on (val 0, attrs 0)"
+            if (n, way) == ("1", "Horz")
+            else f"band{n}{way} b, bands on",
+            NO_LOOKS,
+            (f"band{n}{way}", "<w:b/>"),
+        )
+        for way in ("Horz", "Vert")
+        for n in ("1", "2")
+    },
+    "whole-bands-on": _ts("wholeTable b, look val 0", NO_LOOKS, ("wholeTable", "<w:b/>")),
+    "default-1H": _ts(
+        "band1Horz b, Word's default look 04A0", DEFAULT_LOOK, ("band1Horz", "<w:b/>")
+    ),
+    "default-firstrow": _ts(
+        "firstRow b, lastRow i, Word's default look",
+        DEFAULT_LOOK,
+        ("firstRow", "<w:b/>"),
+        ("lastRow", "<w:i/>"),
+    ),
+    "attr-vs-val-row": _ts(
+        "firstRow b, val 0000 but firstRow=1",
+        '<w:tblLook w:val="0000" w:firstRow="1"/>',
+        ("firstRow", "<w:b/>"),
+    ),
+    "attr-off-val-on": _ts(
+        "firstRow b, val 0020 but firstRow=0",
+        '<w:tblLook w:val="0020" w:firstRow="0"/>',
+        ("firstRow", "<w:b/>"),
+    ),
+    "band-vs-row-on": _ts(
+        "band1Horz b, firstRow b=0, bands and first row on",
+        '<w:tblLook w:val="0020" w:firstRow="1" w:noHBand="0" w:noVBand="1"/>',
+        ("band1Horz", "<w:b/>"),
+        ("firstRow", OFF),
+    ),
+    "band-vs-col-on": _ts(
+        "band1Horz b, firstCol b=0, bands and first col on",
+        '<w:tblLook w:val="0080" w:firstColumn="1" w:noHBand="0" w:noVBand="1"/>',
+        ("band1Horz", "<w:b/>"),
+        ("firstCol", OFF),
+    ),
+    "vband-vs-hband": _ts(
+        "band1Vert b, band1Horz b=0, both bands on",
+        NO_LOOKS,
+        ("band1Vert", "<w:b/>"),
+        ("band1Horz", OFF),
+    ),
+    "sized-1H": _ts("band1Horz b, band size 1", NO_LOOKS, ("band1Horz", "<w:b/>"), base=BAND_SIZES),
+    "sized-2H": _ts("band2Horz b, band size 1", NO_LOOKS, ("band2Horz", "<w:b/>"), base=BAND_SIZES),
+    "sized-1V": _ts("band1Vert b, band size 1", NO_LOOKS, ("band1Vert", "<w:b/>"), base=BAND_SIZES),
+    "sized-whole": _ts(
+        "wholeTable b, band size 1", NO_LOOKS, ("wholeTable", "<w:b/>"), base=BAND_SIZES
+    ),
+    "sized-row2": _ts(
+        "band1Horz b, row band size 2",
+        NO_LOOKS,
+        ("band1Horz", "<w:b/>"),
+        base='<w:tblPr><w:tblStyleRowBandSize w:val="2"/></w:tblPr>',
+    ),
+    "sized-hband-off-attr": _ts(
+        "band1Horz b, size 1, noHBand=1",
+        '<w:tblLook w:val="0000" w:noHBand="1" w:noVBand="0"/>',
+        ("band1Horz", "<w:b/>"),
+        base=BAND_SIZES,
+    ),
+    "sized-hband-off-val": _ts(
+        "band1Horz b, size 1, val 0200 no attr",
+        '<w:tblLook w:val="0200"/>',
+        ("band1Horz", "<w:b/>"),
+        base=BAND_SIZES,
+    ),
+    "sized-row-vs-band": _ts(
+        "band1Horz b, firstRow b=0, size 1, first row on",
+        '<w:tblLook w:val="0000" w:firstRow="1" w:noHBand="0" w:noVBand="1"/>',
+        ("band1Horz", "<w:b/>"),
+        ("firstRow", OFF),
+        base=BAND_SIZES,
+    ),
+    "sized-v-vs-h": _ts(
+        "band1Vert b, band1Horz b=0, size 1",
+        NO_LOOKS,
+        ("band1Vert", "<w:b/>"),
+        ("band1Horz", OFF),
+        base=BAND_SIZES,
+    ),
+    "vband-firstcol": _ts(
+        "band1Vert b, first col on",
+        FOUR_LOOK.format('w:firstColumn="1" w:noVBand="0" w:noHBand="1"'),
+        ("band1Vert", "<w:b/>"),
+        base=BAND_SIZES,
+        size=4,
+    ),
+    "vband-lastcol": _ts(
+        "band2Vert b, last col on",
+        FOUR_LOOK.format('w:lastColumn="1" w:noVBand="0" w:noHBand="1"'),
+        ("band2Vert", "<w:b/>"),
+        base=BAND_SIZES,
+        size=4,
+    ),
+    "hband-lastrow": _ts(
+        "band2Horz b, last row on",
+        FOUR_LOOK.format('w:lastRow="1" w:noHBand="0" w:noVBand="1"'),
+        ("band2Horz", "<w:b/>"),
+        base=BAND_SIZES,
+        size=4,
+    ),
+    "hband-first-last": _ts(
+        "band1Horz b, first+last row on",
+        FOUR_LOOK.format('w:firstRow="1" w:lastRow="1" w:noHBand="0" w:noVBand="1"'),
+        ("band1Horz", "<w:b/>"),
+        base=BAND_SIZES,
+        size=4,
+    ),
+    "col-vs-vband": _ts(
+        "band1Vert b, firstCol b=0, first col on",
+        FOUR_LOOK.format('w:firstColumn="1" w:noVBand="0" w:noHBand="1"'),
+        ("band1Vert", "<w:b/>"),
+        ("firstCol", OFF),
+        base=BAND_SIZES,
+        size=4,
+    ),
+    "lastcol-vs-row": _ts(
+        "lastCol b, lastRow b=0, both on",
+        FOUR_LOOK.format('w:lastColumn="1" w:lastRow="1" w:noHBand="1" w:noVBand="1"'),
+        ("lastCol", "<w:b/>"),
+        ("lastRow", OFF),
+        base=BAND_SIZES,
+        size=4,
+    ),
+    "italic-toggle-para": _ts(
+        "firstRow i; Normal style i",
+        '<w:tblLook w:val="0000" w:firstRow="1"/>',
+        ("firstRow", "<w:i/>"),
+        base=BAND_SIZES,
+        size=4,
+        extra=normal("<w:i/>"),
+    ),
+}
+CASES.update({f"table-style-{name}": case for name, case in TABLE_STYLE_CASES.items()})
+
+
 def package(case: Case) -> bytes:
     """``case`` as a complete .docx, stored, with fixed timestamps."""
     # Parts only the note cases have, so the list cases' bytes do not change.

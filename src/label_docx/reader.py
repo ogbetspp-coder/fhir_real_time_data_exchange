@@ -59,19 +59,25 @@ not: a run with no character style, or an unknown one, takes none, since Word do
 default character style to text. A reference to a style of another kind is refused. A paragraph
 style based on a character style takes nothing from it, as Word draws it; any other ``basedOn``
 naming a style of another kind is refused. Paragraph shading and right-to-left are looked up the
-same way through the paragraph properties. The reader does not apply a table style's conditional
-formatting (``tblStylePr`` for the first row, banded rows and so on), so it refuses a table whose
-style's
-conditional formatting could change what it produces, and reads one whose conditional formatting
-sets only what it cannot change: properties the reader does not report (spacing, borders) and
-fonts, sizes and colours that are ordinary text; and bold and italic only where no cell with
-text stands in a part of the table its looks may turn on. Word applies such bold, italic or
-capitals where ``tblLook`` turns the part on and nothing where it turns it off; the reader counts
-a part on if the table's or any row's look turns it on (by attribute or bit), every part on for
-a table without a look, corners and banding on, a header row as a first row, and every cell of a
-row with ``gridBefore`` or ``gridAfter`` as first and last. Cell shading a style may paint is
-taken as possibly under every cell, for faint text. Under such formatting, Symbol text is
-refused, since a conditional font could replace the Symbol font.
+same way through the paragraph properties.
+
+A table style's conditional formatting (``tblStylePr``) is applied as Word applies it, each rule
+Word's answer to a case in ``corpus/numbering-cases`` (table-style-*). A part applies where the
+table's look turns it on (an attribute over the ``val`` bits; with no look, the first row only):
+the first or last row (header rows at the top are first rows), column, a corner (both its looks
+on), or a band, only where the style sets a band size and counted past the first row or column
+only where the style defines that part; the whole-table part never. Nearest first: corner, row,
+column, vertical band, horizontal band; together they stand over the table style's own run
+properties at its level, so they toggle with the character and paragraph styles as any style
+does and the run's own setting wins. Bold, italic, capitals and strike are applied. A part's
+fonts, sizes, colours and spacing are not on record: whether text is faint or in Symbol must come
+out the same with and without them, and the layout bounds must hold both ways. Any other run
+property in a part is refused. What Word was not asked is refused over text
+(``_TableLayout``): a look or band size it has no answer for, a corner without both looks, the
+last row or column under banding where the style defines it, parts through ``basedOn``, and a
+part over a row off the grid, merged cells, a nested table or a table outside the body. Cell
+shading a style may paint is taken as possibly under every cell, for faint text, and Symbol
+text under a part's fonts is refused.
 
 Symbol fonts. A run whose effective ``ascii`` and ``hAnsi`` fonts (set directly, by a style, by the
 document defaults or through the theme) are both Symbol, by that exact name, with no complex-script
@@ -203,8 +209,8 @@ What it refuses (``DocxRefusedError.code``):
   placeholder building block (Word shows the placeholder; one with none shows nothing, as read),
   a note or comment mark in a field code, a note mark outside the body, a note's echo of its mark
   outside that note, a comment mark in a comment, a comment's echo of its mark outside it, a note
-  of a type other than normal (separators aside), conditional table formatting that could change
-  the text (bold or italic over text in a part its looks may turn on), text, whitespace, a list
+  of a type other than normal (separators aside), conditional table formatting whose effect on
+  the text or a list label is not on record (see "Styles"), text, whitespace, a list
   label, or a note, comment or page mark in a vertically merged-away cell (Word draws none of it
   and does not count the label; a horizontally merged one is read as its own cell, as Word shows
   it), a bidirectional override (``bdo``) or an embedding (``dir``) of no direction, a style
@@ -301,7 +307,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 # The version of the rules above; versions.lock.json ties it to this file (tests/test_locks.py).
-READER_VERSION = "docx-reader/1.23.0"
+READER_VERSION = "docx-reader/1.24.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -893,8 +899,10 @@ class _Style:
     conditional: str | None = None
     # Whether that formatting sets fonts, which could override a Symbol font beneath it.
     conditional_fonts: bool = False
-    # The parts of the table (``firstRow``...) whose conditional formatting sets bold or italic.
-    conditional_emphasis: frozenset[str] = frozenset()
+    # A table style's conditional parts (``tblStylePr``) by type (``firstRow``...), and the band
+    # sizes its ``tblPr`` sets (``tblStyleRowBandSize``, ``tblStyleColBandSize``), if any.
+    parts: dict[str, ET.Element] = field(default_factory=dict)
+    bands: tuple[str | None, str | None] = (None, None)
     # A table style's shading of the table and its cells, its parts' (firstRow...) included.
     shadings: tuple[ET.Element, ...] = ()
     # The style's name (w:name), which Word's heading levels and STYLEREF go by.
@@ -916,9 +924,10 @@ class _Styles:
     # Wingdings, embedded (its glyphs may be any), or replaced when missing (altName) by a
     # symbol or dingbat font.
     symbol_encoded: set[str] = field(default_factory=set)
-    # _Properties' style levels by (run style, paragraph style, table style, label mark).
+    # _Properties' style levels by (run style, paragraph style, table style, label mark,
+    # conditional parts).
     inherited: dict[
-        tuple[str | None, str | None, str | None, ET.Element | None],
+        tuple[str | None, str | None, str | None, ET.Element | None, tuple[ET.Element, ...]],
         tuple[list[list[ET.Element | None]], list[ET.Element]],
     ] = field(default_factory=dict)
     # The theme's colours by slot (dk1, lt1, accent1...), and the names (background1, text1...)
@@ -1112,14 +1121,8 @@ def _styles(
                 for path in ("tblPr", "tcPr", "tblStylePr/tblPr", "tblStylePr/tcPr")
                 for shd in style.findall(f"{'/'.join(_w(n) for n in path.split('/'))}/{_w('shd')}")
             ),
-            conditional_emphasis=frozenset(
-                part.get(_w("type"), "")
-                for part in style.findall(_w("tblStylePr"))
-                if any(
-                    part.find(f"{_w('rPr')}/{_w(name)}") is not None
-                    for name in ("b", "bCs", "i", "iCs")
-                )
-            ),
+            parts={part.get(_w("type"), ""): part for part in style.findall(_w("tblStylePr"))},
+            bands=(_band_size(style, "Row"), _band_size(style, "Col")),
         )
         if style.get(_w("default")) in ("1", "true", "on"):
             # With more than one default of a kind, the last one is used (ECMA-376 17.7.4.17).
@@ -1127,10 +1130,17 @@ def _styles(
     return styles
 
 
-# What a table style's conditional formatting may set, since the reader does not apply it: run
-# and paragraph properties it does not report, fonts, sizes and colours checked below to be
-# ordinary text, and bold and italic, refused where a part that sets them may be on over text
-# (``_Body.table``). Cell, row and table properties (shading, borders) are not reported either.
+def _band_size(element: ET.Element, way: str) -> str | None:
+    """The band size a table style's or table's ``tblPr`` sets for rows or columns, if any."""
+    size = element.find(f"{_w('tblPr')}/{_w(f'tblStyle{way}BandSize')}")
+    return None if size is None else size.get(_w("val"), "")
+
+
+# What a table style's conditional formatting may set: bold, italic, capitals and strike, which
+# the reader applies where Word does (``_TableLayout``); fonts, sizes and colours checked below to
+# be ordinary text, held where applied to what the reader reads without them (``_ParagraphReader.
+# run``); and run and paragraph properties it does not report. Cell, row and table properties
+# (shading, borders) are not reported either.
 _CONDITIONAL_RUN = {
     _w(name)
     for name in (
@@ -1138,6 +1148,8 @@ _CONDITIONAL_RUN = {
         "bCs",
         "i",
         "iCs",
+        "caps",
+        "strike",
         "rFonts",
         "sz",
         "szCs",
@@ -1169,13 +1181,17 @@ _CONDITIONAL_PARAGRAPH = {
 def _conditional(style: ET.Element, styles: _Styles) -> str | None:
     """Why a table style's conditional formatting could change what the reader produces.
 
-    None when every property it sets is one the reader does not report, or a font, size or
-    colour that cannot make text faint or Symbol. Such formatting changes nothing the reader
-    produces except where it would override a faint size or colour beneath it, which the reader
-    then over-reports as faint; a Symbol font beneath it is refused (``_in_symbol``).
+    None when every property it sets is bold, italic, capitals or strike (applied where Word
+    applies them), one the reader does not report, or a font, size or colour that cannot make
+    text faint or Symbol (held, where applied, to what the reader reads without it; a Symbol
+    font beneath it is refused, ``_in_symbol``). A part defined twice is not on record.
     """
+    seen: set[str] = set()
     for part in style.findall(_w("tblStylePr")):
         kind = part.get(_w("type"), "")
+        if kind in seen:
+            return f"conditional table formatting ({kind}) defined twice"
+        seen.add(kind)
         rpr = part.find(_w("rPr"))
         for child in [] if rpr is None else list(rpr):
             if child.tag not in _CONDITIONAL_RUN:
@@ -1211,7 +1227,9 @@ class _Properties:
     """The run properties in force for one run, from the run outwards.
 
     ``mark``, for a list label, is the paragraph mark's run properties, which the label's level
-    properties (``direct``) sit over.
+    properties (``direct``) sit over. ``conditional`` is the run properties of the table style's
+    conditional parts Word applies to the cell, nearest first (``_TableLayout``): they stand over
+    the table style's own at its level, as Word's answers have it (table-style-base-and-row).
     """
 
     def __init__(
@@ -1221,6 +1239,7 @@ class _Properties:
         paragraph_style: str | None,
         table_style: str | None,
         mark: ET.Element | None = None,
+        conditional: tuple[ET.Element, ...] = (),
     ) -> None:
         self.styles = styles
         self.direct = direct
@@ -1231,7 +1250,7 @@ class _Properties:
         self.mark = mark
         # The same for every run with these styles, so worked out once per read (a refusal is
         # never kept: it is raised again).
-        key = (run_style, paragraph_style, table_style, mark)
+        key = (run_style, paragraph_style, table_style, mark, conditional)
         if key not in styles.inherited:
             # Each kind of style with its basedOn chain, nearest first: the character, paragraph
             # and (inside a table only; ``table_style`` is already resolved) table style.
@@ -1240,7 +1259,7 @@ class _Properties:
                 # apply the default character style to text [default-character-style].
                 [style.rpr for style in styles.resolve_named(run_style, "character")],
                 [style.rpr for style in styles.resolve(paragraph_style, "paragraph")],
-                [style.rpr for style in styles.chain(table_style)],
+                [*conditional, *(style.rpr for style in styles.chain(table_style))],
             ]
             # The mark's own character style, as for a run: Word draws the label in it (Sym
             # gives Symbol, Caps capitals) [Word's answer, 2026-10].
@@ -1598,8 +1617,11 @@ class _ParagraphReader:
         story: tuple[str, int] | None,
         carried: int = 0,
         under: tuple[_Rgb, ...] = (),
+        conditional: tuple[ET.Element, ...] = (),
     ) -> None:
         self.styles = styles
+        # The table style's conditional parts Word applies to the paragraph's cell (_Properties).
+        self.conditional = conditional
         # Fields an earlier paragraph left open in their results, which an end here may close.
         self.carried = carried
         # What may be painted under the paragraph's text (its shading, its cell's, the page).
@@ -1714,10 +1736,21 @@ class _ParagraphReader:
 
     def run(self, run: ET.Element) -> None:
         self.runs.add(run)
+        rpr = run.find(_w("rPr"))
         properties = _Properties(
-            self.styles, run.find(_w("rPr")), self.paragraph_style, self.table_style
+            self.styles, rpr, self.paragraph_style, self.table_style, None, self.conditional
         )
         symbol = _in_symbol(self.styles, properties, self.table_style)
+        # The same without the conditional parts: their fonts, sizes, colours and spacing are not
+        # on record (Word answered bold, italic, capitals and strike), so the reader reads only
+        # what they cannot change.
+        plain = (
+            _Properties(self.styles, rpr, self.paragraph_style, self.table_style)
+            if self.conditional
+            else properties
+        )
+        if plain is not properties and _in_symbol(self.styles, plain, self.table_style) != symbol:
+            raise DocxRefusedError("symbol-font", "a font set by conditional table formatting")
         if symbol and self.embedded:
             # Drawn as complex script, as under rtl: Word may draw it in another font.
             raise DocxRefusedError("symbol-font", "Symbol in a bidirectional embedding")
@@ -1808,15 +1841,20 @@ class _ParagraphReader:
             raise DocxRefusedError(
                 "unsupported-formatting", "complex script whose b and bCs, or i and iCs, differ"
             )
-        size = _size(properties)
-        condensed = _twips(properties.element("spacing"), "val")
-        if properties.element("fitText") is not None or (
-            condensed is not None and -condensed / 20 > size / 4
-        ):
-            # Text squeezed into a width, or condensed by more than a quarter of its size:
-            # its characters may be drawn over one another.
-            raise DocxRefusedError("unsupported-formatting", "text drawn over itself")
-        self.line = max(self.line, size)
+        for each in (properties,) if plain is properties else (properties, plain):
+            size = _size(each)
+            condensed = _twips(each.element("spacing"), "val")
+            if each.element("fitText") is not None or (
+                condensed is not None and -condensed / 20 > size / 4
+            ):
+                # Text squeezed into a width, or condensed by more than a quarter of its size:
+                # its characters may be drawn over one another.
+                raise DocxRefusedError("unsupported-formatting", "text drawn over itself")
+            self.line = max(self.line, size)
+        if plain is not properties and _faint(plain, self.under) != _faint(properties, self.under):
+            raise DocxRefusedError(
+                "unsupported-element", "conditional table formatting may make text faint or not"
+            )
         start = self.length
         self.parts.append(text)
         self.length += len(text)
@@ -2333,6 +2371,8 @@ class _Context:
     style: str | None
     table_style: str | None
     mark: ET.Element | None
+    # The conditional parts of the table style Word applies to the paragraph's cell.
+    conditional: tuple[ET.Element, ...] = ()
     # The section the paragraph ends in or belongs to, counted from 0 (body only), and the
     # notes whose marks are custom.
     section: int = 0
@@ -2363,6 +2403,7 @@ def _paragraph(
     section: int = 0,
     carried: int = 0,
     under: tuple[_Rgb, ...] = (),
+    conditional: tuple[ET.Element, ...] = (),
 ) -> tuple[Paragraph, _Context]:
     ppr = element.find(_w("pPr"))
     style = None
@@ -2370,7 +2411,7 @@ def _paragraph(
         style_element = ppr.find(_w("pStyle"))
         style = style_element.get(_w("val")) if style_element is not None else None
     mark_rpr = ppr.find(_w("rPr")) if ppr is not None else None
-    mark = _Properties(styles, mark_rpr, style, table_style)
+    mark = _Properties(styles, mark_rpr, style, table_style, None, conditional)
     mark_hidden = mark.toggle("vanish") or mark.toggle("specVanish")
     if mark.toggle("vanish") and not mark.shown("vanish") and not mark.toggle("specVanish"):
         # Whether Word runs the paragraph on is not on record (see ``run``).
@@ -2388,7 +2429,9 @@ def _paragraph(
         None,
     )
     painted = tuple(styles.painted(shading)) or under
-    reader = _ParagraphReader(styles, style, table_style, runs, story, carried, painted)
+    reader = _ParagraphReader(
+        styles, style, table_style, runs, story, carried, painted, conditional
+    )
     reader.container(element)
     if reader.in_instruction():
         raise DocxRefusedError("unbalanced-field", "a paragraph ends inside a field instruction")
@@ -2402,7 +2445,8 @@ def _paragraph(
     if numbering != _numbering([level for level in levels if level not in table_levels]):
         # A list, or its level, from the table style: what Word draws is not on record.
         raise _refuse_numbering("a list from a table style")
-    line = max(reader.line, _size(mark))
+    # The mark's size with and without the conditional parts (_ParagraphReader.run).
+    line = max(reader.line, _size(mark), _size(_Properties(styles, mark_rpr, style, table_style)))
     if reader.length:
         _layout(levels, line)
     context = _Context(
@@ -2410,6 +2454,7 @@ def _paragraph(
         style=styles.effective(style, "paragraph"),
         table_style=table_style,
         mark=mark_rpr,
+        conditional=conditional,
         section=section,
         custom=frozenset(reader.custom),
         symbolic=reader.symbolic,
@@ -2906,7 +2951,12 @@ class _Lists:
             legal = definition.legal and source.format != "decimalZero"
             pieces.append(_number(value, "decimal" if legal else source.format))
         properties = _Properties(
-            self.styles, definition.rpr, context.style, context.table_style, context.mark
+            self.styles,
+            definition.rpr,
+            context.style,
+            context.table_style,
+            context.mark,
+            context.conditional,
         )
         if properties.toggle("vanish") or properties.toggle("specVanish"):
             raise DocxRefusedError("ambiguous-numbering", "a hidden list label")
@@ -3353,6 +3403,7 @@ class _Body:
         table: tuple[int, int, int] | None,
         table_style: str | None,
         under: tuple[_Rgb, ...] = (),
+        conditional: tuple[ET.Element, ...] = (),
     ) -> None:
         for child in element:
             tag = child.tag
@@ -3367,6 +3418,7 @@ class _Body:
                     len(self.sections),
                     self.contexts[-1].fields_open if self.contexts else 0,
                     under,
+                    conditional,
                 )
                 self.out.append(paragraph)
                 self.contexts.append(replace(context, rows_ended=self.rows_ended))
@@ -3379,9 +3431,9 @@ class _Body:
                 _content_control(child)
                 content = child.find(_w("sdtContent"))
                 if content is not None:
-                    self.blocks(content, table, table_style, under)
+                    self.blocks(content, table, table_style, under, conditional)
             elif tag == _w("customXml"):
-                self.blocks(child, table, table_style, under)
+                self.blocks(child, table, table_style, under, conditional)
             elif tag in (_w("bookmarkStart"), _w("bookmarkEnd")):
                 self.loose_bookmarks.add(child.get(_w("id"), ""))
             elif tag in (_w("sectPr"), _w("tcPr")) or tag in _PROPERTIES or tag in _MARKERS:
@@ -3402,8 +3454,8 @@ class _Body:
             (s.conditional for s in self.styles.chain(table_style) if s.conditional), None
         )
         if problem is not None:
-            # Formatting for the first row, banded rows and the like; the reader does not apply
-            # it, so formatting that could hide or change text is refused.
+            # Formatting for the first row, banded rows and the like that could hide or change
+            # text, other than what the reader applies (_TableLayout).
             raise DocxRefusedError("unsupported-element", problem)
         floating = element.find(f"{_w('tblPr')}/{_w('tblpPr')}")
         indent = _twips(element.find(f"{_w('tblPr')}/{_w('tblInd')}"), "w")
@@ -3415,27 +3467,45 @@ class _Body:
             raise DocxRefusedError("unsupported-formatting", "a table placed off the page")
         rows: list[ET.Element] = []
         _collect(element, _w("tr"), rows, {_w("tblPr"), _w("tblGrid")})
-        emphasis = frozenset().union(
-            *(s.conditional_emphasis for s in self.styles.chain(table_style))
+        chain = self.styles.chain(table_style)
+        # The conditional parts that set what the reader reports, by type, and from which style.
+        active = [
+            {kind: rpr for kind, part in s.parts.items() if (rpr := _applied(part)) is not None}
+            for s in chain
+        ]
+        cells_of: list[list[ET.Element]] = []
+        for row in rows:
+            cells_of.append([])
+            _collect(row, _w("tc"), cells_of[-1], {_w("trPr"), _w("tblPrEx")})
+        layout = (
+            _TableLayout(
+                element, rows, cells_of, chain, active, self.story is not None or bool(outer)
+            )
+            if any(active)
+            else None
         )
-        turned_on = _turned_on(element, rows) if emphasis else set()
         # Under a cell without shading of its own: the table's, its style's (any part of it,
         # as the reader does not apply the parts), or what is under the table.
         shadings = [element.find(f"{_w('tblPr')}/{_w('shd')}")]
         shadings += [row.find(f"{_w('tblPrEx')}/{_w('shd')}") for row in rows]
-        shadings += [shd for style in self.styles.chain(table_style) for shd in style.shadings]
+        shadings += [shd for style in chain for shd in style.shadings]
         # ponytail: every one of them may be under any cell (the union); a cell's own place in
         # the table and the parts tblLook turns on would narrow it, if refusals call for it.
         painted = [c for shd in shadings for c in self.styles.painted(shd)]
         table_under = tuple(dict.fromkeys([*painted, *(under or self.styles.page)]))
-        for row_index, row in enumerate(rows):
-            cells: list[ET.Element] = []
-            _collect(row, _w("tc"), cells, {_w("trPr"), _w("tblPrEx")})
+        for row_index, (row, cells) in enumerate(zip(rows, cells_of, strict=True)):
             for cell_index, cell in enumerate(cells):
                 start, first = len(self.out), len(self.contexts)
                 own = tuple(self.styles.painted(cell.find(f"{_w('tcPr')}/{_w('shd')}")))
+                applied, unknown = (
+                    ((), None) if layout is None else layout.cell(row_index, cell_index)
+                )
                 self.blocks(
-                    cell, outer or (index, row_index, cell_index), table_style, own or table_under
+                    cell,
+                    outer or (index, row_index, cell_index),
+                    table_style,
+                    own or table_under,
+                    () if unknown else applied,
                 )
                 height = row.find(f"{_w('trPr')}/{_w('trHeight')}")
                 if (
@@ -3447,15 +3517,12 @@ class _Body:
                 ):
                     # A row of exact height lower than its lines: Word clips what does not fit.
                     raise DocxRefusedError("unsupported-formatting", "a row too low for its text")
-                parts = _parts_of(row, row_index, len(rows), cell_index, len(cells))
-                # A part the reader does not know counts as on everywhere.
-                if any(p.text for p in self.out[start:]) and (
-                    emphasis & turned_on & parts or emphasis - _TABLE_PARTS
+                if unknown is not None and any(
+                    p.text or (p.numbering and p.numbering.num_id) for p in self.out[start:]
                 ):
-                    # Word applies the table style's bold or italic for the part to text there
-                    # (and nothing where tblLook turns the part off); the reader does not.
+                    # What Word applies to the text or label there is not on record.
                     raise DocxRefusedError(
-                        "unsupported-element", "conditional bold or italic over text"
+                        "unsupported-element", f"conditional table formatting {unknown}"
                     )
                 merge = cell.find(f"{_w('tcPr')}/{_w('vMerge')}")
                 continued = merge is not None and merge.get(_w("val")) in (None, "continue")
@@ -3476,9 +3543,15 @@ class _Body:
             self.rows_ended += 1
 
 
-# tblLook's bits (ECMA-376 17.4.56): the parts a table turns on, and the banding it turns off.
-_LOOK = {"firstRow": 0x20, "lastRow": 0x40, "firstColumn": 0x80, "lastColumn": 0x100}
-_NO_BANDS = {"noHBand": (0x200, "Horz"), "noVBand": (0x400, "Vert")}
+# tblLook's settings (ECMA-376 17.4.56), each an attribute or a bit of val.
+_LOOK = {
+    "firstRow": 0x20,
+    "lastRow": 0x40,
+    "firstColumn": 0x80,
+    "lastColumn": 0x100,
+    "noHBand": 0x200,
+    "noVBand": 0x400,
+}
 _TABLE_PARTS = {
     "wholeTable",
     "firstRow",
@@ -3494,67 +3567,226 @@ _TABLE_PARTS = {
     "swCell",
     "seCell",
 }
+# The parts by Word's precedence, nearest first (corner, row, column; then the vertical and the
+# horizontal band), each with where it stands and the looks that turn it on.
+_REGIONS = (
+    ("nwCell", ("top", "left"), ("firstRow", "firstColumn")),
+    ("neCell", ("top", "right"), ("firstRow", "lastColumn")),
+    ("swCell", ("bottom", "left"), ("lastRow", "firstColumn")),
+    ("seCell", ("bottom", "right"), ("lastRow", "lastColumn")),
+    ("firstRow", ("top",), ("firstRow",)),
+    ("lastRow", ("bottom",), ("lastRow",)),
+    ("firstCol", ("left",), ("firstColumn",)),
+    ("lastCol", ("right",), ("lastColumn",)),
+)
+# What a conditional part sets that the reader applies (bold, italic, capitals, strike) or holds
+# to what it reads without it (colour, size, spacing); a part setting none of these changes
+# nothing the reader produces.
+_APPLIED = {
+    _w(name)
+    for name in ("b", "bCs", "i", "iCs", "caps", "strike", "color", "sz", "szCs", "spacing")
+}
 
 
-def _turned_on(table: ET.Element, rows: list[ET.Element]) -> set[str]:
-    """The conditional parts the table may turn on: every part any of its looks turns on.
+def _applied(part: ET.Element) -> ET.Element | None:
+    """A conditional part's run properties, if they set anything the reader applies or holds."""
+    rpr = part.find(_w("rPr"))
+    return rpr if rpr is not None and any(c.tag in _APPLIED for c in rpr) else None
 
-    The table's ``tblLook`` and each row's (``tblPrEx``), by attribute and by ``val`` bits; a
-    part on in any, and every part of a table without a look, counts as on. So do the corner
-    cells, and banding unless every look turns it off.
+
+def _looks(table: ET.Element, rows: list[ET.Element]) -> dict[str, bool | None]:
+    """Each of the table's looks: on, off, or None where Word's answer is not on record.
+
+    An attribute wins over the ``val`` bits (table-style-attr-vs-val-row, -attr-off-val-on);
+    without one the bit decides (table-style-look-val-only); with neither, not on record. With
+    no ``tblLook`` the first row is on (table-style-no-look) and the rest not on record. A row's
+    own look (``tblPrEx``) that says otherwise than the table's makes that look not on record.
     """
-    looks = [table.find(f"{_w('tblPr')}/{_w('tblLook')}")]
-    if looks[0] is None:
-        return set(_TABLE_PARTS)
-    looks += [row.find(f"{_w('tblPrEx')}/{_w('tblLook')}") for row in rows]
-    on = {"wholeTable", "nwCell", "neCell", "swCell", "seCell"}
-    for look in (look for look in looks if look is not None):
-        raw = look.get(_w("val"))
-        if raw is not None and not re.fullmatch(r"[0-9A-Fa-f]{1,4}", raw):
-            raise DocxRefusedError("invalid-package", f"tblLook {raw!r} is not a number")
-        bits = None if raw is None else int(raw, 16)
-
-        def says(
-            name: str, bit: int, look: ET.Element = look, bits: int | None = bits
-        ) -> list[bool]:
-            """What the look's attribute and its bits each say of ``name``, where they do."""
-            attribute = look.get(_w(name))
-            found = [] if attribute is None else [attribute.lower() not in ("0", "false", "off")]
-            return found + ([] if bits is None else [bool(bits & bit)])
-
-        on |= {name.replace("Column", "Col") for name, bit in _LOOK.items() if any(says(name, bit))}
-        for name, (bit, way) in _NO_BANDS.items():
-            if not all(says(name, bit)) or not says(name, bit):
-                on |= {f"band1{way}", f"band2{way}"}
-    return on
+    looks = [_look(table.find(f"{_w('tblPr')}/{_w('tblLook')}"))]
+    looks += [
+        _look(found)
+        for row in rows
+        if (found := row.find(f"{_w('tblPrEx')}/{_w('tblLook')}")) is not None
+    ]
+    return {
+        name: looks[0][name] if all(x[name] == looks[0][name] for x in looks) else None
+        for name in _LOOK
+    }
 
 
-def _parts_of(row: ET.Element, index: int, rows: int, cell: int, cells: int) -> set[str]:
-    """The conditional parts a cell may be in, counted generously.
+def _look(look: ET.Element | None) -> dict[str, bool | None]:
+    """What one ``tblLook`` says of each look (``_looks``)."""
+    if look is None:
+        return {name: True if name == "firstRow" else None for name in _LOOK}
+    raw = look.get(_w("val"))
+    if raw is not None and not re.fullmatch(r"[0-9A-Fa-f]{1,4}", raw):
+        raise DocxRefusedError("invalid-package", f"tblLook {raw!r} is not a number")
+    out: dict[str, bool | None] = {}
+    for name, bit in _LOOK.items():
+        stated = (look.get(_w(name)) or "").lower()
+        if stated:
+            out[name] = True if stated in ("1", "true", "on") else (
+                False if stated in ("0", "false", "off") else None
+            )  # fmt: skip
+        else:
+            out[name] = None if raw is None else bool(int(raw, 16) & bit)
+    return out
 
-    A header row (``tblHeader``) is a first row too, and every cell of a row whose grid starts or
-    ends early (``gridBefore``, ``gridAfter``) a first and a last cell.
+
+class _TableLayout:
+    """Where a table style's conditional parts stand in one table, as Word applies them.
+
+    Word's answers, each a case in ``corpus/numbering-cases`` (table-style-*): a part applies
+    where its look turns it on (``_looks``); the first row is row 0 and every row marked
+    ``tblHeader`` at the top; a corner needs both its row's and its column's look on; the
+    whole-table part is never applied; bands only where the style sets a band size (n rows or
+    columns to a band) and the look does not turn them off, counted past the first row (column)
+    only where its look is on and the style defines that part. Nearest first: corner, row,
+    column, vertical band, horizontal band. ``cell`` names what is not on record, which is
+    refused over text: a look or band size not on record; a corner without both looks on, or on
+    a header row past the first; the last row or column under banding where the style defines
+    it; first and last row (or column, or two corners) over one cell; header rows below a row
+    that is none, or past the first under banding; parts or band sizes from a ``basedOn`` style,
+    or the table's own band size; a part of no known type; and, where a part applies, a row off
+    the grid (``gridBefore``, ``gridAfter``), merged cells, a nested table, or a table in a
+    note, header, footer, comment or another table.
     """
-    first = index == 0 or row.find(f"{_w('trPr')}/{_w('tblHeader')}") is not None
-    last = index == rows - 1
-    shifted = any(
-        row.find(f"{_w('trPr')}/{_w(n)}") is not None for n in ("gridBefore", "gridAfter")
-    )
-    left, right = cell == 0 or shifted, cell == cells - 1 or shifted
-    parts = {"wholeTable", "band1Horz", "band2Horz", "band1Vert", "band2Vert"}
-    for name, inside in (
-        ("firstRow", first),
-        ("lastRow", last),
-        ("firstCol", left),
-        ("lastCol", right),
-        ("nwCell", first and left),
-        ("neCell", first and right),
-        ("swCell", last and left),
-        ("seCell", last and right),
-    ):
-        if inside:
-            parts.add(name)
-    return parts
+
+    def __init__(
+        self,
+        table: ET.Element,
+        rows: list[ET.Element],
+        cells: list[list[ET.Element]],
+        chain: list[_Style],
+        active: list[dict[str, ET.Element]],
+        outside: bool,
+    ) -> None:
+        self.parts = active[0]
+        self.below = {kind for found in active[1:] for kind in found}
+        self.defined = set(chain[0].parts)
+        self.defined_below = {kind for style in chain[1:] for kind in style.parts}
+        # The band sizes (rows, columns), and whether one is set otherwise than by the style.
+        self.sizes = chain[0].bands
+        self.sizes_elsewhere = [
+            _band_size(table, way) is not None or any(s.bands[i] is not None for s in chain[1:])
+            for i, way in enumerate(("Row", "Col"))
+        ]
+        self.looks = _looks(table, rows)
+        self.cells = cells
+        headers = [bool(_on(r.find(f"{_w('trPr')}/{_w('tblHeader')}"))) for r in rows]
+        # How many rows at the top are header rows, and the header rows below a row that is none.
+        self.headers = headers.index(False) if False in headers else len(headers)
+        self.stray = [header and i > self.headers for i, header in enumerate(headers)]
+        self.shifted = [
+            any(r.find(f"{_w('trPr')}/{_w(n)}") is not None for n in ("gridBefore", "gridAfter"))
+            for r in rows
+        ]
+        self.merged = any(
+            c.find(f"{_w('tcPr')}/{_w('vMerge')}") is not None
+            or c.find(f"{_w('tcPr')}/{_w('hMerge')}") is not None
+            or (
+                (span := c.find(f"{_w('tcPr')}/{_w('gridSpan')}")) is not None
+                and span.get(_w("val")) != "1"
+            )
+            for row in cells
+            for c in row
+        )
+        self.outside = outside
+
+    def cell(self, row: int, column: int) -> tuple[tuple[ET.Element, ...], str | None]:
+        """The run properties of the parts Word applies to a cell, and what is not on record.
+
+        The run properties nearest first; what is not on record None if nothing is.
+        """
+        parts = self.parts.keys() | self.below
+        count = len(self.cells[row])
+        # Where the cell stands; anywhere, for a row off the grid or merged cells.
+        anywhere = self.shifted[row] or self.merged
+        place = {
+            "top": row < max(self.headers, 1) or self.stray[row] or self.merged,
+            "bottom": row == len(self.cells) - 1 or self.merged,
+            "left": column == 0 or anywhere,
+            "right": column == count - 1 or anywhere,
+        }
+        applied: list[str] = []
+        unknown = [f"({kind}) of no known type" for kind in sorted(parts - _TABLE_PARTS)]
+        for kind, where, names in _REGIONS:
+            if kind not in parts or not all(place[p] for p in where):
+                continue
+            said = [self.looks[name] for name in names]
+            if all(said) and not (kind in ("nwCell", "neCell") and row and not self.merged):
+                applied.append(kind)
+            elif len(names) > 1 or None in said:
+                unknown.append(f"({kind}) under a look or header row not on record")
+        for way, index, number in (("Vert", column, count), ("Horz", row, len(self.cells))):
+            if {f"band1{way}", f"band2{way}"} & parts:
+                band, why = self._band(way, index, number, anywhere)
+                unknown += [why] if why else []
+                applied += [band] if band in parts else []
+        if {"firstRow", "lastRow"} <= set(applied) or {"firstCol", "lastCol"} <= set(applied):
+            unknown.append("(first and last) over one cell")
+        if len({"nwCell", "neCell", "swCell", "seCell"} & set(applied)) > 1:
+            unknown.append("(corners) over one cell")
+        if applied or unknown:
+            nested = any(t.tag == _w("tbl") for t in self.cells[row][column].iter())
+            for problem, why in (
+                (bool(set(applied) & self.below), "set through basedOn"),
+                (self.stray[row], "over a header row below a row that is none"),
+                (self.shifted[row], "in a row off the grid"),
+                (self.merged, "in a table with merged cells"),
+                (nested, "over a nested table"),
+                (self.outside, "in a nested table, a note, header, footer or comment"),
+            ):
+                if problem:
+                    unknown.append(why)
+        rprs = tuple(self.parts[kind] for kind in applied if kind in self.parts)
+        return rprs, (unknown[0] if unknown else None)
+
+    def _band(self, way: str, index: int, number: int, anywhere: bool) -> tuple[str, str | None]:
+        """The band a row (``Horz``) or column (``Vert``) stands in, or why it is not on record.
+
+        The band "" where it stands in none.
+        """
+        size = self.sizes[way == "Vert"]
+        off = self.looks["noVBand" if way == "Vert" else "noHBand"]
+        if self.sizes_elsewhere[way == "Vert"]:
+            return "", f"(band{way}) under a band size not on record"
+        if size is None or off is True:
+            # No band size, no bands (table-style-bands-on-1H, -default-1H).
+            return "", None
+        if off is None or not re.fullmatch(r"[1-9][0-9]{0,3}", size):
+            return "", f"(band{way}) under a look or band size not on record"
+        if anywhere:
+            return "", f"(band{way}) in a row off the grid or among merged cells"
+        first, last, look_first, look_last = (
+            ("firstCol", "lastCol", "firstColumn", "lastColumn")
+            if way == "Vert"
+            else ("firstRow", "lastRow", "firstRow", "lastRow")
+        )
+        skip = 0
+        if first in self.defined | self.defined_below:
+            on = self.looks[look_first]
+            if (
+                first not in self.defined
+                or on is None
+                or (on and way == "Horz" and self.headers > 1)
+            ):
+                return "", f"(band{way}) past a {first} not on record"
+            # Counted past the first row (column) the style defines (table-style-sized-row-vs-band,
+            # -col-vs-vband); from it where it does not (-hband-first-last, -vband-firstcol).
+            skip = int(on)
+        if (
+            last in self.defined | self.defined_below
+            and self.looks[look_last] is not False
+            and index == number - 1
+        ):
+            # Whether banding passes over a last row (column) the style defines: not on record.
+            # Where it defines none, banding goes on (table-style-hband-lastrow, -vband-lastcol).
+            return "", f"(band{way}) over a {last} not on record"
+        position = index - skip
+        if position < 0:
+            return "", None
+        return f"band{position // int(size) % 2 + 1}{way}", None
 
 
 def _collect(element: ET.Element, wanted: str, out: list[ET.Element], silent: set[str]) -> None:

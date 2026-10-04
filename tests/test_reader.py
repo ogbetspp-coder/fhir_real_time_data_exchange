@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import struct
 import zipfile
 import zlib
@@ -1715,13 +1716,15 @@ def test_conditional_table_formatting_that_cannot_change_the_text_is_read() -> N
         '</w:rPr><w:tcPr><w:shd w:val="clear" w:fill="D9D9D9"/></w:tcPr>'
     )
     # As in the ATMP template, the table turns its first row off (tblLook 0000), so Word
-    # shows no bold or italic there; with it on, or no look, it would (refused above).
+    # shows no bold or italic there.
     off = _in_banded(r("<w:t>10</w:t>")).replace(
         "</w:tblPr>", '<w:tblLook w:val="0000"/></w:tblPr>'
     )
     (paragraph,) = read_docx(docx(off, harmless))
     assert (paragraph.text, paragraph.marks) == ("10", ())
-    assert refusal(_in_banded(r("<w:t>10</w:t>")), harmless) == "unsupported-element"
+    # With no look, Word turns the first row on and applies its bold and italic there.
+    (paragraph,) = read_docx(docx(_in_banded(r("<w:t>10</w:t>")), harmless))
+    assert [m.kind for m in paragraph.marks] == ["bold", "italic"]
 
 
 @pytest.mark.parametrize(
@@ -1731,7 +1734,12 @@ def test_conditional_table_formatting_that_cannot_change_the_text_is_read() -> N
         '<w:rPr><w:sz w:val="2"/></w:rPr>',
         '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr>',
         '<w:rPr><w:rFonts w:ascii="Wingdings" w:hAnsi="Wingdings"/></w:rPr>',
-        "<w:rPr><w:caps/></w:rPr>",
+        "<w:rPr><w:smallCaps/></w:rPr>",
+        '<w:rPr><w:vertAlign w:val="superscript"/></w:rPr>',
+        '<w:rPr><w:u w:val="single"/></w:rPr>',
+        "<w:rPr><w:dstrike/></w:rPr>",
+        '<w:rPr><w:highlight w:val="yellow"/></w:rPr>',
+        "<w:rPr><w:vanish/></w:rPr>",
         '<w:pPr><w:shd w:val="clear" w:fill="FFFF00"/></w:pPr>',
     ],
 )
@@ -2833,13 +2841,14 @@ def _styled_table(look: str, rows: list[list[str]], props: str = "<w:b/><w:i/>")
     [
         '<w:tblLook w:val="04A0"/>',  # Word's default: first row and first column on
         '<w:tblLook w:val="0000" w:firstRow="1"/>',
-        "",  # no tblLook: what Word turns on is not on record
+        "",  # no tblLook: Word turns the first row on (table-style-no-look)
     ],
 )
-def test_conditional_emphasis_in_a_region_the_table_turns_on_is_refused(look: str) -> None:
+def test_conditional_emphasis_in_a_region_the_table_turns_on_is_applied(look: str) -> None:
     # Word applies firstRow b+i where tblLook turns the first row on, and nothing where off.
     body, styles = _styled_table(look, [["Frequency"], ["Very common"]])
-    assert refusal(body, styles) == "unsupported-element"
+    marks = [[m.kind for m in x.marks] for x in read_docx(docx(body, styles))]
+    assert marks == [["bold", "italic"], []]
 
 
 def test_conditional_emphasis_is_read_where_the_table_turns_it_off_or_holds_no_text() -> None:
@@ -2993,3 +3002,372 @@ def test_symbol_text_in_a_bidirectional_embedding_is_refused() -> None:
     for direction in ("rtl", "ltr"):
         assert refusal(p(f'<w:dir w:val="{direction}">{run}</w:dir>')) == "symbol-font"
     assert text_of(p(run)) == ["\u03b1"]
+
+
+# --- table styles' conditional formatting, as Word applies it (docx-reader/1.24.0) -------------
+# Each grid is Word's answer to the same table in corpus/numbering-cases (table-style-*): each
+# cell's bold (B), italic (I), capitals (C) and strike (S), rows top to bottom.
+
+ALL_LOOKS = (
+    '<w:tblLook w:val="06A0" w:firstRow="1" w:lastRow="1" w:firstColumn="1" w:lastColumn="1" '
+    'w:noHBand="0" w:noVBand="0"/>'
+)
+NO_LOOKS = (
+    '<w:tblLook w:val="0000" w:firstRow="0" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" '
+    'w:noHBand="0" w:noVBand="0"/>'
+)
+SIZE_ONE = '<w:tblPr><w:tblStyleRowBandSize w:val="1"/><w:tblStyleColBandSize w:val="1"/></w:tblPr>'
+OFF = '<w:b w:val="0"/>'
+
+
+def t_style(*parts: tuple[str, str], base: str = "", extra: str = "") -> str:
+    """Table style T with conditional parts (type, run properties); ``base`` goes before them."""
+    body = "".join(
+        f'<w:tblStylePr w:type="{k}"><w:rPr>{v}</w:rPr></w:tblStylePr>' for k, v in parts
+    )
+    return f'<w:style w:type="table" w:styleId="T"><w:name w:val="T"/>{base}{body}</w:style>{extra}'
+
+
+def t_table(look: str = ALL_LOOKS, size: int = 3, props: str = "", rows: str = "") -> str:
+    """A size-by-size table in style T, one run in each cell; ``rows`` opens every row."""
+    return (
+        f'<w:tbl><w:tblPr><w:tblStyle w:val="T"/>{look}</w:tblPr>'
+        + "".join(
+            f"<w:tr>{rows}"
+            + "".join(f"<w:tc>{p(r(f'<w:t>r{i}c{j}</w:t>', props))}</w:tc>" for j in range(size))
+            + "</w:tr>"
+            for i in range(size)
+        )
+        + "</w:tbl>"
+    )
+
+
+def grid(body: str, styles: str) -> str:
+    """Each cell's bold, italic, capitals and strike, as read and certified (rows split by |)."""
+    value = json.loads(served(docx(body, styles))[0])
+    assert "refusal" not in value, value.get("refusal")
+    letters = {"bold": "B", "italic": "I", "caps": "C", "strike": "S"}
+    cells = [
+        "".join(letters[m["kind"]] for m in x["marks"] if m["kind"] in letters) or "."
+        for x in value["paragraphs"]
+    ]
+    size = round(len(cells) ** 0.5)
+    return "|".join(" ".join(cells[i * size : (i + 1) * size]) for i in range(size))
+
+
+HEADERS = "<w:trPr><w:tblHeader/></w:trPr>"
+CHARACTER_B = '<w:style w:type="character" w:styleId="C"><w:rPr><w:b/></w:rPr></w:style>'
+NORMAL = '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:rPr>{}</w:rPr></w:style>'
+APPLIED = {
+    # Each part where all looks are on; the whole-table part never.
+    "type-firstRow": (t_table(), t_style(("firstRow", "<w:b/>")), "B B B|. . .|. . ."),
+    "type-lastRow": (t_table(), t_style(("lastRow", "<w:b/>")), ". . .|. . .|B B B"),
+    "type-firstCol": (t_table(), t_style(("firstCol", "<w:b/>")), "B . .|B . .|B . ."),
+    "type-lastCol": (t_table(), t_style(("lastCol", "<w:b/>")), ". . B|. . B|. . B"),
+    "type-nwCell": (t_table(), t_style(("nwCell", "<w:b/>")), "B . .|. . .|. . ."),
+    "type-neCell": (t_table(), t_style(("neCell", "<w:b/>")), ". . B|. . .|. . ."),
+    "type-swCell": (t_table(), t_style(("swCell", "<w:b/>")), ". . .|. . .|B . ."),
+    "type-seCell": (t_table(), t_style(("seCell", "<w:b/>")), ". . .|. . .|. . B"),
+    "type-wholeTable": (t_table(), t_style(("wholeTable", "<w:b/>")), ". . .|. . .|. . ."),
+    # Looks: an attribute over the val bits, else the bit; no look turns the first row on.
+    "look-off": (
+        t_table(NO_LOOKS.replace('noHBand="0" w:noVBand="0"', 'noHBand="1" w:noVBand="1"')),
+        t_style(("firstRow", "<w:b/>"), ("band1Horz", "<w:i/>")),
+        ". . .|. . .|. . .",
+    ),
+    "attr-vs-val-row": (
+        t_table('<w:tblLook w:val="0000" w:firstRow="1"/>'),
+        t_style(("firstRow", "<w:b/>")),
+        "B B B|. . .|. . .",
+    ),
+    "attr-off-val-on": (
+        t_table('<w:tblLook w:val="0020" w:firstRow="0"/>'),
+        t_style(("firstRow", "<w:b/>")),
+        ". . .|. . .|. . .",
+    ),
+    "look-val-only": (
+        t_table('<w:tblLook w:val="0020"/>'),
+        t_style(("firstRow", "<w:b/>")),
+        "B B B|. . .|. . .",
+    ),
+    "no-look": (t_table(""), t_style(("firstRow", "<w:b/>")), "B B B|. . .|. . ."),
+    # A row's own look that says what the table's does (as the EMA ATMP template has it).
+    "row-look-agrees": (
+        t_table(
+            '<w:tblLook w:val="0020"/>', rows='<w:tblPrEx><w:tblLook w:val="0020"/></w:tblPrEx>'
+        ),
+        t_style(("firstRow", "<w:b/>")),
+        "B B B|. . .|. . .",
+    ),
+    # Bands: only with a band size, n rows or columns to a band, unless the look turns them off.
+    "bands-on-1H": (t_table(NO_LOOKS), t_style(("band1Horz", "<w:b/>")), ". . .|. . .|. . ."),
+    "sized-1H": (
+        t_table(NO_LOOKS),
+        t_style(("band1Horz", "<w:b/>"), base=SIZE_ONE),
+        "B B B|. . .|B B B",
+    ),
+    "sized-2H": (
+        t_table(NO_LOOKS),
+        t_style(("band2Horz", "<w:b/>"), base=SIZE_ONE),
+        ". . .|B B B|. . .",
+    ),
+    "sized-1V": (
+        t_table(NO_LOOKS),
+        t_style(("band1Vert", "<w:b/>"), base=SIZE_ONE),
+        "B . B|B . B|B . B",
+    ),
+    "sized-row2": (
+        t_table(NO_LOOKS),
+        t_style(
+            ("band1Horz", "<w:b/>"), base='<w:tblPr><w:tblStyleRowBandSize w:val="2"/></w:tblPr>'
+        ),
+        "B B B|B B B|. . .",
+    ),
+    "sized-hband-off-attr": (
+        t_table('<w:tblLook w:val="0000" w:noHBand="1" w:noVBand="0"/>'),
+        t_style(("band1Horz", "<w:b/>"), base=SIZE_ONE),
+        ". . .|. . .|. . .",
+    ),
+    "sized-hband-off-val": (
+        t_table('<w:tblLook w:val="0200"/>'),
+        t_style(("band1Horz", "<w:b/>"), base=SIZE_ONE),
+        ". . .|. . .|. . .",
+    ),
+    # Banding counts past the first row (column) where its look is on and the style defines it,
+    # from it where the style does not; a last row (column) the style does not define is banded.
+    "sized-row-vs-band": (
+        t_table('<w:tblLook w:val="0000" w:firstRow="1" w:noHBand="0" w:noVBand="1"/>'),
+        t_style(("band1Horz", "<w:b/>"), ("firstRow", OFF), base=SIZE_ONE),
+        ". . .|B B B|. . .",
+    ),
+    "hband-first-last": (
+        t_table(
+            '<w:tblLook w:val="0000" w:firstRow="1" w:lastRow="1" w:noHBand="0" w:noVBand="1"/>', 4
+        ),
+        t_style(("band1Horz", "<w:b/>"), base=SIZE_ONE),
+        "B B B B|. . . .|B B B B|. . . .",
+    ),
+    "col-vs-vband": (
+        t_table('<w:tblLook w:val="0000" w:firstColumn="1" w:noVBand="0" w:noHBand="1"/>', 4),
+        t_style(("band1Vert", "<w:b/>"), ("firstCol", OFF), base=SIZE_ONE),
+        "|".join([". B . B"] * 4),
+    ),
+    "vband-firstcol": (
+        t_table('<w:tblLook w:val="0000" w:firstColumn="1" w:noVBand="0" w:noHBand="1"/>', 4),
+        t_style(("band1Vert", "<w:b/>"), base=SIZE_ONE),
+        "|".join(["B . B ."] * 4),
+    ),
+    "hband-lastrow": (
+        t_table('<w:tblLook w:val="0000" w:lastRow="1" w:noHBand="0" w:noVBand="1"/>', 4),
+        t_style(("band2Horz", "<w:b/>"), base=SIZE_ONE),
+        ". . . .|B B B B|. . . .|B B B B",
+    ),
+    # Precedence: horizontal band < vertical band < column < row < corner.
+    "corner-vs-row": (
+        t_table(),
+        t_style(("firstRow", "<w:b/>"), ("nwCell", OFF)),
+        ". B B|. . .|. . .",
+    ),
+    "row-vs-col": (
+        t_table(),
+        t_style(("firstRow", "<w:b/>"), ("firstCol", OFF)),
+        "B B B|. . .|. . .",
+    ),
+    "col-vs-row": (
+        t_table(),
+        t_style(("firstCol", "<w:b/>"), ("firstRow", OFF)),
+        ". . .|B . .|B . .",
+    ),
+    "lastcol-vs-row": (
+        t_table(
+            '<w:tblLook w:val="0000" w:lastColumn="1" w:lastRow="1" w:noHBand="1" w:noVBand="1"/>',
+            4,
+        ),
+        t_style(("lastCol", "<w:b/>"), ("lastRow", OFF), base=SIZE_ONE),
+        ". . . B|. . . B|. . . B|. . . .",
+    ),
+    "sized-v-vs-h": (
+        t_table(NO_LOOKS),
+        t_style(("band1Vert", "<w:b/>"), ("band1Horz", OFF), base=SIZE_ONE),
+        "B . B|B . B|B . B",
+    ),
+    # Over the table style's own properties at its level; a toggle across levels; direct wins.
+    "base-and-row": (
+        t_table(),
+        t_style(("firstRow", "<w:b/>"), base="<w:rPr><w:b/></w:rPr>"),
+        "B B B|B B B|B B B",
+    ),
+    "charstyle-and-row": (
+        t_table(props='<w:rStyle w:val="C"/>'),
+        t_style(("firstRow", "<w:b/>"), extra=CHARACTER_B),
+        ". . .|B B B|B B B",
+    ),
+    "parastyle-and-row": (
+        t_table(),
+        t_style(("firstRow", "<w:b/>"), extra=NORMAL.format("<w:b/>")),
+        ". . .|B B B|B B B",
+    ),
+    "italic-toggle-para": (
+        t_table('<w:tblLook w:val="0000" w:firstRow="1"/>'),
+        t_style(("firstRow", "<w:i/>"), extra=NORMAL.format("<w:i/>")),
+        ". . .|I I I|I I I",
+    ),
+    "direct-off": (t_table(props=OFF), t_style(("firstRow", "<w:b/>")), ". . .|. . .|. . ."),
+    "direct-on": (t_table(props="<w:b/>"), t_style(("firstRow", "<w:b/>")), "B B B|B B B|B B B"),
+    # Capitals and strike as bold; header rows at the top are first rows.
+    "italic-caps": (
+        t_table(),
+        t_style(("firstRow", "<w:i/>"), ("lastRow", "<w:caps/>"), ("firstCol", "<w:strike/>")),
+        "IS I I|S . .|CS C C",
+    ),
+    "header-rows": (
+        t_table().replace("<w:tr>", f"<w:tr>{HEADERS}", 2),
+        t_style(("firstRow", "<w:b/>")),
+        "B B B|B B B|. . .",
+    ),
+}
+
+
+@pytest.mark.parametrize(("body", "styles", "shown"), APPLIED.values(), ids=APPLIED.keys())
+def test_table_style_parts_are_applied_as_word_applies_them(
+    body: str, styles: str, shown: str
+) -> None:
+    assert grid(body, styles) == shown
+
+
+def _nested_table(look: str = ALL_LOOKS) -> str:
+    inner = t_table(look, 1)
+    return t_table().replace("<w:t>r0c0</w:t></w:r></w:p>", "<w:t>r0c0</w:t></w:r></w:p>" + inner)
+
+
+NOT_ASKED = {
+    # The last row (column) under banding, where the style defines it.
+    "banded-defined-last-row": (
+        t_table(ALL_LOOKS),
+        t_style(("band1Horz", "<w:b/>"), ("lastRow", "<w:i/>"), base=SIZE_ONE),
+    ),
+    "banded-defined-last-column": (
+        t_table(ALL_LOOKS),
+        t_style(("band1Vert", "<w:b/>"), ("lastCol", "<w:i/>"), base=SIZE_ONE),
+    ),
+    # A corner without both its looks on; on a header row past the first.
+    "corner-one-look": (
+        t_table('<w:tblLook w:val="0000" w:firstRow="1" w:firstColumn="0"/>'),
+        t_style(("nwCell", "<w:b/>")),
+    ),
+    "corner-no-look": (t_table('<w:tblLook w:val="0000"/>'), t_style(("nwCell", "<w:b/>"))),
+    "corner-header-row": (
+        t_table().replace("<w:tr>", f"<w:tr>{HEADERS}", 2),
+        t_style(("nwCell", "<w:b/>")),
+    ),
+    # Looks not on record: other than the first row with no look; neither attribute nor bit;
+    # a row's own look that says otherwise.
+    "no-look-last-row": (t_table(""), t_style(("lastRow", "<w:b/>"))),
+    "look-unsaid": (t_table('<w:tblLook w:firstRow="1"/>'), t_style(("lastRow", "<w:b/>"))),
+    "row-look-differs": (
+        t_table(
+            '<w:tblLook w:val="0000"/>', rows='<w:tblPrEx><w:tblLook w:val="0020"/></w:tblPrEx>'
+        ),
+        t_style(("firstRow", "<w:b/>")),
+    ),
+    # Band sizes not on record: zero, set by the table, from a basedOn style.
+    "band-size-zero": (
+        t_table(NO_LOOKS),
+        t_style(
+            ("band1Horz", "<w:b/>"), base='<w:tblPr><w:tblStyleRowBandSize w:val="0"/></w:tblPr>'
+        ),
+    ),
+    "band-size-of-the-table": (
+        t_table(NO_LOOKS + '<w:tblStyleRowBandSize w:val="1"/>'),
+        t_style(("band1Horz", "<w:b/>")),
+    ),
+    # Parts through basedOn; a part of no known type.
+    "based-on": (
+        t_table(),
+        '<w:style w:type="table" w:styleId="T"><w:basedOn w:val="U"/></w:style>'
+        + t_style(("firstRow", "<w:b/>")).replace('"T"', '"U"'),
+    ),
+    "unknown-type": (t_table(), t_style(("firstRows", "<w:b/>"))),
+    # First and last row over one cell; a header row below a row that is none; banding past
+    # several header rows.
+    "first-and-last-row": (t_table(size=1), t_style(("firstRow", "<w:b/>"), ("lastRow", OFF))),
+    "stray-header": (
+        t_table().replace("</w:tr><w:tr>", f"</w:tr><w:tr>{HEADERS}", 1),
+        t_style(("firstRow", "<w:b/>")),
+    ),
+    "banding-past-headers": (
+        t_table().replace("<w:tr>", f"<w:tr>{HEADERS}", 2),
+        t_style(("firstRow", "<w:i/>"), ("band1Horz", "<w:b/>"), base=SIZE_ONE),
+    ),
+    # Where a part applies: a row off the grid, merged cells, a nested table, or the table
+    # nested in another.
+    "row-off-the-grid": (
+        t_table(rows='<w:trPr><w:gridBefore w:val="1"/></w:trPr>'),
+        t_style(("firstRow", "<w:b/>")),
+    ),
+    "merged-cells": (
+        t_table().replace("<w:tc>", '<w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr>', 1),
+        t_style(("firstRow", "<w:b/>")),
+    ),
+    "nested-under-part": (
+        _nested_table('<w:tblLook w:val="0000"/>'),
+        t_style(("firstRow", "<w:b/>")),
+    ),
+    "nested-table-applies": (
+        _nested_table().replace(ALL_LOOKS, '<w:tblLook w:val="0000"/>', 1),
+        t_style(("firstRow", "<w:b/>")),
+    ),
+}
+
+
+@pytest.mark.parametrize(("body", "styles"), NOT_ASKED.values(), ids=NOT_ASKED.keys())
+def test_table_style_parts_word_was_not_asked_about_are_refused(body: str, styles: str) -> None:
+    assert refusal(body, styles) == "unsupported-element"
+    # Over no text, nothing of it is drawn.
+    empty = re.sub(r"<w:r><w:t>r[0-9]c[0-9]</w:t></w:r>", "", body)
+    assert set(text_of(empty, styles)) == {""}
+
+
+def test_a_table_style_part_defined_twice_is_refused_wherever_the_style_is_used() -> None:
+    styles = t_style(("firstRow", "<w:b/>"), ("firstRow", "<w:i/>"))
+    assert refusal(t_table(), styles) == "unsupported-element"
+    assert refusal(t_table(NO_LOOKS), styles) == "unsupported-element"
+
+
+def test_table_style_parts_in_a_note_are_refused_and_in_the_body_read() -> None:
+    styles = t_style(("firstRow", "<w:b/>"))
+    note = fnote(1, p(r("<w:footnoteRef/>")) + t_table())
+    with pytest.raises(DocxRefusedError, match=r"a note, header"):
+        read_document(docx(p(r("<w:t>a</w:t>") + ref(1)), styles, footnotes=SEPARATORS + note))
+    assert grid(t_table(), styles) == "B B B|. . .|. . ."
+
+
+def test_conditional_colours_and_fonts_are_read_only_where_they_change_nothing() -> None:
+    # A part's colour or font is not on record: read where the text looks the same without it.
+    white = '<w:rPr><w:color w:val="FFFFFF"/></w:rPr>'
+    styles = t_style(("firstRow", '<w:b/><w:color w:val="000000"/>'), base=white)
+    assert refusal(t_table(), styles) == "unsupported-element"  # faint without it, not with it
+    styles = t_style(("firstRow", '<w:b/><w:color w:val="1F497D"/><w:sz w:val="18"/>'))
+    assert grid(t_table(), styles) == "B B B|. . .|. . ."
+    # A Wingdings table whose first row's part sets Arial: Word's font there is not on record.
+    wingdings = '<w:rPr><w:rFonts w:ascii="Wingdings" w:hAnsi="Wingdings"/></w:rPr>'
+    styles = t_style(
+        ("firstRow", '<w:b/><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/>'), base=wingdings
+    )
+    only_first = re.sub(r"<w:r><w:t>r[12]c[0-9]</w:t></w:r>", "", t_table())
+    assert refusal(only_first, styles) == "symbol-font"
+
+
+def test_a_based_on_table_style_whose_parts_set_no_mark_changes_nothing() -> None:
+    # Its part's cell shading is no run property: the table's own style's bold is applied.
+    shaded = '<w:tcPr><w:shd w:val="clear" w:fill="D9D9D9"/></w:tcPr>'
+    based = (
+        '<w:style w:type="table" w:styleId="U"><w:tblStylePr w:type="firstRow">'
+        f"{shaded}</w:tblStylePr></w:style>"
+    )
+    styles = t_style(("firstRow", "<w:b/>"), base='<w:basedOn w:val="U"/>', extra=based)
+    assert grid(t_table(), styles) == "B B B|. . .|. . ."
+    # Where the based-on part sets a mark too, how Word merges them is not on record.
+    marking = based.replace(shaded, "<w:rPr><w:i/></w:rPr>")
+    styles = t_style(("firstRow", "<w:b/>"), base='<w:basedOn w:val="U"/>', extra=marking)
+    assert refusal(t_table(), styles) == "unsupported-element"

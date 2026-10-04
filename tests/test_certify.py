@@ -18,6 +18,7 @@ import hashlib
 import json
 import pickle
 import random
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -39,7 +40,20 @@ from label_docx.certify import (
 from label_docx.output import canonical
 from label_docx.word import SUFFIXES, label_as_drawn
 from lock import MANIFESTS
-from test_reader import LINE, SHAPE, WP, W, _alternate, docx
+from test_reader import (
+    ALL_LOOKS,
+    APPLIED,
+    LINE,
+    NO_LOOKS,
+    NOT_ASKED,
+    SHAPE,
+    WP,
+    W,
+    _alternate,
+    docx,
+    t_style,
+    t_table,
+)
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 # A character no document holds and no reading can produce: an inserted or substituted
@@ -2661,28 +2675,6 @@ def test_complex_script_whose_emphasis_settings_differ_is_never_certified(run: s
     DocxSource(docx("<w:p><w:r><w:rPr><w:rtl/><w:b/><w:bCs/></w:rPr><w:t>abc</w:t></w:r></w:p>"))
 
 
-def test_conditional_emphasis_over_text_in_a_part_the_table_turns_on_is_never_certified() -> None:
-    styles = (
-        '<w:style w:type="table" w:styleId="T"><w:tblStylePr w:type="firstRow">'
-        "<w:rPr><w:b/></w:rPr></w:tblStylePr></w:style>"
-    )
-
-    def table(look: str, first: str) -> bytes:
-        return docx(
-            f'<w:tbl><w:tblPr><w:tblStyle w:val="T"/>{look}</w:tblPr>'
-            f"<w:tr><w:tc><w:p>{first}</w:p></w:tc></w:tr>"
-            "<w:tr><w:tc><w:p><w:r><w:t>Very common</w:t></w:r></w:p></w:tc></w:tr></w:tbl>",
-            styles=styles,
-        )
-
-    text = "<w:r><w:t>Frequency</w:t></w:r>"
-    for look in ('<w:tblLook w:val="04A0"/>', '<w:tblLook w:firstRow="1"/>', ""):
-        with pytest.raises(CertificationError):
-            DocxSource(table(look, text))
-    DocxSource(table('<w:tblLook w:val="0000"/>', text))
-    DocxSource(table('<w:tblLook w:val="04A0"/>', ""))
-
-
 def test_the_check_reads_the_bundle_strictly_and_on_its_own() -> None:
     # S34, S35: one reading of each name, no NaN, the first entry's Composition; S71: a long
     # character reference reads as the reader reads it, and nesting is counted without recursion.
@@ -2743,152 +2735,105 @@ def test_symbol_text_drawn_as_complex_script_is_never_certified() -> None:
 # --- mutation survivors, part a: table looks and regions, merged cells, complex script, fonts
 
 
-_EVERYWHERE = {(row, cell) for row in range(2) for cell in range(2)}
-# The cells of a 2 x 2 table (row, cell) each conditional part stands in.
-_PLACES = {
-    **dict.fromkeys(
-        ("wholeTable", "band1Horz", "band2Horz", "band1Vert", "band2Vert"), _EVERYWHERE
-    ),
-    "firstRow": {(0, 0), (0, 1)},
-    "lastRow": {(1, 0), (1, 1)},
-    "firstCol": {(0, 0), (1, 0)},
-    "lastCol": {(0, 1), (1, 1)},
-    "nwCell": {(0, 0)},
-    "neCell": {(0, 1)},
-    "swCell": {(1, 0)},
-    "seCell": {(1, 1)},
-}
-_CORNERS = {"wholeTable", "nwCell", "neCell", "swCell", "seCell"}
-_HORIZONTAL = {"band1Horz", "band2Horz"}
-_VERTICAL = {"band1Vert", "band2Vert"}
+def _checked_grid(body: str, styles: str) -> str:
+    """Each cell's bold, italic, capitals and strike as the check works them out (rows by |)."""
+    letters = {"bold": "B", "italic": "I", "caps": "C", "strike": "S"}
+    paragraphs = DocxSource(docx(body, styles=styles)).body.paragraphs
+    cells = [
+        "".join(letters[k] for k in sorted(kinds, key=list(letters).index) if k in letters) or "."
+        for paragraph in paragraphs
+        for kinds in [set().union(*(s.kinds for s in paragraph.segments))]
+    ]
+    size = round(len(cells) ** 0.5)
+    return "|".join(" ".join(cells[i * size : (i + 1) * size]) for i in range(size))
 
 
-def _emphasis_refused(
-    part: str,
-    texted: set[tuple[int, int]],
-    look: str = "",
-    rows: tuple[str, ...] = ("", ""),
-    emphasis: str = "<w:b/>",
-) -> bool:
-    """Whether the check refuses a two-cell-wide table whose style sets ``emphasis`` on ``part``,
-    with text in the cells ``texted``; ``rows`` holds what goes first in each row."""
-    style = (
-        f'<w:style w:type="table" w:styleId="T"><w:tblStylePr w:type="{part}">'
-        f"<w:rPr>{emphasis}</w:rPr></w:tblStylePr></w:style>"
-    )
-    cells = (
-        "".join(
-            f"<w:tc><w:p>{'<w:r><w:t>x</w:t></w:r>' if (row, cell) in texted else ''}</w:p></w:tc>"
-            for cell in range(2)
-        )
-        for row in range(len(rows))
-    )
-    body = (
-        f'<w:tbl><w:tblPr><w:tblStyle w:val="T"/>{look}</w:tblPr>'
-        + "".join(f"<w:tr>{extra}{inner}</w:tr>" for extra, inner in zip(rows, cells, strict=True))
-        + "</w:tbl>"
-    )
-    try:
-        DocxSource(docx(body, styles=style))
-    except CertificationError as error:
-        if "conditional emphasis" not in str(error):
-            raise
-        return True
-    return False
+@pytest.mark.parametrize(("body", "styles", "shown"), APPLIED.values(), ids=APPLIED.keys())
+def test_the_check_works_out_table_style_parts_as_word_applies_them(
+    body: str, styles: str, shown: str
+) -> None:
+    assert _checked_grid(body, styles) == shown
 
 
-def _parts_on(look: str, rows: tuple[str, ...] = ("", "")) -> set[str]:
-    """The parts a table with this look (and these rows) turns on, text in every cell."""
-    return {part for part in _PLACES if _emphasis_refused(part, _EVERYWHERE, look, rows)}
+@pytest.mark.parametrize(("body", "styles"), NOT_ASKED.values(), ids=NOT_ASKED.keys())
+def test_table_style_parts_word_was_not_asked_about_are_never_certified(
+    body: str, styles: str
+) -> None:
+    with pytest.raises(CertificationError, match=r"table style's part|table look"):
+        DocxSource(docx(body, styles=styles))
+    # Over no text, nothing of it is drawn.
+    DocxSource(docx(re.sub(r"<w:r><w:t>r[0-9]c[0-9]</w:t></w:r>", "", body), styles=styles))
 
 
-def test_each_conditional_part_stands_in_its_cells_only() -> None:
-    for part, places in _PLACES.items():
-        for place in sorted(_EVERYWHERE):
-            assert _emphasis_refused(part, {place}) == (place in places), (part, place)
-
-
-def test_a_header_row_is_a_first_row_and_a_row_off_the_grid_is_every_edge() -> None:
-    header = ("", "<w:trPr><w:tblHeader/></w:trPr>", "")
-    assert _emphasis_refused("firstRow", {(1, 0)}, rows=header)
-    assert not _emphasis_refused("firstRow", {(1, 0)}, rows=("", "", ""))
-    for grid in ("gridBefore", "gridAfter"):
-        early = (f'<w:trPr><w:{grid} w:val="1"/></w:trPr>', "")
-        assert _emphasis_refused("firstCol", {(0, 1)}, rows=early)
-        assert _emphasis_refused("lastCol", {(0, 0)}, rows=early)
-        assert not _emphasis_refused("firstCol", {(1, 1)}, rows=early)
+def test_a_result_without_a_table_style_parts_marks_is_not_certified() -> None:
+    data = docx(t_table(), styles=t_style(("firstRow", "<w:b/>"), ("lastRow", "<w:caps/>")))
+    value = json.loads(output.read(data)[0])
+    assert value["paragraphs"][0]["marks"] == [{"start": 0, "end": 4, "kind": "bold"}]
+    for drop in ("bold", "caps"):
+        changed = copy.deepcopy(value)
+        for paragraph in changed["paragraphs"]:
+            paragraph["marks"] = [m for m in paragraph["marks"] if m["kind"] != drop]
+        with pytest.raises(CertificationError, match="not Word's"):
+            certify_docx(data, changed)
 
 
 @pytest.mark.parametrize(
-    ("look", "on"),
+    "props",
     [
-        ("", set(_PLACES)),
-        ('w:val="0000"', _CORNERS | _HORIZONTAL | _VERTICAL),
-        # A bit the look does not read turns nothing on or off.
-        ('w:val="0001"', _CORNERS | _HORIZONTAL | _VERTICAL),
-        ('w:val="0020"', _CORNERS | _HORIZONTAL | _VERTICAL | {"firstRow"}),
-        ('w:val="0040"', _CORNERS | _HORIZONTAL | _VERTICAL | {"lastRow"}),
-        ('w:val="0080"', _CORNERS | _HORIZONTAL | _VERTICAL | {"firstCol"}),
-        ('w:val="0100"', _CORNERS | _HORIZONTAL | _VERTICAL | {"lastCol"}),
-        ('w:val="0200"', _CORNERS | _VERTICAL),
-        ('w:val="0400"', _CORNERS | _HORIZONTAL),
-        ('w:val="04a0"', _CORNERS | _HORIZONTAL | {"firstRow", "firstCol"}),
-        ('w:firstRow="1"', _CORNERS | _HORIZONTAL | _VERTICAL | {"firstRow"}),
-        ('w:lastRow="1"', _CORNERS | _HORIZONTAL | _VERTICAL | {"lastRow"}),
-        ('w:firstColumn="1"', _CORNERS | _HORIZONTAL | _VERTICAL | {"firstCol"}),
-        ('w:lastColumn="1"', _CORNERS | _HORIZONTAL | _VERTICAL | {"lastCol"}),
-        ('w:noHBand="1"', _CORNERS | _VERTICAL),
-        ('w:noVBand="true"', _CORNERS | _HORIZONTAL),
-        *(
-            (f'w:firstRow="{off}" w:noHBand="{off}"', _CORNERS | _HORIZONTAL | _VERTICAL)
-            for off in ("0", "false", "off", "Off")
-        ),
-        # A part is on where the bits or the attribute say so; banding unless both turn it off.
-        ('w:val="0020" w:firstRow="0"', _CORNERS | _HORIZONTAL | _VERTICAL | {"firstRow"}),
-        ('w:val="0000" w:firstRow="1"', _CORNERS | _HORIZONTAL | _VERTICAL | {"firstRow"}),
-        ('w:val="0200" w:noHBand="0"', _CORNERS | _HORIZONTAL | _VERTICAL),
-        ('w:val="0000" w:noHBand="1"', _CORNERS | _HORIZONTAL | _VERTICAL),
-        ('w:val="0200" w:noHBand="1"', _CORNERS | _VERTICAL),
+        "<w:smallCaps/>",
+        "<w:dstrike/>",
+        '<w:vertAlign w:val="superscript"/>',
+        '<w:u w:val="single"/>',
+        "<w:vanish/>",
+        "<w:specVanish/>",
     ],
 )
-def test_a_table_look_turns_parts_on_by_its_bits_and_its_attributes(
-    look: str, on: set[str]
-) -> None:
-    assert _parts_on(f"<w:tblLook {look}/>" if look else "") == on
+def test_a_part_setting_a_mark_word_was_not_asked_about_is_never_certified(props: str) -> None:
+    with pytest.raises(CertificationError, match="not asked about"):
+        DocxSource(docx(t_table(), styles=t_style(("firstRow", props))))
+    DocxSource(docx(t_table(NO_LOOKS), styles=t_style(("firstRow", props))))
 
 
-def test_every_look_of_the_table_and_of_its_rows_counts() -> None:
-    def row(look: str) -> str:
-        return f'<w:tblPrEx><w:tblLook w:val="{look}"/></w:tblPrEx>'
+def test_a_font_a_part_sets_is_certified_only_where_it_changes_nothing() -> None:
+    wingdings = '<w:rPr><w:rFonts w:ascii="Wingdings" w:hAnsi="Wingdings"/></w:rPr>'
+    part = ("firstRow", '<w:b/><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/>')
+    only_first = re.sub(r"<w:r><w:t>r[12]c[0-9]</w:t></w:r>", "", t_table())
+    with pytest.raises(CertificationError, match="a font set by a table style's part"):
+        DocxSource(docx(only_first, styles=t_style(part, base=wingdings)))
+    assert _checked_grid(t_table(), t_style(part)) == "B B B|. . .|. . ."
 
-    plain = _CORNERS | _HORIZONTAL | _VERTICAL
-    assert _parts_on('<w:tblLook w:val="0000"/>', (row("0020"), "")) == plain | {"firstRow"}
-    # Banding is off only where every look turns it off.
-    assert _parts_on('<w:tblLook w:val="0200"/>', (row("0000"), "")) == plain
-    assert _parts_on('<w:tblLook w:val="0200"/>', (row("0200"), row("0200"))) == plain - _HORIZONTAL
+
+def test_each_toggle_a_part_sets_counts_and_complex_script_twins_with_them() -> None:
+    hebrew = t_table().replace("<w:t>r0c0</w:t>", "<w:t>\u05d0</w:t>")
+    for twin in ("<w:bCs/>", "<w:iCs/>"):
+        with pytest.raises(CertificationError, match="complex script"):
+            DocxSource(docx(hebrew, styles=t_style(("firstRow", twin))))
+        DocxSource(docx(hebrew.replace(ALL_LOOKS, NO_LOOKS), styles=t_style(("firstRow", twin))))
+
+
+def test_the_default_table_style_sets_parts_on_a_table_naming_none() -> None:
+    style = t_style(("firstRow", "<w:b/>")).replace('w:styleId="T"', 'w:default="1" w:styleId="T"')
+    body = t_table("").replace('<w:tblStyle w:val="T"/>', "")
+    assert _checked_grid(body, style) == "B B B|. . .|. . ."
+    assert _checked_grid(body, style.replace(' w:default="1"', "")) == ". . .|. . .|. . ."
 
 
 @pytest.mark.parametrize("value", ["00000", "zz", "", "+20", " 20"])
 def test_a_table_look_the_check_cannot_read_is_never_certified(value: str) -> None:
     with pytest.raises(CertificationError, match="table look"):
-        _emphasis_refused("firstRow", _EVERYWHERE, f'<w:tblLook w:val="{value}"/>')
+        DocxSource(
+            docx(t_table(f'<w:tblLook w:val="{value}"/>'), styles=t_style(("firstRow", "<w:b/>")))
+        )
 
 
-@pytest.mark.parametrize("emphasis", ["<w:b/>", "<w:bCs/>", "<w:i/>", "<w:iCs/>"])
-def test_each_emphasis_setting_of_a_table_part_counts(emphasis: str) -> None:
-    assert _emphasis_refused("firstRow", {(0, 0)}, emphasis=emphasis)
-    assert not _emphasis_refused("firstRow", {(0, 0)}, emphasis="<w:caps/>")
-
-
-def test_the_default_table_style_sets_emphasis_on_a_table_naming_none() -> None:
-    style = (
-        '<w:style w:type="table" w:default="1" w:styleId="T"><w:tblStylePr w:type="firstRow">'
-        "<w:rPr><w:b/></w:rPr></w:tblStylePr></w:style>"
+def test_a_part_in_a_note_is_never_certified() -> None:
+    note = (
+        '<w:footnote w:id="1"><w:p><w:r><w:footnoteRef/></w:r></w:p>' + t_table() + "</w:footnote>"
     )
-    body = "<w:tbl><w:tr><w:tc><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl>"
-    with pytest.raises(CertificationError, match="conditional emphasis"):
-        DocxSource(docx(body, styles=style))
-    DocxSource(docx(body, styles=style.replace(' w:default="1"', "")))
+    body = '<w:p><w:r><w:t>a</w:t></w:r><w:r><w:footnoteReference w:id="1"/></w:r></w:p>'
+    data = docx(body, styles=t_style(("firstRow", "<w:b/>")), footnotes=note)
+    with pytest.raises(CertificationError, match="a note"):
+        DocxSource(data)
 
 
 @pytest.mark.parametrize("kind", ["character", "Xharacter", "run"])
