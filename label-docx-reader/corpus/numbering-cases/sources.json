@@ -1,0 +1,912 @@
+{
+  "schemaVersion": "1.0.0",
+  "note": "Synthetic list-numbering cases written by scripts/numbering_cases.py.",
+  "sources": [
+    {
+      "name": "Levels count and restart the deeper levels.",
+      "file": "multilevel.docx",
+      "sha256": "4190a564d1cc563a180fc6db24a5fa14ddf95902e65fd51872c13cd35b6447a5",
+      "bytes": 3762
+    },
+    {
+      "name": "Each number format at the edges of its range.",
+      "file": "formats.docx",
+      "sha256": "494ff88e90f40d1f4216752a2f4bf44c85b6f019a6e6471e139d2f53eab325e4",
+      "bytes": 5799
+    },
+    {
+      "name": "isLgl shows every level in decimal.",
+      "file": "legal.docx",
+      "sha256": "be5983db03b9e8a1781f8b837617ba2798a07153b37cb3a6e645e30fd04b65fd",
+      "bytes": 3112
+    },
+    {
+      "name": "lvlRestart 0: the level never restarts.",
+      "file": "restart-never.docx",
+      "sha256": "04b6b2a16e3313a51e521195aaefc5605eb517cef49b2a6066c5a51b37603c22",
+      "bytes": 3457
+    },
+    {
+      "name": "lvlRestart 0 on level 1, counted after a level 0 paragraph and the end of a table row (the reader refuses).",
+      "file": "restart-never-rows.docx",
+      "sha256": "2c4f79dc2e195871516ea7cb35e1f29326a12a6821ff97dc0d3ed9fcaba938cf",
+      "bytes": 3306
+    },
+    {
+      "name": "lvlRestart 1 on level 2: it restarts after level 0 only.",
+      "file": "restart-after-first.docx",
+      "sha256": "aa48a48f3a8dca6613701ef7af8c0c88c40c514dcb15fd6d358e4f2cfe5fabfe",
+      "bytes": 3665
+    },
+    {
+      "name": "Lists of different abstractNums count apart.",
+      "file": "two-definitions.docx",
+      "sha256": "a1c97b8fdf82d03e15f35ec89a2a88a129f35035c6af7088b64ae1ad73c68627",
+      "bytes": 3316
+    },
+    {
+      "name": "Two lists of one abstractNum that override nothing continue each other.",
+      "file": "shared-continue.docx",
+      "sha256": "a408beea90ff48a64c408ef33b2587f2cd8d6d6e5c9d00eb9ccf0ed2cefcf462",
+      "bytes": 3425
+    },
+    {
+      "name": "A new list with a startOverride restarts the shared count.",
+      "file": "start-override-restart.docx",
+      "sha256": "00d5a7e5d691662c597f023d491b903fba6cdd3b9ef2e6f1844ecddaa791cd07",
+      "bytes": 3538
+    },
+    {
+      "name": "A startOverride on the first list sets its start.",
+      "file": "start-override-first.docx",
+      "sha256": "c1d3b8a65704c41c3faa573cf97432eca280fb06f39a14029080182141b23c71",
+      "bytes": 3312
+    },
+    {
+      "name": "Back to the first list after a second restarted the count.",
+      "file": "return-after-restart.docx",
+      "sha256": "20a86c73e2af321d272d2bfa0a49ac70485b8afad9fe6fe3eb06337b3419f730",
+      "bytes": 3425
+    },
+    {
+      "name": "A list that overrides nothing after one that restarted.",
+      "file": "plain-after-restart.docx",
+      "sha256": "a0842636db8d397723bb68625e1b6f1609253af03e73d4d217ff656efe7ab9de",
+      "bytes": 3312
+    },
+    {
+      "name": "A new list restarts level 1 at 5 under a level 0 counted by another list.",
+      "file": "override-deeper-level.docx",
+      "sha256": "11d58b08f224a041fbbce024fac1a5d03234294c19f196c74acdb073ece1e221",
+      "bytes": 3551
+    },
+    {
+      "name": "A level shown before its parent level was counted.",
+      "file": "ancestor-never-counted.docx",
+      "sha256": "617e136f80bd10bd5c208c4431e43acb31bbe05864cb6a3f4e8fc54efbfb7837",
+      "bytes": 3426
+    },
+    {
+      "name": "A decimal level with no w:start.",
+      "file": "missing-start.docx",
+      "sha256": "f4b020efcd8da3cec4d6d41cbd3538d5b310c3e8b10ddc5e9aec12078e8a49bc",
+      "bytes": 2981
+    },
+    {
+      "name": "A style names numId 1 but no level; level 1 names the style.",
+      "file": "style-tied-deeper-level.docx",
+      "sha256": "73f18d5ea4c000816683ea221ec26d49664f6119af4def1308ff3c79f34adf33",
+      "bytes": 3289
+    },
+    {
+      "name": "A style names numId 1 but no level; level 0 names the style.",
+      "file": "style-tied-level-zero.docx",
+      "sha256": "11653d3f9bc4b19e5deac3399388b666050afa5c12e47424e37a13ae1ed8fece",
+      "bytes": 3177
+    },
+    {
+      "name": "A list linked through a numbering style shares the linked list's count.",
+      "file": "numbering-style-link.docx",
+      "sha256": "b4c87364de3fb2c67610fc2dac0ad0e9fd0ba1c19f188af37ce9717bb49ea021",
+      "bytes": 3436
+    },
+    {
+      "name": "A numStyleLink whose target abstractNum has no styleLink back.",
+      "file": "numbering-style-link-one-way.docx",
+      "sha256": "04ef975df766eebdbff187c73fe89bde80804c79438ffc6bf8986b236b3644ac",
+      "bytes": 3406
+    },
+    {
+      "name": "Back to a list with a startOverride after another list: does it restart again?",
+      "file": "override-return.docx",
+      "sha256": "eb5f8c7b32b9764e6082aaf139160dfc79715edee6c84d5fea84e3aab27d513b",
+      "bytes": 3538
+    },
+    {
+      "name": "A list that restarts level 1 at 5, then restarts level 1 itself after its level 0.",
+      "file": "override-restart-within.docx",
+      "sha256": "3612d10fe863e0f3486c9127efa08463052c4fdd0c8ef52be5c25e6f93c3d2fe",
+      "bytes": 3551
+    },
+    {
+      "name": "A new list with a startOverride on level 0, first used at level 1.",
+      "file": "override-ancestor.docx",
+      "sha256": "0600d4876dc95c1b4aa8f01df4550a8f9c8a7581e8e2c6f31ce81bd9910fb224",
+      "bytes": 3551
+    },
+    {
+      "name": "A list that redefines level 0 (w:lvl, start 1) after a list of the same abstractNum.",
+      "file": "level-override-shared.docx",
+      "sha256": "b886c90c0ca7f51dbf1a26cdfbf257c51fc6ca0e8f70b8de61a9e5f942d4e551",
+      "bytes": 3428
+    },
+    {
+      "name": "A list that redefines level 0 with start 7, after a list of the same abstractNum.",
+      "file": "level-override-start.docx",
+      "sha256": "46aa4382142654524821092aaf461a7f62df62cc25b7afdb6aa6eb783dc63ee3",
+      "bytes": 3428
+    },
+    {
+      "name": "A list that redefines level 0 with start 7, as the first list of its abstractNum.",
+      "file": "level-override-first.docx",
+      "sha256": "112a6938b56f6b3f93c30cd27869cc05cb0be1ca092e0de360bf8cfe5689385a",
+      "bytes": 3315
+    },
+    {
+      "name": "A startOverride on level 0 of a list first used at level 1, nothing counted before.",
+      "file": "override-implicit-ancestor.docx",
+      "sha256": "e55961207231b8972fabbedfed9594e0eef2a7b2dce397c30e6d95ccbafd43e3",
+      "bytes": 3439
+    },
+    {
+      "name": "Level 0 first reached at level 1 by a list with a startOverride, then another list.",
+      "file": "override-implicit-continued.docx",
+      "sha256": "a81b4c0bb973748a305cd0d93e0e2ed861e5cf34dc74803d806afb7b0a8d29d0",
+      "bytes": 3551
+    },
+    {
+      "name": "Level 1 reached at level 2, after its list's startOverride was used.",
+      "file": "override-implicit-reused.docx",
+      "sha256": "4753e9403efcb154918e0e636f493f10011da0cc69022e740b0c2e9d835c0679",
+      "bytes": 3663
+    },
+    {
+      "name": "As override-implicit-continued, but the other list counts level 0 in a later row of a table: Word takes the override here, not in other tables (the reader refuses).",
+      "file": "override-implicit-rows.docx",
+      "sha256": "09dfca802aaebe99194446a0867fff2fbb8df7732a0144304ce61edb92989f47",
+      "bytes": 3506
+    },
+    {
+      "name": "Levels 0 and 1, both with startOverrides, first reached at level 2.",
+      "file": "override-implicit-levels.docx",
+      "sha256": "1b52d3a2462dc552948cd4ca1553ec50818246c506c95c2133a17cdd9ebb83d0",
+      "bytes": 3621
+    },
+    {
+      "name": "A level 2 item before levels 0 and 1 were counted, then levels 1 and 0.",
+      "file": "ancestor-two-levels.docx",
+      "sha256": "b9dc3744b284c81a68ab252f2050e17fcb331003cd10e5e9be8dbfa984f5d9a7",
+      "bytes": 3538
+    },
+    {
+      "name": "A level override replaces the level whole (the EMA template's Word 6 dash).",
+      "file": "level-override.docx",
+      "sha256": "9a345eee6dbd4ae92fca25235e2ec006f2fab5f3b82d806cc03608a188c4015e",
+      "bytes": 3200
+    },
+    {
+      "name": "Bullets in Symbol, in Courier New, and in the paragraph mark's font.",
+      "file": "bullets.docx",
+      "sha256": "62a355d1e912cb232cc60eacbd917ff31642219a2e0e428a88cb0cec3071b14b",
+      "bytes": 3721
+    },
+    {
+      "name": "Word's third-level bullet, the Wingdings square, stored as U+F0A7 and as \u00a7.",
+      "file": "bullets-wingdings.docx",
+      "sha256": "6f082fc46d4249770ab8059c02be357bd4d770955a756225d98e195fb3d9fc99",
+      "bytes": 3367
+    },
+    {
+      "name": "SEQ captions count 1, 2, 3, stored as Word prints them.",
+      "file": "fields-seq.docx",
+      "sha256": "fb03611eb720cb2673f7f88bacffdb92d38df0e0a1f440269ed11d0ba4918eed",
+      "bytes": 3504
+    },
+    {
+      "name": "One SEQ count shown in each number format.",
+      "file": "fields-seq-formats.docx",
+      "sha256": "09e3ebda048ab49e2a6b3bd947bc25c883a6768fa85a0ccfa0af2523ec048e05",
+      "bytes": 4518
+    },
+    {
+      "name": "Tables and figures count apart.",
+      "file": "fields-seq-identifiers.docx",
+      "sha256": "e19103afde4d87129ccbec4e508bb4213c4968bc10f17f8672d4201cd2299847",
+      "bytes": 3818
+    },
+    {
+      "name": "SEQ \\r sets, \\c repeats, \\n counts on, \\h counts and shows nothing.",
+      "file": "fields-seq-switches.docx",
+      "sha256": "3abf1d1951c0d83197eee8b6281befb3791d16e5ac6944f21b09455d75195259",
+      "bytes": 4404
+    },
+    {
+      "name": "SEQ \\s 1 restarts after each heading 1, not after a heading 2.",
+      "file": "fields-chapter-reset.docx",
+      "sha256": "6ac7a96f4521a6fd75259153a96d75647750fdc9571079f073beb177ea79950e",
+      "bytes": 4787
+    },
+    {
+      "name": "SEQ \\s 2 restarts after a heading 2 and after a heading 1.",
+      "file": "fields-chapter-reset-level-2.docx",
+      "sha256": "3bb60d3a0b7bfcfe0ed52e22bd767051a481e38cc6c001ba2e3deac38156a83b",
+      "bytes": 4880
+    },
+    {
+      "name": "Captions by chapter: STYLEREF 1 \\s, a hyphen, SEQ \\s 1; and the heading's text.",
+      "file": "fields-chapter-captions.docx",
+      "sha256": "7ef7e7939ed5b8f081515b30657c59b4d5af685309507a994f23d5fa5c199ad5",
+      "bytes": 5193
+    },
+    {
+      "name": "STYLEREF \\s of headings numbered 1. and 1.1. drops the final period.",
+      "file": "fields-chapter-dotted.docx",
+      "sha256": "adea78c1b9715abdeccbfc3fd8e373dae6cf8ac7661ce152a9d6d0ded933432c",
+      "bytes": 3956
+    },
+    {
+      "name": "Word's heading levels go by the style's name, not its outline level.",
+      "file": "fields-heading-by-name.docx",
+      "sha256": "ee0a173064750f01fd51479ca2ff822123dd230fd1e118a466cfd345464ab2ec",
+      "bytes": 4228
+    },
+    {
+      "name": "STYLEREF before any paragraph of its style takes the next one.",
+      "file": "fields-styleref-forward.docx",
+      "sha256": "9ace8ecefeaf3e37c11eebe462c49eaffc068396ed8ed47512b126f4b1bf32e5",
+      "bytes": 3590
+    },
+    {
+      "name": "STYLEREF to a heading with a no-break space, a no-break hyphen and a soft hyphen: Word shows a space, a hyphen and nothing.",
+      "file": "fields-styleref-characters.docx",
+      "sha256": "88c47ad4033e1cdd2b53d9287e1982d36dacab2c6ad4d787d8c71fceb001ef50",
+      "bytes": 3753
+    },
+    {
+      "name": "STYLEREF to a heading with a Symbol character, which Word leaves out (the reader refuses).",
+      "file": "fields-styleref-symbol.docx",
+      "sha256": "f46e5f03ecda14776b2d3967fca0cddf5d50eab87e2b0edd0d95346301356c6d",
+      "bytes": 3688
+    },
+    {
+      "name": "A cross-reference (REF) to bookmarked text prints that text.",
+      "file": "fields-ref.docx",
+      "sha256": "48d644b4a225777e38a0f775da0d1015005881acc3045b9e1a2ba14075d40e30",
+      "bytes": 3122
+    },
+    {
+      "name": "A REF stored as other text than its bookmark's (the reader refuses).",
+      "file": "fields-ref-stale.docx",
+      "sha256": "aadaa74b16eed4f18115fb8c84f8d97ab8e8b8a7855f0e9c632e26b944f832ad",
+      "bytes": 2975
+    },
+    {
+      "name": "A REF to a bookmark that is not there; Word prints an error (the reader refuses).",
+      "file": "fields-ref-missing.docx",
+      "sha256": "caec02bbde333b95b35c54951058e834f39344da16c644f07e1bc1bf3414f8c7",
+      "bytes": 2841
+    },
+    {
+      "name": "A cross-reference to a caption: the caption's bookmark holds its SEQ.",
+      "file": "fields-ref-caption.docx",
+      "sha256": "22985d27fec53c65b992e2267841fedf0f04260d1e3807e077d229aed02ee724",
+      "bytes": 3689
+    },
+    {
+      "name": "A NOTEREF prints the mark of the note its bookmark holds.",
+      "file": "fields-noteref.docx",
+      "sha256": "e3032ddf3d4fc689f0f98b2a280cea475861d352f8ba19a68cfe8f5fcc60da65",
+      "bytes": 4194
+    },
+    {
+      "name": "A NOTEREF stored as 7 for note 1 (the reader refuses).",
+      "file": "fields-noteref-stale.docx",
+      "sha256": "2a13e4089d823427215772a3b7026f472ff6537733e72e1366e4d820267b07fc",
+      "bytes": 3910
+    },
+    {
+      "name": "DOCPROPERTY and HYPERLINK, which Word prints as stored.",
+      "file": "fields-stored.docx",
+      "sha256": "ff92577f32a18cb195acc09176557962df0ef46a58a81b2c8c721053f03cd866",
+      "bytes": 3155
+    },
+    {
+      "name": "A hidden SEQ with no stored result shows nothing and still counts: \\r 3, then 4.",
+      "file": "fields-seq-hidden-no-result.docx",
+      "sha256": "db657909d02c4ecde2230027e643c498b9ddde48ec4e946cef27fb9b7b9b9903",
+      "bytes": 3367
+    },
+    {
+      "name": "A SEQ with no stored result that would show a number (the reader refuses it).",
+      "file": "fields-seq-shown-no-result.docx",
+      "sha256": "35f989a1c7b640e55b9c66c289125b87531dc59db189c0686a9d0b11c585cc22",
+      "bytes": 2792
+    },
+    {
+      "name": "Captions stored as 7 and 7, which Word prints as 1 and 2 (the reader refuses).",
+      "file": "fields-stale.docx",
+      "sha256": "22e42c8c0532dd985bb4a9df1848490495a1e6c1269ef09a0aab605032878861",
+      "bytes": 3194
+    },
+    {
+      "name": "Bold, italic, caps and strike set every way a style can set them (one 'x' each).",
+      "file": "emphasis-toggles.docx",
+      "sha256": "28b1f3f2e06c075a73097e4c17828214940f2edb65b8dd924afe9773ea4f427d",
+      "bytes": 5944
+    },
+    {
+      "name": "lvlRestart 0 on level 1, counted by list 1, then shown in list 2's level 2 label after list 2's level 0 paragraph: Word draws it as a space.",
+      "file": "restart-never-shown-deeper.docx",
+      "sha256": "d15465eb5893330dbfaf21acbd2f2af068103f093067cac4c00031d5313bccb9",
+      "bytes": 3525
+    },
+    {
+      "name": "List 1 overrides level 1's start with 8; its level 0 paragraph restarts level 1, which list 2 counts next: from list 1's override.",
+      "file": "restart-source-override.docx",
+      "sha256": "25a23877dc276027b60b36f4a781364ff6cc0943915550c28772ec202a0d9096",
+      "bytes": 3340
+    },
+    {
+      "name": "List 1 overrides level 2's start; list 2's paragraph restarts level 2, which list 1 counts next: from the abstractNum's start.",
+      "file": "restart-source-plain.docx",
+      "sha256": "d3696855c4976fd5d1ecc74e21bbff19a7f7fb1d32c5acb75079424c1ae0ed09",
+      "bytes": 3515
+    },
+    {
+      "name": "List 1 overrides level 2's start; its level 1 paragraph restarts level 2, never yet counted, which list 2 counts first: from list 1's override.",
+      "file": "restart-source-unused.docx",
+      "sha256": "a7aca5dc84b209ef9871fee2566568fa4a5543ebf2d0fb20e8a3c278d6aa0ed2",
+      "bytes": 3500
+    },
+    {
+      "name": "List 1's level 1 paragraph restarts level 2, which list 3 counts next, in the next cell of the same row: from list 1's override.",
+      "file": "restart-source-cells.docx",
+      "sha256": "db9a5a3f7ffdab87cf5b6d5a0ec23774db3d10719806ba41435afdac7bf2e821",
+      "bytes": 3605
+    },
+    {
+      "name": "As restart-source-cells, but list 3 counts level 2 in the next row: not from list 1's override (the reader refuses).",
+      "file": "restart-source-rows.docx",
+      "sha256": "79c6d917ed2518af2f9659a1d6227001f91295ff25799e2a4c841b6a14bb626b",
+      "bytes": 3618
+    },
+    {
+      "name": "The document defaults turn the toggles on and styles of each kind turn them off: each kind that differs from the defaults turns them over.",
+      "file": "emphasis-defaults-off.docx",
+      "sha256": "509d8f091ed179600ea38cd7a6ff0464e58f7c0285feec0f94eb62ad089877eb",
+      "bytes": 5531
+    },
+    {
+      "name": "A default character style that turns bold on: Word does not apply it to text.",
+      "file": "default-character-style.docx",
+      "sha256": "9ef22c4d6a40ebc08d59963ccaba61a03c0c17d1bfdfcd0a6eed8413ac32537b",
+      "bytes": 2829
+    },
+    {
+      "name": "lvlRestart 1 on level 1, the level directly above written out: Word draws it empty.",
+      "file": "restart-level-above.docx",
+      "sha256": "0c42ffa7643a5269c103e4293c63f456b0b3c892250773a166dc1765dcd58d25",
+      "bytes": 3238
+    },
+    {
+      "name": "lvlRestart 0 on level 1, first counted by a level 2 item: Word draws it otherwise.",
+      "file": "restart-skipped-ancestor.docx",
+      "sha256": "60f7bacef4f598dbf31714a1f89e32684820e53c9d5d58f067ca77090062d499",
+      "bytes": 3345
+    },
+    {
+      "name": "The same toggles with the document defaults turning them on.",
+      "file": "emphasis-defaults.docx",
+      "sha256": "21c882458608d310f474348508cddaea519e01862017a6fd5d92ba24af8c7d68",
+      "bytes": 4337
+    },
+    {
+      "name": "Footnotes number 1, 2, 3 through the document.",
+      "file": "notes-continuous.docx",
+      "sha256": "cefb0cc55bb723e6a71b6857618a833487bdbd7ae8eb581dea40498f8bdcec31",
+      "bytes": 3955
+    },
+    {
+      "name": "Footnotes restart in each section (numRestart eachSect).",
+      "file": "notes-each-section.docx",
+      "sha256": "5787b5db07058aa972c2872c5f4b4494d629c2111956c56321609dc94ed29403",
+      "bytes": 4352
+    },
+    {
+      "name": "Footnotes from 5 in lower roman (the document's footnotePr).",
+      "file": "notes-start-format.docx",
+      "sha256": "bdbbdcb5e543123b4a659e7d37ddb867ba11d426e111973d05f6f258313efc10",
+      "bytes": 4351
+    },
+    {
+      "name": "The document's footnotePr, with the separators Word lists in it, and no section's.",
+      "file": "notes-document-format.docx",
+      "sha256": "566a66f4c2e6a2f2449017a8db77d276cf2c08f64e876923578abf3dfe6e4ecf",
+      "bytes": 4396
+    },
+    {
+      "name": "Footnotes from 5 in lower roman, set on the section as Word writes them.",
+      "file": "notes-section-rules.docx",
+      "sha256": "b9b25b7a8c607b1695508ae055c4687dfa9c47ed5625bae0dea071dbc0e62834",
+      "bytes": 3838
+    },
+    {
+      "name": "Footnotes in symbols (chicago) set on the section, past the fourth.",
+      "file": "notes-section-chicago.docx",
+      "sha256": "3fa4c70a131538b2ae05c68ed7f2fb5827a83a4d026829ca21363f2a2d587211",
+      "bytes": 4413
+    },
+    {
+      "name": "Footnotes in symbols (chicago), past the fourth.",
+      "file": "notes-chicago.docx",
+      "sha256": "028d55ff20fb8ce1cef138b588cef733aede9e022e9f52c8a6c717295de3e559",
+      "bytes": 4926
+    },
+    {
+      "name": "A footnote with a custom mark between two numbered ones: does it take a number?",
+      "file": "notes-custom-mark.docx",
+      "sha256": "697f8f35be0c31f75da2bb0aaf446c90bda6e1c45b72c29396f8a3abd6bb4269",
+      "bytes": 4035
+    },
+    {
+      "name": "Endnotes in Word's default format.",
+      "file": "notes-endnotes.docx",
+      "sha256": "222872d0fc7fb674e0aebcd40d002bc9f753197a5bfaec70ea2a0fa280180925",
+      "bytes": 3726
+    },
+    {
+      "name": "Footnotes and endnotes count apart.",
+      "file": "notes-mixed.docx",
+      "sha256": "267a03b96efbdb67cf1243dbd8d2349573c25772b16558f8629e9ffa2150c1ef",
+      "bytes": 4573
+    },
+    {
+      "name": "A footnote in a table cell counts in document order.",
+      "file": "notes-in-table.docx",
+      "sha256": "e4d9c36963916688854f9599bb14a0cb2a70940e826747de48e793c61f9c2399",
+      "bytes": 3787
+    },
+    {
+      "name": "Continuous footnotes; the second section sets numStart 10.",
+      "file": "notes-section-start-continuous.docx",
+      "sha256": "bd2cec4279b10b43210780c61eba89761a59dc0740c2922aadf388268a953e6d",
+      "bytes": 4064
+    },
+    {
+      "name": "Continuous footnotes; the second section sets upper letters.",
+      "file": "notes-section-format.docx",
+      "sha256": "be84d1f0183a7217f07c1783c5979a2e367866a5398b09a5dee2e24b38b59c5a",
+      "bytes": 4071
+    },
+    {
+      "name": "A picture in line with the text: Word's text shows it as '/'.",
+      "file": "drawing-inline-picture.docx",
+      "sha256": "f3cce2aad2510916e04eee9dd73ba6dee49fa8b653fcf0e93e29368f7d77e996",
+      "bytes": 4179
+    },
+    {
+      "name": "A picture anchored to the paragraph (floating): what Word's text shows for it.",
+      "file": "drawing-anchored-picture.docx",
+      "sha256": "a42be95767a36a3cd4afe4a29758d00f89c1dcaf3bba28d109b79893083b0099",
+      "bytes": 4575
+    },
+    {
+      "name": "A drawn line anchored to the paragraph, as the FDA template's rules: Word's text.",
+      "file": "drawing-anchored-line.docx",
+      "sha256": "831bd598649e83a84c4edd3c9dc135e256288d910221b0fbe1474deedf520ae2",
+      "bytes": 4667
+    },
+    {
+      "name": "A paragraph holding only an anchored drawn line, then text.",
+      "file": "drawing-anchored-line-alone.docx",
+      "sha256": "b7cbe3ed781b1064aca4d8ef5490e173c1c491087b5de72c72476a472bddc937",
+      "bytes": 4638
+    },
+    {
+      "name": "A drawn square in line with the text: Word's text.",
+      "file": "drawing-inline-shape.docx",
+      "sha256": "3dd60e1af142e6f18d1f69139062e00a2db13cc09d1aac1b6d8ec8672d72ee01",
+      "bytes": 4356
+    },
+    {
+      "name": "A drawn square anchored to the paragraph: Word's text.",
+      "file": "drawing-anchored-shape.docx",
+      "sha256": "750b0013e7fce81a82b98c78a73661362e97b615de68d825705ed0780b025c04",
+      "bytes": 4729
+    },
+    {
+      "name": "A VML picture in line with the text: Word's text.",
+      "file": "drawing-vml-inline-picture.docx",
+      "sha256": "66608d645ed50fcbdaa7f7d128b6f17b8d66a3089e5655351fc4d37ed584d0c3",
+      "bytes": 3721
+    },
+    {
+      "name": "A VML picture positioned absolutely (floating): Word's text.",
+      "file": "drawing-vml-floating-picture.docx",
+      "sha256": "f8d5a4e96fa7e285690698c77fee83e672a992335572a196760353cd32b6d4ae",
+      "bytes": 3776
+    },
+    {
+      "name": "firstRow",
+      "file": "table-style-type-firstRow.docx",
+      "sha256": "7eb3f0ea15c14f4ee0f455a185e22923fc2908368a90c7bd3fc726db73194db8",
+      "bytes": 3470
+    },
+    {
+      "name": "lastRow",
+      "file": "table-style-type-lastRow.docx",
+      "sha256": "5a5b4c83a9cbf58e2ef8db2d28a78eef866e92a8c2fbb9ad1cdb25163fa8b8b0",
+      "bytes": 3469
+    },
+    {
+      "name": "firstCol",
+      "file": "table-style-type-firstCol.docx",
+      "sha256": "1b725a970327d29b8fb559636b3a3ca3bb3f5615576be25122c2eb35e9f530fc",
+      "bytes": 3470
+    },
+    {
+      "name": "lastCol",
+      "file": "table-style-type-lastCol.docx",
+      "sha256": "8ace8aaaba76b06fb00b7d36d7e51ec2a9236c632b588e0af4247c43e485b2d5",
+      "bytes": 3469
+    },
+    {
+      "name": "band1Vert",
+      "file": "table-style-type-band1Vert.docx",
+      "sha256": "9bdae11617f8a30b310510fd49a3e77ee79a3f7f94b4c9ced0af72ccbd6341ed",
+      "bytes": 3471
+    },
+    {
+      "name": "band2Vert",
+      "file": "table-style-type-band2Vert.docx",
+      "sha256": "181e1899bb4c35d35249d4d4d9668b510303a0ada2a5fb4567ed5b5fa4309d6b",
+      "bytes": 3471
+    },
+    {
+      "name": "band1Horz",
+      "file": "table-style-type-band1Horz.docx",
+      "sha256": "716005c7362234a610ef97ab273d6737ada89f7cbd88e66fd6608dccae9756e6",
+      "bytes": 3471
+    },
+    {
+      "name": "band2Horz",
+      "file": "table-style-type-band2Horz.docx",
+      "sha256": "8e2f4a06408b47d78f0647ba5af3432e3eecf4742aa8181388b2ade461dd5d79",
+      "bytes": 3471
+    },
+    {
+      "name": "neCell",
+      "file": "table-style-type-neCell.docx",
+      "sha256": "16a6adb22c6c6f9dcf7efbb93806ca442794c31228fb20acc9a6ed43c51acec6",
+      "bytes": 3468
+    },
+    {
+      "name": "nwCell",
+      "file": "table-style-type-nwCell.docx",
+      "sha256": "330910d3811e7dd638409b0556b59fd46fb6768f1fc4ee28d6d22d5012f4eb5b",
+      "bytes": 3468
+    },
+    {
+      "name": "seCell",
+      "file": "table-style-type-seCell.docx",
+      "sha256": "9abc774034f3973c54f3c913817a6b75972e241b307164685f641b85b9e2dad9",
+      "bytes": 3468
+    },
+    {
+      "name": "swCell",
+      "file": "table-style-type-swCell.docx",
+      "sha256": "75dd006b1cc91d18c022219847760a126b7f3bab8c2496feff504503c48f8d2e",
+      "bytes": 3468
+    },
+    {
+      "name": "wholeTable",
+      "file": "table-style-type-wholeTable.docx",
+      "sha256": "6630d596bbc0e433f91d64b373cdaac59214f61ff73a3386fa0fd254b6c7933b",
+      "bytes": 3472
+    },
+    {
+      "name": "firstRow b, look all off",
+      "file": "table-style-look-off.docx",
+      "sha256": "61ae03807e11ee14cfbdce68d5d966af5b958a1f576098173c1806b5d4b82b9c",
+      "bytes": 3539
+    },
+    {
+      "name": "firstRow b, look by val bits only (0020 = firstRow)",
+      "file": "table-style-look-val-only.docx",
+      "sha256": "3e874e3cc98d1a19301208f784c47db6b434c896b8bc7def2711a1f9932ee7bf",
+      "bytes": 3378
+    },
+    {
+      "name": "firstRow b, no tblLook",
+      "file": "table-style-no-look.docx",
+      "sha256": "7dd0939a6fa9995e6e7fa0a2ecde891bcb50fa0397232a9d9ea6b5480e474b44",
+      "bytes": 3353
+    },
+    {
+      "name": "firstRow b, firstCol b=0",
+      "file": "table-style-row-vs-col.docx",
+      "sha256": "a030f6f94017822e62c9c04f0f26ddb25e266f906dfd863df90a0c164c5a8b05",
+      "bytes": 3548
+    },
+    {
+      "name": "firstCol b, firstRow b=0",
+      "file": "table-style-col-vs-row.docx",
+      "sha256": "0b29af76cafff707d1e7592af7bf6d25e64185f294b1cf75068014cf72f37c9e",
+      "bytes": 3548
+    },
+    {
+      "name": "wholeTable b, firstRow b=0",
+      "file": "table-style-whole-vs-row.docx",
+      "sha256": "3948e77de6c664c4c1a6f6a15ab648ce64d5627e14489239c09d31fd2f32a65c",
+      "bytes": 3550
+    },
+    {
+      "name": "band1Horz b, firstRow b=0",
+      "file": "table-style-band-vs-row.docx",
+      "sha256": "5731e1457adee191dd12118ef5dba82a8acb2e377318f639469de84af1f74af9",
+      "bytes": 3549
+    },
+    {
+      "name": "firstRow b, nwCell b=0",
+      "file": "table-style-corner-vs-row.docx",
+      "sha256": "62a44d974364b34930a854266d419e061e503aa87b7e23bceba91089a92007f3",
+      "bytes": 3546
+    },
+    {
+      "name": "firstRow b, run b=0",
+      "file": "table-style-direct-off.docx",
+      "sha256": "d6347469442b99fdaf7c241e6463393de0606e85c291efce0e36595227379f67",
+      "bytes": 3749
+    },
+    {
+      "name": "firstRow b, run b",
+      "file": "table-style-direct-on.docx",
+      "sha256": "9bbbeb9c8be5304e096c51a937619275b5d057c516e02ad9bf4fd11ff96aaf4a",
+      "bytes": 3659
+    },
+    {
+      "name": "table style base rPr b, firstRow b",
+      "file": "table-style-base-and-row.docx",
+      "sha256": "213dcbbe644bde2352fb06657e00a4dce80dda6f86f622dc53736ea1e84e2662",
+      "bytes": 3491
+    },
+    {
+      "name": "firstRow b, run in char style C (b)",
+      "file": "table-style-charstyle-and-row.docx",
+      "sha256": "b74acbe1d19d8c4f04b043cc51543d48c625db5a8dd863eec58de10d37b3805d",
+      "bytes": 3886
+    },
+    {
+      "name": "firstRow b, Normal style b",
+      "file": "table-style-parastyle-and-row.docx",
+      "sha256": "663ed6b2cad4265a5a2e1784642143f1d1947043de37993be4a2510abeb38c04",
+      "bytes": 3586
+    },
+    {
+      "name": "firstRow i, lastRow caps, firstCol strike",
+      "file": "table-style-italic-caps.docx",
+      "sha256": "c0c238409b590ef3610fb1a13bebf1b906d3bff3fb5e3c657ffa2af2f1c53eca",
+      "bytes": 3613
+    },
+    {
+      "name": "firstRow b, rows 0-1 marked tblHeader",
+      "file": "table-style-header-rows.docx",
+      "sha256": "a007a2690fcfcbcfa4dabad8e48bb70cadae7fd0b4ddb8dceb8ba3815502d909",
+      "bytes": 3532
+    },
+    {
+      "name": "band1Horz b, bands on (val 0, attrs 0)",
+      "file": "table-style-bands-on-1H.docx",
+      "sha256": "acf331b314f05838e8ef1eaa63c2517b0e7be51567b999c5e094421a52c1792c",
+      "bytes": 3471
+    },
+    {
+      "name": "band2Horz b, bands on",
+      "file": "table-style-bands-on-2H.docx",
+      "sha256": "74ac7d12cd4d2f5ad3bbc0372fd2217f76ca6b9192da02ac87c31dc7fd63ae73",
+      "bytes": 3471
+    },
+    {
+      "name": "band1Vert b, bands on",
+      "file": "table-style-bands-on-1V.docx",
+      "sha256": "bb95cc315059d94e4e28e51530b36dd3fc28d9c328701302318d181e45aaa029",
+      "bytes": 3471
+    },
+    {
+      "name": "band2Vert b, bands on",
+      "file": "table-style-bands-on-2V.docx",
+      "sha256": "730ecec5b44fb03ee13bfb1c9fd924d7cc5e7eb9fdbe96333d8b7c41471e345f",
+      "bytes": 3471
+    },
+    {
+      "name": "wholeTable b, look val 0",
+      "file": "table-style-whole-bands-on.docx",
+      "sha256": "f367817b51cf3967c2a8dcdeb7f1d2e17f457a5e3f989bb9195f1faf28601746",
+      "bytes": 3472
+    },
+    {
+      "name": "band1Horz b, Word's default look 04A0",
+      "file": "table-style-default-1H.docx",
+      "sha256": "95c969052941af3222204afaf3409090a718aca7fb3e12402bd41d54cafc318f",
+      "bytes": 3471
+    },
+    {
+      "name": "firstRow b, lastRow i, Word's default look",
+      "file": "table-style-default-firstrow.docx",
+      "sha256": "4ab38fa657f426523493e1fa2810a41bf80609ebbd09d0c58a3c01e2244e9834",
+      "bytes": 3537
+    },
+    {
+      "name": "firstRow b, val 0000 but firstRow=1",
+      "file": "table-style-attr-vs-val-row.docx",
+      "sha256": "5a98c09d4dd75a57930b221e7f20858991ea7db038a0cde6fb0bd154f72ab4c5",
+      "bytes": 3393
+    },
+    {
+      "name": "firstRow b, val 0020 but firstRow=0",
+      "file": "table-style-attr-off-val-on.docx",
+      "sha256": "f285d6fd4c1f9ca6f53a014e6c6441557ae333a368c51b239751adb61d8428d3",
+      "bytes": 3393
+    },
+    {
+      "name": "band1Horz b, firstRow b=0, bands and first row on",
+      "file": "table-style-band-vs-row-on.docx",
+      "sha256": "f1b325fe6be483bd58972ebb9769d5be3e975bf50ddd4fa93150d6a37cf766fc",
+      "bytes": 3500
+    },
+    {
+      "name": "band1Horz b, firstCol b=0, bands and first col on",
+      "file": "table-style-band-vs-col-on.docx",
+      "sha256": "f37c8ba4b179aef8acc718314e2811354ec4d0c516c849fbcae8cc9b820350b6",
+      "bytes": 3503
+    },
+    {
+      "name": "band1Vert b, band1Horz b=0, both bands on",
+      "file": "table-style-vband-vs-hband.docx",
+      "sha256": "e23a84d3709c4c9c279e5276c90cbec2432b567f4b9bc05def53da19ed2ce414",
+      "bytes": 3550
+    },
+    {
+      "name": "band1Horz b, band size 1",
+      "file": "table-style-sized-1H.docx",
+      "sha256": "5a959e4a9c47a6008a9a51026f51c8fd466425d423ad44f3fa3055d1e990bd3f",
+      "bytes": 3558
+    },
+    {
+      "name": "band2Horz b, band size 1",
+      "file": "table-style-sized-2H.docx",
+      "sha256": "f6b2ac7481be1386cfe88787ec55629fb500cb622f7d914ee63059bb33ab7f05",
+      "bytes": 3558
+    },
+    {
+      "name": "band1Vert b, band size 1",
+      "file": "table-style-sized-1V.docx",
+      "sha256": "e2b63a6ae3dd871525b56e158a091fe24dd044546f2f31530aaf221b9631a787",
+      "bytes": 3558
+    },
+    {
+      "name": "wholeTable b, band size 1",
+      "file": "table-style-sized-whole.docx",
+      "sha256": "cb107d34c36d4e3b6fc73340583b2177eb6676beb4a09984d86f8042ba989726",
+      "bytes": 3559
+    },
+    {
+      "name": "band1Horz b, row band size 2",
+      "file": "table-style-sized-row2.docx",
+      "sha256": "a6659dcbbb93228e6dce5313c0fb25994b12becaffc39e520e8bcdb6489b0a5d",
+      "bytes": 3524
+    },
+    {
+      "name": "band1Horz b, size 1, noHBand=1",
+      "file": "table-style-sized-hband-off-attr.docx",
+      "sha256": "8dae4638342da898e5a9a4082c43a7709723d7c5a677b9e042e082b9977fc47f",
+      "bytes": 3494
+    },
+    {
+      "name": "band1Horz b, size 1, val 0200 no attr",
+      "file": "table-style-sized-hband-off-val.docx",
+      "sha256": "3b029b06408b2d3b1654db5c106fdd2fdc7d6455f7f53a4e7aaa51c64b78e25b",
+      "bytes": 3466
+    },
+    {
+      "name": "band1Horz b, firstRow b=0, size 1, first row on",
+      "file": "table-style-sized-row-vs-band.docx",
+      "sha256": "565ea5a794d91e8e334c81ac105a1c335c6ec8c2ad2652b5bc24eb565c838bb5",
+      "bytes": 3587
+    },
+    {
+      "name": "band1Vert b, band1Horz b=0, size 1",
+      "file": "table-style-sized-v-vs-h.docx",
+      "sha256": "5944bac8dea2e6aba71ce1901d57bf7a0c654c24d1e03d15bf139e9b83de85c8",
+      "bytes": 3637
+    },
+    {
+      "name": "band1Vert b, first col on",
+      "file": "table-style-vband-firstcol.docx",
+      "sha256": "7e35402eda4192d21a1b92181f857abb3c650b416693eb7ec2bc802e2a93481f",
+      "bytes": 3898
+    },
+    {
+      "name": "band2Vert b, last col on",
+      "file": "table-style-vband-lastcol.docx",
+      "sha256": "0d8a035d9d90cfbb181a86987f5a4c0263f646b6673e77dfa5b6b665c69741ef",
+      "bytes": 3897
+    },
+    {
+      "name": "band2Horz b, last row on",
+      "file": "table-style-hband-lastrow.docx",
+      "sha256": "faa47b71c116bc68cc9e906d149ba431991df3bd2fa5756933eabd36550cbba2",
+      "bytes": 3894
+    },
+    {
+      "name": "band1Horz b, first+last row on",
+      "file": "table-style-hband-first-last.docx",
+      "sha256": "12b833c4954b8e7634d144516e23cba2c8acf0c1344802ed65737caff567cef1",
+      "bytes": 3909
+    },
+    {
+      "name": "band1Vert b, firstCol b=0, first col on",
+      "file": "table-style-col-vs-vband.docx",
+      "sha256": "ad4f4262ff89f5890a05e132229207356419de4fd32c40d63d697353a75d1993",
+      "bytes": 3976
+    },
+    {
+      "name": "lastCol b, lastRow b=0, both on",
+      "file": "table-style-lastcol-vs-row.docx",
+      "sha256": "6b420c85b629583a19182cf98c75d9e625171b1168876a52881c4c2489337ab2",
+      "bytes": 3986
+    },
+    {
+      "name": "firstRow i; Normal style i",
+      "file": "table-style-italic-toggle-para.docx",
+      "sha256": "0c85b83a53d478098476406831d4827c0eac7735cd836b557e9277ab1c2d9308",
+      "bytes": 3982
+    },
+    {
+      "name": "band1Horz b, row size 2, firstRow part, first row on",
+      "file": "table-style-row2-after-first.docx",
+      "sha256": "5c8bd17e90d4188006dd8c50c9606a4949b3585071211aa77ef95ae0ebac0952",
+      "bytes": 3869
+    },
+    {
+      "name": "band1Horz b, row size 3",
+      "file": "table-style-row3.docx",
+      "sha256": "396c789d94edc72275452ffa5f82c4da5895148c93f70c6074dbb2cd5a015f41",
+      "bytes": 3786
+    },
+    {
+      "name": "band1Vert b, col size 2",
+      "file": "table-style-col2.docx",
+      "sha256": "f7b2d16a9d9c8bd403ea6f525aaf9354fb291a180c2c003135e73a0063419f00",
+      "bytes": 3806
+    },
+    {
+      "name": "band1Vert b, col size 3, firstCol part, first col on",
+      "file": "table-style-col3-after-first.docx",
+      "sha256": "b68be8836a81a1e4deeef21614b273098ebb853d8020fc064e25ea53cd65272d",
+      "bytes": 3892
+    },
+    {
+      "name": "band1Horz b, row size 2, lastRow part, last row on",
+      "file": "table-style-row2-lastrow-part.docx",
+      "sha256": "0ba04c8eb9b151d6d9fa13ad5011f598f1a0abbb065b818ab3a8af58c6ced5e1",
+      "bytes": 3867
+    },
+    {
+      "name": "band2Horz b, row size 1, lastRow part, last row on",
+      "file": "table-style-row1-lastrow-part.docx",
+      "sha256": "52463eb118007c5ca140b661409fdf83af49852cd1be88334e2c5a1748c065c6",
+      "bytes": 3867
+    }
+  ]
+}

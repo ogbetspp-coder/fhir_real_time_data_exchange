@@ -1,0 +1,673 @@
+{
+  "killed": 2545,
+  "mutants": 2627,
+  "survivors": [
+    {
+      "code": "return False",
+      "equivalent": "its one caller reads it as true or false, and None is as false as False",
+      "function": "_in_line",
+      "kind": "statement",
+      "line": 562,
+      "occurrence": 0
+    },
+    {
+      "code": "return False",
+      "equivalent": "its callers read it with not, and None is as false as False",
+      "function": "_typed",
+      "kind": "statement",
+      "line": 1334,
+      "occurrence": 0
+    },
+    {
+      "code": "_XML_NS = \"http://www.w3.org/XML/1998/namespace\"",
+      "equivalent": "the xml prefix can never name Word's namespace, the only one the tokenizer looks for",
+      "function": "<module>",
+      "kind": "str:'http://www.w3.org/XML/1998/namespace'",
+      "line": 1714,
+      "occurrence": 0
+    },
+    {
+      "code": "return False",
+      "equivalent": "a function that ends without a return gives None, which is as false as False here",
+      "function": "_refused",
+      "kind": "statement",
+      "line": 2150,
+      "occurrence": 0
+    },
+    {
+      "code": "custom: bool = False",
+      "equivalent": "a segment's custom flag is read only on a note reference, which always sets it",
+      "function": "<module>",
+      "kind": "bool",
+      "line": 194,
+      "occurrence": 0
+    },
+    {
+      "code": "section: int = 0",
+      "equivalent": "the one place a paragraph is made sets its section",
+      "function": "<module>",
+      "kind": "int:0",
+      "line": 208,
+      "occurrence": 0
+    },
+    {
+      "code": "mark_hidden: bool = False",
+      "equivalent": "the one place a paragraph is made sets whether its mark is hidden",
+      "function": "<module>",
+      "kind": "bool",
+      "line": 211,
+      "occurrence": 0
+    },
+    {
+      "code": "return None",
+      "equivalent": "the function returns None at its end anyway",
+      "function": "_Fonts.font",
+      "kind": "statement",
+      "line": 443,
+      "occurrence": 0
+    },
+    {
+      "code": "\"thead\",",
+      "equivalent": "a row group is always met beside a table or a row, which end the paragraph; text directly in one is refused by the reader",
+      "function": "<module>",
+      "kind": "str:'thead'",
+      "line": 2491,
+      "occurrence": 0
+    },
+    {
+      "code": "\"tbody\",",
+      "equivalent": "a row group is always met beside a table or a row, which end the paragraph; text directly in one is refused by the reader",
+      "function": "<module>",
+      "kind": "str:'tbody'",
+      "line": 2492,
+      "occurrence": 0
+    },
+    {
+      "code": "return None",
+      "equivalent": "the function returns None at its end anyway",
+      "function": "_Fonts.marks.nearest",
+      "kind": "statement",
+      "line": 419,
+      "occurrence": 0
+    },
+    {
+      "code": "def mark(self, kind: str, value: Any, custom: bool = False) -> None:",
+      "equivalent": "the custom flag is read only on a body's note reference, which always passes it",
+      "function": "_Story.mark",
+      "kind": "bool",
+      "line": 710,
+      "occurrence": 0
+    },
+    {
+      "code": "return",
+      "equivalent": "an empty run then adds an empty segment, or no hidden characters: nothing either way",
+      "function": "_Story.flush_run",
+      "kind": "statement",
+      "line": 891,
+      "occurrence": 0
+    },
+    {
+      "code": "depth_of_capture = -1",
+      "equivalent": "the depth is set whenever a capture begins, before it is read",
+      "function": "_raw_texts",
+      "kind": "int:1",
+      "line": 1753,
+      "occurrence": 0
+    },
+    {
+      "code": "raise CertificationError(\"the ledger does not balance\")",
+      "equivalent": "the counts follow from the sequences, which are equal by then: the ledger is a second statement of the same fact, stated in the certificate",
+      "function": "DocxSource.certify",
+      "kind": "statement",
+      "line": 2082,
+      "occurrence": 0
+    },
+    {
+      "code": "self.pending = False",
+      "equivalent": "the parser starts at the div, a block, which ends the (empty) paragraph and clears it",
+      "function": "_Div.__init__",
+      "kind": "bool",
+      "line": 2515,
+      "occurrence": 0
+    },
+    {
+      "code": "parsed.close()",
+      "equivalent": "the div ends with its own end tag, so nothing is left buffered",
+      "function": "EpiSource._section",
+      "kind": "call",
+      "line": 2610,
+      "occurrence": 0
+    },
+    {
+      "code": "parsed.flush()",
+      "equivalent": "the div's end tag, a block's, has ended the last paragraph",
+      "function": "EpiSource._section",
+      "kind": "call",
+      "line": 2611,
+      "occurrence": 0
+    },
+    {
+      "code": "raise CertificationError(\"the ledger does not balance\")",
+      "equivalent": "the counts follow from the sequences, which are equal by then: the ledger is a second statement of the same fact, stated in the certificate",
+      "function": "EpiSource.certify",
+      "kind": "statement",
+      "line": 2681,
+      "occurrence": 0
+    },
+    {
+      "code": "return tag.rsplit(\"}\", 1)[-1]",
+      "equivalent": "an element's tag holds one '}', after its namespace",
+      "function": "_local",
+      "kind": "int:1",
+      "line": 157,
+      "occurrence": 0
+    },
+    {
+      "code": "0x0590 <= code <= 0x0DFF",
+      "equivalent": "0x0E00, one past the first range, is the start of the second: ending the first there adds no character",
+      "function": "_drawn_complex",
+      "kind": "int:3583",
+      "line": 499,
+      "occurrence": 0
+    },
+    {
+      "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
+      "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
+      "function": "_symbol_reading",
+      "kind": "compare:0",
+      "line": 525,
+      "occurrence": 0
+    },
+    {
+      "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
+      "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
+      "function": "_symbol_reading",
+      "kind": "compare:1",
+      "line": 525,
+      "occurrence": 0
+    },
+    {
+      "code": "self.unsure: tuple[bool, bool] = (False, False)",
+      "equivalent": "read only in flush_run, which only run calls, after setting it for the run",
+      "function": "_Story.__init__",
+      "kind": "bool",
+      "line": 590,
+      "occurrence": 0
+    },
+    {
+      "code": "self.unsure: tuple[bool, bool] = (False, False)",
+      "equivalent": "read only in flush_run, which only run calls, after setting it for the run",
+      "function": "_Story.__init__",
+      "kind": "bool",
+      "line": 590,
+      "occurrence": 1
+    },
+    {
+      "code": "scopes: list[dict[str, str]] = [{\"xml\": _XML_NS}]",
+      "equivalent": "the xml prefix can never name Word's namespace, the only one the tokenizer looks for",
+      "function": "_raw_texts",
+      "kind": "str:'xml'",
+      "line": 1750,
+      "occurrence": 0
+    },
+    {
+      "code": "chunk = text[at:] if less < 0 else text[at:less]",
+      "equivalent": "a '<' at the very start finds no capture open, so the chunk is never used there",
+      "function": "_raw_texts",
+      "kind": "compare:0",
+      "line": 1757,
+      "occurrence": 0
+    },
+    {
+      "code": "_paragraphs(self.body, value[\"paragraphs\"], \"paragraph\")",
+      "equivalent": "the word only names the place in a refusal's detail",
+      "function": "DocxSource.certify",
+      "kind": "str:'paragraph'",
+      "line": 2029,
+      "occurrence": 0
+    },
+    {
+      "code": "_paragraphs(part, theirs[\"paragraphs\"], f\"{where} paragraph\")",
+      "equivalent": "the words only name the place in a refusal's detail",
+      "function": "_refused",
+      "kind": "str:' paragraph'",
+      "line": 2149,
+      "occurrence": 0
+    },
+    {
+      "code": "continue",
+      "equivalent": "a change (ins, del, moveFrom, moveTo) is a revision outside _SAME_AS and no cell change: the test after it passes over it too",
+      "function": "_canon.add",
+      "kind": "statement",
+      "line": 2274,
+      "occurrence": 3
+    },
+    {
+      "code": "index, tables = tables, tables + 1",
+      "equivalent": "the table count is compared only between two walks that both make it: any step but zero numbers the same tables apart, so a table added or lost shows either way",
+      "function": "_run_tokens.table",
+      "kind": "binop",
+      "line": 2322,
+      "occurrence": 0
+    },
+    {
+      "code": "continue",
+      "equivalent": "a paragraph holds no paragraph and run content no run the walk reads: walking either again only adds to a list outside any paragraph, which is never read",
+      "function": "_run_tokens.walk",
+      "kind": "statement",
+      "line": 2355,
+      "occurrence": 0
+    },
+    {
+      "code": "continue",
+      "equivalent": "the element has no children: walking it reads nothing",
+      "function": "_run_tokens.walk",
+      "kind": "statement",
+      "line": 2379,
+      "occurrence": 3
+    },
+    {
+      "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
+      "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
+      "function": "_symbol_reading",
+      "kind": "int:61440",
+      "line": 525,
+      "occurrence": 1
+    },
+    {
+      "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
+      "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
+      "function": "_symbol_reading",
+      "kind": "int:61695",
+      "line": 525,
+      "occurrence": 0
+    },
+    {
+      "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
+      "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
+      "function": "_Story.token",
+      "kind": "compare:0",
+      "line": 843,
+      "occurrence": 0
+    },
+    {
+      "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
+      "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
+      "function": "_Story.token",
+      "kind": "compare:1",
+      "line": 843,
+      "occurrence": 0
+    },
+    {
+      "code": "if found.rsplit(\"/\", 1)[-1] == kind:",
+      "equivalent": "splitting once more leaves the last segment, the type's name, the same",
+      "function": "_typed",
+      "kind": "int:1",
+      "line": 1332,
+      "occurrence": 0
+    },
+    {
+      "code": "values = self.values.setdefault(key, [None] * 9)",
+      "equivalent": "a tenth place is never used: list levels are 0 to 8",
+      "function": "_Numbering.label",
+      "kind": "int:9",
+      "line": 1524,
+      "occurrence": 0
+    },
+    {
+      "code": "restarts = self.restarts.setdefault(key, [None] * 9)",
+      "equivalent": "a tenth place is never used: list levels are 0 to 8",
+      "function": "_Numbering.label",
+      "kind": "int:9",
+      "line": 1526,
+      "occurrence": 0
+    },
+    {
+      "code": "showing = self.showing.setdefault(key, [None] * 9)",
+      "equivalent": "a tenth place is never used: list levels are 0 to 8",
+      "function": "_Numbering.label",
+      "kind": "int:9",
+      "line": 1527,
+      "occurrence": 0
+    },
+    {
+      "code": "digits = (found.group(2) or found.group(3)).lstrip(\"0\") or \"0\"",
+      "equivalent": "a reference to character 0 is refused by the XML parser first (_parse); any other keeps a digit",
+      "function": "_unescape.one",
+      "kind": "str:'0'",
+      "line": 1727,
+      "occurrence": 1
+    },
+    {
+      "code": "chunk = text[at:] if less < 0 else text[at:less]",
+      "equivalent": "a '<' at the very start finds no capture open, so the chunk is never used there",
+      "function": "_raw_texts",
+      "kind": "int:0",
+      "line": 1757,
+      "occurrence": 0
+    },
+    {
+      "code": "for (comment, part), theirs in zip(self.comments, value[\"comments\"], strict=True):",
+      "equivalent": "the comments' metadata lists are compared just before, so the lengths are equal",
+      "function": "DocxSource.certify",
+      "kind": "bool",
+      "line": 2070,
+      "occurrence": 0
+    },
+    {
+      "code": "for (comment, part), theirs in zip(self.comments, value[\"comments\"], strict=True):",
+      "equivalent": "called only after certify has compared the lengths",
+      "function": "DocxSource._pairs",
+      "kind": "bool",
+      "line": 2117,
+      "occurrence": 0
+    },
+    {
+      "code": "for index, (mine, paragraph) in enumerate(zip(part.paragraphs, theirs, strict=True)):",
+      "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
+      "function": "_paragraphs",
+      "kind": "bool",
+      "line": 2137,
+      "occurrence": 0
+    },
+    {
+      "code": "_match(mine, paragraph, f\"{where} {index + 1}\")",
+      "equivalent": "the words only name the place in a refusal's detail",
+      "function": "_paragraphs",
+      "kind": "str:' '",
+      "line": 2138,
+      "occurrence": 0
+    },
+    {
+      "code": "index, tables = tables, tables + 1",
+      "equivalent": "the table count is compared only between two walks that both make it: any step but zero numbers the same tables apart, so a table added or lost shows either way",
+      "function": "_run_tokens.table",
+      "kind": "int:1",
+      "line": 2322,
+      "occurrence": 0
+    },
+    {
+      "code": "return element.get(_w(\"val\"), \"true\").lower() not in (\"0\", \"false\", \"off\")",
+      "equivalent": "any value outside the off list is on: 'Xrue' is on as 'true' is",
+      "function": "_on",
+      "kind": "str:'true'",
+      "line": 245,
+      "occurrence": 0
+    },
+    {
+      "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
+      "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
+      "function": "_Story.token",
+      "kind": "int:61440",
+      "line": 843,
+      "occurrence": 1
+    },
+    {
+      "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
+      "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
+      "function": "_Story.token",
+      "kind": "int:61695",
+      "line": 843,
+      "occurrence": 0
+    },
+    {
+      "code": "section = sections[min(paragraph.section, len(sections) - 1)] if sections else None",
+      "equivalent": "a paragraph's section is at most the number of sections closed before the last, len(sections) - 1, so the bound never takes",
+      "function": "_note_marks",
+      "kind": "binop",
+      "line": 1681,
+      "occurrence": 0
+    },
+    {
+      "code": "for (name, _, part), story in zip(found, theirs, strict=True):",
+      "equivalent": "the parts and their uses are compared just before, so the lengths are equal",
+      "function": "DocxSource.certify",
+      "kind": "bool",
+      "line": 2053,
+      "occurrence": 0
+    },
+    {
+      "code": "for (name, _, part), story in zip(found, value[kind + \"s\"], strict=True):",
+      "equivalent": "called only after certify has compared the lengths",
+      "function": "DocxSource._pairs",
+      "kind": "bool",
+      "line": 2114,
+      "occurrence": 0
+    },
+    {
+      "code": "if f\"{self.comments_part}#{comment['id']}\" not in refused:",
+      "equivalent": "a refused comment is served with no paragraphs (certify holds it to that): counting it adds nothing to the output",
+      "function": "DocxSource._pairs",
+      "kind": "str:'#'",
+      "line": 2118,
+      "occurrence": 0
+    },
+    {
+      "code": "_match(mine, paragraph, f\"{where} {index + 1}\")",
+      "equivalent": "the words only name the place in a refusal's detail",
+      "function": "_paragraphs",
+      "kind": "binop",
+      "line": 2138,
+      "occurrence": 0
+    },
+    {
+      "code": "for index, (mine, theirs) in enumerate(zip(self.sections, value[\"sections\"], strict=True)):",
+      "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
+      "function": "EpiSource.certify",
+      "kind": "bool",
+      "line": 2672,
+      "occurrence": 0
+    },
+    {
+      "code": "section(mine, theirs, f\"section {index + 1}\")",
+      "equivalent": "the words only name the place in a refusal's detail",
+      "function": "EpiSource.certify",
+      "kind": "str:'section '",
+      "line": 2673,
+      "occurrence": 0
+    },
+    {
+      "code": "(self.marked[row] and row >= self.top, \"a header row below a row that is none\"),",
+      "equivalent": "the header rows at the top end at the first unmarked row, so row top is never marked",
+      "function": "_Applied.at",
+      "kind": "compare:0",
+      "line": 1129,
+      "occurrence": 0
+    },
+    {
+      "code": "part, theirs_by_id[note_id][\"paragraphs\"], f\"{kind} {note_id} paragraph\"",
+      "equivalent": "the words only name the place in a refusal's detail",
+      "function": "DocxSource.certify",
+      "kind": "str:' '",
+      "line": 2046,
+      "occurrence": 0
+    },
+    {
+      "code": "part, theirs_by_id[note_id][\"paragraphs\"], f\"{kind} {note_id} paragraph\"",
+      "equivalent": "the words only name the place in a refusal's detail",
+      "function": "DocxSource.certify",
+      "kind": "str:' paragraph'",
+      "line": 2046,
+      "occurrence": 0
+    },
+    {
+      "code": "_match(mine, paragraph, f\"{where} {index + 1}\")",
+      "equivalent": "the words only name the place in a refusal's detail",
+      "function": "_paragraphs",
+      "kind": "int:1",
+      "line": 2138,
+      "occurrence": 0
+    },
+    {
+      "code": "zip(mine.sections, theirs[\"sections\"], strict=True)",
+      "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
+      "function": "EpiSource.certify.section",
+      "kind": "bool",
+      "line": 2657,
+      "occurrence": 0
+    },
+    {
+      "code": "section(child, other, f\"{where}.{index + 1}\")",
+      "equivalent": "the words only name the place in a refusal's detail",
+      "function": "EpiSource.certify.section",
+      "kind": "str:'.'",
+      "line": 2659,
+      "occurrence": 0
+    },
+    {
+      "code": "section(mine, theirs, f\"section {index + 1}\")",
+      "equivalent": "the words only name the place in a refusal's detail",
+      "function": "EpiSource.certify",
+      "kind": "binop",
+      "line": 2673,
+      "occurrence": 0
+    },
+    {
+      "code": "for i, found in zip(style_ids, self.styles, strict=True)",
+      "equivalent": "self.styles is made from style_ids one for one, so zip(strict=True) never raises",
+      "function": "_Applied.__init__",
+      "kind": "bool",
+      "line": 997,
+      "occurrence": 0
+    },
+    {
+      "code": "paragraph.section if value(\"numRestart\", \"continuous\") == \"eachSect\" else None,",
+      "equivalent": "the default is only compared with 'eachSect', which 'Xontinuous' is not either",
+      "function": "_note_marks",
+      "kind": "str:'continuous'",
+      "line": 1704,
+      "occurrence": 0
+    },
+    {
+      "code": "if note.get(_w(\"type\"), \"normal\") in _NOTE_LAYOUT:",
+      "equivalent": "the default only has to be outside the layout types, as 'Xormal' is",
+      "function": "DocxSource.__init__",
+      "kind": "str:'normal'",
+      "line": 1877,
+      "occurrence": 0
+    },
+    {
+      "code": "gone = dropped or (child.tag in dropping and element.tag != _w(\"rPr\"))",
+      "equivalent": "a paragraph mark's change markers are empty: dropping one drops no content",
+      "function": "_run_tokens.walk",
+      "kind": "str:'rPr'",
+      "line": 2380,
+      "occurrence": 0
+    },
+    {
+      "code": "self.open_tables.append([self.tables, -1, -1])",
+      "equivalent": "the cell count starts again at each row; only the row count's start matters, and its mutant is caught",
+      "function": "_Div.handle_starttag",
+      "kind": "int:1",
+      "line": 2542,
+      "occurrence": 1
+    },
+    {
+      "code": "section(child, other, f\"{where}.{index + 1}\")",
+      "equivalent": "the words only name the place in a refusal's detail",
+      "function": "EpiSource.certify.section",
+      "kind": "binop",
+      "line": 2659,
+      "occurrence": 0
+    },
+    {
+      "code": "section(mine, theirs, f\"section {index + 1}\")",
+      "equivalent": "the words only name the place in a refusal's detail",
+      "function": "EpiSource.certify",
+      "kind": "int:1",
+      "line": 2673,
+      "occurrence": 0
+    },
+    {
+      "code": "at = next(i for i, (a, b) in enumerate(zip(shown, claimed, strict=True)) if set(a) != b)",
+      "equivalent": "both lists have one entry per character of the text, which was compared just before",
+      "function": "_match",
+      "kind": "bool",
+      "line": 1247,
+      "occurrence": 0
+    },
+    {
+      "code": "found = _TAG.match(text, less + 1)",
+      "equivalent": "a tag's first character is its name's, never '>' or a quote, so matching from one character later finds the same end",
+      "function": "_raw_texts",
+      "kind": "int:1",
+      "line": 1774,
+      "occurrence": 0
+    },
+    {
+      "code": "_ATTRIBUTE.findall(body, len(name)) if \"xmlns\" in body or \"&\" in body else ()",
+      "equivalent": "outside a namespace declaration an attribute is read only for its references, which the XML parser has checked first (_parse)",
+      "function": "_raw_texts",
+      "kind": "compare:0",
+      "line": 1793,
+      "occurrence": 1
+    },
+    {
+      "code": "and all(_agree(a, b) for a, b in zip(expected, found, strict=True))",
+      "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
+      "function": "_agree",
+      "kind": "bool",
+      "line": 2234,
+      "occurrence": 0
+    },
+    {
+      "code": "if a != b",
+      "equivalent": "where a difference is found only words the refusal",
+      "function": "EpiSource.certify.section",
+      "kind": "compare:0",
+      "line": 2639,
+      "occurrence": 0
+    },
+    {
+      "code": "section(child, other, f\"{where}.{index + 1}\")",
+      "equivalent": "the words only name the place in a refusal's detail",
+      "function": "EpiSource.certify.section",
+      "kind": "int:1",
+      "line": 2659,
+      "occurrence": 0
+    },
+    {
+      "code": "self.ledger.symbol += sum(1 for a, b in zip(text, mapped, strict=True) if a != b)",
+      "equivalent": "the Symbol table maps one character to one, so the two are the same length",
+      "function": "_Story.token",
+      "kind": "bool",
+      "line": 818,
+      "occurrence": 0
+    },
+    {
+      "code": "name = body.split(None, 1)[0] if body.strip() else \"\"",
+      "equivalent": "splitting once more leaves the first word, the name, the same",
+      "function": "_raw_texts",
+      "kind": "int:1",
+      "line": 1788,
+      "occurrence": 0
+    },
+    {
+      "code": "_ATTRIBUTE.findall(body, len(name)) if \"xmlns\" in body or \"&\" in body else ()",
+      "equivalent": "outside a namespace declaration an attribute is read only for its references, which the XML parser has checked first (_parse)",
+      "function": "_raw_texts",
+      "kind": "str:'&'",
+      "line": 1793,
+      "occurrence": 0
+    },
+    {
+      "code": "elif start[0] in ours and self.look[start[1]] and way == \"Horz\" and self.top > 1:",
+      "equivalent": "for Horz both names are firstRow; for Vert the test of way is false whichever is looked for",
+      "function": "_Applied.at",
+      "kind": "int:0",
+      "line": 1101,
+      "occurrence": 0
+    }
+  ],
+  "target": "src/label_docx/certify.py",
+  "targetSha256": "2428339a680d584fcef234b3e79654b1fb2583a934910e949af6f6fda80a3065",
+  "tests": [
+    "tests/test_certify.py",
+    "tests/test_headers_comments.py",
+    "tests/test_tracked.py",
+    "tests/test_generated_docx.py",
+    "tests/test_robustness.py",
+    "tests/test_output.py"
+  ],
+  "testsSha256": "48aea053cb9063b8e96d91c081276facaf7565ea0c703e0d56856c25a2661626"
+}

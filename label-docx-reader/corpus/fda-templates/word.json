@@ -1,0 +1,2871 @@
+{
+  "application": "Microsoft Word 16.113.3 (macOS)",
+  "at": {
+    "fda-medication-guide-template.docx": [],
+    "fda-patient-package-insert-template.docx": [],
+    "fda-prescribing-information-template.docx": [
+      9,
+      10,
+      24,
+      25,
+      31,
+      32,
+      35,
+      36,
+      44,
+      45,
+      48,
+      49,
+      139,
+      140,
+      141,
+      142,
+      143,
+      144,
+      145,
+      146,
+      147,
+      152,
+      153,
+      167,
+      168,
+      191,
+      192,
+      193,
+      194,
+      254,
+      255,
+      256,
+      257,
+      262,
+      263,
+      264,
+      348,
+      352,
+      354,
+      379,
+      380,
+      381,
+      382,
+      383,
+      384,
+      388,
+      389,
+      390,
+      391,
+      392,
+      393,
+      394,
+      395,
+      396,
+      397,
+      412,
+      413,
+      414,
+      415,
+      416,
+      420,
+      421,
+      422,
+      423,
+      424,
+      425,
+      431,
+      432,
+      433,
+      434,
+      435,
+      438,
+      439
+    ]
+  },
+  "drawn": {
+    "fda-medication-guide-template.docx": [],
+    "fda-patient-package-insert-template.docx": [],
+    "fda-prescribing-information-template.docx": [
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "o\t",
+      "o\t",
+      "o\t",
+      "o\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\u2022\t",
+      "\u2022\t",
+      "\u2022\t",
+      "\u2022\t",
+      "\u2022\t",
+      "\u2022\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t"
+    ]
+  },
+  "emphasis": {
+    "fda-medication-guide-template.docx": {
+      "": [],
+      "0": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "10": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "11": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "12": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "13": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "14": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "15": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "16": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "17": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "18": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "19": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "20": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "21": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "22": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "23": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "24": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "26": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "27": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "29": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "6": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "7": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "8": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "9": [
+        true,
+        false,
+        false,
+        false
+      ]
+    },
+    "fda-patient-package-insert-template.docx": {
+      "": [],
+      "0": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "10": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "11": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "12": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "13": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "14": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "15": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "16": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "17": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "18": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "19": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "20": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "21": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "22": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "24": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "25": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "27": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "6": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "7": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "8": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "9": [
+        true,
+        false,
+        false,
+        false
+      ]
+    },
+    "fda-prescribing-information-template.docx": {
+      "": [],
+      "0": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "10": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "100": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "101": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "102": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "103": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "104": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "105": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "106": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "107": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "108": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "109": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "110": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "111": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "112": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "113": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "114": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "115": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "116": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "117": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "119": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "121": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "123": [
+        true,
+        true,
+        false,
+        false
+      ],
+      "125": [
+        true,
+        true,
+        false,
+        false
+      ],
+      "126": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "128": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "129": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "13": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "131": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "132": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "134": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "135": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "137": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "139": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "14": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "140": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "141": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "142": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "143": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "144": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "145": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "146": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "147": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "149": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "15": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "151": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "152": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "153": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "155": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "156": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "158": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "159": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "161": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "163": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "164": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "165": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "167": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "168": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "17": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "170": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "172": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "174": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "175": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "177": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "179": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "18": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "181": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "183": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "184": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "186": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "188": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "189": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "191": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "192": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "193": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "194": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "196": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "198": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "20": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "200": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "202": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "203": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "205": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "206": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "208": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "209": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "21": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "211": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "213": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "215": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "217": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "219": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "220": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "222": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "224": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "226": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "228": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "229": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "23": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "231": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "232": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "234": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "235": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "237": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "238": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "24": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "240": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "242": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "243": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "245": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "247": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "248": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "25": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "250": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "251": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "252": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "253": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "254": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "255": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "256": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "257": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "259": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "26": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "260": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "262": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "263": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "264": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "266": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "268": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "27": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "270": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "271": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "272": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "273": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "274": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "276": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "277": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "279": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "28": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "280": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "282": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "284": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "285": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "287": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "288": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "29": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "290": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "292": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "293": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "295": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "297": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "299": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "30": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "300": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "302": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "303": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "305": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "307": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "308": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "31": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "310": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "312": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "313": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "315": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "317": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "318": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "32": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "320": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "322": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "324": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "326": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "328": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "330": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "332": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "333": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "335": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "337": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "338": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "34": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "340": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "341": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "343": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "344": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "346": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "348": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "35": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "350": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "352": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "354": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "356": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "357": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "358": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "36": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "360": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "362": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "363": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "365": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "367": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "369": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "371": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "372": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "374": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "375": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "377": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "379": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "38": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "380": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "381": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "382": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "383": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "384": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "386": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "388": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "389": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "39": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "390": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "391": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "392": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "393": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "394": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "395": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "396": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "397": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "399": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "4": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "401": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "403": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "404": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "406": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "407": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "409": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "41": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "410": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "412": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "413": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "414": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "415": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "416": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "418": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "420": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "421": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "422": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "423": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "424": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "425": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "427": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "429": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "43": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "430": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "431": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "432": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "433": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "434": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "435": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "437": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "438": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "439": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "44": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "45": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "47": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "48": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "49": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "51": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "52": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "53": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "57": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "58": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "59": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "6": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "60": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "61": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "62": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "63": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "64": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "65": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "66": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "67": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "68": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "69": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "7": [
+        true,
+        true,
+        false,
+        false
+      ],
+      "70": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "71": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "72": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "73": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "74": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "75": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "76": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "77": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "78": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "79": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "80": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "81": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "83": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "84": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "85": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "88": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "89": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "9": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "91": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "95": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "96": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "97": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "98": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "99": [
+        true,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "fields": {},
+  "fonts": {
+    "fda-medication-guide-template.docx": [],
+    "fda-patient-package-insert-template.docx": [],
+    "fda-prescribing-information-template.docx": [
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Courier New",
+      "Courier New",
+      "Courier New",
+      "Courier New",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Arial",
+      "Arial",
+      "Arial",
+      "Arial",
+      "Arial",
+      "Arial",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol"
+    ]
+  },
+  "method": "list labels: convert numbers to text, what each list item gained; fonts and at: the font Word gave each label and its body paragraph, from its copy saved after; sha256: the bytes each file's answers are for; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text; noteText: each footnote's and endnote's text",
+  "noteText": {
+    "fda-prescribing-information-template.docx": {
+      "endnote": [],
+      "footnote": [
+        "\u0002 For purposes of prescription drug labeling, an adverse reaction is an undesirable effect, reasonably associated with use of a drug, that may occur as part of the pharmacological action of the drug or may be unpredictable in its occurrence. This definition does not include all adverse events observed during use of a drug, only those adverse events for which there is some basis to believe there is a causal relationship between the drug and the occurrence of the adverse event.\n",
+        "\u0002 If the baseline demographics in the safety and efficacy populations are generally the same and the description of the baseline demographics are included the CLINICAL STUDIES section, instead of repeating the same baseline demographics in the ADVERSE REACTIONS section, the ADVERSE REACTIONS section can cross-reference the CLINICAL STUDIES section.\n"
+      ]
+    }
+  },
+  "notes": {
+    "fda-prescribing-information-template.docx": {
+      "body": [
+        "1",
+        "2"
+      ],
+      "notes": [
+        "1",
+        "2"
+      ]
+    }
+  },
+  "prints": {
+    "fda-medication-guide-template.docx": true,
+    "fda-patient-package-insert-template.docx": true,
+    "fda-prescribing-information-template.docx": true
+  },
+  "recorded": "2026-10-03",
+  "sha256": {
+    "fda-medication-guide-template.docx": "435c5e9d5c10722e78db6bb90c7489a5b4ede8e08fb08334b7bb9e5ec2c5511c",
+    "fda-patient-package-insert-template.docx": "3442be0483c834bb3d178a56857c9d93f4d17e817629a18c5204e2c0eeaf12c2",
+    "fda-prescribing-information-template.docx": "6b9ae21fae9183418e05688cb3e826c7cabd050ceed564a5d177d8119cb64561"
+  },
+  "stories": {
+    "fda-prescribing-information-template.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\t\t\n\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "\tGilead Sciences\t1\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\t\t\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "1\n\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "footer",
+          1,
+          "default",
+          "\t\t\n",
+          []
+        ]
+      ]
+    }
+  },
+  "text": {
+    "fda-medication-guide-template.docx": [
+      "MEDICATION GUIDE\u000bDRUG-X (pronunciation spelling)\u000b(drugimab-cznm)\u000binjection, for intramuscular use",
+      "What is the most important information I should know about DRUG-X?",
+      "\u2026",
+      "What is DRUG-X?",
+      "\u2026",
+      "Who should not take DRUG-X?",
+      "\u2026",
+      "Before taking DRUG-X, tell your healthcare provider about all of your medical conditions, including if you:",
+      "\u2026",
+      "How should I take DRUG-X?",
+      "\u2026",
+      "What should I avoid while taking DRUG-X?",
+      "\u2026",
+      "What are the possible side effects of DRUG-X?",
+      "\u2026",
+      "Call your doctor for medical advice about side effects.\u00a0 You may report side effects to FDA at 1-800-FDA-1088.",
+      "How should I store DRUG-X?",
+      "\u2026",
+      "General information about the safe and effective use of DRUG-X.",
+      "Medicines are sometimes prescribed for purposes other than those listed in a Medication Guide. Do not use DRUG-X for a condition for which it was not prescribed. Do not give DRUG-X to other people, even if they have the same symptoms that you have. It may harm them.",
+      "\u00a0",
+      "You can ask your pharmacist or healthcare provider for information about DRUG-X that is written for health professionals.",
+      "What are the ingredients in DRUG-X?",
+      "Active ingredients:\u00a0",
+      "Inactive ingredients:",
+      "Manufactured for: ",
+      "Manufactured by:",
+      "This Medication Guide has been approved by the U.S. Food and Drug Administration.                  Revised:  MM/YYYY\u00a0"
+    ],
+    "fda-patient-package-insert-template.docx": [
+      "\u00a0PATIENT\u00a0INFORMATION\u000bDRUG-X (pronunciation spelling)\u000b(drugoxide-a and drugoxide-b tablets)\u000bfor oral use",
+      "What is DRUG-X?",
+      "\u2026",
+      "Do not take DRUG-X if you:",
+      "\u2026",
+      "Before taking DRUG-X, tell your healthcare provider about all of your medical conditions, including if you:",
+      "\u2026",
+      "How should I take DRUG-X?",
+      "\u00a0\u2026",
+      "What should I avoid while taking DRUG-X?",
+      "\u2026",
+      "What are the possible side effects of DRUG-X?",
+      "\u2026",
+      "Call your doctor for medical advice about side effects. You may report side effects to FDA at 1-800-FDA-1088.",
+      "How should I store DRUG-X?",
+      "\u2026",
+      "General information about the safe and effective use of DRUG-X.",
+      "Medicines are sometimes prescribed for purposes other than those listed in a Patient Information leaflet. Do not use DRUG-X for a condition for which it was not prescribed. Do not give DRUG-X to other people, even if they have the same symptoms that you have. It may harm them.",
+      "\u00a0",
+      "You can ask your pharmacist or healthcare provider for information about DRUG-X that is written for health professionals.",
+      "What are the ingredients in DRUG-X?",
+      "Active ingredients:\u00a0",
+      "Inactive ingredients:",
+      "Manufactured for: ",
+      "Manufactured by:",
+      "This Patient Information has been approved by the U.S. Food and Drug Administration.                  Revised: MM/YYYY"
+    ],
+    "fda-prescribing-information-template.docx": [
+      "HIGHLIGHTS OF PRESCRIBING INFORMATION",
+      "These highlights do not include all the information needed to use PROPRIETARY NAME safely and effectively. See full prescribing information for PROPRIETARY NAME.",
+      "PROPRIETARY NAME (nonproprietary name) dosage form, route of administration, controlled substance symbol",
+      "Initial U.S. Approval:  YYYY",
+      "WARNING:  TITLE OF WARNING",
+      "See full prescribing information for complete boxed warning.",
+      "Text (4)",
+      "Text (5.x)",
+      "----------------------------RECENT MAJOR CHANGES--------------------------",
+      "Section Title, Subsection Title (x.x) \t\t                  M/YYYY",
+      "Section Title, Subsection Title (x.x) \t                                  M/YYYY",
+      "-----------------------------INDICATIONS AND USAGE---------------------------",
+      "PROPRIETARY NAME is a ([insert FDA established pharmacologic class text phrase]] indicated for \u2026 (1)",
+      "Limitations of Use ",
+      "Text (1)",
+      "------------------------DOSAGE AND ADMINISTRATION-----------------------",
+      "Text (2.x)",
+      "Text (2.x)",
+      "---------------------DOSAGE FORMS AND STRENGTHS----------------------",
+      "Dosage form(s): strength(s) (3)      ",
+      "                   ",
+      "-------------------------------CONTRAINDICATIONS-------------------------------",
+      "Text (4)",
+      "Text (4) ",
+      "------------------------WARNINGS AND PRECAUTIONS-----------------------",
+      "Text (5.x)",
+      "Text (5.x) ",
+      "-------------------------------ADVERSE REACTIONS------------------------------",
+      "Most common adverse reactions (incidence > x%) are text (6.x) ",
+      "To report SUSPECTED ADVERSE REACTIONS, contact name of manufacturer at toll-free phone # or FDA at 1-800-FDA-1088 or www.fda.gov/medwatch. ",
+      "------------------------------DRUG INTERACTIONS--------------------------------",
+      "Text (7.x)",
+      "Text (7.x)",
+      "--------------------------USE IN SPECIFIC POPULATIONS---------------------",
+      "Text (8.x)",
+      "Text (8.x)",
+      "See 17 for PATIENT COUNSELING INFORMATION and FDA\u001eapproved patient labeling OR and Medication Guide.",
+      "\t\t\t\t                 ",
+      "\t\t\t\t                  Revised: M/YYYY",
+      "\fFULL PRESCRIBING INFORMATION: CONTENTS*",
+      "WARNING:  TITLE OF WARNING",
+      "1  INDICATIONS AND USAGE",
+      "2  DOSAGE AND ADMINISTRATION",
+      "\t2.1  Subsection Title",
+      "\t2.2  Subsection Title",
+      "3  DOSAGE FORMS AND STRENGTHS",
+      "4  CONTRAINDICATIONS",
+      "5  WARNINGS AND PRECAUTIONS",
+      "\t5.1  Subsection Title ",
+      "\t5.2  Subsection Title ",
+      "6  ADVERSE REACTIONS",
+      "6.1  Clinical Trials Experience",
+      "6.2  Postmarketing Experience",
+      "7  DRUG INTERACTIONS",
+      "7.1  Subsection Title ",
+      "7.2  Subsection Title",
+      "8  USE IN SPECIFIC POPULATIONS",
+      "8.1  Pregnancy",
+      "8.2  Lactation",
+      "8.3  Females and Males of Reproductive Potential   ",
+      "8.4  Pediatric Use",
+      "8.5  Geriatric Use",
+      "8.6  Subpopulation X (e.g., Renal Impairment)",
+      "   ",
+      "\t",
+      "\t",
+      "\t",
+      "\t",
+      " ",
+      "9  DRUG ABUSE AND DEPENDENCE ",
+      "9.1  Controlled Substance",
+      "9.2  Abuse",
+      "9.3  Dependence",
+      "10  OVERDOSAGE",
+      "11  DESCRIPTION",
+      "12  CLINICAL PHARMACOLOGY",
+      "12.1  Mechanism of Action",
+      "12.2  Pharmacodynamics",
+      "12.3  Pharmacokinetics",
+      "12.4  Microbiology",
+      "12.5  Pharmacogenomics",
+      "12.6  Immunogenicity",
+      "13  NONCLINICAL TOXICOLOGY",
+      "13.1  Carcinogenesis, Mutagenesis, Impairment of Fertility",
+      "13.2  Animal Toxicology and/or Pharmacology",
+      "14  CLINICAL STUDIES",
+      "\t14.1  Subsection Title  ",
+      "\t14.2  Subsection Title ",
+      "15  REFERENCES  ",
+      "16  HOW SUPPLIED/STORAGE AND HANDLING",
+      "17  PATIENT COUNSELING INFORMATION ",
+      "* Sections or subsections omitted from the full prescribing information are not listed.\f\fFULL PRESCRIBING INFORMATION",
+      "WARNING: TITLE OF WARNING",
+      "[[Include a boxed warning for contraindications or serious adverse reactions\u0002 or risks, particularly those that may lead to death or serious injury.  Include a boxed warning when (1) an adverse reaction is so serious in proportion to the potential benefit from the drug that it is essential that it be considered in assessing the drug\u2019s benefits and risks, (2) a serious adverse reaction can be prevented or reduced in frequency or severity by appropriate use of the drug, or (3) the drug has been approved with restrictions for use because the drug can be safely used only if distribution or use is restricted (e.g., Elements to Assure Safe Use (ETASU)). ",
+      "Provide a brief, concise summary of critical information from the CONTRAINDICATIONS and/or WARNINGS AND PRECAUTIONS section(s).  Cross-reference to more detailed discussion in other sections (e.g., CONTRAINDICATIONS, WARNINGS AND PRECAUTIONS) and use bold font.]]",
+      " ",
+      "1  INDICATIONS AND USAGE",
+      "PROPRIETARY NAME is indicated for \u2026 ",
+      "Limitations of Use",
+      "[[Limitations of Use are included when there is reasonable concern or uncertainty about a drug\u2019s risk-benefit profile in certain settings (e.g., use of drug may be inadvisable, drug should generally not be used).]]",
+      "2  DOSAGE AND ADMINISTRATION ",
+      "[[When certain dosage- or administration-related information is particulary critical to the safe and effective use of the drug that health care practitioners need to be alerted to such information prior to drug initiation, include this information prior the recommended dosage and administration information ordinarily placed at the beginning of this section (e.g., critical tests, procedures, and/or evaluations needed prior to administration).",
+      "Include the recommended dosage (e.g., recommended starting and/or loading dose/dosage, recommended titration schedule, dosage range, maximum recommended dosage, maximum recommended duration) and administration instructions included with the recommended dosage (e.g., route(s) of administration) for each indication and subpopulation (e.g,. recommended dosage in pediatric patients).  In addition, include if applicable:",
+      "Required and/or recommended therapy used before, during, or after drug treatment or administration",
+      "Dosage modifications intended to reduce the risk of adverse reactions",
+      "Dosage modifications for drug interactions",
+      "Recommended dosage in specific populations (e.g., patients with renal or hepatic impairment)",
+      "Recommendations regarding missed dose(s)",
+      "Recommendations for discontinuation or dosage reduction when there are risks of withdrawal",
+      "Preparation instructions (e.g., reconstitution of a lyophilized powder, dilution)",
+      "Storage conditions needed to maintain the stability and sterility of the reconstituted and/or diluted product.",
+      "Administration instructions (e.g., recommended intravenous infusion rate and infusion duration, recommended injection sites for drugs administered intramuscularly or subcutaneously).",
+      "Subsections or headings may be used to enhance the organization, presentation and accessibility of the information in this section.  For example, \u201c2.1 Recommended Dosage and Administration\u201d, 2.2 Preparation and Administration Instructions\u201d.]]",
+      "3  DOSAGE FORMS AND STRENGTHS",
+      "Dosage form #1:  strength(s), identifying characteristics, limited packaging information that facilitates prescribing",
+      "Dosage form #2:  strength(s), identifying characteristics, limited packaging information that facilitates prescribing",
+      "4  CONTRAINDICATIONS",
+      "[[Contraindications are situations in which the drug must not be used because the risk of use clearly outweighs any possible therapeutic benefit. If no contraindications are known, this section must state \u201cNone.\u201d]]  ",
+      "5  WARNINGS AND PRECAUTIONS",
+      "[[Include a succinct description of clinically significant adverse reactions or risks associated with the use of the drug; the frequency/rate of occurrence of these adverse reactions; known risk factors; and steps to take to prevent, mitigate, monitor for or manage these clinically significant adverse reactions or risks.  ",
+      "Include each clinically significant adverse reaction or risk under its own subsection.  For example,  \u201c5.1 Hypersensitivity Reactions\u201d, \u201c5.2 Hepatotoxicity\u201d.]]",
+      "6  ADVERSE REACTIONS",
+      "[[At the beginning of this section identify the most clinically significant adverse reactions.  For example:]]",
+      "\u201cThe following clinically significant adverse reactions are described elsewhere in the labeling:",
+      "Subsection Title [see Warnings and Precautions (5.1)]",
+      "Subsection Title [see Warnings and Precautions (5.2)]\u201d",
+      "[[If the source of adverse reactions cannot be determined (e.g., an older drug) consider eliminating numbered subsections (e.g., remove subsection 6.1 Clinical Trials Experience and 6.2 Postmarketing Experience) and including a list of adverse reactions preceded by a modified postmarketing caveat statement.  For example:]] ",
+      "\u201cThe following adverse reactions associated with the use of [[insert drug name]] were identified in clinical studies or postmarketing reports.  Because some of these reactions were reported voluntarily from a population of uncertain size, it is not always possible to reliably estimate their frequency or establish a causal relationship to drug exposure.\u201d ",
+      "6.1  Clinical Trials Experience",
+      "Because clinical trials are conducted under widely varying conditions, adverse reaction rates observed in the clinical trials of a drug cannot be directly compared to rates in the clinical trials of another drug and may not reflect the rates observed in practice.",
+      "[[Include a description of the overall clinical trial database from which adverse reaction data have been drawn, including a discussion of overall exposure (number of patients, dosage, duration), baseline demographics of the exposed population,\u0002 designs of the trials in which exposure occurred (e.g., placebo-controlled), and any critical exclusions from the safety database.",
+      "Include a table of the adverse reactions identified from clinical trials that occurred at or above a specified rate appropriate to the database (common adverse reactions table). Within a listing, categorize adverse reactions by body system, by severity of the reaction, or in order of decreasing frequency, or by a combination of these, as appropriate. Within a category, list adverse reactions in decreasing order of frequency.",
+      "Below the common adverse reactions table, include adverse reactions that occurred below the specified rate for inclusion in the common adverse reactions table (referred to as less common adverse reactions).]]",
+      "6.2  Postmarketing Experience ",
+      "The following adverse reactions have been identified during postapproval use of DRUG-X.  Because these reactions are reported voluntarily from a population of uncertain size, it is not always possible to reliably estimate their frequency or establish a causal relationship to drug exposure.",
+      "[[Include a list of the adverse reactions that were identified from domestic and foreign spontaneous reports. Avoid listing adverse reactions that are already included in the Clinical Trials Experience subsection.]]",
+      "7  DRUG INTERACTIONS",
+      "[[Include a description of clinically significant drug interactions (observed and predicted) with other prescription or nonprescription drugs, drug classes, or foods (e.g., dietary supplements, grapefruit juice).  Also include the following:",
+      "Specific practical instructions for preventing or managing clinically significant drug interactions",
+      "Mechanism of the clinically significant drug interactions if known. ",
+      "Clinical effect(s) of clinically significant drug interactions",
+      "Practical guidance on known interference of the drug with laboratory tests. ",
+      "Information in this section should generally be placed into subsections to enhance organization, presentation, and accessibility of information.  For example, \u201c7.1  Effects of Other Drugs on DRUG-X\u201d, \u201c7.2  Effects of DRUG-X on Other Drugs\u201d.]]",
+      "8  USE IN SPECIFIC POPULATIONS",
+      "8.1  Pregnancy",
+      "Pregnancy Exposure Registry (omit this heading if not applicable)",
+      "[[If there is a scientifically acceptable pregnancy exposure registry for the drug, include the following statement under this heading: \u201cThere is a pregnancy exposure registry that monitors pregnancy outcomes in women exposed to DRUG-X during pregnancy.\u201d]] ",
+      "Risk Summary (required heading)",
+      "[[Include risk summary statement(s) that describe for the drug, the risk of adverse developmental outcomes based on all relevant human data, animal data, and/or the drug\u2019s pharmacology, under this heading. If such animal and/or human data are unavailable or insufficient, include a statement noting this.]]",
+      "Clinical Considerations (omit this heading if none of the subheadings below are applicable)\u000b[[This heading provides information to further inform prescribing and risk-benefit counseling under the following subheadings (omit any of the following subheadings if they are not applicable):]]",
+      "Disease-Associated Maternal and/or Embryo/Fetal Risk ",
+      "Dose Adjustments During Pregnancy and the Postpartum Period ",
+      "Maternal Adverse Reactions",
+      "Fetal/Neonatal Adverse Reactions ",
+      "Labor or Delivery ",
+      "Data (omit this heading if none of the subheadings below are applicable)",
+      "[[Summarize the human and/or animal data that support the risk summary statements or information under the Clinical Considerations heading (omit any of the following subheadings if they are not applicable).]]",
+      "Human Data ",
+      "Animal Data",
+      "8.2  Lactation ",
+      "Risk Summary (required heading) ",
+      "[[Summarize information on the presence of a drug and/or its active metabolite(s) in human milk, the effects of a drug and/or its active metabolite(s) on the breastfed infant, and the effects of a drug and/or its active metabolite(s) on milk production. If this information is unknown, include a statement noting this.]] ",
+      "Clinical Considerations (omit this heading if not applicable) ",
+      "[[Include information for minimizing exposure to the breastfed infant (e.g., pumping sessions) and monitoring and mitigating adverse reactions in the breastfed infant.]] ",
+      "Data (omit this heading if not applicable)",
+      "[[Describe the human and/or animal data on which the labeling under the Risk Summary or Clinical Considerations is based.]]",
+      "8.3  Females and Males of Reproductive Potential   ",
+      "[[Include this subsection if there are recommendations for pregnancy testing and/or contraception before, during, or after drug therapy, and/or (2) there are human and/or animal data suggesting drug-associated effects on fertility and/or pre-implantation loss effects. Include the information under the following headings, when applicable.]]",
+      "Pregnancy Testing (omit this heading if not applicable)",
+      "Contraception (This heading may be omitted if not applicable.  The following subheadings may be included if applicable:)",
+      "Females ",
+      "Males ",
+      "Infertility (This heading may be omitted if not applicable.  The following subheadings may be included if applicable:) ",
+      "Females",
+      "Males ",
+      "  ",
+      "8.4  Pediatric Use",
+      "[[Include:",
+      "A required pediatric regulatory statement for all indications in adults and/or pediatric patients (this may include any limitations on the pediatric indication).",
+      "If the drug is approved for pediatric use based on adequate and well-controlled studies in adults with other information supporting pediatric use, must include (a summary of) the basis of approval.  In all other situations, recommend including the basis of approval.",
+      "Include specific risks or safety concerns in pediatric patients and/or need for specific monitoring, and any differences between the effectiveness and safety of the drug in pediatric patients compared to adults.",
+      "When the data suggest an adverse signal(s) that has not been previously assessed in a pediatric clinical study (e.g., information on long-term safety for growth or neurocognitive development, juvenile animal studies have addressed safety concerns in an age group not studied in a pediatric study), include a concise summary of clinically relevant juvenile animal study data under the Juvenile Animal Toxicity Data heading.]] ",
+      "8.5  Geriatric Use",
+      "[[Include geriatric exposure data in the clinical studies (e.g., the number and percentage of drug-treated patients 65 years of age and older and the number and percentage of drug-treated patients 75 years of age and older) when information is sufficient to detect differences in safety and/or effectiveness between geriatric and younger adult patients and there were no observed differences in safety and/or effectiveness between these groups. If accurate and appropriate, may use alternative age cutoff point(s) within the the geriatric population to describe drug exposure (e.g., 65 to 74 years of age, 75 to 84 years of age, and 85 years of age and older).  If there are: ",
+      "Insufficient data to detect differences in safety and/or effectiveness between geriatric patients and younger adult patients, then if accurate and appropriate as per 21 CFR 201.57(c)(9)(v)(F)   state:  \u201cClinical studies of DRUG-X did not include sufficient numbers of patients 65 years of age and older to determine whether they respond differently from younger adult patients.\u201d",
+      "Sufficient data to detect differences in safety and/or effectiveness between geriatric patients and younger adult patients but no overall differences were observed, then if accurate and appropriate as per 21 CFR 201.57(c)(9)(v)(F) state:  \u201cNo overall differences in safety or effectiveness of DRUG-X have been observed between patients 65 years of age and older and younger adult patients.\u201d",
+      "Sufficient data to detect differences in safety and/or effectiveness between geriatric patients and younger adult patients and there were observed differences, then describe these differences (e.g., geriatric patients experienced unique adverse reactions, adverse reactions occurred at a greater frequency or severity in geriatric patients than in younger adult patients, or there was reduced effectiveness in geriatric patients) and provide information on risk mitigation in geriatric patients (e.g., specific monitoring in geriatric patients, different recommended dosage in geriatric patients).  ",
+      "Include specific risks or safety concerns associated with the use of the drug in geriatric patients and specific risk mitigation in geriatric patients (e.g., specific monitoring in geriatric patients).]]",
+      "8.6  Subpopulation X (e.g., Renal Impairment)",
+      "9  DRUG ABUSE AND DEPENDENCE",
+      "[[Include this section for drugs controlled under the Controlled Substances Act or drugs not controlled under the Controlled Substances Act for which there is important information to convey to health care practitioners related to abuse and dependence.]]",
+      " ",
+      "9.1  Controlled Substance",
+      "[[If the drug is scheduled under the Controlled Substances Act, state that the drug is a controlled substance and identify the schedule under which the drug is controlled.]]  ",
+      "9.2  Abuse",
+      "[[Include, as appropriate, information about the drug related to abuse, misuse, and addiction that is important for health care practitioners to consider.]]",
+      "9.3  Dependence",
+      "[[Include information about the drug related to physical dependence, withdrawal, and tolerance.  ",
+      "Summarize signs and symptoms of withdrawal after chronic use or abuse of the drug in the Dependence subsection, whereas discuss abuse-related adverse reactions in the Abuse subsection.]]",
+      "10  OVERDOSAGE",
+      "[[If applicable, describe signs, symptoms, and laboratory findings of overdosage, complications that can occur with overdosage (e.g., organ toxicity), the amount of drug in a single dose that is ordinarly associated with symptoms of overdosage, the amount of drug in a single dose that is likely to be life-threatening, and recommended general treatment procedures and specific measures for support of vital functions during an overdosage.]]",
+      "11  DESCRIPTION ",
+      "[[Include the drug name(s), dosage form(s), route(s) of administration, pharmacologic or therapeutic class, and qualitative and quantitative ingredient information.  Additionally, for nonbiological drug products, include the chemical name, structural formula, and molecular weight.]]",
+      "12  CLINICAL PHARMACOLOGY",
+      "12.1\t Mechanism of Action",
+      "[[Summarize the established mechanism(s) of action (1) for the approved indication(s) or uses of the drug and (2) for the clinically significant adverse reactions or other potential hazards associated with the drug.  ",
+      "If different mechanism(s) of action are the basis of response in different approved indications, summarize the mechanism of action for each approved indication. Do not include a mechanism of action for indications or uses not included in the INDICATIONS AND USAGE section.",
+      "If the mechanism of action is unknown, include a statement about the lack of this information.]]",
+      "12.2\tPharmacodynamics",
+      "[[Describe the biochemical or physiologic pharmacologic effects of the drug and/or active metabolites related to the drug\u2019s clinical effect(s) or toxicity.]]",
+      "Cardiac Electrophysiology",
+      "[[Include data on drug effects on QTc interval.]]",
+      "12.3  Pharmacokinetics",
+      "Absorption",
+      "Effect of Food",
+      "Distribution",
+      "Elimination",
+      "Metabolism",
+      "Excretion",
+      "Specific Populations",
+      "Geriatric Patients ",
+      "Pediatric Patients",
+      "Male and Female Patients",
+      "Racial or Ethnic Groups",
+      "Patients with Renal Impairment ",
+      "Patients with Hepatic Impairment ",
+      "Pregnant Women ",
+      "Drug Interaction Studies",
+      "Drug A",
+      "Drug B",
+      "12.4  Microbiology",
+      "[[For antimicrobial drugs, include information relevant to the microbiology characteristics of the drug.]]",
+      "12.5 \t Pharmacogenomics",
+      "[[Include clinically relevant data or information on the effect of genetic variations affecting drug therapy.]]",
+      "12.6  Immunogenicity",
+      "[[Include this subsection if the drug has had an immunogenicity assessment (e.g., therapeutic proteins, oligonucleotides, peptides, heparins).",
+      "If the methodology for the submitted immunogenicity evaluation is adequate such that it allows for an assessment of anti-drug-antibody (ADA) incidence:",
+      "Include the following paragraph at the beginning of this subsection, preceding the immunogenicity data:",
+      "\u201cThe observed incidence of anti-drug antibodies is highly dependent on the sensitivity and specificity of the assay. Differences in assay methods preclude meaningful comparisons of the incidence of anti-drug antibodies in the studies described below with the incidence of anti-drug antibodies in other studies, including those of [insert proper name, active moiety name, or active ingredient name] or of other [insert core name, active moiety name, or active ingredient name] products.\u201d",
+      "Report the incidence of ADA, including neutralizing antibodies, along with duration of exposure to the drug and time period over which sampling for ADA was conducted.",
+      "Summarize the known effect(s) of ADA on the pharmacokinetics and pharmacodynamics.",
+      "If the methodology for the submitted immunogenicity evaluation is inadequate, such that it precludes an assessment of the incidence of ADA, include the following or similar statement in this subsection: ",
+      " ",
+      "\u201cThere is insufficient information to characterize the anti-drug antibody response to [insert proper name, active moiety name, or active ingredient name] and the effects of anti-drug antibodies on pharmacokinetics, pharmacodynamics, safety, or effectiveness of [insert core name, active moiety name, or active ingredient name] products.\u201d]]",
+      "13  NONCLINICAL TOXICOLOGY",
+      "13.1  Carcinogenesis, Mutagenesis, Impairment of Fertility",
+      "[[Include information on animal studies/models about the carcinogenic potential, mutagenesis, and impairment of fertility of the drug.]]",
+      "Carcinogenesis",
+      "Mutagenesis",
+      "Impairment of Fertility",
+      "13.2  Animal Toxicology and/or Pharmacology",
+      "[[Include information about clinically significant animal data that is not incorporated in other sections of the Prescribing Information.]]",
+      "14  CLINICAL STUDIES",
+      "[[Discuss the clinical studies that are important to a health care practitioner\u2019s understanding of the safe and effective use of the drug.  Include a description and results of the clinical studies (adequate and well-controlled studies) that (1) provided the primary support for the approved indication(s) (2) provided other important information about the drug\u2019s effectiveness not furnished by the studies that provided primary support for effectiveness (e.g., studies that suggested differential effects in subpopulations) and/or (3) prospectively evaluated a safety endpoint.  Include information about clinical studies that suggested lack of effectiveness in a clinical situation or lack of effect on an endpoint. ",
+      "For the study design description include:",
+      "Major design characteristics",
+      "Study treatment arms, including the dosage and route(s) of administration",
+      "Eligibility criteria important for understanding the treatment effect or for understanding if the results can be generalized (it may be more important to describe the important baseline disease characteristics of the studied population rather than the protocol/study eligibility criteria) ",
+      "Important concomitant therapy that helps understand the effects of the drug ",
+      "Endpoints critical to establish effectiveness",
+      "Limitations of the study design and statistical analysis plan, and uncertainties with the endpoint(s)",
+      "When summarizing study findings include:",
+      "Number enrolled  ",
+      "Baseline demographics:",
+      "Age",
+      "Sex",
+      "Racial subgroups (e.g., White, Black or African American, American Indian or Alaska Native, Asian, Native Hawaiian or Other Pacific Islander), and ",
+      "Ethnic subgroups (i.e., Hispanic or Latino vs. Not Hispanic or Latino))",
+      "Baseline disease characteristics important for understanding the treatment effect or for understanding if the results can be generalized ",
+      "Endpoint results that are found to be both statistically and clinically significant or demonstrated a meaningful lack of effect ",
+      "Important limitations of the results to convey uncertainties regarding the interpretation of the data",
+      "Confidence intervals even if p-values are presented   ",
+      "This section must not include any information that implies or suggests indications or uses or dosing regimens not stated in the INDICATIONS AND USAGE or DOSAGE AND ADMINISTRATION sections. ",
+      "Subsections or headings may be used to enhance the organization, presentation and accessibility of the information within this section.  For example, \u201c14.1  Subsection Title\u201d, 14.2  Subsection Title\u201d.]]",
+      "15  REFERENCES",
+      "[[This section is usually omitted, unless there are authoritative references important to prescribing decisions that are mentioned in another section of the Prescribing Information but cannot readily be summarized.]]",
+      "16  HOW SUPPLIED/STORAGE AND HANDLING ",
+      "[[Include information about the dosage form(s), strength(s), units in which the dosage form is ordinarily available for prescribing by practitioners (e.g., bottles of 100), identifying characteristics of the dosage form(s) including the NDC number(s), and special handling and storage conditions of the supplied product (e.g., refrigerate, do not freeze).]]  ",
+      "17  PATIENT COUNSELING INFORMATION",
+      "[[This section must reference any FDA-approved patient labeling.  The reference should appear at the beginning of this section and include the type(s) of FDA-approved patient labeling.  Recommended options for the reference statement include the following: ",
+      "Advise the patient to read the FDA-approved patient labeling (Patient Information).",
+      "Advise the patient to read the FDA-approved patient labeling (Instructions for Use).  ",
+      "Advise the patient to read the FDA-approved patient labeling (Patient Information and Instructions for Use). ",
+      "Advise the patient to read the FDA-approved patient labeling (Medication Guide). ",
+      "Advise the patient to read the FDA-approved patient labeling (Medication Guide and Instructions for Use).",
+      "In this section include information a health care practitioner should convey to a patient (or caregiver) during a counseling discussion.  This section typically focuses on major risks of the drug and risks for which a patient may need to do something actionable (e.g., contact the health care practitioner, immediately discontinue the drug, or seek emergency medical care) and how the patient may mitigate or manage them.  Also include other information such as:",
+      "Critical administration instructions (e.g., take drug with a high fat meal; swallow capsules intact and do not open, chew or crush)",
+      "Unique storage and handling instructions (e.g., do not handle broken or crushed DRUG-X tablets because DRUG-X may cause harm to a male fetus).",
+      "For drugs with special instructions for disposal for the patient or caregiver (e.g., opioids, methylphenidate, sodium oxybate, diazepam, testosterones), provide instruction to counsel patients (or caregivers) on proper disposal of unneeded drug (used or unused) and include a brief summary of patient-directed drug disposal information. Avoid including disposal instructions in this section for drugs that do not have special disposal instructions for the patient or caregiver.",
+      "It may be important to convey other information such as a common drug effect that does not pose a risk to patients but could be important because it may be worrisome or potentially affect compliance (e.g., cough from the use of angiotensin-converting enzyme inhibitors).",
+      "Drug interaction (DI) information if the co-administration could be initiated by the patient (e.g., dietary supplement, nonprescription drug) or DI information that is in the BOXED WARNING, CONTRAINDICATIONS, or WARNINGS AND PRECAUTIONS section.",
+      "Discussion of the risks of a drug in pediatric patients, pregnancy, or during lactation if the information concerns an important risk. For products with a pregnancy exposure registry included in the Pregnancy subsection, include the availability of the registry in this section with a cross-reference to the Pregnancy subsection where the contact information for enrollment is located.",
+      "Use headings (e.g. (e.g., \u201cHepatotoxicity,\u201d \u201cHypersensitivity Reactions,\u201d \u201cImportant Administration Instructions,\u201d \u201cUnique Storage and Handling Instructions,\u201d \u201cPregnancy Exposure Registry\u201d) to organize and differentiate topics within this section instead of numbered subsections (e.g., 17.1, 17.2).]]",
+      "[[Include manufacturing information at the end of the Prescribing Information (after Section 17).",
+      "For NDAs must include at least one of the following: the manufacturer\u2019s name (e.g., Firm-M) and their place of business; distributor\u2019s name (e.g., Firm-D) and their place of business, or packer\u2019s name (e.g., Firm-P) and their place of business:",
+      "The manufacturer\u2019s, distributor\u2019s, and/or packer\u2019s name may be the name of a parent, subsidiary, or affiliate company where the related companies are under common ownership and control.",
+      "The place of business must include the street address, city, state, and zip code; however, may omit the street address if the address is shown in a current city or telephone directory. For a foreign manufacturer must also include the country and any applicable mailing code.",
+      "If the manufacturer information is included and there are joint manufacturers must state: \u201cJointly Manufactured By [insert name of all of the manufacturers]\u201d",
+      "If the distributor is included, must use one of the following phrases: \u201cManufactured for Firm-D\u201d, \u201cDistributed by Firm-D\u201d, \u201cManufactured by Firm-M for Firm-D\u201d, \u201cManufactured for Firm-D by Firm-M\u201d, \u201cDistributor: Firm-D\u201d, \u201cMarketed by Firm-D\u201d.",
+      "If the packer is included, must use one of the following phrases: \u201cPacked by Firm-P\u201d or \u201cPackaged by Firm-P\u201d",
+      "For BLAs must include the license manufacturer\u2019s name (i.e., the applicant on Form 356h) along with the license manufacturer\u2019s address and U.S. license number. ",
+      "The distributor\u2019s name and address may also be included. ",
+      "If the distributor is included must include one of the following phrases: \u201cManufactured for Firm-D\u201d, \u201cDistributed by Firm-D\u201d, \u201cManufactured by Firm-M for Firm-D\u201d, \u201cManufactured for Firm-D by Firm-M\u201d, \u201cDistributor: Firm-D\u201d, or \u201cMarketed by Firm-D\u201d.]]"
+    ]
+  },
+  "verifier": "word-verifier/1.0.4"
+}
