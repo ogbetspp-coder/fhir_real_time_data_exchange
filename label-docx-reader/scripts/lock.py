@@ -97,14 +97,17 @@ def _git(*arguments: str) -> str | None:
 
 
 def base() -> str:
-    """The commit whose history is released: LOCK_BASE in CI (scripts/ci/lock-base.sh at the
-    repository's root), else origin/main."""
+    """The commit whose history is released: LOCK_BASE in CI, else origin/main.
+
+    In CI, scripts/ci/lock-base.sh at the repository's root names it.
+    """
     return os.environ.get("LOCK_BASE", "origin/main")
 
 
 def released(base: str) -> list[tuple[str, Lock]] | None:
-    """Every version lock in the first-parent history of ``base``, with its commit; None without
-    that history.
+    """Every version lock in ``base``'s first-parent history, with its commit, or None.
+
+    None when that history cannot be read.
 
     Reading the whole history means neither a second push nor a hand edit of the lock can change
     a released entry and pass: ``locked_versions`` refuses to re-lock a version, but a lock edited
