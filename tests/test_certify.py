@@ -43,10 +43,12 @@ from lock import MANIFESTS
 from test_reader import (
     ALL_LOOKS,
     APPLIED,
+    HEADERS,
     LINE,
     NO_LOOKS,
     NOT_ASKED,
     SHAPE,
+    SIZE_ONE,
     WP,
     W,
     _alternate,
@@ -3189,3 +3191,292 @@ def test_a_view_holds_a_paragraph_wherever_it_stands() -> None:
     at = in_cell.index(">a<", in_cell.index(">a<") + 1)
     views.append(_with_part(source, "word/document.xml", in_cell[:at] + ">x<" + in_cell[at + 3 :]))
     _held(source, views)
+
+
+# --- mutation survivors, table style
+# The check's own regions, looks, band sizes and offsets, and the reason it gives where Word's
+# answer is not on record (EVIDENCE: corpus/numbering-cases, table-style-*).
+
+
+def _shaded(kind: str) -> str:
+    """A part that sets no run property: it is defined, and changes no text."""
+    shading = '<w:tcPr><w:shd w:val="clear" w:fill="D9D9D9"/></w:tcPr>'
+    return f'<w:tblStylePr w:type="{kind}">{shading}</w:tblStylePr>'
+
+
+def _based_on(content: str) -> str:
+    """Table style U, which T is based on (``base='<w:basedOn w:val="U"/>'``), holding content."""
+    return f'<w:style w:type="table" w:styleId="U"><w:name w:val="U"/>{content}</w:style>'
+
+
+_ON_U = '<w:basedOn w:val="U"/>'
+_BOLD_FIRST_ROW = t_style(("firstRow", "<w:b/>"))
+_ROW_SIZE_TWO = '<w:tblPr><w:tblStyleRowBandSize w:val="2"/></w:tblPr>'
+_COL_SIZE_THREE = '<w:tblPr><w:tblStyleColBandSize w:val="3"/></w:tblPr>'
+_V_BANDS = '<w:tblLook w:val="0000" w:noHBand="1" w:noVBand="0"'
+_H_BANDS = '<w:tblLook w:val="0000" w:noHBand="0" w:noVBand="1"'
+_OFF_GRID = '<w:trPr><w:gridBefore w:val="1"/></w:trPr>'
+
+
+def _only_text(body: str, *cells: str) -> str:
+    """``body`` with the text of every cell but ``cells`` (as r1c1) taken out."""
+    return re.sub(
+        r"<w:r><w:t>(r[0-9]c[0-9])</w:t></w:r>",
+        lambda m: m.group(0) if m.group(1) in cells else "",
+        body,
+    )
+
+
+_PART_REASONS = {
+    **{
+        name: (*NOT_ASKED[name], reason)
+        for name, reason in (
+            ("banded-defined-last-row", "Horz banding over a lastRow not on record"),
+            ("banded-defined-last-column", "Vert banding over a lastCol not on record"),
+            ("corner-one-look", "nwCell: a corner Word was not asked about"),
+            ("no-look-last-row", "lastRow under a look not on record"),
+            ("band-size-zero", "Horz banding not on record"),
+            ("band-size-of-the-table", "Horz band size not on record"),
+            ("based-on", "a part through basedOn"),
+            ("unknown-type", "a part of type 'firstRows'"),
+            ("first-and-last-row", "first and last over one cell"),
+            ("stray-header", "a header row below a row that is none"),
+            ("banding-past-headers", "banding past several header rows"),
+            ("row-off-the-grid", "a row off the grid"),
+            ("merged-cells", "merged cells"),
+            ("nested-under-part", "a table in it"),
+            ("nested-table-applies", "a nested table, or a note, header, footer or comment"),
+        )
+    },
+    "defined-twice": (
+        t_table(),
+        t_style(("firstRow", "<w:b/>"), ("firstRow", "<w:i/>")),
+        "a part defined twice",
+    ),
+    "unanswered-mark": (
+        t_table(),
+        t_style(("firstRow", '<w:u w:val="single"/>')),
+        "firstRow sets a mark Word was not asked about",
+    ),
+    # Two corners over one cell, each corner in a pair; first and last column over one cell.
+    "north-corners": (
+        t_table(size=1),
+        t_style(("nwCell", "<w:b/>"), ("neCell", "<w:i/>")),
+        "two corners over one cell",
+    ),
+    "south-corners": (
+        t_table(size=1),
+        t_style(("swCell", "<w:b/>"), ("seCell", "<w:i/>")),
+        "two corners over one cell",
+    ),
+    "first-and-last-column": (
+        t_table(size=1),
+        t_style(("firstCol", "<w:b/>"), ("lastCol", "<w:i/>")),
+        "first and last over one cell",
+    ),
+    # Off the grid after the row as before it; merged down or across.
+    "row-after-the-grid": (
+        t_table(rows='<w:trPr><w:gridAfter w:val="1"/></w:trPr>'),
+        _BOLD_FIRST_ROW,
+        "a row off the grid",
+    ),
+    "merged-down": (
+        t_table().replace("<w:tc>", '<w:tc><w:tcPr><w:vMerge w:val="restart"/></w:tcPr>', 1),
+        _BOLD_FIRST_ROW,
+        "merged cells",
+    ),
+    "merged-across": (
+        t_table().replace("<w:tc>", '<w:tc><w:tcPr><w:hMerge w:val="restart"/></w:tcPr>', 1),
+        _BOLD_FIRST_ROW,
+        "merged cells",
+    ),
+    # A row off the grid may stand anywhere: its middle cell may be in the first column.
+    "middle-of-a-row-off-the-grid": (
+        _only_text(t_table().replace("</w:tr><w:tr>", f"</w:tr><w:tr>{_OFF_GRID}", 1), "r1c1"),
+        t_style(("firstCol", "<w:b/>")),
+        "a row off the grid",
+    ),
+    "banding-off-the-grid": (
+        t_table(_H_BANDS + "/>", rows=_OFF_GRID),
+        t_style(("band1Horz", "<w:b/>"), base=SIZE_ONE),
+        "Horz banding in a row off the grid or among merged cells",
+    ),
+    # Column band size set by the table; a band size set by a style it is based on.
+    "column-band-size-of-the-table": (
+        t_table(NO_LOOKS + '<w:tblStyleColBandSize w:val="1"/>'),
+        t_style(("band1Vert", "<w:b/>")),
+        "Vert band size not on record",
+    ),
+    "band-size-through-based-on": (
+        t_table(NO_LOOKS),
+        t_style(("band1Horz", "<w:b/>"), base=_ON_U + SIZE_ONE, extra=_based_on(SIZE_ONE)),
+        "Horz band size not on record",
+    ),
+    # The same part in both styles: how Word merges them is not on record.
+    "part-in-both-styles": (
+        t_table(),
+        t_style(
+            ("firstRow", "<w:b/>"),
+            base=_ON_U,
+            extra=_based_on('<w:tblStylePr w:type="firstRow"><w:rPr><w:i/></w:rPr></w:tblStylePr>'),
+        ),
+        "a part through basedOn",
+    ),
+    # Banding past a first column only the based-on style defines, or under a look unsaid;
+    # over a last column only the based-on style defines.
+    "first-column-below": (
+        t_table(_V_BANDS + ' w:firstColumn="1"/>'),
+        t_style(
+            ("band1Vert", "<w:b/>"), base=_ON_U + SIZE_ONE, extra=_based_on(_shaded("firstCol"))
+        ),
+        "Vert banding past a firstCol not on record",
+    ),
+    "first-column-look-unsaid": (
+        t_table('<w:tblLook w:noHBand="1" w:noVBand="0"/>'),
+        t_style(("band1Vert", "<w:b/>"), base=SIZE_ONE + _shaded("firstCol")),
+        "Vert banding past a firstCol not on record",
+    ),
+    "last-column-below": (
+        t_table(_V_BANDS + ' w:lastColumn="1"/>'),
+        t_style(
+            ("band1Vert", "<w:b/>"), base=_ON_U + SIZE_ONE, extra=_based_on(_shaded("lastCol"))
+        ),
+        "Vert banding over a lastCol not on record",
+    ),
+    # A look spelled in no way Word reads.
+    "look-spelled-otherwise": (
+        t_table('<w:tblLook w:val="0020" w:firstRow="yes"/>'),
+        _BOLD_FIRST_ROW,
+        "firstRow under a look not on record",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("body", "styles", "reason"), _PART_REASONS.values(), ids=_PART_REASONS.keys()
+)
+def test_each_table_style_part_not_on_record_is_refused_for_its_own_reason(
+    body: str, styles: str, reason: str
+) -> None:
+    with pytest.raises(
+        CertificationError, match=f"^a table style's part over text: {re.escape(reason)}$"
+    ):
+        DocxSource(docx(body, styles=styles))
+
+
+_ROW_BANDS_FIVE = t_table(_H_BANDS + ' w:firstRow="1"/>', 5)
+_COL_BANDS_FIVE = t_table(_V_BANDS + ' w:firstColumn="1"/>', 5)
+_PART_GRIDS = {
+    # Each spelling of a look's attribute, over a val bit that says otherwise.
+    **{
+        f"look-{said}": (
+            t_table(f'<w:tblLook w:val="{"0020" if not on else "0000"}" w:firstRow="{said}"/>'),
+            _BOLD_FIRST_ROW,
+            "B B B|. . .|. . ." if on else ". . .|. . .|. . .",
+        )
+        for said, on in (("true", True), ("on", True), ("false", False), ("off", False))
+    },
+    # val is hexadecimal: 0400 is no vertical banding, 0080 the first column.
+    "look-val-0400": (
+        t_table('<w:tblLook w:val="0400"/>'),
+        t_style(("firstCol", "<w:b/>")),
+        ". . .|. . .|. . .",
+    ),
+    "look-val-0080": (
+        t_table('<w:tblLook w:val="0080"/>'),
+        t_style(("firstCol", "<w:b/>")),
+        "B . .|B . .|B . .",
+    ),
+    # One header row is the first row alone; banding counts on past it.
+    "one-header-row": (
+        t_table(_H_BANDS + ' w:firstRow="1"/>').replace("<w:tr>", f"<w:tr>{HEADERS}", 1),
+        t_style(("firstRow", "<w:b/>"), ("band1Horz", "<w:i/>"), base=SIZE_ONE),
+        "B B B|I I I|. . .",
+    ),
+    # Band sizes with no band part, or a based-on style that sets none, change nothing.
+    "band-size-without-bands": (
+        t_table(""),
+        t_style(("firstRow", "<w:b/>"), base=SIZE_ONE),
+        "B B B|. . .|. . .",
+    ),
+    "based-on-without-band-size": (
+        t_table(NO_LOOKS),
+        t_style(("band1Horz", "<w:b/>"), base=_ON_U + SIZE_ONE, extra=_based_on("")),
+        "B B B|. . .|B B B",
+    ),
+    # A first column both styles define, its look on: banding counts on past it.
+    "first-column-in-both": (
+        t_table(_V_BANDS + ' w:firstColumn="1"/>', 4),
+        t_style(
+            ("band1Vert", "<w:b/>"),
+            base=_ON_U + SIZE_ONE + _shaded("firstCol"),
+            extra=_based_on(_shaded("firstCol")),
+        ),
+        "|".join([". B . B"] * 4),
+    ),
+    # A last column the style defines: only that column's banding is not on record.
+    "banded-before-a-defined-last-column": (
+        _only_text(
+            t_table(_V_BANDS + ' w:lastColumn="1"/>'),
+            *(f"r{i}c{j}" for i in range(3) for j in range(2)),
+        ),
+        t_style(("band1Vert", "<w:b/>"), base=SIZE_ONE + _shaded("lastCol")),
+        "B . .|B . .|B . .",
+    ),
+    # Cell properties that merge nothing.
+    "cell-width": (
+        t_table().replace("<w:tc>", '<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr>'),
+        _BOLD_FIRST_ROW,
+        "B B B|. . .|. . .",
+    ),
+    "span-of-one": (
+        t_table().replace("<w:tc>", '<w:tc><w:tcPr><w:gridSpan w:val="1"/></w:tcPr>'),
+        _BOLD_FIRST_ROW,
+        "B B B|. . .|. . .",
+    ),
+    # Bands of two and three, counted from the first row (column) or past it.
+    "row-bands-of-two-past-the-first": (
+        _ROW_BANDS_FIVE,
+        t_style(("band1Horz", "<w:b/>"), base=_ROW_SIZE_TWO + _shaded("firstRow")),
+        "|".join([". . . . ."] + ["B B B B B"] * 2 + [". . . . ."] * 2),
+    ),
+    "row-bands-of-two-from-the-first": (
+        _ROW_BANDS_FIVE,
+        t_style(("band1Horz", "<w:b/>"), base=_ROW_SIZE_TWO),
+        "|".join(["B B B B B"] * 2 + [". . . . ."] * 2 + ["B B B B B"]),
+    ),
+    "column-bands-of-three-past-the-first": (
+        _COL_BANDS_FIVE,
+        t_style(("band1Vert", "<w:b/>"), base=_COL_SIZE_THREE + _shaded("firstCol")),
+        "|".join([". B B B ."] * 5),
+    ),
+    "column-bands-of-three-from-the-first": (
+        _COL_BANDS_FIVE,
+        t_style(("band2Vert", "<w:b/>"), base=_COL_SIZE_THREE),
+        "|".join([". . . B B"] * 5),
+    ),
+}
+
+
+@pytest.mark.parametrize(("body", "styles", "shown"), _PART_GRIDS.values(), ids=_PART_GRIDS.keys())
+def test_the_check_works_out_looks_band_sizes_and_offsets_of_table_style_parts(
+    body: str, styles: str, shown: str
+) -> None:
+    assert _checked_grid(body, styles) == shown
+
+
+def test_a_list_label_under_a_table_style_part_not_on_record_is_never_certified() -> None:
+    numbering = _list(_level(0, "%1.")) + _NUM
+
+    def labelled(num_id: int) -> bytes:
+        numbered = f'<w:numPr><w:ilvl w:val="0"/><w:numId w:val="{num_id}"/></w:numPr>'
+        label = f"<w:p><w:pPr>{numbered}</w:pPr></w:p>"
+        body = _only_text(t_table(rows=_OFF_GRID)).replace("<w:p></w:p>", label, 1)
+        return docx(body, styles=_BOLD_FIRST_ROW, numbering=numbering)
+
+    with pytest.raises(
+        CertificationError, match=r"^a table style's part over text: a row off the grid$"
+    ):
+        DocxSource(labelled(1))
+    # numId 0 takes the numbering off: nothing is drawn.
+    DocxSource(labelled(0))

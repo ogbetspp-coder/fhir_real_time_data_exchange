@@ -366,6 +366,25 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
     ("_agree", "and all(_agree(a, b) for a, b in zip(expected, found, strict=True))", "bool", 0): (
         _STRICT
     ),
+    # certify survivors, table style
+    ("_Applied.__init__", "for i, found in zip(style_ids, self.styles, strict=True)", "bool", 0): (
+        "self.styles is made from style_ids one for one, so zip(strict=True) never raises"
+    ),
+    (
+        "_Applied.at",
+        '(self.marked[row] and row >= self.top, "a header row below a row that is none"),',
+        "compare:0",
+        0,
+    ): "the header rows at the top end at the first unmarked row, so row top is never marked",
+    (
+        "_Applied.at",
+        'elif start[0] in ours and self.look[start[1]] and way == "Horz" and self.top > 1:',
+        "int:0",
+        0,
+    ): (
+        "for Horz both names are firstRow; for Vert the test of way is false whichever is "
+        "looked for"
+    ),
 }
 
 _COMPARE = {
