@@ -154,7 +154,7 @@ python3.14 -m venv .uv-bootstrap && .uv-bootstrap/bin/pip install "uv==0.12.17"
 .uv-bootstrap/bin/uv run --frozen ruff check . && .uv-bootstrap/bin/uv run --frozen ruff format --check .
 .uv-bootstrap/bin/uv run --frozen mypy --strict
 .uv-bootstrap/bin/uv run --frozen python scripts/lock.py --check
-.uv-bootstrap/bin/uv run --frozen pytest --cov
+.uv-bootstrap/bin/uv run --frozen pytest --cov -n auto   # on every core
 ```
 
 Rules for changing the code: [AGENTS.md](AGENTS.md). Extracted from EMA Flow

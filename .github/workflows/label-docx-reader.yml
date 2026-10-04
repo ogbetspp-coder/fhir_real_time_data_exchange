@@ -69,4 +69,5 @@ jobs:
         run: uv run --frozen python scripts/lock.py --check
 
       - name: Test
-        run: uv run --frozen pytest --cov
+        # On every core (pytest-xdist): the tests share no state, and coverage is combined.
+        run: uv run --frozen pytest --cov -n auto
