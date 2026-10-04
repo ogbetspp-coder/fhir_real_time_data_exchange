@@ -71,7 +71,6 @@ _TABLE_EDGE = (
     "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the "
     "U+F000 range, or just past it, is refused before and after"
 )
-_XML_LINE = '_XML_NS = "http://www.w3.org/XML/1998/namespace"'
 _XML_PREFIX = "the xml prefix can never name Word's namespace, the only one the tokenizer looks for"
 _FIRST_LESS = "a '<' at the very start finds no capture open, so the chunk is never used there"
 _STRICT = "the lengths are compared just before, so zip(strict=True) never raises"
@@ -170,6 +169,11 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
     ("_Story.token", _SYMBOL_RANGE, "compare:1", 0): _TABLE_EDGE,
     ("_Story.token", _SYMBOL_RANGE, "int:61440", 1): _TABLE_EDGE,
     ("_Story.token", _SYMBOL_RANGE, "int:61695", 0): _TABLE_EDGE,
+    # The last variation selector, U+E01EF: one past it, U+E01F0, is unassigned (Cn), which the
+    # check refuses as such, so a range that ends one later refuses nothing more.
+    ("<module>", "(0xE0100, 0xE01EF),", "int:917999", 0): (
+        "U+E01F0, one past the range, is unassigned and refused as such before and after"
+    ),
     ("_Story.token", _SYMBOL_COUNT, "bool", 0): (
         "the Symbol table maps one character to one, so the two are the same length"
     ),
@@ -256,7 +260,6 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
         "bool",
         0,
     ): "both lists have one entry per character of the text, which was compared just before",
-    ("<module>", _XML_LINE, "str:'http://www.w3.org/XML/1998/namespace'", 0): _XML_PREFIX,
     (
         "_raw_texts",
         'scopes: list[dict[str, str]] = [{"xml": _XML_NS}]',

@@ -135,7 +135,8 @@ turned round, a number one off, a statement removed...) and runs the check's tes
 its tests and the corpus, at least 90% of faults killed, and every survivor recorded with the
 reason it cannot change a result; each reason names one fault. The run works on a copy of the
 files taken when it starts, so an edit made meanwhile cannot reach it. Counts are in
-`docs/checker-mutants.json`. A run takes about 50 minutes on eight cores and resumes in parts (`--budget`).
+`docs/checker-mutants.json`. The last run took 31 minutes on eight cores; a run resumes in parts
+(`--budget`).
 
 ## Every time
 
