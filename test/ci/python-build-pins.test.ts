@@ -2,9 +2,10 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-// Zone A and the agent are built by hatchling on every `uv sync`. Its version was pinned; its own
-// dependencies were resolved afresh each time, unpinned (audit B07, S-5). Both projects now pin
-// the whole build closure in [tool.uv] build-constraint-dependencies, recorded in uv.lock.
+// Zone A, the agent and the label reader are built by hatchling on every `uv sync`. Its version was
+// pinned; its own dependencies were resolved afresh each time, unpinned (audit B07, S-5). Every
+// project now pins the whole build closure in [tool.uv] build-constraint-dependencies, recorded in
+// uv.lock.
 
 // hatchling's runtime dependencies on Python 3.14 (tomli only applies below 3.11).
 const HATCHLING_CLOSURE = ["packaging", "pathspec", "pluggy", "tomlkit", "trove-classifiers"];
@@ -14,7 +15,7 @@ function list(text: string, key: string): string[] {
   return [...body.matchAll(/"([^"]+)"/g)].map((match) => match[1] ?? "");
 }
 
-describe.each(["zone-a", "agent"])("%s's build", (project) => {
+describe.each(["zone-a", "agent", "label-docx-reader"])("%s's build", (project) => {
   const pyproject = readFileSync(`${project}/pyproject.toml`, "utf8");
   const lock = readFileSync(`${project}/uv.lock`, "utf8");
   const constraints = list(pyproject, "build-constraint-dependencies");

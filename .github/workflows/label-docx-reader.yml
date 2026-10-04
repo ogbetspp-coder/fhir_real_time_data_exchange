@@ -1,13 +1,11 @@
 name: Label reader
 
 # The label reader (label-docx-reader/), brought in with its history from its own repository,
-# keeps its own gate: the five checks of its README's "Development", run only when it or this
-# workflow changes. Its own label-docx-reader/.github/ is inert here; this file replaces it.
+# keeps its own gate: the five checks of its README's "Development". It is a required check, so
+# it runs on every pull request (a path-filtered workflow never reports, and a required check that
+# never reports blocks the merge); on main, only when it or this workflow changes.
 on:
   pull_request:
-    paths:
-      - "label-docx-reader/**"
-      - ".github/workflows/label-docx-reader.yml"
   push:
     branches:
       - main
@@ -50,7 +48,7 @@ jobs:
           cache-dependency-glob: label-docx-reader/uv.lock
 
       - name: Install
-        run: uv sync --frozen
+        run: uv sync --locked
 
       - name: Lint
         run: uv run --frozen ruff check .

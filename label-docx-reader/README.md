@@ -136,4 +136,4 @@ python3.14 -m venv .uv-bootstrap && .uv-bootstrap/bin/pip install "uv==0.12.17"
 ```
 
 Rules for changing the code: [AGENTS.md](AGENTS.md). Extracted from EMA Flow
-(`zone-a/src/zone_a/docx/reader.py`, docx-reader/1.1.0).
+(`zone-a/src/zone_a/docx/reader.py` at docx-reader/1.1.0, since replaced by this reader).
