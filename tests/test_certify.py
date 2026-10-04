@@ -2738,3 +2738,244 @@ def test_symbol_text_drawn_as_complex_script_is_never_certified() -> None:
         with pytest.raises(CertificationError):
             DocxSource(docx(body))
     assert DocxSource(docx(_p(run))).certify(_value("\u03b1"))["symbolMapped"] == 1
+
+
+# --- mutation survivors, part a: table looks and regions, merged cells, complex script, fonts
+
+
+_EVERYWHERE = {(row, cell) for row in range(2) for cell in range(2)}
+# The cells of a 2 x 2 table (row, cell) each conditional part stands in.
+_PLACES = {
+    **dict.fromkeys(
+        ("wholeTable", "band1Horz", "band2Horz", "band1Vert", "band2Vert"), _EVERYWHERE
+    ),
+    "firstRow": {(0, 0), (0, 1)},
+    "lastRow": {(1, 0), (1, 1)},
+    "firstCol": {(0, 0), (1, 0)},
+    "lastCol": {(0, 1), (1, 1)},
+    "nwCell": {(0, 0)},
+    "neCell": {(0, 1)},
+    "swCell": {(1, 0)},
+    "seCell": {(1, 1)},
+}
+_CORNERS = {"wholeTable", "nwCell", "neCell", "swCell", "seCell"}
+_HORIZONTAL = {"band1Horz", "band2Horz"}
+_VERTICAL = {"band1Vert", "band2Vert"}
+
+
+def _emphasis_refused(
+    part: str,
+    texted: set[tuple[int, int]],
+    look: str = "",
+    rows: tuple[str, ...] = ("", ""),
+    emphasis: str = "<w:b/>",
+) -> bool:
+    """Whether the check refuses a two-cell-wide table whose style sets ``emphasis`` on ``part``,
+    with text in the cells ``texted``; ``rows`` holds what goes first in each row."""
+    style = (
+        f'<w:style w:type="table" w:styleId="T"><w:tblStylePr w:type="{part}">'
+        f"<w:rPr>{emphasis}</w:rPr></w:tblStylePr></w:style>"
+    )
+    cells = (
+        "".join(
+            f"<w:tc><w:p>{'<w:r><w:t>x</w:t></w:r>' if (row, cell) in texted else ''}</w:p></w:tc>"
+            for cell in range(2)
+        )
+        for row in range(len(rows))
+    )
+    body = (
+        f'<w:tbl><w:tblPr><w:tblStyle w:val="T"/>{look}</w:tblPr>'
+        + "".join(f"<w:tr>{extra}{inner}</w:tr>" for extra, inner in zip(rows, cells, strict=True))
+        + "</w:tbl>"
+    )
+    try:
+        DocxSource(docx(body, styles=style))
+    except CertificationError as error:
+        if "conditional emphasis" not in str(error):
+            raise
+        return True
+    return False
+
+
+def _parts_on(look: str, rows: tuple[str, ...] = ("", "")) -> set[str]:
+    """The parts a table with this look (and these rows) turns on, text in every cell."""
+    return {part for part in _PLACES if _emphasis_refused(part, _EVERYWHERE, look, rows)}
+
+
+def test_each_conditional_part_stands_in_its_cells_only() -> None:
+    for part, places in _PLACES.items():
+        for place in sorted(_EVERYWHERE):
+            assert _emphasis_refused(part, {place}) == (place in places), (part, place)
+
+
+def test_a_header_row_is_a_first_row_and_a_row_off_the_grid_is_every_edge() -> None:
+    header = ("", "<w:trPr><w:tblHeader/></w:trPr>", "")
+    assert _emphasis_refused("firstRow", {(1, 0)}, rows=header)
+    assert not _emphasis_refused("firstRow", {(1, 0)}, rows=("", "", ""))
+    for grid in ("gridBefore", "gridAfter"):
+        early = (f'<w:trPr><w:{grid} w:val="1"/></w:trPr>', "")
+        assert _emphasis_refused("firstCol", {(0, 1)}, rows=early)
+        assert _emphasis_refused("lastCol", {(0, 0)}, rows=early)
+        assert not _emphasis_refused("firstCol", {(1, 1)}, rows=early)
+
+
+@pytest.mark.parametrize(
+    ("look", "on"),
+    [
+        ("", set(_PLACES)),
+        ('w:val="0000"', _CORNERS | _HORIZONTAL | _VERTICAL),
+        # A bit the look does not read turns nothing on or off.
+        ('w:val="0001"', _CORNERS | _HORIZONTAL | _VERTICAL),
+        ('w:val="0020"', _CORNERS | _HORIZONTAL | _VERTICAL | {"firstRow"}),
+        ('w:val="0040"', _CORNERS | _HORIZONTAL | _VERTICAL | {"lastRow"}),
+        ('w:val="0080"', _CORNERS | _HORIZONTAL | _VERTICAL | {"firstCol"}),
+        ('w:val="0100"', _CORNERS | _HORIZONTAL | _VERTICAL | {"lastCol"}),
+        ('w:val="0200"', _CORNERS | _VERTICAL),
+        ('w:val="0400"', _CORNERS | _HORIZONTAL),
+        ('w:val="04a0"', _CORNERS | _HORIZONTAL | {"firstRow", "firstCol"}),
+        ('w:firstRow="1"', _CORNERS | _HORIZONTAL | _VERTICAL | {"firstRow"}),
+        ('w:lastRow="1"', _CORNERS | _HORIZONTAL | _VERTICAL | {"lastRow"}),
+        ('w:firstColumn="1"', _CORNERS | _HORIZONTAL | _VERTICAL | {"firstCol"}),
+        ('w:lastColumn="1"', _CORNERS | _HORIZONTAL | _VERTICAL | {"lastCol"}),
+        ('w:noHBand="1"', _CORNERS | _VERTICAL),
+        ('w:noVBand="true"', _CORNERS | _HORIZONTAL),
+        *(
+            (f'w:firstRow="{off}" w:noHBand="{off}"', _CORNERS | _HORIZONTAL | _VERTICAL)
+            for off in ("0", "false", "off", "Off")
+        ),
+        # A part is on where the bits or the attribute say so; banding unless both turn it off.
+        ('w:val="0020" w:firstRow="0"', _CORNERS | _HORIZONTAL | _VERTICAL | {"firstRow"}),
+        ('w:val="0000" w:firstRow="1"', _CORNERS | _HORIZONTAL | _VERTICAL | {"firstRow"}),
+        ('w:val="0200" w:noHBand="0"', _CORNERS | _HORIZONTAL | _VERTICAL),
+        ('w:val="0000" w:noHBand="1"', _CORNERS | _HORIZONTAL | _VERTICAL),
+        ('w:val="0200" w:noHBand="1"', _CORNERS | _VERTICAL),
+    ],
+)
+def test_a_table_look_turns_parts_on_by_its_bits_and_its_attributes(
+    look: str, on: set[str]
+) -> None:
+    assert _parts_on(f"<w:tblLook {look}/>" if look else "") == on
+
+
+def test_every_look_of_the_table_and_of_its_rows_counts() -> None:
+    def row(look: str) -> str:
+        return f'<w:tblPrEx><w:tblLook w:val="{look}"/></w:tblPrEx>'
+
+    plain = _CORNERS | _HORIZONTAL | _VERTICAL
+    assert _parts_on('<w:tblLook w:val="0000"/>', (row("0020"), "")) == plain | {"firstRow"}
+    # Banding is off only where every look turns it off.
+    assert _parts_on('<w:tblLook w:val="0200"/>', (row("0000"), "")) == plain
+    assert _parts_on('<w:tblLook w:val="0200"/>', (row("0200"), row("0200"))) == plain - _HORIZONTAL
+
+
+@pytest.mark.parametrize("value", ["00000", "zz", "", "+20", " 20"])
+def test_a_table_look_the_check_cannot_read_is_never_certified(value: str) -> None:
+    with pytest.raises(CertificationError, match="table look"):
+        _emphasis_refused("firstRow", _EVERYWHERE, f'<w:tblLook w:val="{value}"/>')
+
+
+@pytest.mark.parametrize("emphasis", ["<w:b/>", "<w:bCs/>", "<w:i/>", "<w:iCs/>"])
+def test_each_emphasis_setting_of_a_table_part_counts(emphasis: str) -> None:
+    assert _emphasis_refused("firstRow", {(0, 0)}, emphasis=emphasis)
+    assert not _emphasis_refused("firstRow", {(0, 0)}, emphasis="<w:caps/>")
+
+
+def test_the_default_table_style_sets_emphasis_on_a_table_naming_none() -> None:
+    style = (
+        '<w:style w:type="table" w:default="1" w:styleId="T"><w:tblStylePr w:type="firstRow">'
+        "<w:rPr><w:b/></w:rPr></w:tblStylePr></w:style>"
+    )
+    body = "<w:tbl><w:tr><w:tc><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl>"
+    with pytest.raises(CertificationError, match="conditional emphasis"):
+        DocxSource(docx(body, styles=style))
+    DocxSource(docx(body, styles=style.replace(' w:default="1"', "")))
+
+
+@pytest.mark.parametrize("kind", ["character", "Xharacter", "run"])
+def test_text_takes_no_default_style_of_a_kind_but_paragraph_and_table(kind: str) -> None:
+    style = f'<w:style w:type="{kind}" w:default="1" w:styleId="S">{_SYMBOL}</w:style>'
+    assert not _mapped(docx(_plain(), styles=style))
+
+
+def _merged(top: str, below: str, styles: str | None = None) -> bytes:
+    numbering = _list(_level(0, "%1.")) + _NUM
+    return docx(
+        f"<w:tbl><w:tr><w:tc><w:tcPr>{top}</w:tcPr><w:p><w:r><w:t>top</w:t></w:r></w:p></w:tc></w:tr>"
+        f"<w:tr><w:tc><w:tcPr><w:vMerge/></w:tcPr>{below}</w:tc></w:tr></w:tbl>",
+        styles=styles,
+        numbering=numbering,
+    )
+
+
+def test_a_merged_cell_holds_what_its_lists_and_restart_say() -> None:
+    # The cell a merge restarts at is read; one merged away may be in list 0, at any level.
+    DocxSource(_merged('<w:vMerge w:val="restart"/>', "<w:p/>"))
+    none = '<w:p><w:pPr><w:numPr><w:ilvl w:val="1"/><w:numId w:val="0"/></w:numPr></w:pPr></w:p>'
+    DocxSource(_merged("", none))
+    # A list from the document defaults draws a label there.
+    listed = (
+        '<w:docDefaults><w:pPrDefault><w:pPr><w:numPr><w:numId w:val="1"/></w:numPr>'
+        "</w:pPr></w:pPrDefault></w:docDefaults>"
+    )
+    with pytest.raises(CertificationError, match="merged-away"):
+        DocxSource(_merged("", "<w:p/>", listed))
+    DocxSource(docx("<w:p/>", styles=listed, numbering=_list(_level(0, "%1.")) + _NUM))
+
+
+@pytest.mark.parametrize(
+    ("code", "complex_script"),
+    [
+        *((code, True) for code in (0x0590, 0x0DFF, 0x0E00, 0x109F, 0x1780, 0x17FF)),
+        *((code, True) for code in (0xFB1D, 0xFDFF, 0xFE70, 0xFEFF)),
+        *((code, False) for code in (0x058F, 0x10A0, 0x177F, 0x1800, 0xFB1C, 0xFE00)),
+        *((code, False) for code in (0xFE6F, 0xFF00)),
+    ],
+)
+def test_complex_script_is_known_by_its_ranges_alone(code: int, complex_script: bool) -> None:
+    body = _p(f"<w:r><w:rPr><w:b/></w:rPr><w:t>{chr(code)}</w:t></w:r>")
+    if complex_script:
+        with pytest.raises(CertificationError, match="complex script"):
+            DocxSource(docx(body))
+    else:
+        DocxSource(docx(body))
+
+
+@pytest.mark.parametrize("name", ["bdo", "dir"])
+def test_text_in_an_embedding_is_complex_script_and_after_it_is_not(name: str) -> None:
+    bold = "<w:r><w:rPr><w:b/></w:rPr><w:t>abc</w:t></w:r>"
+    with pytest.raises(CertificationError, match="complex script"):
+        DocxSource(docx(_p(f'<w:{name} w:val="rtl">{bold}</w:{name}>')))
+    after = _p(f'<w:{name} w:val="rtl"><w:r><w:t>d</w:t></w:r></w:{name}>{bold}')
+    DocxSource(docx(after))
+
+
+def test_complex_script_whose_italic_settings_differ_is_never_certified() -> None:
+    with pytest.raises(CertificationError, match="complex script"):
+        DocxSource(docx(_p("<w:r><w:rPr><w:rtl/><w:i/></w:rPr><w:t>abc</w:t></w:r>")))
+    DocxSource(docx(_p("<w:r><w:rPr><w:rtl/><w:i/><w:iCs/></w:rPr><w:t>abc</w:t></w:r>")))
+
+
+def test_a_table_style_never_hides_a_paragraph_mark_outside_its_table() -> None:
+    style = (
+        '<w:style w:type="table" w:default="1" w:styleId="T"><w:rPr><w:vanish/></w:rPr></w:style>'
+    )
+    body = _p("<w:r><w:t>a</w:t></w:r>") + _p("<w:r><w:t>b</w:t></w:r>")
+    DocxSource(docx(body, styles=style)).certify(_value("a", "b"))
+
+
+@pytest.mark.parametrize("holder", ["rPr", "lastRenderedPageBreak"])
+def test_a_paragraph_inside_a_paragraph_is_never_certified(holder: str) -> None:
+    body = _p(f"<w:r><w:{holder}><w:p/></w:{holder}><w:t>a</w:t></w:r>")
+    with pytest.raises(CertificationError, match="paragraph inside a paragraph"):
+        DocxSource(docx(body))
+
+
+def test_the_font_table_names_symbol_encoded_fonts_in_any_case_and_spacing() -> None:
+    table = '<w:font w:name="My Encoded"><w:charset w:val="02"/></w:font>'
+    for name in ("My Encoded", "my encoded", "MyEncoded"):
+        run = f'<w:r><w:rPr><w:rFonts w:ascii="{name}" w:hAnsi="{name}"/></w:rPr><w:t>a</w:t></w:r>'
+        with pytest.raises(CertificationError, match="font"):
+            DocxSource(docx(_p(run), fonts=table))
+    # Text in another font beside it is read.
+    run = '<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr><w:t>a</w:t></w:r>'
+    DocxSource(docx(_p(run), fonts=table)).certify(_value("a"))

@@ -333,6 +333,17 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
         )
         for name in ("values", "restarts", "showing")
     },
+    # certify survivors, part a
+    ("_drawn_complex", "0x0590 <= code <= 0x0DFF", "int:3583", 0): (
+        "0x0E00, one past the first range, is the start of the second: ending the first there "
+        "adds no character"
+    ),
+    **{
+        ("_Story.__init__", "self.unsure: tuple[bool, bool] = (False, False)", "bool", which): (
+            "read only in flush_run, which only run calls, after setting it for the run"
+        )
+        for which in (0, 1)
+    },
 }
 
 _COMPARE = {
