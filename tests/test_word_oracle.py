@@ -29,10 +29,12 @@ from label_docx.word import (
     _mark_fields,
     _mark_paragraphs,
     _set_page_numbers_aside,
+    _unasked,
     emphasis_verdict,
     field_verdict,
     judge,
     label_as_drawn,
+    note_text_verdict,
     note_verdict,
     print_verdict,
     reader_labels,
@@ -434,7 +436,7 @@ def test_what_word_was_not_asked_about_is_not_agreement(tmp_path: Path) -> None:
         docx(p(r("<w:t>Take 5 mg</w:t>") + r('<w:footnoteReference w:id="1"/>')), footnotes=note)
     )
     assert judge(path, _answers(text=["Take 5 mg\x02"])) == (
-        "differs: Word was not asked about note marks"
+        "differs: Word was not asked about note marks, note text"
     )
     assert judge(path, _answers()).startswith("differs: Word was not asked about the text")
     # A header named by a relationship in single quotes: still a header.
@@ -707,3 +709,19 @@ def test_word_is_asked_about_a_field_however_its_code_is_spelt_or_split(
     path = tmp_path / "a.docx"
     path.write_bytes(docx(body))
     assert _has_computed_fields(path) is asked
+
+
+def test_each_notes_text_is_held_to_words() -> None:
+    path = CORPUS / "numbering-cases" / "notes-continuous.docx"
+    word = {"footnote": ["\x02 note 1\n", "\x02 note 2\n", "\x02 note 3\n"], "endnote": []}
+    assert note_text_verdict(word, path) == "agrees"
+    for wrong in (
+        {"footnote": ["\x02 note 1\n", "\x02 note X\n", "\x02 note 3\n"], "endnote": []},
+        {"footnote": [" note 1\n", "\x02 note 2\n", "\x02 note 3\n"], "endnote": []},  # no echo
+        {"footnote": ["\x02 note 1\n", "\x02 note 2\n"], "endnote": []},
+    ):
+        assert note_text_verdict(wrong, path).startswith("differs")
+    # A document with notes whose text Word was not asked about is not agreement.
+    answers = json.loads((CORPUS / "numbering-cases" / "word.json").read_text("utf-8"))
+    kept = {k: answers[k].get(path.name) for k in ("text", "notes", "fields", "stories")}
+    assert "note text" in _unasked(path, {**kept, "noteText": None})

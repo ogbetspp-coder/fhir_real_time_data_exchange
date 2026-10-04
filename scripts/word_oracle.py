@@ -79,6 +79,7 @@ def main() -> int:
     print_answers: dict[str, bool] = {}
     emphasis_answers: dict[str, dict[str, list[bool]]] = {}
     story_answers: dict[str, dict[str, list[list[Any]]]] = {}
+    note_text_answers: dict[str, dict[str, list[str]]] = {}
     text_answers: dict[str, list[str]] = {}
     # A recording keeps each file's answers as it goes, so one stopped part way resumes there.
     progress = args.folder / ".word-progress.json" if args.command == "record" else None
@@ -100,6 +101,7 @@ def main() -> int:
                         "prints": kept["prints"][name],
                         "emphasis": kept["emphasis"][name],
                         "stories": kept.get("stories", {}).get(name),
+                        "noteText": kept.get("noteText", {}).get(name),
                         "text": kept.get("text", {}).get(name),
                         "sha256": kept["sha256"][name],
                         "application": kept["application"],
@@ -165,6 +167,8 @@ def main() -> int:
             field_answers[path.name] = kept["fields"]
         if kept.get("stories") is not None:
             story_answers[path.name] = kept["stories"]
+        if kept.get("noteText") is not None:
+            note_text_answers[path.name] = kept["noteText"]
         if kept.get("text") is not None:
             text_answers[path.name] = kept["text"]
         result = judge(path, kept)
@@ -190,7 +194,7 @@ def main() -> int:
                 "italic, caps and strike of each body paragraph's text, between and in field "
                 "results; stories: each section's headers and footers by type (unless linked to "
                 "the previous section's) with their page-number fields' results, and each "
-                "comment's author and text"
+                "comment's author and text; noteText: each footnote's and endnote's text"
             ),
             "recorded": datetime.date.today().isoformat(),
             "drawn": answers,
@@ -200,6 +204,7 @@ def main() -> int:
             "prints": print_answers,
             "emphasis": emphasis_answers,
             "stories": story_answers,
+            "noteText": note_text_answers,
             "text": text_answers,
         }
         target = args.folder / "word.json"

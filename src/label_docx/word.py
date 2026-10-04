@@ -74,7 +74,7 @@ from label_docx.reader import (
 WORD = Path("/Applications/Microsoft Word.app")
 # What Word is asked and how its answers are judged: a change to this file changes it
 # (``scripts/lock.py``). A kept verdict or recorded answer of another version is not reused.
-VERIFIER = "word-verifier/1.0.2"
+VERIFIER = "word-verifier/1.0.3"
 
 
 class WordError(Exception):
@@ -228,6 +228,47 @@ on run argv
         set g to contents of c
         set out to out & "comment" & unit & (author of g) & unit ¬
           & (content of (comment text of g)) & record_
+      end repeat
+      close document (item 2 of argv) saving no
+    end tell
+  end timeout
+  return out
+end run
+"""
+
+# Each footnote's and endnote's text, in Word's order (the order the body refers to them).
+NOTES = """
+on run argv
+  set target to (POSIX file (item 1 of argv)) as string
+  set out to ""
+  set unit to (character id 28)
+  set record_ to (character id 27)
+  with timeout of 600 seconds
+    tell application "Microsoft Word"
+      open file name target
+      repeat 600 times
+        try
+          if (name of every document) contains {item 2 of argv} then exit repeat
+        end try
+        delay 0.1
+      end repeat
+      set d to document (item 2 of argv)
+      -- Each note's whole paragraphs: its range alone starts after its mark's echo and a space.
+      repeat with n in (get footnotes of d)
+        set r to text object of (contents of n)
+        set out to out & "footnote" & unit
+        repeat with q in (get paragraphs of r)
+          set out to out & (content of (text object of (contents of q)))
+        end repeat
+        set out to out & record_
+      end repeat
+      repeat with n in (get endnotes of d)
+        set r to text object of (contents of n)
+        set out to out & "endnote" & unit
+        repeat with q in (get paragraphs of r)
+          set out to out & (content of (text object of (contents of q)))
+        end repeat
+        set out to out & record_
       end repeat
       close document (item 2 of argv) saving no
     end tell
@@ -1243,6 +1284,60 @@ def word_stories(path: Path) -> dict[str, list[list[Any]]] | None:
     return {"stories": stories, "comments": comments}
 
 
+def word_note_texts(path: Path) -> dict[str, list[str]] | None:
+    """Word's text of each footnote and endnote, in its order; None if the body refers to none."""
+    try:
+        document = read_document(path.read_bytes())
+    except DocxRefusedError:
+        return None
+    if not (document.footnotes or document.endnotes):
+        return None
+    CONTAINER.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=CONTAINER) as folder:
+        copy = Path(folder) / path.name
+        shutil.copyfile(path, copy)
+        done = _osascript(["osascript", "-", str(copy), path.name], NOTES)
+    if done.returncode != 0:
+        raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
+    texts: dict[str, list[str]] = {"footnote": [], "endnote": []}
+    for entry in done.stdout.rstrip("\n").split(_RECORD):
+        if not entry:
+            continue
+        kind, unit, text = entry.partition(_UNIT)
+        if kind not in texts or not unit or _UNIT in text:
+            raise SystemExit(f"{path.name}: Word's notes do not parse")
+        texts[kind].append(text)
+    return texts
+
+
+def note_text_verdict(word: dict[str, list[str]], path: Path) -> str:
+    """Whether each footnote's and endnote's text is Word's, paragraph by paragraph.
+
+    Word's text shows a note mark (the note's echo of its own, or a reference) as U+0002, a
+    picture as "/", capitals as capitals, and its own codes as ``_as_shown`` maps.
+    """
+    try:
+        document = read_document(path.read_bytes())
+    except DocxRefusedError as refused:
+        return f"reader refuses: {refused.code}"
+    for kind, notes in (("footnote", document.footnotes), ("endnote", document.endnotes)):
+        theirs = word.get(kind, [])
+        if len(theirs) != len(notes):
+            return f"differs: Word has {len(theirs)} {kind}s, the reader {len(notes)}"
+        for index, (note, text) in enumerate(zip(notes, theirs, strict=True)):
+            mine: list[str] = []
+            for paragraph in note.paragraphs:
+                filled = _capitalised(paragraph).replace("\ufffc", "/")
+                for offset in sorted((n.offset for n in paragraph.notes), reverse=True):
+                    filled = filled[:offset] + "\x02" + filled[offset:]
+                if filled:
+                    mine.append(filled)
+            shown = [_as_shown(t) for t in _paragraphs_shown(text)]
+            if mine != shown or any(p.pages for p in note.paragraphs):
+                return f"differs in {kind} {index + 1}"
+    return "agrees"
+
+
 def story_verdict(word: dict[str, list[list[Any]]], path: Path) -> str:
     """Whether the reader's headers, footers and comments are Word's.
 
@@ -1402,6 +1497,7 @@ def ask(path: Path) -> dict[str, Any]:
         "prints": word_prints_what_it_shows(path),
         "emphasis": word_emphasis(path),
         "stories": word_stories(path),
+        "noteText": word_note_texts(path),
     }
 
 
@@ -1417,6 +1513,8 @@ def judge(path: Path, answers: dict[str, Any]) -> str:
         result = text_verdict(answers["text"], path)
     if answers["notes"] is not None and result == "agrees":
         result = note_verdict(answers["notes"], reader_note_marks(path))
+    if answers.get("noteText") is not None and result == "agrees":
+        result = note_text_verdict(answers["noteText"], path)
     if result == "agrees":
         result = emphasis_verdict(answers["emphasis"], path)
     if result in ("agrees", "reader refuses: stale-field"):
@@ -1447,6 +1545,7 @@ def _unasked(path: Path, answers: dict[str, Any]) -> str:
         for what, there, answer in (
             ("the text", True, "text"),
             ("note marks", any(p.notes for p in document.body), "notes"),
+            ("note text", bool(document.footnotes or document.endnotes), "noteText"),
             ("fields", _has_computed_fields(path), "fields"),
             (
                 "headers, footers and comments",
