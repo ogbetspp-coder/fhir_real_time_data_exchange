@@ -52,9 +52,11 @@ COMPONENTS: dict[str, Component] = {
     "docx-format": Component(
         "label_docx.output",
         "FORMAT_VERSION",
-        (f"{_LABEL_DOCX}/output.py", f"{_LABEL_DOCX}/certify.py"),
+        tuple(f"{_LABEL_DOCX}/{name}.py" for name in ("output", "certify", "documents")),
     ),
-    "epi-reader": Component("label_docx.epi", "READER_VERSION", (f"{_LABEL_DOCX}/epi.py",)),
+    "epi-reader": Component(
+        "label_docx.epi", "READER_VERSION", (f"{_LABEL_DOCX}/epi.py", f"{_LABEL_DOCX}/reader.py")
+    ),
     "epi-format": Component(
         "label_docx.epi_output",
         "FORMAT_VERSION",
