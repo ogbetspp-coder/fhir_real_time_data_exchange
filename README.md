@@ -66,11 +66,11 @@ from another web page.
 
 ```json
 {"certificate": {…}, "comments": [], "endnotes": [], "footers": [], "footnotes": [],
- "format": "label-docx-json/1.14.0", "headers": [],
+ "format": "label-docx-json/1.14.1", "headers": [],
  "paragraphs": [{"comments": [], "markHidden": false,
    "marks": [{"end": 5, "kind": "superscript", "start": 4}], "notes": [], "numbering": null,
    "pages": [], "style": "Heading2", "table": null, "text": "x 109/l"}],
- "reader": "docx-reader/1.22.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"}}
+ "reader": "docx-reader/1.22.1", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"}}
 ```
 
 - Offsets (`marks`, `notes`, `pages`, `comments`) count Unicode code points of `text`.

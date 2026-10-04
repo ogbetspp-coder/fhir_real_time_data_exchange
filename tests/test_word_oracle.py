@@ -682,3 +682,28 @@ def test_a_comparison_word_did_not_judge_whole_does_not_exit_zero(
     monkeypatch.setattr(word_oracle, "ask", fails)
     monkeypatch.setattr(sys, "argv", ["word_oracle.py", "compare", str(path)])
     assert word_oracle.main() == 2
+
+
+@pytest.mark.parametrize(
+    ("pieces", "asked"),
+    [
+        ((" SEQ Table ",), True),
+        ((" seq Table ",), True),
+        ((" SE", "Q Table "), True),
+        ((" PAGE ",), False),
+    ],
+)
+def test_word_is_asked_about_a_field_however_its_code_is_spelt_or_split(
+    tmp_path: Path, pieces: tuple[str, ...], asked: bool
+) -> None:
+    code = "".join(r(f'<w:instrText xml:space="preserve">{c}</w:instrText>') for c in pieces)
+    body = p(
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + code
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + r("<w:t>1</w:t>")
+        + r('<w:fldChar w:fldCharType="end"/>')
+    )
+    path = tmp_path / "a.docx"
+    path.write_bytes(docx(body))
+    assert _has_computed_fields(path) is asked

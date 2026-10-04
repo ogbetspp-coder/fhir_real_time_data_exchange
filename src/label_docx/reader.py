@@ -276,8 +276,9 @@ comments part (``Comment``: its author, initials and date as stored), each parag
 rule above. A comment's mark in a paragraph is placed in ``comments`` (``CommentReference``),
 never in ``text``; every comment must be anchored exactly once. Fields the reader computes
 (SEQ, STYLEREF, REF, NOTEREF) and lists are refused there, since how Word counts them outside
-the body is not on record; page numbers are placed. A header, footer or comment the reader
-cannot read exactly is refused on its own (``Story.refusal``, ``Comment.refusal``): the body
+the body is not on record; PAGE, NUMPAGES and SECTIONPAGES are placed, PAGEREF refused. A
+header, footer or comment the reader cannot read exactly is refused on its own
+(``Story.refusal``, ``Comment.refusal``): the body
 is read all the same. A header or footer Word shows on no page is refused on its own as
 ``unread-content``: a ``first`` part shows only in a section with ``titlePg``, an ``even`` part
 only with the settings' ``evenAndOddHeaders``, and a section naming no part of a type takes the
@@ -300,7 +301,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 # The version of the rules above; versions.lock.json ties it to this file (tests/test_locks.py).
-READER_VERSION = "docx-reader/1.22.0"
+READER_VERSION = "docx-reader/1.22.1"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -751,7 +752,7 @@ class _Package:
             raise DocxRefusedError("invalid-package", "a part name occurs twice")
         self.names = set(names)
         # Each part parsed once. The reader never changes a parsed part (``tracked`` writes its
-        # views from parts it parses again), so the one parse serves every use.
+        # views from deep copies of the parsed parts), so the one parse serves every use.
         self.parsed: dict[str, ET.Element] = {}
         self.elements = 0
         self.by_id: dict[str, dict[str | None, tuple[ET.Element, str]]] = {}
@@ -1645,6 +1646,8 @@ class _ParagraphReader:
         # The instruction text of each open field, collected while in its instruction.
         self.instructions: list[list[str]] = []
         self.rtl = 0
+        # How many embeddings (w:dir) hold the run, of either direction.
+        self.embedded = 0
 
     def in_instruction(self) -> bool:
         return True in self.fields
@@ -1682,7 +1685,9 @@ class _ParagraphReader:
                     raise DocxRefusedError("unsupported-element", "an embedding of no direction")
                 rtl = child.get(_w("val")) == "rtl"
                 self.rtl += rtl
+                self.embedded += 1
                 self.container(child)
+                self.embedded -= 1
                 self.rtl -= rtl
             elif tag in _INLINE_TRANSPARENT:
                 self.container(child)
@@ -1713,6 +1718,9 @@ class _ParagraphReader:
             self.styles, run.find(_w("rPr")), self.paragraph_style, self.table_style
         )
         symbol = _in_symbol(self.styles, properties, self.table_style)
+        if symbol and self.embedded:
+            # Drawn as complex script, as under rtl: Word may draw it in another font.
+            raise DocxRefusedError("symbol-font", "Symbol in a bidirectional embedding")
         # A hidden run's text is whitespace (or refused) and dropped, so a mark or field
         # character in it stands where the run starts.
         hidden = properties.toggle("vanish")
@@ -3792,7 +3800,7 @@ def _read_blocks(
     """The paragraphs of a header, a footer or a comment, by every rule of the body.
 
     Fields the reader computes and lists are refused there: how Word counts them outside the
-    body is not on record. A page number is placed, as in the body.
+    body is not on record. PAGE, NUMPAGES and SECTIONPAGES are placed; a PAGEREF is refused.
     """
     _check_part(root)
     reader = _Body(styles, story)

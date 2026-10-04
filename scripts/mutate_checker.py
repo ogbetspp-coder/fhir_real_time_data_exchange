@@ -602,8 +602,9 @@ def fingerprint(root: Path = ROOT) -> str:
 
 
 def held_sha256(root: Path = ROOT) -> str:
-    """SHA-256 of the check's tests and what they read (corpus, tests/data): the record holds it."""
-    return _digest(root, [*TESTS, "corpus", "tests/data"])
+    """SHA-256 of the check's tests and all they run on (the package, their helpers, corpus)."""
+    helpers = ["tests/test_reader.py", "scripts/fuzz_docx.py", "scripts/lock.py", "src"]
+    return _digest(root, [*TESTS, *helpers, "corpus", "tests/data"])
 
 
 def _copy(root: Path) -> None:

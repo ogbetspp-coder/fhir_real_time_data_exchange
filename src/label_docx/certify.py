@@ -81,7 +81,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT, WINGDINGS_BULLETS
 
-CHECKER_VERSION = "conservation-check/1.10.0"
+CHECKER_VERSION = "conservation-check/1.10.1"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -705,6 +705,9 @@ class _Story:
         family = self.fonts.drawn(levels)
         if family == "wingdings":
             raise CertificationError("text in the Wingdings font, which the check does not read")
+        if self.bidi and family != "text":
+            # In a right-to-left container Word may draw the characters in another font.
+            raise CertificationError(f"text in {family} drawn as complex script")
         symbol = family == "symbol"
         hidden: bool | None = self.fonts.hidden(levels, own)
         chains = self.fonts.chains(own, here.style, here.table_style, in_table)
@@ -731,7 +734,7 @@ class _Story:
                     raise CertificationError("annotationRef outside a comment")
                 continue
             marked = local == "commentReference" or local in _NOTE_MARKS
-            if marked and (hidden or self.in_instruction()):
+            if marked and (hidden is not False or self.in_instruction()):
                 # Word draws no mark there, or what it draws is not on record.
                 raise CertificationError(f"a {local} hidden or in a field's code")
             if local == "commentReference":

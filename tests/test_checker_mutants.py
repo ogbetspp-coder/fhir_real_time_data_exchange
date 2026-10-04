@@ -29,7 +29,12 @@ def test_the_record_is_the_run_of_the_check_as_it_is() -> None:
 
 def test_every_fault_is_caught_or_recorded_as_unable_to_matter() -> None:
     record = json.loads(RECORD.read_text("utf-8"))
-    unexplained = [s for s in record["survivors"] if not s["equivalent"]]
+    # Each survivor excused by today's reasons, not by those the record kept.
+    unexplained = [
+        s
+        for s in record["survivors"]
+        if (s["function"], s["code"], s["kind"], s["occurrence"]) not in EQUIVALENT
+    ]
     assert not unexplained, unexplained
     assert record["killed"] + len(record["survivors"]) == record["mutants"]
     # Each reason recorded is one a survivor needed: no stale excuses.

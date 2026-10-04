@@ -2708,3 +2708,33 @@ def test_the_check_reads_the_bundle_strictly_and_on_its_own() -> None:
         nested = [nested]
     deep["x"] = nested
     assert EpiSource(json.dumps(deep).encode()).narratives == 0
+
+
+@pytest.mark.parametrize(
+    "mark", ['<w:footnoteReference w:id="1"/>', '<w:commentReference w:id="0"/>']
+)
+def test_a_mark_whose_hiding_is_not_on_record_is_never_certified(mark: str) -> None:
+    # Paragraph and character styles both hide the mark's run: Word's toggle rule cancels them.
+    styles = (
+        '<w:style w:type="paragraph" w:styleId="PS"><w:rPr><w:vanish/></w:rPr></w:style>'
+        '<w:style w:type="character" w:styleId="CS"><w:rPr><w:vanish/></w:rPr></w:style>'
+    )
+    body = (
+        '<w:p><w:pPr><w:pStyle w:val="PS"/></w:pPr>'
+        '<w:r><w:rPr><w:vanish w:val="0"/></w:rPr><w:t>A</w:t></w:r>'
+        f'<w:r><w:rPr><w:rStyle w:val="CS"/></w:rPr>{mark}</w:r></w:p>'
+    )
+    with pytest.raises(CertificationError):
+        DocxSource(docx(body, styles=styles))
+
+
+def test_symbol_text_drawn_as_complex_script_is_never_certified() -> None:
+    # In a right-to-left container, as with rtl on the run, Word may draw it in another font.
+    run = '<w:r><w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr><w:t>a</w:t></w:r>'
+    for body in (
+        _p(f'<w:dir w:val="rtl">{run}</w:dir>'),
+        _p(run.replace("<w:rFonts", "<w:rtl/><w:rFonts")),
+    ):
+        with pytest.raises(CertificationError):
+            DocxSource(docx(body))
+    assert DocxSource(docx(_p(run))).certify(_value("\u03b1"))["symbolMapped"] == 1

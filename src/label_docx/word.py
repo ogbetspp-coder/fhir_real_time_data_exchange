@@ -74,7 +74,7 @@ from label_docx.reader import (
 WORD = Path("/Applications/Microsoft Word.app")
 # What Word is asked and how its answers are judged: a change to this file changes it
 # (``scripts/lock.py``). A kept verdict or recorded answer of another version is not reused.
-VERIFIER = "word-verifier/1.0.1"
+VERIFIER = "word-verifier/1.0.2"
 
 
 class WordError(Exception):
@@ -1148,7 +1148,7 @@ def _has_stories(path: Path) -> bool:
     )
 
 
-_COMPUTED_CODES = re.compile(r"\s*(?:SEQ|STYLEREF|REF|NOTEREF|DOCPROPERTY|HYPERLINK)\b")
+_COMPUTED_CODES = re.compile(r"\s*(?:SEQ|STYLEREF|REF|NOTEREF|DOCPROPERTY|HYPERLINK)\b", re.I)
 
 
 def _has_computed_fields(path: Path) -> bool:
@@ -1158,8 +1158,19 @@ def _has_computed_fields(path: Path) -> bool:
     """
     with zipfile.ZipFile(path) as source:
         root = ET.fromstring(source.read("word/document.xml"))
-    codes = [node.text or "" for node in root.iter(f"{{{W}}}instrText")]
-    codes += [node.get(f"{{{W}}}instr", "") for node in root.iter(f"{{{W}}}fldSimple")]
+    # Each instruction whole, as the reader joins it: its pieces may split the code.
+    codes = [node.get(f"{{{W}}}instr", "") for node in root.iter(f"{{{W}}}fldSimple")]
+    open_codes: list[list[str]] = []
+    for node in root.iter():
+        if node.tag not in (f"{{{W}}}fldChar", f"{{{W}}}instrText"):
+            continue
+        kind = node.get(f"{{{W}}}fldCharType")
+        if kind == "begin":
+            open_codes.append([])
+        elif kind in ("separate", "end") and open_codes:
+            codes.append("".join(open_codes.pop()))
+        elif node.tag == f"{{{W}}}instrText" and open_codes:
+            open_codes[-1].append(node.text or "")
     return any(_COMPUTED_CODES.match(code) for code in codes)
 
 

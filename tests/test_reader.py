@@ -2986,3 +2986,10 @@ def test_segoe_ui_symbol_is_a_unicode_font_read_as_stored() -> None:
     assert refusal(other) == "symbol-font"
     value = json.loads(served(docx(run))[0])
     assert value["paragraphs"][0]["text"] == "☐ a"
+
+
+def test_symbol_text_in_a_bidirectional_embedding_is_refused() -> None:
+    run = r("<w:t>a</w:t>", '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/>')
+    for direction in ("rtl", "ltr"):
+        assert refusal(p(f'<w:dir w:val="{direction}">{run}</w:dir>')) == "symbol-font"
+    assert text_of(p(run)) == ["\u03b1"]
