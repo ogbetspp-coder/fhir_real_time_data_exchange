@@ -81,6 +81,17 @@ def test_a_body_that_refers_to_a_note_is_refused() -> None:
     assert refused.value.code == "note-reference"
 
 
+def test_a_body_with_a_page_number_is_refused() -> None:
+    # A table of contents: its page numbers are places in the reader's text, not digits.
+    data = (
+        ROOT / "label-docx-reader" / "corpus" / "word-authored" / "table-of-contents.docx"
+    ).read_bytes()
+    assert any(paragraph.pages for paragraph in reader_read_docx(data))
+    with pytest.raises(DocxRefusedError) as refused:
+        certified.read_docx(data)
+    assert refused.value.code == "page-number"
+
+
 def test_a_refusal_is_the_readers() -> None:
     with pytest.raises(DocxRefusedError) as docx:
         certified.read_docx(b"not a zip")
