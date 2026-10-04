@@ -29,6 +29,7 @@ from label_docx.service import (
     health,
 )
 from label_docx.store import Checker, Store, StoreError
+from test_no_label_leak import sha256_hex
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 TEMPLATE = (
@@ -43,15 +44,15 @@ def test_the_same_bytes_get_the_same_receipt_and_result(tmp_path: Path) -> None:
     again = Store(tmp_path).ingest(TEMPLATE)
     assert (first.created, again.created) == (True, False)
     assert first.receipt == again.receipt
-    assert first.result == again.result == read(TEMPLATE)[0]
+    assert sha256_hex(first.result) == sha256_hex(again.result) == sha256_hex(read(TEMPLATE)[0])
     document = hashlib.sha256(TEMPLATE).hexdigest()
     assert first.document == document
     receipt = json.loads(first.receipt)
     # Its footers' EQ fields are computed by Word, so those footers are refused on their own.
     assert receipt["outcome"] == "read-in-part"
     assert receipt["result"]["sha256"] == hashlib.sha256(first.result).hexdigest()
-    assert kept.source(document) == TEMPLATE
-    assert kept.result(document) == first.result
+    assert sha256_hex(kept.source(document)) == sha256_hex(TEMPLATE)
+    assert sha256_hex(kept.result(document)) == sha256_hex(first.result)
 
 
 def test_a_refusal_is_kept_and_answered_like_a_read(tmp_path: Path) -> None:
@@ -105,7 +106,7 @@ def test_verify_reads_every_source_again_and_catches_a_consistent_edit(
     value = json.loads(receipt.read_bytes())
     value["result"]["sha256"] = hashlib.sha256(edited).hexdigest()
     receipt.write_bytes(canonical(value))
-    assert kept.result(document) == edited
+    assert sha256_hex(kept.result(document)) == sha256_hex(edited)
     with pytest.raises(StoreError):
         kept.verify(document)
     assert service_main(["verify", "--store", str(tmp_path)]) == 1
@@ -146,9 +147,8 @@ def test_a_new_reader_version_adds_its_result_and_leaves_the_old_one(
     )
     monkeypatch.setattr(output, "READER_VERSION", "docx-reader/99.0.0")
     new = kept.ingest(TEMPLATE)
-    assert new.created
-    assert json.loads(new.result)["reader"] == "docx-reader/99.0.0"
-    assert old_path.read_bytes() == old.result
+    assert (new.created, json.loads(new.result)["reader"]) == (True, "docx-reader/99.0.0")
+    assert sha256_hex(old_path.read_bytes()) == sha256_hex(old.result)
     assert len(list((tmp_path / "documents").rglob("result.json"))) == 2
 
 
@@ -185,8 +185,10 @@ def test_the_api_answers_the_same_bytes_and_serves_what_it_keeps(tmp_path: Path)
     assert again == receipt
     document = json.loads(receipt)["document"]
     assert headers["Location"] == f"/v1/documents/{document}"
-    assert _call(service, "GET", f"/v1/documents/{document}")[2] == read(TEMPLATE)[0]
-    assert _call(service, "GET", f"/v1/documents/{document}/source")[2] == TEMPLATE
+    served = _call(service, "GET", f"/v1/documents/{document}")[2]
+    assert sha256_hex(served) == sha256_hex(read(TEMPLATE)[0])
+    source = _call(service, "GET", f"/v1/documents/{document}/source")[2]
+    assert sha256_hex(source) == sha256_hex(TEMPLATE)
     assert _call(service, "GET", "/v1/health")[2] == health()
 
 
@@ -292,8 +294,8 @@ def test_nothing_is_served_while_its_application_is_asked(tmp_path: Path) -> Non
 
     store.word = Checker(lambda: "Word 1.0", verify)
     ingested = store.ingest(TEMPLATE)
-    assert seen == [None]
-    assert store.result(ingested.document) == ingested.result
+    assert [sha256_hex(result) for result in seen] == [sha256_hex(None)]
+    assert sha256_hex(store.result(ingested.document)) == sha256_hex(ingested.result)
 
 
 def test_an_application_that_fails_in_any_way_verifies_nothing(
@@ -305,8 +307,7 @@ def test_an_application_that_fails_in_any_way_verifies_nothing(
     for checker in (Checker(lambda: "Word 1.0", broken), Checker(lambda: str(1 / 0), broken)):
         store = Store(tmp_path / str(id(checker)), word=checker)
         ingested = store.ingest(TEMPLATE)
-        assert ingested.verification is None
-        assert store.verifications(ingested.document) == []
+        assert (ingested.verification, store.verifications(ingested.document)) == (None, [])
     assert "ZeroDivisionError" in capsys.readouterr().err
 
 
@@ -389,7 +390,7 @@ def test_over_http_the_same_document_gets_the_same_bytes(server: str) -> None:
     assert first == again
     document = json.loads(first)["document"]
     with urllib.request.urlopen(f"{server}/v1/documents/{document}") as answer:
-        assert answer.read() == read(TEMPLATE)[0]
+        assert sha256_hex(answer.read()) == sha256_hex(read(TEMPLATE)[0])
     with pytest.raises(urllib.error.HTTPError) as missing:
         urllib.request.urlopen(f"{server}/v1/documents/{'f' * 64}")
     assert missing.value.code == 404
@@ -425,9 +426,9 @@ def test_a_result_kept_without_its_receipt_is_served_only_after_it_is_read_again
     document = kept.ingest(TEMPLATE).document
     _, result = _paths(tmp_path, document)
     result.with_name("receipt.json").unlink()
-    assert kept.result(document) is None
-    assert kept.ingest(TEMPLATE).result == result.read_bytes()
-    assert kept.result(document) == result.read_bytes()
+    assert sha256_hex(kept.result(document)) == sha256_hex(None)
+    assert sha256_hex(kept.ingest(TEMPLATE).result) == sha256_hex(result.read_bytes())
+    assert sha256_hex(kept.result(document)) == sha256_hex(result.read_bytes())
     # Without its receipt, a result that is not what the reader makes of the source is refused.
     result.with_name("receipt.json").unlink()
     result.write_bytes(result.read_bytes().replace(b'"text":"', b'"text":"X', 1))
@@ -453,7 +454,7 @@ def test_an_epi_is_read_by_the_epi_reader_and_kept_like_a_docx(tmp_path: Path) -
     again = Store(tmp_path).ingest(EPI)
     assert (first.created, again.created) == (True, False)
     assert first.receipt == again.receipt
-    assert first.result == epi_output.read(EPI)[0]
+    assert sha256_hex(first.result) == sha256_hex(epi_output.read(EPI)[0])
     receipt = json.loads(first.receipt)
     assert (receipt["reader"], receipt["format"], receipt["outcome"]) == (
         documents.EPI.reader,
@@ -461,7 +462,7 @@ def test_an_epi_is_read_by_the_epi_reader_and_kept_like_a_docx(tmp_path: Path) -
         "read",
     )
     kept.verify(first.document)
-    assert kept.result(first.document) == first.result
+    assert sha256_hex(kept.result(first.document)) == sha256_hex(first.result)
 
 
 def test_an_epi_with_a_refused_section_is_read_in_part(tmp_path: Path) -> None:
@@ -472,9 +473,11 @@ def test_an_epi_with_a_refused_section_is_read_in_part(tmp_path: Path) -> None:
 
 
 def test_the_reader_is_chosen_from_the_bytes_alone() -> None:
-    assert documents.kind(EPI) is documents.EPI
+    # Chosen before the assertions, which would print the bytes they were chosen from.
+    epi_kind, docx_kind = documents.kind(EPI), documents.kind(TEMPLATE)
+    assert epi_kind is documents.EPI
     assert documents.kind(b" \r\n\t{}") is documents.EPI
-    assert documents.kind(TEMPLATE) is documents.DOCX
+    assert docx_kind is documents.DOCX
     assert documents.kind(b"\xef\xbb\xbf{}") is documents.DOCX
     assert json.loads(documents.kind(b"[]").read(b"[]")[0])["refusal"]["code"] == (
         "invalid-package"
@@ -487,7 +490,10 @@ def test_an_epi_over_http_names_its_reader_and_its_source_type(tmp_path: Path) -
     assert status == "201 Created"
     document = json.loads(body)["document"]
     _, headers, source = _call(service, "GET", f"/v1/documents/{document}/source")
-    assert (source, headers["Content-Type"]) == (EPI, "application/fhir+json")
+    assert (sha256_hex(source), headers["Content-Type"]) == (
+        sha256_hex(EPI),
+        "application/fhir+json",
+    )
     _, _, docx_body = _call(service, "POST", "/v1/documents", TEMPLATE)
     _, headers, _ = _call(
         service, "GET", f"/v1/documents/{json.loads(docx_body)['document']}/source"

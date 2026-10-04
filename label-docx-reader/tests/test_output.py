@@ -12,6 +12,7 @@ from label_docx import epi, epi_output, output
 from label_docx.cli import main
 from label_docx.output import FORMAT_VERSION, Json, canonical, read
 from label_docx.reader import READER_VERSION, Paragraph
+from test_no_label_leak import sha256_hex
 
 TEMPLATE = (
     Path(__file__).resolve().parents[1]
@@ -26,7 +27,7 @@ def test_a_read_is_canonical_and_names_its_source_and_versions() -> None:
     result, ok = read(data)
     assert ok
     value = json.loads(result)
-    assert result == canonical(value)
+    assert sha256_hex(result) == sha256_hex(canonical(value))
     assert sorted(value) == [
         "certificate",
         "comments",
@@ -90,9 +91,9 @@ def test_the_command_line_writes_the_same_bytes_and_exits_by_outcome(
 ) -> None:
     out = tmp_path / "out.json"
     assert main([str(TEMPLATE), "--output", str(out)]) == 0
-    assert out.read_bytes() == read(TEMPLATE.read_bytes())[0]
+    assert sha256_hex(out.read_bytes()) == sha256_hex(read(TEMPLATE.read_bytes())[0])
     assert main([str(TEMPLATE)]) == 0
-    assert capsysbinary.readouterr().out == out.read_bytes()
+    assert sha256_hex(capsysbinary.readouterr().out) == sha256_hex(out.read_bytes())
     broken = tmp_path / "broken.docx"
     broken.write_bytes(b"not a zip")
     assert main([str(broken)]) == 2
@@ -116,7 +117,7 @@ def test_footnotes_are_written_with_their_marks_and_paragraphs() -> None:
     assert (footnote["id"], footnote["mark"]) == (marked[0]["id"], "1")
     echo = footnote["paragraphs"][0]["notes"][0]
     assert (echo["offset"], echo["mark"]) == (0, "1")
-    assert value["endnotes"] == []
+    assert [endnote["id"] for endnote in value["endnotes"]] == []
 
 
 def test_an_epi_result_is_canonical_and_names_its_source_and_versions() -> None:
@@ -124,7 +125,7 @@ def test_an_epi_result_is_canonical_and_names_its_source_and_versions() -> None:
     result, ok = epi_output.read(data)
     value = json.loads(result)
     assert ok
-    assert canonical(value) == result
+    assert sha256_hex(canonical(value)) == sha256_hex(result)
     assert value["source"] == {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
     assert (value["reader"], value["format"]) == (epi.READER_VERSION, epi_output.FORMAT_VERSION)
     first = value["sections"][0]
