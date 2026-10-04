@@ -32,8 +32,9 @@ of a kind the format names) and the ledger:
 whitespace + floating objects`. Equality is all or nothing, so a dropped, added, changed, repeated, swapped or moved
 character, and a dropped, split or merged paragraph, all fail it.
 
-`tests/test_certify.py` applies each of its kinds of change to the result of every corpus
-document read: every changed result is refused, and every unchanged result is certified.
+`tests/test_certify.py` applies up to four seeded changes of each of its kinds to the result of
+every corpus document read (a tracked document's views aside): every changed result is refused,
+and every unchanged result is certified. These are samples, not every possible change.
 
 ## Why it is independent
 
@@ -88,8 +89,9 @@ byte. In a part with revisions, everything else is the source's too, element by 
 run element in full with its run's properties and the elements around it, each paragraph's
 properties, attributes and place, and everything outside paragraphs (tables, sections, styles,
 note ids). Properties a change records are the current ones in the accepted view; the former
-ones the original takes are held to Word: for every case in `corpus/tracked-cases`, the reader
-reads its view exactly as it reads Word's own Accept All / Reject All file.
+ones the original takes are held to Word: for every case in `corpus/tracked-cases` the reader
+does not refuse, the reader reads its view exactly as it reads Word's own Accept All / Reject All
+file. It refuses 6 of the 39 (`tracked-change`), and their views are not compared.
 
 ## What is held to the applications instead
 
@@ -97,9 +99,18 @@ The proof covers the text. How it is shown is held to the application that shows
 
 | What                                              | Held to | Where                                  |
 | ------------------------------------------------- | ------- | -------------------------------------- |
-| List labels, note marks, fields, text, emphasis, headers, footers, comments of a .docx | Word | `test_word_oracle.py` (corpus; comments by unit tests only, none in the corpus yet); `--word on` (every ingest) |
+| List labels, note marks, fields, text, bold, italic, caps and strike, headers, footers, comments of a .docx | Word | `test_word_oracle.py` (corpus; comments by unit tests only, none in the corpus yet); `--word on` (every ingest) |
 | Text, marks and list markers of an ePI section    | Chrome  | `test_browser_oracle.py` (corpus); every ingest with Chrome |
 | Tracked views                                     | Word    | `test_tracked.py` (corpus); `--word on` |
+
+Word is asked about emphasis per body paragraph: whether all its letters are bold, italic, in
+capitals or struck through, white space's formatting aside, so Word's "no" agrees with a
+paragraph partly so; a paragraph with a note reference, a page number or a hidden paragraph mark
+is not held to it (`word.emphasis_verdict`). Superscript, subscript, underline, highlight, shading, faint, raised or
+lowered and right-to-left text are not asked of Word: they are held by unit tests, and the
+first three, with the toggles, by the check's own copy of Word's rules (R-35). Word's text shows
+every Symbol character (`w:sym`) as "(", so Word cannot tell them apart: there the reader's
+character is held to be one of the Symbol table's (R-38), and this check holds which one.
 
 Word's and Chrome's rules are not published, so this is evidence by example, not proof. With
 `--word require` or `--browser require` the service serves nothing the application has not
@@ -132,5 +143,6 @@ files taken when it starts, so an edit made meanwhile cannot reach it. Counts ar
 - The store keeps each result once, under the source's SHA-256 and the versions, and serves it
   only if it hashes to its receipt; `label-docx-service verify` re-reads every source and
   requires the kept result byte for byte.
-- 1,200 damaged copies of real documents each give a refusal or a certified read, never an
-  error (`test_robustness.py`).
+- 1,200 seeded damaged copies of four corpus documents (an EMA QRD template, an EMA ePI and two
+  synthetic test documents) each give a refusal or a certified read, never an error
+  (`test_robustness.py`).

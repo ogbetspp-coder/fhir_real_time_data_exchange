@@ -47,11 +47,13 @@ new version, and adopting it is a reviewed change: new bytes, new lock entry, re
 
 ## The reader
 
-The label reader (`label-docx-reader/src/label_docx/reader.py`) reads the text of a Word body
-and refuses a document whose text it cannot produce exactly. The registry takes only its
-certified read (`label_docx.output.read`, through `zone-a/src/zone_a/certified.py`): the reader's
-independent check accounts for every character, a result it cannot account for is refused
-(`uncertified`), and a document with tracked changes, which reads to two texts, is refused. It
+The label reader (`label-docx-reader/src/label_docx/reader.py`) reads the text of a Word
+document and refuses a document whose text it cannot produce exactly. The registry takes only
+the body of its certified read (`label_docx.output.read`, through
+`zone-a/src/zone_a/certified.py`): the reader's independent check accounts for every character,
+a result it cannot account for is refused (`uncertified`), and Zone A refuses a document with
+tracked changes, which reads to two texts (`tracked-change`), a body that refers to a footnote or
+endnote (`note-reference`) and a body with a page number (`page-number`). It
 is the first component of the engine and is written to the same rule as the fidelity check: false refusals are acceptable, silent changes are not. Its
 module docstring lists every rule and every refusal. What the EMA files and the review forced:
 
@@ -66,27 +68,31 @@ module docstring lists every rule and every refusal. What the EMA files and the 
    Symbol encoding as the Unicode Consortium's `symbol.txt` maps it, checked entry by entry
    against that file. Where `symbol.txt` gives two characters for one code, the table takes one
    and says so (0x6D is U+03BC GREEK SMALL LETTER MU, not U+00B5 MICRO SIGN). A run with Symbol
-   in only some of its font slots, or with a font hint or a complex-script or right-to-left
-   property, is refused: Word picks the font character by character there. Dingbat fonts, and
-   any font the document's font table declares symbol-encoded, are refused.
+   in only some of its font slots, or with a font hint other than `default` or a complex-script
+   or right-to-left property, is refused: Word picks the font character by character there.
+   Dingbat fonts, and any font the document's font table declares symbol-encoded, are refused.
 2. **Formatting that changes what a reader sees.** Superscript, subscript, raised text,
    capitals, strike-through, highlight (with its colour), shading (on the run or the
-   paragraph), right-to-left text and faint text (white, under two points, or scaled under a
-   fifth) are reported as marks on the exact characters (`Paragraph.marks`), because `text`
-   alone flattens "10" with a superscript "9" to "109". A caller that uses `text` must look at
+   paragraph), right-to-left text and faint text (a colour whose contrast with what is painted
+   under it is below 1.33:1, under two points, or scaled under a fifth) are reported as marks
+   on the exact characters (`Paragraph.marks`), because `text` alone flattens "10" with a superscript "9" to "109". A caller that uses `text` must look at
    the marks. So is underline of any style (`docx-reader/1.1.0`), since an underlined "<" is
    how "≤" is often typed. Bold and italic are marked too (the label reader's
-   `docx-reader/1.25.0`; registry 1.1.0 lets them through, as they draw the same characters);
+   `docx-reader/1.25.0`; registry 1.2.0 lets them through, as they draw the same characters);
    other appearance (colour, size) is not reported. A picture is U+FFFC OBJECT REPLACEMENT CHARACTER where it stands: the black triangle of the
    additional-monitoring statement is a picture in the template; a U+FFFC typed as text is
    refused.
 3. **Fields.** A field keeps its stored result and drops its instruction, however deeply
-   nested; a paragraph that ends inside an instruction is refused. Only HYPERLINK, REF,
-   NOTEREF and DOCPROPERTY results are read, because Word shows those as stored; PAGE, DATE,
-   SEQ, IF and every other field Word recomputes on display or print are refused, and so is a
-   field with no stored result (a form checkbox, a SYMBOL field without a result, an empty
-   simple field), one marked for update, one whose code is hidden behind a nested field, and
-   any field in a document set to update fields on open.
+   nested; a paragraph that ends inside an instruction is refused. HYPERLINK, DOCPROPERTY and
+   TOC results are read as stored, because Word shows and prints them so. SEQ, STYLEREF, REF and
+   NOTEREF, which Word recomputes when it prints, the reader computes as Word does, and reads
+   only where the stored result is the computed one (else `stale-field`). PAGE, PAGEREF,
+   NUMPAGES and SECTIONPAGES, set by the page layout, are left out of the text and their places
+   recorded in `pages`; Zone A refuses a body with one. DATE, IF and every other field Word
+   recomputes on display or print are refused, and so is a field with no stored result (a form
+   checkbox, a SYMBOL field without a result, an empty simple field), one marked for update, one
+   whose code is hidden behind a nested field, and any field in a document set to update fields
+   on open.
 4. **Styles and hidden text.** Run properties are looked up on the run, its character style,
    its paragraph style and, inside a table, its table style (each through its `basedOn` chain,
    falling back to the document's last default style of that kind when the id is absent or
@@ -94,23 +100,24 @@ module docstring lists every rule and every refusal. What the EMA files and the 
    another kind is refused. A run with text that any of these levels hides is refused
    unless the run itself says it is visible. A hidden paragraph mark, direct or through the
    paragraph's style, is reported (`mark_hidden`): Word shows such a paragraph run on into the
-   next. A table whose effective style has conditional formatting (first row, banded rows) is
-   refused, because the reader does not apply it; the template defines one such style and
-   never uses it.
+   next. A table style's conditional formatting (first row, banded rows) is applied as Word
+   applies it, each rule Word's answer to a test case; what Word was not asked is refused. The
+   template defines one such style and never uses it.
 5. **The package.** The main part is found through the package relationships, not by name; a
    part name that occurs twice (ignoring case), a part that is not UTF-8 and any DTD are
    refused.
 
-It also refuses any revision anywhere in the body (including formatting changes and deleted
-paragraph marks), text boxes, footnote references, embedded objects, charts and other
-non-picture drawings, alternate content, content controls bound to data, text in a vertically
-merged-away cell, text whose whitespace is not preserved or that holds a raw tab or line break,
-and any element or container it does not know. List numbering, direct or through a style, is reported
-as metadata and never rendered into the text. Headers, footers, footnotes and comments are
-separate parts and are not read. The rule for field instructions was prompted by Appendix V's
-header, which carries `DOCPROPERTY DM_emea_doc_ref_id \* MERGEFORMAT` next to its displayed
-value; Appendix V is not pinned and headers are not read, so that rule is tested on synthetic
-files only.
+A document with revisions (including formatting changes and deleted paragraph marks) the reader
+reads as two views, every change accepted and every change rejected; Zone A takes neither and
+refuses it (`tracked-change`). The reader refuses text boxes, embedded objects, charts and
+drawings other than a picture or a shape with no text, other alternate content, content controls
+bound to data, text in a vertically merged-away cell, text whose whitespace is not preserved or
+that holds a raw tab or line break, and any element or container it does not know. List
+numbering, direct or through a style, is reported as metadata and never rendered into the text.
+The reader also reads footnotes, endnotes, headers, footers and comments, each its own part;
+Zone A and the registry use the body only. The rule for field instructions was prompted by
+Appendix V's header, which carries `DOCPROPERTY DM_emea_doc_ref_id \* MERGEFORMAT` next to its
+displayed value; Appendix V is not pinned, so that rule is tested on synthetic files only.
 
 ## The grammar
 

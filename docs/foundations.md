@@ -27,7 +27,8 @@ Stated first, because the gaps below should not obscure it.
   image is pinned by digest and checked in CI.
 - **Nine required checks gate every merge** to `main` — `Check`, `Official validation`,
   `Renderer`, `Images`, `Zone A`, `Agent`, `Label reader`, `Plan` and `Vulnerabilities` — and the
-  deploy of a commit waits for every job of CI's run on it to succeed.
+  deploy of a commit waits for CI's run on it to succeed in every job but `Renderer`; it does
+  not wait for `Label reader`, `Plan` or `Vulnerabilities`, which are other workflows (D3).
 - **The FHIR stores keep full version history and enforce referential integrity**, and writes are
   atomic transactions.
 
@@ -208,13 +209,13 @@ Terraform but referenced by nothing else in the repository: Secret Manager, Clou
 Dataplex, BigQuery Data Transfer and Eventarc. Each is surface nothing monitors. Trim both lists
 to what the product uses, and make Terraform the only list.
 
-_Status 2026-09-22: closed._ Fifty-four enabled became forty-five, every one declared, and no API was enabled outside `infra/main.tf`. Of the fifteen measured unused, eight are disabled; five turned out to be held by a declared service (Google's umbrella service, Binary Authorization, Compute) and one is re-enabled by Cloud Build on every deploy, so those six are declared as dependencies rather than forced off with their holder. The list the deploy enables before Terraform runs is tested to be a subset of Terraform's. 30 days of request counts
+_Status 2026-09-22: closed._ Fifty-four enabled became forty-five, every one declared, and no API was enabled outside `infra/main.tf`. Of the fifteen measured unused, nine are disabled; five turned out to be held by a declared service (Google's umbrella service, Binary Authorization, Compute) and one is re-enabled by Cloud Build on every deploy, so those six are declared as dependencies rather than forced off with their holder. The list the deploy enables before Terraform runs is tested to be a subset of Terraform's. 30 days of request counts
 per API decided it, not a reading of names: an API that served requests, or that Google enables
 as a dependency of one that did, is declared in `infra/main.tf`, which is now the complete list
-(39). Fifteen served no request, hold no resource and are referenced nowhere; they are dropped
-from Terraform (without disabling — `disable_on_destroy` is false) and disabled once, without
-forcing past a dependency, by a one-shot script deleted in refactor R1 (in history at `250d8a2`,
-`scripts/gcp/api-trim.sh`); compare `gcloud services list --enabled` with `infra/main.tf` to look
+(45, the six above among them). Fifteen served no request, hold no resource and are referenced
+nowhere; the other nine are not in Terraform (dropping one does not disable it —
+`disable_on_destroy` is false) and were disabled once, without forcing past a dependency, by a
+one-shot script deleted in refactor R1 (in history at `250d8a2`, `scripts/gcp/api-trim.sh`); compare `gcloud services list --enabled` with `infra/main.tf` to look
 for drift. Kept although idle: Vertex AI, for the agent, and Datastore, a
 candidate home for the entitlement store.
 
@@ -223,8 +224,8 @@ Python, Docker base-image digests, Terraform providers or Actions. Digest pinnin
 update path means pinned and slowly rotting.
 
 _Status 2026-09-21: closed._ `.github/dependabot.yml` proposes weekly, grouped updates for
-Actions, npm, both uv projects, Docker base images and Terraform providers, each as a pull
-request through the required checks.
+Actions, npm, the three uv projects (`agent`, `zone-a`, `label-docx-reader`), Docker base
+images and Terraform providers, each as a pull request through the required checks.
 
 **C4. The worker's Healthcare role is project-wide** (`healthcare.fhirResourceEditor` at
 project level) while the query service's reader is dataset-scoped. Already on the roadmap's
@@ -358,7 +359,8 @@ _Status 2026-09-28 (audit B15): still off, the owner's decision._ What the bypas
 narrower: a push to `main` by an administrator deploys only once CI's run on that commit has
 succeeded in every job but `Renderer` (`scripts/ci/workflow-runs.mjs`, in the deploy job before any
 credential is taken), so the bypass skips the pull request and CI's checks do not, but only CI's:
-`Plan` and `Vulnerabilities` are other workflows, and the deploy does not wait for them. `Plan` runs
+`Label reader`, `Plan` and `Vulnerabilities` are other workflows, and the deploy does not wait for
+them. `Plan` runs
 on pull requests only, so a direct push has none; the push's own `Vulnerabilities` run may be red
 while its deploy goes on. `Renderer` has been a required pull-request check since 2026-09-28; since
 refactor R1 the deploy no longer waits for it, since nothing the deploy ships reads its verdict.
@@ -405,7 +407,9 @@ _Status 2026-09-22: closed; first proof on the next two deploys._ Merges touchin
 tests, the agent or Zone A no longer deploy (`test/ci/deploy-trigger.test.ts` pins that no
 deployable path is ignored). The profile sync and import run only when the generated set's
 fingerprint differs from the one recorded after the last successful import, or the target
-store does not hold the expected 753 StructureDefinitions, or `FORCE_PROFILE_IMPORT` is set
+store's own fingerprint (every resource of the import's types, with its version) does, or
+`FORCE_PROFILE_IMPORT` is set (until audit B08 the store was checked by its StructureDefinition
+count alone)
 (`test/ci/profile-import.test.ts`). The first deploy after this records the fingerprint; the
 second should skip both steps.
 
