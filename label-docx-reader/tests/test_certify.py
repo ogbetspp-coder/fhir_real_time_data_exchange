@@ -39,6 +39,7 @@ from label_docx.certify import (
     certify_docx,
     certify_epi,
 )
+from label_docx.epi import is_default_ignorable
 from label_docx.output import canonical
 from label_docx.word import SUFFIXES, label_as_drawn
 from lock import MANIFESTS
@@ -3638,6 +3639,40 @@ def test_text_word_shows_otherwise_than_stored_is_never_certified(text: str, rea
     # In a field's code as anywhere: the check reads every text element alike.
     with pytest.raises(CertificationError, match=f"^{re.escape(reason)}$"):
         DocxSource(docx(_p(_BEGIN + f"<w:r>{text}</w:r>" + _SEPARATE + _END)))
+
+
+# Each end of the check's ranges of characters drawn as nothing, and one past it.
+_IGNORED_EDGES = sorted(
+    {
+        code + step
+        for low, high in (
+            (0x034F, 0x034F),
+            (0x115F, 0x1160),
+            (0x17B4, 0x17B5),
+            (0x180B, 0x180F),
+            (0x3164, 0x3164),
+            (0xFE00, 0xFE0F),
+            (0xFFA0, 0xFFA0),
+            (0xE0100, 0xE01EF),
+        )
+        for code, step in ((low, -1), (low, 0), (high, 0), (high, 1))
+    }
+)
+
+
+@pytest.mark.parametrize("code", _IGNORED_EDGES, ids=lambda code: f"U+{code:04X}")
+def test_a_character_is_refused_exactly_where_unicode_draws_it_as_nothing(code: int) -> None:
+    # Held to the ePI reader's own copy of Unicode's Default_Ignorable_Code_Point, so a range
+    # of the check's that ends one character early or late is caught at that character.
+    unshown = unicodedata.category(chr(code)) in ("Cf", "Cc", "Cn") or is_default_ignorable(code)
+    try:
+        DocxSource(docx(_p(f"<w:r><w:t>a{chr(code)}b</w:t></w:r>"))).certify(
+            _value(f"a{chr(code)}b")
+        )
+        refused = False
+    except CertificationError:
+        refused = True
+    assert refused == unshown
 
 
 def test_text_shown_as_stored_is_certified() -> None:
