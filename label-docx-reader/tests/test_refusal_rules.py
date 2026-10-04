@@ -554,3 +554,68 @@ def test_a_part_over_the_part_cap_is_refused(monkeypatch: pytest.MonkeyPatch) ->
     code, detail = _refusal(docx(p(r("<w:t>a</w:t>"))))
     assert code == "invalid-package"
     assert detail.endswith("is over 64 bytes")
+
+
+_OPEN_FIELD = (
+    r('<w:fldChar w:fldCharType="begin"/>')
+    + r('<w:instrText xml:space="preserve"> DOCPROPERTY Title </w:instrText>')
+    + r('<w:fldChar w:fldCharType="separate"/>')
+    + r("<w:t>a</w:t>")
+)
+_STORY_END = ("unbalanced-field", "a field still open where its story ends")
+
+
+def test_a_field_still_open_where_its_story_ends_is_refused() -> None:
+    # Its result has no end: what of the story is the field's, and what Word shows, is unknown.
+    assert _refusal(docx(p(_OPEN_FIELD))) == _STORY_END
+    in_cell = f"<w:tbl><w:tr><w:tc>{p(_OPEN_FIELD)}</w:tc></w:tr></w:tbl>"
+    assert _refusal(docx(in_cell)) == _STORY_END
+    note = fnote(1, p(r("<w:footnoteRef/>") + _OPEN_FIELD))
+    assert _refusal(docx(p(r("<w:t>x</w:t>") + ref(1)), footnotes=note)) == _STORY_END
+    (story,) = read_document(_with_header(p(_OPEN_FIELD))).headers
+    assert story.refusal is not None
+    assert (story.refusal[0], story.refusal[1]) == _STORY_END
+    # A stored result may run on past its paragraph, closed in a later one.
+    closed = p(_OPEN_FIELD) + p(r("<w:t>b</w:t>") + r('<w:fldChar w:fldCharType="end"/>'))
+    assert _read_text(docx(closed)) == ["a", "b"]
+
+
+@pytest.mark.parametrize("showing", ["<w:showingPlcHdr/>", '<w:showingPlcHdr w:val="true"/>'])
+def test_an_empty_content_control_showing_its_placeholder_is_refused(showing: str) -> None:
+    # Word shows a placeholder, which is not in the content, whether or not it names one.
+    body = p(r("<w:t>a</w:t>") + f"<w:sdt><w:sdtPr>{showing}</w:sdtPr><w:sdtContent/></w:sdt>")
+    assert _refusal(docx(body)) == ("unsupported-element", "an empty content control's placeholder")
+    off = body.replace(showing, '<w:showingPlcHdr w:val="0"/>')
+    assert _read_text(docx(off)) == ["a"]
+    # A placeholder kept in the content is the content's text.
+    kept = body.replace("<w:sdtContent/>", f"<w:sdtContent>{r('<w:t>b</w:t>')}</w:sdtContent>")
+    assert _read_text(docx(kept)) == ["ab"]
+
+
+@pytest.mark.parametrize(
+    "character", ["\u200b", "\u2060", "\ufeff"], ids=["zero-width-space", "word-joiner", "bom"]
+)
+def test_a_field_code_with_an_invisible_format_character_is_refused(character: str) -> None:
+    for code in (f'HYPERLINK "https://example.org"{character}', f"DOCPROPERTY Title{character}"):
+        assert _refusal(docx(p(_field(code, "link")))) == (
+            "computed-field",
+            "a field code with an invisible format character",
+        )
+    # Inside quotes it parts no words: a hyperlink's tooltip.
+    tooltip = f'HYPERLINK "https://example.org" \\o "see{character}here"'
+    assert _read_text(docx(p(_field(tooltip, "link")))) == ["link"]
+
+
+def test_a_reference_must_name_its_bookmark_in_the_case_written() -> None:
+    # Word's bookmark names are case-insensitive, but what it prints for another case is not on
+    # record: the name must be the bookmark's as written.
+    marked = p(_marked("_Ref1", r("<w:t>below</w:t>")))
+    assert _read_text(docx(marked + p(_field("REF _Ref1 \\h", "below")))) == ["below", "below"]
+    assert _refusal(docx(marked + p(_field("REF _ref1 \\h", "below")))) == (
+        "computed-field",
+        "a REF to a bookmark that is not there",
+    )
+    assert _refusal(docx(marked + p(_field("PAGEREF _ref1 \\h", "4")))) == (
+        "computed-field",
+        "a PAGEREF to a bookmark it cannot read",
+    )

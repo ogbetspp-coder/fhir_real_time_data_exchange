@@ -36,6 +36,8 @@ TEMPLATE = (
     CORPUS / "ema-qrd" / "qrd-product-information-template-version-104_en.docx"
 ).read_bytes()
 REFUSED = (CORPUS / "numbering-cases" / "fields-stale.docx").read_bytes()
+# Read whole: no header, footer or comment refused.
+WHOLE = (CORPUS / "numbering-cases" / "bullets.docx").read_bytes()
 
 
 def test_the_same_bytes_get_the_same_receipt_and_result(tmp_path: Path) -> None:
@@ -399,9 +401,11 @@ def test_over_http_the_same_document_gets_the_same_bytes(server: str) -> None:
 def test_the_command_line_ingests_and_exits_by_outcome(
     tmp_path: Path, capsysbinary: pytest.CaptureFixture[bytes]
 ) -> None:
-    good, bad = tmp_path / "good.docx", tmp_path / "bad.docx"
-    good.write_bytes(TEMPLATE)
+    good, bad, part = tmp_path / "good.docx", tmp_path / "bad.docx", tmp_path / "part.docx"
+    good.write_bytes(WHOLE)
     bad.write_bytes(REFUSED)
+    # Its footers are refused on their own: read in part, exit 3.
+    part.write_bytes(TEMPLATE)
     store_root = tmp_path / "store"
     assert service_main(["ingest", "--store", str(store_root), str(good)]) == 0
     first = capsysbinary.readouterr().out
@@ -409,6 +413,11 @@ def test_the_command_line_ingests_and_exits_by_outcome(
     both = capsysbinary.readouterr().out
     assert both.startswith(first)
     assert json.loads(both[len(first) :])["outcome"] == "refused"
+    assert service_main(["ingest", "--store", str(store_root), str(good), str(part)]) == 3
+    assert json.loads(capsysbinary.readouterr().out[len(first) :])["outcome"] == "read-in-part"
+    # A refusal outranks a read in part, whatever the order.
+    assert service_main(["ingest", "--store", str(store_root), str(part), str(bad)]) == 2
+    capsysbinary.readouterr()
 
 
 def test_the_service_runs_only_on_the_pinned_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
