@@ -1,0 +1,5068 @@
+{
+  "application": "Microsoft Word 16.113.3 (macOS)",
+  "at": {
+    "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": [],
+    "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx": [],
+    "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx": [],
+    "qrd-product-information-template-version-104_en.docx": [
+      293,
+      300,
+      311,
+      316,
+      317,
+      321,
+      323,
+      581,
+      582,
+      584,
+      588,
+      589,
+      590,
+      591,
+      681,
+      682
+    ]
+  },
+  "drawn": {
+    "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": [],
+    "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx": [],
+    "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx": [],
+    "qrd-product-information-template-version-104_en.docx": [
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "\uf0b7\t",
+      "-\t",
+      "-\t",
+      "-\t",
+      "-\t",
+      "-\t",
+      "-\t",
+      "-\t",
+      "-\t",
+      "-\t"
+    ]
+  },
+  "emphasis": {
+    "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": {
+      "": [],
+      "1": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "10": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "11": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "13": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "15": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "17": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "18": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "19": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "21": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "23": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "24": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "25": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "26": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "28": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "30": [
+        true,
+        true,
+        false,
+        false
+      ],
+      "31": [
+        true,
+        true,
+        false,
+        false
+      ],
+      "32": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "33": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "34": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "36": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "37": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "38": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "39": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "41": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "43": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "45": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "47": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "49": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "50": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "52": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "53": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "56": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "58": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "59": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "6": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "60": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "61": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "62": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "64": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "65": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "66": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "67": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "68": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "7": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "70": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "71": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "72": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "73": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "74": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "75": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "76": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "77": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "78": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "8": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "80": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "82": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "83": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "84": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "85": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "86": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "88": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "89": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "9": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "90": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "91": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "92": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "93": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "94": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "95": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "96": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "98": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx": {
+      "": [],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "10": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "11": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "12": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "13": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "14": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "15": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "16": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "18": [
+        true,
+        true,
+        false,
+        false
+      ],
+      "19": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "20": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "21": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "22": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "23": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "24": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "25": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "26": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "27": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "28": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "29": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "30": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "31": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "32": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "33": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "34": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "35": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "36": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "37": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "38": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "39": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        true,
+        true,
+        false,
+        false
+      ],
+      "40": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "41": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "42": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "43": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "44": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "45": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "46": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "47": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "48": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "49": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "50": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "51": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "52": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "53": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "54": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "55": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "56": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "57": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "58": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "59": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "6": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "60": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "61": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "62": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "63": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "64": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "65": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "66": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "67": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "68": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "69": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "7": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "70": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "71": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "72": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "8": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "9": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx": {
+      "": [],
+      "0": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "10": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "11": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "12": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "13": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "14": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "15": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "16": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "17": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "18": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "22": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "24": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "26": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "27": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "28": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "29": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "30": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "31": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "32": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "33": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "34": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "35": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "39": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "41": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "43": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "44": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "45": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "46": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "47": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "48": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "49": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "50": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "51": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "52": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "53": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "54": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "58": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "60": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "62": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "64": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "66": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "7": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "8": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "9": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "qrd-product-information-template-version-104_en.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "101": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "102": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "103": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "105": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "107": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "109": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "111": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "113": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "115": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "116": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "118": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "120": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "122": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "125": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "127": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "129": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "131": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "133": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "134": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "135": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "136": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "138": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "140": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "142": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "143": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "145": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "146": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "148": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "150": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "152": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "153": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "154": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "155": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "156": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "157": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "159": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "161": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "163": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "165": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "167": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "170": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "172": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "174": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "176": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "178": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "180": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "182": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "184": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "186": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "188": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "190": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "192": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "194": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "196": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "198": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "200": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "202": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "205": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "207": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "208": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "209": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "210": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "213": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "216": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "218": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "219": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "222": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "224": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "225": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "226": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "229": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "23": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "232": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "234": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "236": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "238": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "25": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "26": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "261": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "263": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "265": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "267": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "269": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "271": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "272": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "274": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "276": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "278": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "280": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "282": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "285": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "287": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "288": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "289": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "29": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "290": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "291": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "293": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "295": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "298": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "300": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "302": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "304": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "306": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "309": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "31": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "311": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "313": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "315": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "316": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "317": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "319": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "321": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "323": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "325": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "327": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "328": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "329": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "331": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "337": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "339": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "34": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "341": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "343": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "344": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "345": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "351": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "36": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "374": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "376": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "377": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "38": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "40": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "400": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "401": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "402": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "404": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "407": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "409": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "41": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "410": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "413": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "415": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "418": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "421": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "424": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "426": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "429": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "431": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "434": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "436": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "439": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "44": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "442": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "445": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "448": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "450": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "451": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "452": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "453": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "456": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "458": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "46": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "461": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "464": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "467": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "47": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "470": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "472": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "475": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "477": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "479": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "48": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "483": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "485": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "486": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "487": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "489": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "493": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "494": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "496": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "499": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "501": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "502": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "505": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "507": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "51": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "510": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "513": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "516": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "518": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "520": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "522": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "525": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "527": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "528": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "529": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "53": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "532": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "535": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "538": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "541": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "544": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "546": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "549": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "55": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "57": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "572": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "573": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "575": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "576": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "578": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "580": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "581": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "582": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "583": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "584": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "586": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "587": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "588": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "589": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "59": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "590": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "591": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "593": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "595": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "596": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "597": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "598": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "599": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "600": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "603": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "605": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "608": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "61": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "610": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "611": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "613": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "614": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "616": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "618": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "619": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "621": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "623": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "624": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "626": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "628": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "63": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "631": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "633": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "635": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "637": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "639": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "641": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "642": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "643": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "644": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "646": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "648": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "649": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "65": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "651": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "652": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "655": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "657": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "659": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "66": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "661": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "662": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "664": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "667": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "669": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "67": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "671": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "673": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "675": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "678": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "680": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "681": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "682": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "684": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "686": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "687": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "688": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "689": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "69": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "690": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "692": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "694": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "695": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "696": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "697": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "698": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "699": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "700": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "702": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "703": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "704": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "705": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "706": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "707": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "71": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "710": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "711": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "712": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "713": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "714": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "715": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "717": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "718": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "719": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "720": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "721": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "722": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "723": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "724": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "725": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "726": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "727": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "728": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "73": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "730": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "731": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "732": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "733": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "734": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "735": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "736": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "737": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "738": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "739": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "740": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "741": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "743": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "744": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "745": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "746": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "747": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "748": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "749": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "75": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "750": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "751": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "752": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "753": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "754": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "756": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "757": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "758": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "759": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "760": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "761": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "762": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "763": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "764": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "765": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "766": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "767": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "769": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "77": [
+        false,
+        true,
+        false,
+        false
+      ],
+      "770": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "771": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "772": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "773": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "774": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "775": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "776": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "777": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "778": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "779": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "780": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "782": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "783": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "784": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "785": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "786": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "787": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "788": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "789": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "79": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "790": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "791": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "792": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "793": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "795": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "796": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "797": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "798": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "799": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "800": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "801": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "802": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "803": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "804": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "805": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "806": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "808": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "809": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "81": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "810": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "811": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "812": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "813": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "814": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "815": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "816": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "817": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "818": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "819": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "821": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "822": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "823": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "824": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "825": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "826": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "828": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "829": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "83": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "830": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "831": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "832": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "833": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "835": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "836": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "837": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "838": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "839": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "840": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "841": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "842": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "843": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "844": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "845": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "846": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "848": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "849": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "85": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "850": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "851": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "852": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "853": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "854": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "855": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "856": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "857": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "858": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "859": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "860": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "861": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "862": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "863": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "864": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "865": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "867": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "868": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "869": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "87": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "870": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "871": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "872": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "874": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "875": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "876": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "877": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "878": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "879": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "88": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "880": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "881": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "882": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "883": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "884": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "885": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "890": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "892": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "893": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "895": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "896": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "898": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "90": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "900": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "902": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "904": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "906": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "908": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "92": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "94": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "96": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "97": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "99": [
+        true,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "fields": {},
+  "fonts": {
+    "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": [],
+    "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx": [],
+    "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx": [],
+    "qrd-product-information-template-version-104_en.docx": [
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      "Symbol",
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "method": "list labels: convert numbers to text, what each list item gained; fonts and at: the font Word gave each label and its body paragraph, from its copy saved after; sha256: the bytes each file's answers are for; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text; noteText: each footnote's and endnote's text",
+  "noteText": {},
+  "notes": {},
+  "prints": {
+    "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": true,
+    "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx": true,
+    "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx": true,
+    "qrd-product-information-template-version-104_en.docx": true
+  },
+  "recorded": "2026-10-03",
+  "sha256": {
+    "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": "13031dfae722bfe2479cb9323be96adfe18941da1c489731ea805082e5f886b3",
+    "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx": "68a8026e6d99f22f9a380edf04df34bb5f29f35574f9e507fb4b5d5f16e996ae",
+    "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx": "10aed02c52b69740041841d09a3fca2239bc9839eb3317bc1c1dd732532a9215",
+    "qrd-product-information-template-version-104_en.docx": "6c9da03b2c72f055c81dc14f12c82da61a1609e7beffcc71f95e8046d7104fd1"
+  },
+  "stories": {
+    "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    },
+    "qrd-product-information-template-version-104_en.docx": {
+      "comments": [],
+      "stories": [
+        [
+          "header",
+          0,
+          "default",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "default",
+          "\u00151\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "first",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "first",
+          "\u00151\n",
+          [
+            "1"
+          ]
+        ],
+        [
+          "header",
+          0,
+          "even",
+          "\n",
+          []
+        ],
+        [
+          "footer",
+          0,
+          "even",
+          "\n",
+          []
+        ]
+      ]
+    }
+  },
+  "text": {
+    "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": [
+      "With Respect to \u201cPregnancy\u201d",
+      "[1]<Based on human experience [specify] {Active substance} causes <congenital malformations [specify] when administered during pregnancy.> [or] <harmful pharmacological effects during pregnancy and/or on the fetus/newborn child.> ",
+      "{Invented name} is contraindicated <during pregnancy><during {trimester} of pregnancy> [this case is a strict contraindication] (see section 4.3). ",
+      "<Women of childbearing potential have to use effective contraception <during <and up to {number} weeks after> treatment.>>",
+      " ",
+      "[2] <Based on human experience [specify] {Active substance} is suggested / suspected to cause congenital malformations [specify] when administered during pregnancy. ",
+      "A <Studies in animals have shown reproductive toxicity (see section 5.3).> ",
+      "[or] ",
+      "B <Animal studies are insufficient with respect to reproductive toxicity (see section 5.3).> ",
+      "{Invented name} should not be used <during pregnancy><during {trimester} of pregnancy> unless the clinical condition of the woman requires treatment with {Active substance}.",
+      "<Women of childbearing potential have to use effective contraception <during <and up to {number} weeks after> treatment.>>",
+      "[3] <Based on human experience [specify] {Active substance} is suggested / suspected to cause congenital malformations [specify] when administered during pregnancy. ",
+      "Animal studies do not indicate direct or indirect harmful effects with respect to reproductive toxicity (see section 5.3). ",
+      "{Invented name} should not be used<during pregnancy><during {trimester} of pregnancy> unless the clinical condition of the woman requires treatment with {Active substance}.",
+      "<Women of childbearing potential have to use effective contraception <during <and up to {number} weeks after)> treatment.>> ",
+      "[4] <There are no or limited amount of data from the use of {Active substance} in pregnant women. ",
+      "A <Studies in animals have shown reproductive toxicity (see section 5.3).> ",
+      "[or] ",
+      "B <Animal studies are insufficient with respect to reproductive toxicity (see section 5.3).> ",
+      "{Invented name} is not recommended <during pregnancy><during {trimester} of pregnancy> and in women of childbearing potential not using contraception.> ",
+      " ",
+      "\f",
+      "[5] <There are no or limited amount of data (less than 300 pregnancy outcomes) from the use of {Active substance} in pregnant women.",
+      "Animal studies do not indicate direct or indirect harmful effects with respect to reproductive toxicity (see section 5.3). ",
+      "As a precautionary measure, it is preferable to avoid the use of {Invented name} <during pregnancy> <during {trimester} of pregnancy>. >",
+      "[6] <A moderate amount of data on pregnant women (between 300-1000 pregnancy outcomes) indicate no malformative or feto/ neonatal toxicity of {Active substance}. ",
+      "A <Animal studies have shown reproductive toxicity (see section 5.3).>",
+      " [or] ",
+      "B <Animal studies are insufficient with respect to reproductive toxicity (see section 5.3).>",
+      "As a precautionary measure, it is preferable to avoid the use of {invented name} <during pregnancy > <during {trimester} of pregnancy.> ",
+      "[7] <A moderate amount of data on pregnant women (between 300-1000 pregnancy outcomes) indicate no malformative or feto/ neonatal toxicity of {Active substance}.>",
+      "Animal studies do not indicate reproductive toxicity (see section 5.3). ",
+      "The use of {invented name} may be considered <during pregnancy><during {trimester} of pregnancy>, if necessary. ",
+      "[8] <A large amount of data on pregnant women (more than 1000 pregnancy outcomes) indicate no malformative nor feto/ neonatal toxicity of {Active substance}.>",
+      "{Invented name} can be used <during pregnancy><during {trimester} of pregnancy> if clinically needed. ",
+      "[9] <No effects during pregnancy are anticipated, since systemic exposure to {Active substance} is negligible.>",
+      "{Invented name} can be used during pregnancy. [E.g. medicinal products for which negligible systemic exposure/negligible pharmacodynamic systemic activity has been demonstrated in clinical situation]",
+      " \fWith Respect to \u201cLactation\u201d",
+      "[1] <{Active substance}/metabolites are excreted in human milk and effects have been shown in breastfed newborns/infants of treated women.> ",
+      "[or] ",
+      "<{Active substance}/metabolites have been identified in breastfed newborns/infants of treated women. <The effect of {Active substance} on newborns/infants is unknown.> [or] <There is insufficient information on the effects of {Active substance} in newborns/infants.>>",
+      "[or] ",
+      "<{Active substance}/metabolites are excreted in human milk to such an extent that effects on the breastfed newborns/infants are likely.>",
+      "<{Invented name}<is contraindicated during breast-feeding (see section 4.3)> [or] <should not be used during breast-feeding>.>",
+      " [or]",
+      " <Breast-feeding should be discontinued during treatment with {Invented name}.> ",
+      "[or]",
+      " <A decision must be made whether to discontinue breast-feeding or to discontinue/abstain from {Invented name} therapy taking into account the benefit of breast feeding for the child and the benefit of therapy for the woman.> ",
+      "[2] <It is unknown whether {Active substance}/metabolites are excreted in human milk.> ",
+      "[or] ",
+      "<There is insufficient information on the excretion of {Active substance}/metabolites in human milk.> ",
+      "[or] ",
+      "<There is insufficient information on the excretion of {Active substance}/metabolites in animal milk.> ",
+      "[or] ",
+      "<Available pharmacodynamic/toxicological data in animals have shown excretion of {Active substance}/metabolites in milk (for details see 5.3).> ",
+      "[or] ",
+      "<Physico-chemical data suggest excretion of {Active substance}/metabolites in human milk.> ",
+      "A risk to the newborns/infants cannot be excluded. ",
+      "<{Invented name} <is contraindicated during breast-feeding (see section 4.3)> [or] <should not be used during breast-feeding>.> ",
+      "[or]",
+      " <Breast-feeding should be discontinued during treatment with {Invented name}.>",
+      " [or]",
+      " <A decision must be made whether to discontinue breast-feeding or to discontinue/abstain from {Invented name} therapy taking into account the benefit of breast feeding for the child and the benefit of therapy for the woman.>",
+      "[3] <No effects of {Active substance} have been shown in breastfed newborns/infants of treated mothers.> ",
+      "[or] ",
+      "<No effects on the breastfed newborn/infant are anticipated since the systemic exposure of the breast-feeding woman to {Active substance} is negligible.> ",
+      "[or] ",
+      "<{Active substance}/metabolites have not been identified in plasma of breastfed newborns/infants of treated mothers.> ",
+      "[or] ",
+      "<{Active substance}/metabolites are not excreted in human milk.> ",
+      "[or] ",
+      "<{Active substance}/metabolites are excreted in human milk, but at therapeutic doses of {Invented name} no effects on the breastfed newborns/infants are anticipated.> ",
+      "{Invented name} can be used during breast-feeding. "
+    ],
+    "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx": [
+      "Ref",
+      "EN",
+      "[MedDRA frequency convention]",
+      "001",
+      "<Very common ((\u00a01/10)>",
+      "002",
+      "<Common ((\u00a01/100 to <\u00a01/10)>",
+      "003",
+      "<Uncommon ((\u00a01/1\u00a0000 to <\u00a01/100)>",
+      "004",
+      "<Rare ((\u00a01/10\u00a0000 to <\u00a01/1\u00a0000)>",
+      "005",
+      "<Very rare (<\u00a01/10\u00a0000)>",
+      "006",
+      "<not known (frequency cannot be estimated from the available data)>",
+      "[MedDRA- system organ class database]",
+      "007",
+      "Infections and infestations",
+      "008",
+      "Neoplasms benign, malignant and unspecified (incl cysts and polyps)",
+      "009",
+      "Blood and lymphatic system disorders ",
+      "010",
+      "Immune system disorders ",
+      "011",
+      "Endocrine disorders ",
+      "012",
+      "Metabolism and nutrition disorders ",
+      "013",
+      "Psychiatric disorders ",
+      "014",
+      "Nervous system disorders ",
+      "015",
+      "Eye disorders ",
+      "016",
+      "Ear and labyrinth disorders ",
+      "017",
+      "Cardiac disorders ",
+      "018",
+      "Vascular disorders ",
+      "019",
+      "Respiratory, thoracic and mediastinal disorders ",
+      "020",
+      "Gastrointestinal disorders ",
+      "021",
+      "Hepatobiliary disorders ",
+      "022",
+      "Skin and subcutaneous tissue disorders ",
+      "023",
+      "Musculoskeletal and connective tissue disorders ",
+      "024",
+      "Renal and urinary disorders ",
+      "025",
+      "Pregnancy, puerperium and perinatal conditions ",
+      "026",
+      "Reproductive system and breast disorders ",
+      "027",
+      "Congenital, familial and genetic disorders ",
+      "028",
+      "General disorders and administration site conditions ",
+      "029",
+      "Investigations ",
+      "030",
+      "Injury, poisoning and procedural complications ",
+      "031",
+      "Surgical and medical procedures ",
+      "032",
+      "Social circumstances",
+      "033",
+      "Product issues"
+    ],
+    "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx": [
+      "ENGLISH",
+      "SUMMARY OF PRODUCT CHARACTERISTICS",
+      "6.4\tSpecial precautions for storage",
+      "<Do not store above <25\u00a0(C> <30\u00a0(C>.> or",
+      "<Store below <25\u00a0(C> <30\u00a0(C>.>",
+      "<Store in a refrigerator (2\u00a0(C \u2013 8\u00a0(C).>",
+      "<Store and transport refrigerated (2\u00a0(C \u2013 8\u00a0(C).>*",
+      "<Store in a freezer {temperature range}.>",
+      "<Store and transport frozen {temperature range}.>**",
+      "<Do not <refrigerate> <or> <freeze>.>",
+      "<Store in the original package in order to protect from <light> <moisture>.>****",
+      "<Keep the {container}*** tightly closed in order to protect from <light> <moisture>.>****",
+      "<Keep the {container}*** in the outer carton in order to protect from <light> <moisture>.>****",
+      "<This medicinal product does not require any special storage conditions.>",
+      "<This medicinal product does not require any special temperature storage conditions.>*****",
+      "A. LABELLING",
+      "9.\tSPECIAL STORAGE CONDITIONS",
+      "<Do not store above <25\u00a0(C> <30\u00a0(C>.> or",
+      "<Store below <25\u00a0(C> <30\u00a0(C>.>",
+      "<Store in a refrigerator.>",
+      "<Store and transport refrigerated.>*",
+      "<Store in a freezer.>",
+      "<Store and transport frozen.>**",
+      "<Do not <refrigerate> <or> <freeze>.>",
+      "<Store in the original package in order to protect from <light> <moisture>.>****",
+      "<Keep the {container}*** tightly closed in order to protect from <light> <moisture>.>****",
+      "<Keep the {container}*** in the outer carton in order to protect from <light> <moisture>.>****",
+      "B. PACKAGE LEAFLET",
+      "5.\tHow to store X",
+      "<Do not store above <25\u00a0(C> <30\u00a0(C>.> or",
+      "<Store below <25\u00a0(C> <30\u00a0(C>.> ",
+      "<Store in a refrigerator (2\u00a0(C \u2013 8\u00a0(C). >",
+      "<Store and transport refrigerated (2\u00a0(C \u2013 8\u00a0(C).>*",
+      "<Store in a freezer {temperature range}.>",
+      "<Store and transport frozen {temperature range}.>**",
+      "<Do not <refrigerate> <or> <freeze>.>",
+      "<Store in the original package in order to protect from <light> <moisture>.>****",
+      "<Keep the {container}*** tightly closed in order to protect from <light> <moisture>.>****",
+      "<Keep the {container}*** in the outer carton in order to protect from <light> <moisture>.>****",
+      "<This medicine does not require any special storage conditions.>",
+      "<This medicine does not require any special temperature storage conditions.>*****",
+      "* The stability data generated at 25\u00a0(C/60%RH (acc) should be taken into account when deciding whether or not transport under refrigeration is necessary. The statement should only be used in exceptional cases.",
+      "** The statement should be used only when critical.",
+      "*** The actual name of the container should be used (e.g. bottle, blister, etc.).",
+      "**** It should be specified if the product is sensitive to light and/or moisture.",
+      "***** Depending on the pharmaceutical form and the properties of the product, there may be a risk of deterioration due to physical changes if subjected to low temperatures. Low temperatures may also have an effect on the packaging in certain cases. An additional statement may be necessary to take account of this possibility."
+    ],
+    "qrd-product-information-template-version-104_en.docx": [
+      "Version 10.4, 02/2024 ",
+      "ANNEX I",
+      "SUMMARY OF PRODUCT CHARACTERISTICS",
+      "\f</This medicinal product is subject to additional monitoring. This will allow quick identification of new safety information. Healthcare professionals are asked to report any suspected adverse reactions. See section 4.8 for how to report adverse reactions.> [For medicinal products subject to additional monitoring ONLY]",
+      "1.\tNAME OF THE MEDICINAL PRODUCT",
+      "{(Invented) name strength pharmaceutical form}",
+      "2.\tQUALITATIVE AND QUANTITATIVE COMPOSITION",
+      "<2.1\tGeneral description> [For advanced therapy products only]",
+      "<2.2\tQualitative and quantitative composition> [For advanced therapy products only]",
+      "<Excipient(s) with known effect>",
+      "<For the full list of excipients, see section 6.1.>",
+      "3.\tPHARMACEUTICAL FORM",
+      "<The score line is only to facilitate breaking for ease of swallowing and not to divide into equal doses.>",
+      "<The score line is not intended for breaking the tablet.>",
+      "<The tablet can be divided into equal doses.>",
+      "4.\tCLINICAL PARTICULARS",
+      "4.1\tTherapeutic indications",
+      "<This medicinal product is for diagnostic use only.>",
+      "<{X} is indicated in <adults> <neonates> <infants> <children> <adolescents> <aged {x to y}> <years> <months>.>",
+      "4.2\tPosology and method of administration",
+      "Posology",
+      "Paediatric population",
+      "<The <safety> <and> <efficacy> of {X} in children aged {x to y} <months> <years> [or any other relevant subsets, e.g. weight, pubertal age, gender] <has> <have> not <yet> been established.> ",
+      "<No data are available.> ",
+      "<Currently available data are described in section <4.8> <5.1> <5.2> but no recommendation on a posology can be made.>",
+      "<{X} should not be used in children aged {x to y} <years> <months> [or any other relevant subsets, e.g. weight, pubertal age, gender] because of <safety> <efficacy> concern(s).> ",
+      "<There is no relevant use of {X} <in the paediatric population> <in children aged {x to y} <years> <months> [or any other relevant subsets, e.g. weight, pubertal age, gender] <for the indication of...>.>",
+      "<{X} is contraindicated in children aged {x to y} <years> <months> [or any other relevant subsets, e.g. weight, pubertal age, gender] <for the indication of...> (see section 4.3).>",
+      "Method of administration ",
+      "<Precautions to be taken before handling or administering the medicinal product>",
+      "<For instructions on <reconstitution> <dilution> of the medicinal product before administration, see section <6.6> <and> <12>.>",
+      "4.3\tContraindications",
+      "<Hypersensitivity to the active substance(s) or to any of the excipients listed in section 6.1 <or {name of the residue(s)}>.>",
+      "4.4\tSpecial warnings and precautions for use",
+      "<Traceability",
+      "In order to improve the traceability of biological medicinal products, the name and the batch number of the administered product should be clearly recorded.>",
+      "<Paediatric population>",
+      "4.5\tInteraction with other medicinal products and other forms of interaction",
+      "<No interaction studies have been performed.>",
+      "<Paediatric population>",
+      "<Interaction studies have only been performed in adults.>",
+      "4.6\tFertility, pregnancy and lactation",
+      "<Pregnancy>",
+      "<Breast-feeding>",
+      "<Fertility>",
+      "4.7\tEffects on ability to drive and use machines",
+      "<{(Invented) name} has <no or negligible influence> <minor influence> <moderate influence> <major influence> on the ability to drive and use machines.> ",
+      "<Not relevant.>",
+      "4.8\tUndesirable effects",
+      "<Paediatric population>",
+      "Reporting of suspected adverse reactions",
+      "Reporting suspected adverse reactions after authorisation of the medicinal product is important. It allows continued monitoring of the benefit/risk balance of the medicinal product. Healthcare professionals are asked to report any suspected adverse reactions via the national reporting system listed in Appendix V.*",
+      "[*For the printed material, please refer to the guidance of the annotated QRD template.]",
+      "4.9\tOverdose",
+      "<Paediatric population>",
+      "5.\tPHARMACOLOGICAL PROPERTIES",
+      "5.1 \tPharmacodynamic properties",
+      "Pharmacotherapeutic group: {group}, ATC code: <{code}> <not yet assigned>",
+      "<{(Invented) name} is a biosimilar medicinal product. Detailed information is available on the website of the European Medicines Agency https://www.ema.europa.eu.>",
+      "<Mechanism of action>",
+      "<Pharmacodynamic effects>",
+      "<Clinical efficacy and safety>",
+      "<Paediatric population>",
+      "<The European Medicines Agency has waived the obligation to submit the results of studies with <{(Invented) name}> [or for generics: <the reference medicinal product containing {name of the active substance(s)}>] in all subsets of the paediatric population in {condition as per paediatric investigation plan (PIP) decision, for the granted indication} (see section 4.2 for information on paediatric use).>",
+      "<The European Medicines Agency has deferred the obligation to submit the results of studies with <{(Invented) name}> [or for generics: <the reference medicinal product containing {name of the active substance(s)}>] in one or more subsets of the paediatric population in {condition, as per paediatric investigation plan (PIP) decision, for the granted indication} (see section 4.2 for information on paediatric use).>",
+      "<This medicinal product has been authorised under a so-called \u2018conditional approval\u2019 scheme. This means that further evidence on this medicinal product is awaited.",
+      "The European Medicines Agency will review new information on this medicinal product at least every year and this SmPC will be updated as necessary.>",
+      "<This medicinal product has been authorised under \u2018exceptional circumstances\u2019. This means that <due to the rarity of the disease> <for scientific reasons> <for ethical reasons> it has not been possible to obtain complete information on this medicinal product.",
+      "The European Medicines Agency will review any new information which may become available every year and this SmPC will be updated as necessary.>",
+      "<The reference medicinal product containing {active substance} has been authorised under \u2018exceptional circumstances\u2019. This means that <due to the rarity of the disease><for scientific reasons><for ethical reasons> it has not been possible to obtain complete information on the reference medicinal product. The European Medicines Agency will review any new information which may become available every year and this SmPC will be updated as necessary accordingly to the reference medicinal product SmPC.>",
+      "5.2\tPharmacokinetic properties",
+      "<Absorption>",
+      "<Distribution>",
+      "<Biotransformation>",
+      "<Elimination>",
+      "<Linearity/non-linearity>",
+      "<Pharmacokinetic/pharmacodynamic relationship(s)>",
+      "5.3\tPreclinical safety data",
+      "<Non-clinical data reveal no special hazard for humans based on conventional studies of safety pharmacology, repeated dose toxicity, genotoxicity, carcinogenic potential, toxicity to reproduction and development.>",
+      "<Effects in non-clinical studies were observed only at exposures considered sufficiently in excess of the maximum human exposure indicating little relevance to clinical use.>",
+      "<Adverse reactions not observed in clinical studies, but seen in animals at exposure levels similar to clinical exposure levels and with possible relevance to clinical use were as follows:>",
+      "<Environmental risk assessment (ERA)>",
+      "6.\tPHARMACEUTICAL PARTICULARS",
+      "6.1\tList of excipients",
+      "<None.>",
+      "6.2\tIncompatibilities",
+      "<Not applicable.> ",
+      "<In the absence of compatibility studies, this medicinal product must not be mixed with other medicinal products.> ",
+      "<This medicinal product must not be mixed with other medicinal products except those mentioned in section <6.6> <and> <12>.>",
+      "6.3\tShelf life",
+      "<...> <6 months> <...> <1 year> <18 months> <2 years> <30 months> <3 years> <...>",
+      "6.4\tSpecial precautions for storage",
+      "<For storage conditions after <reconstitution> <dilution> <first opening> of the medicinal product, see section 6.3.>",
+      "6.5\tNature and contents of container <and special equipment for use, administration or implantation>",
+      "<Not all pack sizes may be marketed.>",
+      "6.6\tSpecial precautions for disposal <and other handling>",
+      "<Use in the paediatric population>",
+      "<No special requirements <for disposal>.>",
+      "<Any unused medicinal product or waste material should be disposed of in accordance with local requirements.> ",
+      "7.\tMARKETING AUTHORISATION HOLDER",
+      "{Name and address}",
+      "<{tel}>",
+      "<{fax}>",
+      "<{e-mail}>",
+      "8.\tMARKETING AUTHORISATION NUMBER(S) ",
+      "9.\tDATE OF FIRST AUTHORISATION/RENEWAL OF THE AUTHORISATION",
+      "<Date of first authorisation: {DD month YYYY}>",
+      "<Date of latest renewal: {DD month YYYY}>",
+      "10.\tDATE OF REVISION OF THE TEXT",
+      "<{MM/YYYY}>",
+      "<{DD/MM/YYYY}>",
+      "<{DD month YYYY}>",
+      "<11.\tDOSIMETRY>",
+      "<12.\tINSTRUCTIONS FOR PREPARATION OF RADIOPHARMACEUTICALS>",
+      "<Any unused medicinal product or waste material should be disposed of in accordance with local requirements.>",
+      "Detailed information on this medicinal product is available on the website of the European Medicines Agency https://www.ema.europa.eu<, and on the website of {name of MS Agency (link)}>.",
+      "\f",
+      "ANNEX II",
+      "A.\t<MANUFACTURER(S) OF THE BIOLOGICAL ACTIVE SUBSTANCE(S) AND> MANUFACTURER(S) RESPONSIBLE FOR BATCH RELEASE",
+      "B.\tCONDITIONS OR RESTRICTIONS REGARDING SUPPLY AND USE",
+      "C.\tOTHER CONDITIONS AND REQUIREMENTS OF THE MARKETING AUTHORISATION",
+      "D.\tCONDITIONS OR RESTRICTIONS WITH REGARD TO THE SAFE AND EFFECTIVE USE OF THE MEDICINAL PRODUCT",
+      "<E.\tSPECIFIC OBLIGATION TO COMPLETE POST-AUTHORISATION MEASURES FOR <THE CONDITIONAL MARKETING AUTHORISATION> <THE MARKETING AUTHORISATION UNDER EXCEPTIONAL CIRCUMSTANCES>>",
+      "\fA.\t<MANUFACTURER(S) OF THE BIOLOGICAL ACTIVE SUBSTANCE(S) AND> MANUFACTURER(S) RESPONSIBLE FOR BATCH RELEASE",
+      "<Name and address of the manufacturer(s) of the biological active substance(s)",
+      "{Name and address}>",
+      "Name and address of the manufacturer(s) responsible for batch release",
+      "{Name and address}",
+      "<The printed package leaflet of the medicinal product must state the name and address of the manufacturer responsible for the release of the concerned batch.>",
+      "B.\tCONDITIONS OR RESTRICTIONS REGARDING SUPPLY AND USE ",
+      "<Medicinal product subject to medical prescription.>",
+      "<Medicinal product not subject to medical prescription.>",
+      "<Medicinal product subject to special medical prescription.>",
+      "<Medicinal product subject to restricted medical prescription (see Annex I: Summary of Product Characteristics, section 4.2).>",
+      "<Medicinal product subject to special and restricted medical prescription (see Annex I: Summary of Product Characteristics, section 4.2).>",
+      "<Official batch release",
+      "In accordance with Article 114 of Directive 2001/83/EC, the official batch release will be undertaken by a state laboratory or a laboratory designated for that purpose.>",
+      "C. \tOTHER CONDITIONS AND REQUIREMENTS OF THE MARKETING AUTHORISATION",
+      "Periodic safety update reports (PSURs)",
+      "<The requirements for submission of PSURs for this medicinal product are set out in Article 9 of Regulation (EC) No 507/2006 and, accordingly, the marketing authorisation holder (MAH) shall submit PSURs every 6 months.>",
+      "<The requirements for submission of PSURs for this medicinal product are set out in the list of Union reference dates (EURD list) provided for under Article 107c(7) of Directive 2001/83/EC and any subsequent updates published on the European medicines web-portal.>",
+      "<The marketing authorisation holder (MAH) shall submit the first PSUR for this product within 6\u00a0months following authorisation.> ",
+      "D.\tCONDITIONS OR RESTRICTIONS WITH REGARD TO THE SAFE AND EFFECTIVE USE OF THE MEDICINAL PRODUCT  ",
+      "Risk management plan (RMP)",
+      "The marketing authorisation holder (MAH) shall perform the required pharmacovigilance activities and interventions detailed in the agreed RMP presented in Module 1.8.2 of the marketing authorisation and any agreed subsequent updates of the RMP.",
+      "An updated RMP should be submitted:",
+      "At the request of the European Medicines Agency;",
+      "Whenever the risk management system is modified, especially as the result of new information being received that may lead to a significant change to the benefit/risk profile or as the result of an important (pharmacovigilance or risk minimisation) milestone being reached.",
+      "<An updated RMP shall be submitted by {CHMP agreed deadline}.>",
+      "<Additional risk minimisation measures> ",
+      "<Obligation to conduct post-authorisation measures ",
+      "The MAH shall complete, within the stated timeframe, the below measures:",
+      "Description",
+      "Due date",
+      "<Post\u001eauthorisation efficacy study (PAES):>",
+      "<Non-interventional post-authorisation safety study (PASS):>>",
+      "<E.\tSPECIFIC OBLIGATION TO COMPLETE POST-AUTHORISATION MEASURES FOR <THE CONDITIONAL MARKETING AUTHORISATION> <THE MARKETING AUTHORISATION UNDER EXCEPTIONAL CIRCUMSTANCES>",
+      "<This being a conditional marketing authorisation and pursuant to Article 14-a of Regulation (EC) No\u00a0726/2004, the MAH shall complete, within the stated timeframe, the following measures:>",
+      "<This being an approval under exceptional circumstances and pursuant to Article 14(8) of Regulation (EC) No\u00a0726/2004, the MAH shall conduct, within the stated timeframe, the following measures:>",
+      "Description",
+      "Due date",
+      "<Non-interventional post-authorisation safety study (PASS):>>",
+      "\f",
+      "ANNEX III",
+      "LABELLING AND PACKAGE LEAFLET",
+      "\f",
+      "A. LABELLING",
+      "\f",
+      "PARTICULARS TO APPEAR ON <THE OUTER PACKAGING> <AND> <THE IMMEDIATE PACKAGING>",
+      "{NATURE/TYPE}",
+      "1.\tNAME OF THE MEDICINAL PRODUCT",
+      "{(Invented) name strength pharmaceutical form} ",
+      "{active substance(s)} ",
+      "2.\tSTATEMENT OF ACTIVE SUBSTANCE(S)",
+      "<This product contains cells of <human> <animal> origin.>",
+      "3.\tLIST OF EXCIPIENTS",
+      "4.\tPHARMACEUTICAL FORM AND CONTENTS",
+      "5.\tMETHOD AND ROUTE(S) OF ADMINISTRATION",
+      "Read the package leaflet before use.",
+      "6.\tSPECIAL WARNING THAT THE MEDICINAL PRODUCT MUST BE STORED OUT OF THE SIGHT AND REACH OF CHILDREN",
+      "Keep out of the sight and reach of children.",
+      "7.\tOTHER SPECIAL WARNING(S), IF NECESSARY",
+      "<For autologous use only.>",
+      "8.\tEXPIRY DATE",
+      "9.\tSPECIAL STORAGE CONDITIONS",
+      "10.\tSPECIAL PRECAUTIONS FOR DISPOSAL OF UNUSED MEDICINAL PRODUCTS OR WASTE MATERIALS DERIVED FROM SUCH MEDICINAL PRODUCTS, IF APPROPRIATE",
+      "11.\tNAME AND ADDRESS OF THE MARKETING AUTHORISATION HOLDER",
+      "{Name and address}",
+      "<{tel}>",
+      "<{fax}>",
+      "<{e-mail}> ",
+      "12.\tMARKETING AUTHORISATION NUMBER(S) ",
+      "EU/0/00/000/000 ",
+      "13.\tBATCH NUMBER<, DONATION AND PRODUCT CODES>",
+      "14.\tGENERAL CLASSIFICATION FOR SUPPLY",
+      "15.\tINSTRUCTIONS ON USE",
+      "16.\tINFORMATION IN BRAILLE",
+      "<Justification for not including Braille accepted.>",
+      "17.\tUNIQUE IDENTIFIER \u2013 2D BARCODE",
+      "<2D barcode carrying the unique identifier included.>",
+      "<Not applicable.> ",
+      "18.\tUNIQUE IDENTIFIER - HUMAN READABLE DATA",
+      "< PC {number} [product code]",
+      "SN {number} [serial number]",
+      "NN {number} [national reimbursement number or other national number identifying the medicinal product]>",
+      "<Not applicable.>",
+      "\f",
+      "MINIMUM PARTICULARS TO APPEAR ON BLISTERS OR STRIPS",
+      "{NATURE/TYPE} ",
+      "1.\tNAME OF THE MEDICINAL PRODUCT",
+      "{(Invented) name strength pharmaceutical form}",
+      "{active substance(s)}",
+      "2.\tNAME OF THE MARKETING AUTHORISATION HOLDER",
+      "{Name}",
+      "3.\tEXPIRY DATE",
+      "4.\tBATCH NUMBER<, DONATION AND PRODUCT CODES>",
+      "5.\tOTHER",
+      "<For autologous use only.>",
+      "\fMINIMUM PARTICULARS TO APPEAR ON SMALL IMMEDIATE PACKAGING UNITS",
+      "{NATURE/TYPE} ",
+      "1.\tNAME OF THE MEDICINAL PRODUCT AND ROUTE(S) OF ADMINISTRATION",
+      "{(Invented) name strength pharmaceutical form}",
+      "{active substance(s)}",
+      "{Route of administration}",
+      "2.\tMETHOD OF ADMINISTRATION",
+      "3.\tEXPIRY DATE",
+      "4.\tBATCH NUMBER<, DONATION AND PRODUCT CODES>",
+      "5.\tCONTENTS BY WEIGHT, BY VOLUME OR BY UNIT",
+      "6.\tOTHER",
+      "<For autologous use only.>",
+      "\f",
+      "B. PACKAGE LEAFLET",
+      "\fPackage leaflet: Information for the <patient> <user>",
+      "{(Invented) name strength pharmaceutical form}",
+      "{active substance(s)}",
+      "</This medicine is subject to additional monitoring. This will allow quick identification of new safety information. You can help by reporting any side effects you may get. See the end of section 4 for how to report side effects.> [For medicinal products subject to additional monitoring ONLY]",
+      "<Read all of this leaflet carefully before you start <taking> <using> this medicine because it contains important information for you.",
+      "Keep this leaflet. You may need to read it again. ",
+      "If you have any further questions, ask your <doctor> <,> <or> <pharmacist> <or nurse>.",
+      "<-\tThis medicine has been prescribed for you only. Do not pass it on to others. It may harm them, even if their signs of illness are the same as yours.> ",
+      "If you get any side effects, talk to your <doctor> <,> <or> <pharmacist> <or nurse>. This includes any possible side effects not listed in this leaflet. See section 4.>",
+      "<Read all of this leaflet carefully before you start <taking> <using> this medicine because it contains important information for you.",
+      "Always <take> <use> this medicine exactly as described in this leaflet or as your <doctor> <,> <or> <pharmacist> <or nurse> <has> <have> told you. ",
+      "Keep this leaflet. You may need to read it again. ",
+      "Ask your pharmacist if you need more information or advice.",
+      "If you get any side effects, talk to your <doctor> <,> <or> <pharmacist> <or nurse>. This includes any possible side effects not listed in this leaflet. See section 4.",
+      "You must talk to a doctor if you do not feel better or if you feel worse <after {number of} days>.>",
+      "What is in this leaflet",
+      "1.\tWhat X is and what it is used for ",
+      "2.\tWhat you need to know before you <take> <use> X ",
+      "3.\tHow to <take> <use> X ",
+      "4.\tPossible side effects ",
+      "5.\tHow to store X ",
+      "6.\tContents of the pack and other information",
+      "1.\tWhat X is and what it is used for",
+      "<You must talk to a doctor if you do not feel better or if you feel worse <after {number of} days>.>",
+      "2.\tWhat you need to know before you <take> <use> X ",
+      "Do not <take> <use> X",
+      "-\t<if you are allergic to {active substance(s)} or any of the other ingredients of this medicine (listed in section 6).> ",
+      "Warnings and precautions ",
+      "Talk to your doctor <or> <,> <pharmacist> <or nurse> before <taking> <using> X",
+      "Children <and adolescents>",
+      "\fOther medicines and X",
+      "<Tell your <doctor> <or> <pharmacist> if you are <taking> <using>, have recently <taken> <used> or might <take> <use> any other medicines.>",
+      "X with <food> <and> <,> <drink> <and> <alcohol>",
+      "Pregnancy <and> <,> breast-feeding <and fertility>",
+      "<If you are pregnant or breast-feeding, think you may be pregnant or are planning to have a baby, ask your <doctor> <or> <pharmacist> for advice before taking this medicine.>",
+      "Driving and using machines",
+      "<X contains {name the excipient(s)}>",
+      "3.\tHow to <take> <use> X",
+      "<Always <take> <use> this medicine exactly as your doctor <or pharmacist> has told you. Check with your <doctor> <or> <pharmacist> if you are not sure.> ",
+      "<The recommended dose is...>",
+      "<Always <take> <use> this medicine exactly as described in this leaflet or as your <doctor> <,> <or> <pharmacist> <or nurse> <has> <have> told you. Check with your <doctor> <or> <,> <pharmacist> <or nurse> if you are not sure.> ",
+      "<The recommended dose is...> ",
+      "<Use in children <and adolescents>>",
+      "<The score line is only there to help you break the tablet if you have difficulty swallowing it whole.>",
+      "<The tablet can be divided into equal doses.>",
+      "<The score line is not intended for breaking the tablet.>",
+      "<If you <take> <use> more X than you should>",
+      "<If you forget to <take> <use> X>",
+      "<Do not take a double dose to make up for a forgotten <tablet> <dose> <\u2026>.>",
+      "<If you stop <taking> <using> X>",
+      "<If you have any further questions on the use of this medicine, ask your <doctor> <,> <or> <pharmacist> <or nurse>.>",
+      "4.\tPossible side effects",
+      "Like all medicines, this medicine can cause side effects, although not everybody gets them.",
+      "<Additional side effects in children <and adolescents>>",
+      "Reporting of side effects",
+      "If you get any side effects, talk to your <doctor> <or> <,> <pharmacist> <or nurse>. This includes any possible side effects not listed in this leaflet. You can also report side effects directly via the national reporting system listed in Appendix V.* By reporting side effects you can help provide more information on the safety of this medicine.",
+      "[*For the printed material, please refer to the guidance of the annotated QRD template.]",
+      "5.\tHow to store X",
+      "Keep this medicine out of the sight and reach of children.",
+      "Do not use this medicine after the expiry date which is stated on the <label> <carton> <bottle> <\u2026> <after {abbreviation used for expiry date}.> <The expiry date refers to the last day of that month.>",
+      "<Do not use this medicine if you notice {description of the visible signs of deterioration}.>",
+      "<Do not throw away any medicines via wastewater <or household waste>. Ask your pharmacist how to throw away medicines you no longer use. These measures will help protect the environment.>",
+      "6.\tContents of the pack and other information",
+      "What X contains ",
+      "The active substance(s) is (are)\u2026 ",
+      "The other <ingredient(s)> <(excipient(s))> is (are)... ",
+      "What X looks like and contents of the pack",
+      "Marketing Authorisation Holder and Manufacturer",
+      "{Name and address}",
+      "<{tel}>",
+      "<{fax}>",
+      "<{e-mail}>",
+      "<For any information about this medicine, please contact the local representative of the Marketing Authorisation Holder:",
+      "Belgi\u00eb/Belgique/Belgien",
+      "{Nom/Naam/Name}",
+      "<{Adresse/Adres/Anschrift }",
+      "B-0000 {Localit\u00e9/Stad/Stadt}>",
+      "T\u00e9l/Tel: +{N\u00b0 de t\u00e9l\u00e9phone/Telefoonnummer/",
+      "Telefonnummer}",
+      "<{e-mail}>",
+      "Lietuva",
+      "{pavadinimas}",
+      "<{adresas}",
+      "LT {pa\u0161to indeksas} {miestas}>",
+      "Tel: + {telefono numeris}",
+      "<{e-mail}>",
+      "\u0411\u044a\u043b\u0433\u0430\u0440\u0438\u044f",
+      "{\u0418\u043c\u0435}",
+      "<{\u0410\u0434\u0440\u0435\u0441}",
+      "{\u0413\u0440\u0430\u0434} {\u041f\u043e\u0449\u0435\u043d\u0441\u043a\u0438 \u043a\u043e\u0434}>",
+      "Te\u043b.: +{\u0422\u0435\u043b\u0435\u0444\u043e\u043d\u0435\u043d \u043d\u043e\u043c\u0435\u0440}",
+      "<{e-mail}>",
+      "Luxembourg/Luxemburg",
+      "{Nom}",
+      "<{Adresse}",
+      "L-0000 {Localit\u00e9/Stadt}>",
+      "T\u00e9l/Tel: +{N\u00b0 de t\u00e9l\u00e9phone/Telefonnummer}",
+      "<{e-mail}>",
+      "\u010cesk\u00e1 republika",
+      "(N\u00e1zev(",
+      "<(Adresa(",
+      "CZ (m\u011bsto(>",
+      "Tel: +(telefonn\u00ed \u010d\u00edslo(",
+      "<{e-mail}>",
+      "Magyarorsz\u00e1g",
+      "{N\u00e9v}",
+      "<{C\u00edm}",
+      "H-0000 {V\u00e1ros}>",
+      "Tel.: +{Telefonsz\u00e1m}",
+      "<{e-mail}>",
+      "Danmark",
+      "{Navn}",
+      "<{Adresse}",
+      "DK-0000 {by}>",
+      "Tlf.: +{Telefonnummer}",
+      "<{e-mail}>",
+      "Malta",
+      "{Isem}",
+      "<{Indirizz}",
+      "MT-0000 {Belt/Ra\u0127al}>",
+      "Tel: +{Numru tat-telefon}",
+      "<{e-mail}>",
+      "Deutschland",
+      "{Name}",
+      "<{Anschrift}",
+      "D-00000 {Stadt}>",
+      "Tel: +{Telefonnummer}",
+      "<{e-mail}>",
+      "Nederland",
+      "{Naam}",
+      "<{Adres}",
+      "NL-0000 XX {stad}>",
+      "Tel: +{Telefoonnummer}",
+      "<{e-mail}>",
+      "Eesti",
+      "{Nimi}",
+      "<{Aadress}",
+      "EE - {Postiindeks} {Linn}>",
+      "Tel: +{Telefoninumber}",
+      "<{e-mail}>",
+      "Norge",
+      "{Navn}",
+      "<{Adresse}",
+      "N-0000 {poststed}>",
+      "Tlf: +{Telefonnummer}",
+      "<{e-mail}>",
+      "\u0395\u03bb\u03bb\u03ac\u03b4\u03b1",
+      "{\u038c\u03bd\u03bf\u03bc\u03b1}",
+      "<{\u0394\u03b9\u03b5\u03cd\u03b8\u03c5\u03bd\u03c3\u03b7}",
+      "GR-000\u00a000 {\u03c0\u03cc\u03bb\u03b7}>",
+      "\u03a4\u03b7\u03bb: +{\u0391\u03c1\u03b9\u03b8\u03bc\u03cc\u03c2 \u03c4\u03b7\u03bb\u03b5\u03c6\u03ce\u03bd\u03bf\u03c5}",
+      "<{e-mail}>",
+      "\u00d6sterreich",
+      "{Name}",
+      "<{Anschrift}",
+      "A-0000 {Stadt}>",
+      "Tel: +{Telefonnummer}",
+      "<{e-mail}>",
+      "Espa\u00f1a",
+      "{Nombre}",
+      "<{Direcci\u00f3n}",
+      "E-00000 {Ciudad}>",
+      "Tel: +{Tel\u00e9fono}",
+      "<{e-mail}>",
+      "Polska",
+      "{Nazwa/ Nazwisko}",
+      "<{Adres:",
+      "PL-00 000{Miasto}>",
+      "Tel.: +{Numer telefonu}",
+      "<{e-mail}>",
+      "France",
+      "{Nom}",
+      "<{Adresse}",
+      "F-00000 {Localit\u00e9}>",
+      "T\u00e9l: +{Num\u00e9ro de t\u00e9l\u00e9phone}",
+      "<{e-mail}>",
+      "Portugal",
+      "{Nome}",
+      "<{Morada}",
+      "P-0000(000 {Cidade}>",
+      "Tel: +{N\u00famero de telefone}",
+      "<{e-mail}>",
+      "\fHrvatska",
+      "{Ime}",
+      "<{Adresa}",
+      "{Po\u0161tanski broj} {grad}>",
+      "Tel: +{Telefonski broj}",
+      "<{e-mail}>",
+      "Ireland",
+      "{Name}",
+      "<{Address}",
+      "IRL - {Town} {Code for Dublin}>",
+      "Tel: +{Telephone number}",
+      "<{e-mail}>",
+      "Rom\u00e2nia",
+      "{Nume}",
+      "<{Adres\u0103}",
+      "{Ora\u015f} {Cod po\u015ftal} \u2013 RO>",
+      "Tel: +{Num\u0103r de telefon}",
+      "<{e-mail}>",
+      "Slovenija",
+      "{Ime}",
+      "<{Naslov}",
+      "SI-0000 {Mesto}>",
+      "Tel: +{telefonska \u0161tevilka}",
+      "<{e-mail}>",
+      "\u00cdsland",
+      "{Nafn}",
+      "<{Heimilisfang}",
+      "IS-000 {Borg/B\u00e6r}>",
+      "S\u00edmi: +{S\u00edman\u00famer}",
+      "<{Netfang }>",
+      "Slovensk\u00e1 republika",
+      "{N\u00e1zov}",
+      "<{Adresa}",
+      "SK-000 00 {Mesto}>",
+      "Tel: +{Telef\u00f3nne \u010d\u00edslo}",
+      "<{e-mail}>",
+      "Italia",
+      "{Nome}",
+      "<{Indirizzo}",
+      "I-00000 {Localit\u00e0}>",
+      "Tel: +{Numero di telefono}",
+      "<{e-mail}>",
+      "Suomi/Finland",
+      "{Nimi/Namn}",
+      "<{Osoite/Adress}",
+      "FIN-00000 {Postitoimipaikka/Stad}>",
+      "Puh/Tel: +{Puhelinnumero/Telefonnummer}",
+      "<{e-mail}>",
+      "\u039a\u03cd\u03c0\u03c1\u03bf\u03c2",
+      "{\u038c\u03bd\u03bf\u03bc\u03b1}",
+      "<{\u0394\u03b9\u03b5\u03cd\u03b8\u03c5\u03bd\u03c3\u03b7}",
+      "CY-000\u00a000 {\u03c0\u03cc\u03bb\u03b7}>",
+      "\u03a4\u03b7\u03bb: +{\u0391\u03c1\u03b9\u03b8\u03bc\u03cc\u03c2 \u03c4\u03b7\u03bb\u03b5\u03c6\u03ce\u03bd\u03bf\u03c5}",
+      "<{e-mail}>",
+      "Sverige",
+      "{Namn}",
+      "<{Adress}",
+      "S-000\u00a000 {Stad}>",
+      "Tel: +{Telefonnummer}",
+      "<{e-mail}>>",
+      "Latvija",
+      "{Nosaukums}",
+      "<{Adrese}",
+      "{Pils\u0113ta}, LV{pasta indekss }>",
+      "Tel: +{telefona numurs}",
+      "<{e-mail}>",
+      "This leaflet was last revised in <{MM/YYYY}><{month YYYY}>.",
+      "<This medicine has been given \u2018conditional approval\u2019. This means that there is more evidence to come about this medicine.",
+      "The European Medicines Agency will review new information on this medicine at least every year and this leaflet will be updated as necessary.>",
+      "<This medicine has been authorised under \u2018exceptional circumstances\u2019. This means that <because of the rarity of this disease> <for scientific reasons> <for ethical reasons> it has been impossible to get complete information on this medicine.",
+      "The European Medicines Agency will review any new information on this medicine every year and this leaflet will be updated as necessary.>",
+      "<X contains the same active substance and works in the same way as a \u2018reference medicine\u2019 already authorised in the EU. The reference medicine for X has been authorised under \u2018exceptional circumstances\u2019. This means that <because of the rarity of this disease><due to scientific reasons> <due to ethical reasons> it has been impossible to get complete information on the reference medicine. The European Medicines Agency will review any new information on the reference medicine every year and any updates for the reference medicine will also be included as appropriate in the information for X, such as this leaflet.>",
+      "<Other sources of information>",
+      "Detailed information on this medicine is available on the European Medicines Agency web site: https://www.ema.europa.eu<, and on the website of {name of Member State Agency (link)}>. <There are also links to other websites about rare diseases and treatments.> ",
+      "<This leaflet is available in all EU/EEA languages on the European Medicines Agency website.> ",
+      "<------------------------------------------------------------------------------------------------------------------------>",
+      "<The following information is intended for healthcare professionals only:>"
+    ]
+  },
+  "verifier": "word-verifier/1.0.4"
+}

@@ -1,0 +1,8 @@
+# What `gcloud builds submit` (scripts/gcp/deploy.sh, phase_images) leaves out of the source it
+# uploads to Cloud Build. Without this file gcloud ignores .git, .gitignore and what .gitignore
+# names; those three lines keep that, and the label reader, which no image builds from, is added.
+.gcloudignore
+.git
+.gitignore
+#!include:.gitignore
+label-docx-reader/

@@ -80,6 +80,17 @@ updates:
       zone-a:
         patterns: ["*"]
 
+  - package-ecosystem: uv
+    directory: /label-docx-reader
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      label-docx-reader:
+        patterns: ["*"]
+
   - package-ecosystem: docker
     directory: /
     schedule:

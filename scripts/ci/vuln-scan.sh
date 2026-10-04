@@ -6,7 +6,7 @@
 # rare. This scan is the development one: free, cloud-agnostic, and it runs before merge.
 #
 # Four parts, with different verdicts:
-#   - the lockfiles (npm, and uv for the agent and Zone A): any known vulnerability FAILS. They
+#   - the lockfiles (npm, and uv for the agent, Zone A and the label reader): any known vulnerability FAILS. They
 #     have none today, and a fix for a library is a lockfile bump away.
 #   - the pinned base images the Dockerfiles build on: REPORTED, never failing. Operating-system
 #     advisories in a Debian or Ubuntu base mostly have no fixed package yet, and the fix when
@@ -78,7 +78,7 @@ fi
 
 # 1. Lockfiles: the verdict.
 # VULN_LOCKFILES overrides the list, so the verdict itself can be proved on a known-bad lockfile.
-read -r -a lockfiles <<<"${VULN_LOCKFILES:-$ROOT/package-lock.json $ROOT/agent/uv.lock $ROOT/zone-a/uv.lock}"
+read -r -a lockfiles <<<"${VULN_LOCKFILES:-$ROOT/package-lock.json $ROOT/agent/uv.lock $ROOT/zone-a/uv.lock $ROOT/label-docx-reader/uv.lock}"
 lock_args=()
 for lockfile in "${lockfiles[@]}"; do lock_args+=(-L "$lockfile"); done
 "$WORK/osv-scanner" scan source --config "$config" --format json "${lock_args[@]}" \
@@ -88,7 +88,7 @@ if ! python3 -c "import json,sys;json.load(open(sys.argv[1]))" "$WORK/locks.json
   echo "The lockfile scan did not produce a result." >&2
   exit 1
 fi
-lock_findings="$(summarise "$WORK/locks.json" "Lockfiles (npm, agent, Zone A)" 3>&1 1>>"$REPORT")"
+lock_findings="$(summarise "$WORK/locks.json" "Lockfiles (npm, agent, Zone A, label reader)" 3>&1 1>>"$REPORT")"
 
 # 2. Base images: reported only. Every FROM of every Dockerfile, the runtime bases included.
 if [[ "${OSV_SKIP_IMAGES:-false}" != "true" ]] && command -v docker >/dev/null 2>&1; then

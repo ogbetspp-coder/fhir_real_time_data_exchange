@@ -121,8 +121,10 @@ describe("the plan workflow's Dependabot scope", () => {
       "package-lock.json",
       "agent/uv.lock",
       "zone-a/pyproject.toml",
+      "label-docx-reader/uv.lock",
       "Dockerfile.validator",
       ".github/workflows/ci.yml",
+      ".github/workflows/label-docx-reader.yml",
     ]);
     expect(scope(repository, "dependabot[bot]")).toMatchObject({ status: 0, plan: "false" });
   });

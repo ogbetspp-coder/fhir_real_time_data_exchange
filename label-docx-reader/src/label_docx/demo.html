@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Label Reader</title>
+<style>
+  :root {
+    --ink: #1c2430; --muted: #5b6676; --line: #dfe4ea; --page: #f6f8fa; --card: #ffffff;
+    --accent: #1f5fae; --ok: #1e7a46; --ok-bg: #e8f5ee; --stop: #a12a2a; --stop-bg: #fbecec;
+    --mark: #fff4c2; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #e6ebf1; --muted: #9aa6b5; --line: #2c3540; --page: #12171d; --card: #1a2129;
+      --accent: #6aa6ef; --ok: #5fd193; --ok-bg: #16301f; --stop: #f08a8a; --stop-bg: #3a1c1c;
+      --mark: #4a4220;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink);
+         font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  header { padding: 28px 16px 8px; max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--muted); }
+  main { max-width: 980px; margin: 0 auto; padding: 16px; }
+  .drop { display: block; border: 2px dashed var(--line); border-radius: 12px; background: var(--card);
+          padding: 28px 16px; text-align: center; cursor: pointer; transition: border-color .15s; }
+  .drop.over, .drop:hover { border-color: var(--accent); }
+  .drop strong { color: var(--accent); }
+  .drop small { display: block; color: var(--muted); margin-top: 6px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+          padding: 18px 20px; margin-top: 16px; }
+  .verdict { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .badge { font-weight: 600; padding: 4px 10px; border-radius: 999px; font-size: 13px; }
+  .badge.read { color: var(--ok); background: var(--ok-bg); }
+  .badge.refused { color: var(--stop); background: var(--stop-bg); }
+  .badge.part { color: var(--stop); background: var(--mark); }
+  .section h3 { font-size: 15px; margin: 18px 0 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .section .section h3 { font-size: 14px; border-top: 0; padding-top: 0; }
+  .section .refusal { margin: 4px 0 12px; }
+  .proof { background: var(--ok-bg); color: var(--ink); border-radius: 8px; padding: 12px 14px; margin-top: 12px; font-size: 13px; }
+  .proof strong { color: var(--ok); }
+  .proof .sum { font-family: var(--mono); margin: 6px 0; overflow-wrap: anywhere; }
+  .proof ul { margin: 6px 0 0; padding-left: 18px; }
+  .facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 12px 0 0;
+           font-size: 13px; }
+  .facts dt { color: var(--muted); }
+  .facts dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
+  .again { font-size: 13px; color: var(--muted); margin-top: 10px; }
+  .again.same { color: var(--ok); }
+  .refusal { background: var(--stop-bg); color: var(--stop); border-radius: 8px; padding: 12px 14px;
+             margin-top: 12px; }
+  .refusal code { font-family: var(--mono); font-weight: 600; }
+  .tracked { background: var(--mark); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+  .switch { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  .switch button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--card); color: var(--ink); cursor: pointer; }
+  .switch button[aria-selected="true"] { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .changes { border-collapse: collapse; font-size: 13px; margin: 8px 0; }
+  .changes th, .changes td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; }
+  h4.view { margin: 14px 0 0; font-size: 14px; }
+  .doc p { margin: 0 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .doc .label { color: var(--accent); font-weight: 600; margin-right: 6px; white-space: pre; }
+  .doc .hidden-mark::after { content: "¶"; color: var(--muted); font-size: 11px; }
+  .doc table { border-collapse: collapse; width: 100%; margin: 4px 0 12px; font-size: 14px; }
+  .doc td { border: 1px solid var(--line); padding: 6px 8px; vertical-align: top; }
+  .doc td p { margin: 0 0 4px; }
+  .note { color: var(--accent); font-size: 11px; vertical-align: super; font-weight: 600; }
+  .page { font-family: var(--mono); font-size: 11px; color: var(--muted); border: 1px dashed var(--line);
+          border-radius: 4px; padding: 0 4px; margin-left: 2px; }
+  .m-bold { font-weight: 700; } .m-italic { font-style: italic; }
+  .m-underline { text-decoration: underline; } .m-strike, .m-dstrike { text-decoration: line-through; }
+  .m-superscript { vertical-align: super; font-size: 0.75em; }
+  .m-subscript { vertical-align: sub; font-size: 0.75em; }
+  .m-caps { text-transform: uppercase; } .m-smallCaps { font-variant: small-caps; }
+  .m-highlight, .m-shading { background: var(--mark); }
+  .m-faint { outline: 1px dotted var(--stop); }
+  .notes h3 { font-size: 14px; margin: 16px 0 6px; color: var(--muted); }
+  details { margin-top: 12px; } summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  pre { font-family: var(--mono); font-size: 12px; background: var(--page); padding: 12px;
+        border-radius: 8px; overflow: auto; max-height: 360px; }
+  .legend { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .legend span { margin-right: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Label Reader</h1>
+  <p>Exact text from a Word SmPC or Module 3 document, or an EMA ePI, or a refusal with the reason.
+     The same file always gets the same answer, byte for byte.</p>
+</header>
+<main>
+  <label class="drop" id="drop">
+    <input type="file" id="file" accept=".docx,.json" hidden>
+    <strong>Choose a .docx or an ePI (.json)</strong> or drop it here
+    <small>Read on this machine by the local service; nothing leaves it.</small>
+  </label>
+  <section id="out"></section>
+</main>
+<script>
+"use strict";
+const out = document.getElementById("out");
+const drop = document.getElementById("drop");
+const input = document.getElementById("file");
+const receipts = new Map();
+
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key === "class") node.className = value; else node.setAttribute(key, value);
+  }
+  for (const child of children) node.append(child);
+  return node;
+}
+
+// The paragraph's text with its marks, note marks and page-number places, as elements.
+function render(paragraph) {
+  const text = Array.from(paragraph.text);  // marks count code points
+  const cuts = new Set([0, text.length]);
+  for (const m of paragraph.marks) { cuts.add(m.start); cuts.add(m.end); }
+  for (const n of paragraph.notes) cuts.add(n.offset);
+  for (const p of paragraph.pages) cuts.add(p);
+  for (const c of paragraph.comments || []) cuts.add(c.offset);
+  const points = [...cuts].sort((a, b) => a - b);
+  const node = el("p");
+  if (paragraph.numbering && paragraph.numbering.text !== null && paragraph.numbering.numId) {
+    node.append(el("span", { class: "label" }, paragraph.numbering.text));
+  }
+  for (let i = 0; i < points.length; i++) {
+    const at = points[i];
+    for (const n of paragraph.notes) {
+      if (n.offset === at && n.mark !== null) node.append(el("span", { class: "note", title: `${n.kind} ${n.id}` }, n.mark));
+    }
+    for (const c of paragraph.comments || []) {
+      if (c.offset === at) node.append(el("span", { class: "note comment", title: `comment ${c.id}` }, `c${c.id}`));
+    }
+    for (const p of paragraph.pages) {
+      if (p === at) node.append(el("span", { class: "page", title: "Word sets this page number from the layout" }, "page #"));
+    }
+    if (i + 1 >= points.length) break;
+    const piece = text.slice(at, points[i + 1]).join("");
+    if (!piece) continue;
+    const kinds = paragraph.marks.filter(m => m.start <= at && m.end >= points[i + 1]).map(m => m.kind);
+    const classes = kinds.map(k => "m-" + (k.startsWith("highlight") ? "highlight" : k.startsWith("shading") ? "shading" : k));
+    node.append(classes.length ? el("span", { class: classes.join(" "), title: kinds.join(", ") }, piece) : piece);
+  }
+  if (paragraph.markHidden) node.classList.add("hidden-mark");
+  return node;
+}
+
+// Paragraphs in order, with table cells gathered into tables.
+function body(paragraphs) {
+  const wrap = el("div", { class: "doc" });
+  let table = null, key = null;
+  for (const paragraph of paragraphs) {
+    if (!paragraph.table) { table = null; wrap.append(render(paragraph)); continue; }
+    const [t, row, cell] = paragraph.table;
+    if (!table || key !== t) { table = el("table"); key = t; wrap.append(table); }
+    while (table.rows.length <= row) table.insertRow();
+    const tr = table.rows[row];
+    while (tr.cells.length <= cell) tr.insertCell();
+    tr.cells[cell].append(render(paragraph));
+  }
+  return wrap;
+}
+
+// The independent check's account: every source character in the output or set aside.
+function proof(c, isEpi) {
+  const n = x => Number(x).toLocaleString();
+  const box = el("div", { class: "proof" },
+    el("strong", {}, "Certified: every character accounted for. "),
+    "A separate checker read the original file again by itself and matched the result to it, character by character, in order.");
+  if (isEpi) {
+    const kept = c.source.characters - c.source.whitespace;
+    box.append(el("div", { class: "sum" },
+      `${n(kept)} characters of text + ${n(c.output.spaces)} spaces + ${n(c.source.breaks - c.setAside.closingBreaks)} line breaks + ${n(c.source.pictures)} pictures = ${n(c.output.characters)} characters out`),
+      el("div", {}, `${n(c.setAside.collapsedWhitespace)} extra whitespace characters drawn as one space, as a browser draws them; ${n(c.setAside.closingBreaks)} breaks ending a paragraph draw nothing.`));
+  } else {
+    const src = c.source.textCharacters + c.source.instructionCharacters + c.source.elements;
+    const aside = c.setAside;
+    box.append(el("div", { class: "sum" },
+      `${n(src)} in the source = ${n(c.output.characters)} in the output + ${n(aside.fieldCode)} field code + ${n(aside.pageNumbers)} page numbers + ${n(aside.pageBreaks)} page breaks + ${n(aside.hiddenWhitespace)} hidden spaces`));
+    if (c.symbolMapped) box.append(el("div", {}, `${n(c.symbolMapped)} Symbol-font characters drawn as their Unicode characters (such as ≥).`));
+  }
+  if ((c.refused || []).length) {
+    box.append(el("div", {}, "Refused on their own, so not in the result (the reason is shown with each):"),
+      el("ul", {}, ...c.refused.map(name => el("li", {}, name))));
+  }
+  const notRead = Object.entries(c.notRead).filter(([, v]) => v);
+  if (notRead.length) {
+    box.append(el("div", {}, "Not read, and so not in the result (listed so nothing is left out unseen):"),
+      el("ul", {}, ...notRead.map(([k, v]) => el("li", {}, `${k}: ${n(v)} ${k === "narratives" ? "narrative(s)" : "characters"}`))));
+  }
+  return box;
+}
+
+// A header, footer or comment the reader refused on its own.
+function partRefusal(refusal) {
+  return el("div", { class: "refusal" }, el("code", {}, refusal.code), " — ", refusal.detail,
+    el("div", { class: "legend" }, "Not read: nothing is returned for this part; the rest is read."));
+}
+
+// An ePI section: its title, its paragraphs or why it was refused, then the sections inside it.
+function section(item) {
+  const wrap = el("div", { class: "section" }, el("h3", {}, item.title));
+  if (item.refusal) {
+    wrap.append(el("div", { class: "refusal" }, el("code", {}, item.refusal.code), " — ",
+      item.refusal.detail, el("div", { class: "legend" }, "This section is not read: nothing is returned for it.")));
+  } else {
+    wrap.append(body(item.paragraphs));
+  }
+  for (const child of item.sections) wrap.append(section(child));
+  return wrap;
+}
+
+// A .docx reading: body, headers, footers, comments, footnotes and endnotes.
+function docxParts(result) {
+  const doc = el("div", {});
+  doc.append(body(result.paragraphs));
+  for (const [kind, parts] of [["Headers", result.headers || []], ["Footers", result.footers || []]]) {
+    const shown = parts.filter(part => part.refusal || part.paragraphs.some(x => x.text || x.pages.length));
+    if (!shown.length) continue;
+    const section = el("div", { class: "notes" }, el("h3", {}, kind));
+    for (const part of shown) {
+      const uses = part.uses.map(u => `section ${u.section + 1}, ${u.type}`).join("; ");
+      section.append(el("div", { class: "legend" }, `${part.part} (${uses})`));
+      section.append(part.refusal ? partRefusal(part.refusal) : body(part.paragraphs));
+    }
+    doc.append(section);
+  }
+  if ((result.comments || []).length) {
+    const section = el("div", { class: "notes" }, el("h3", {}, "Comments"));
+    for (const c of result.comments) {
+      section.append(el("div", { class: "legend" }, `c${c.id}: ${c.author || "no author"}${c.date ? ", " + c.date : ""}`));
+      section.append(c.refusal ? partRefusal(c.refusal) : body(c.paragraphs));
+    }
+    doc.append(section);
+  }
+  for (const [kind, notes] of [["Footnotes", result.footnotes || []], ["Endnotes", result.endnotes || []]]) {
+    if (!notes.length) continue;
+    const section = el("div", { class: "notes" }, el("h3", {}, kind));
+    for (const note of notes) section.append(body(note.paragraphs));
+    doc.append(section);
+  }
+  return doc;
+}
+
+// A document with tracked changes: two texts, and the reader does not choose between them.
+function trackedView(tracked) {
+  const wrap = el("div", {});
+  const n = tracked.changes.length;
+  wrap.append(el("div", { class: "tracked" },
+    el("strong", {}, `${n.toLocaleString()} tracked change${n === 1 ? "" : "s"}: this document holds two texts. `),
+    "The reader returns both and does not choose: which one is the label is a decision for the person using it."));
+  const shown = el("div", {});
+  const buttons = el("div", { class: "switch", role: "tablist" });
+  const pick = view => {
+    for (const b of buttons.children) b.setAttribute("aria-selected", String(b.dataset.view === view));
+    shown.replaceChildren(docxParts(tracked[view]));
+  };
+  for (const [view, label] of [["accepted", "All changes accepted"], ["original", "Original (all rejected)"]]) {
+    const b = el("button", { type: "button", role: "tab", "data-view": view }, label);
+    b.addEventListener("click", () => pick(view));
+    buttons.append(b);
+  }
+  const kinds = {};
+  for (const c of tracked.changes) kinds[c.kind] = (kinds[c.kind] || 0) + 1;
+  const list = el("details", {}, el("summary", {}, "The changes, as stored: " +
+    Object.entries(kinds).map(([k, v]) => `${v} ${k}`).join(", ")),
+    el("table", { class: "changes" },
+      el("tr", {}, ...["Kind", "Author", "Date", "Part"].map(h => el("th", {}, h))),
+      ...tracked.changes.map(c => el("tr", {}, ...[c.kind, c.author || "", c.date || "", c.part].map(v => el("td", {}, v))))));
+  wrap.append(list, buttons, shown);
+  pick("accepted");
+  return wrap;
+}
+
+// The certificate of a document with tracked changes: each view's, and the views' own.
+function trackedProof(c) {
+  const n = x => Number(x).toLocaleString();
+  const box = el("div", {});
+  for (const [view, label] of [["accepted", "All changes accepted"], ["original", "Original"]]) {
+    const v = c.views[view];
+    box.append(el("h4", { class: "view" }, label), proof(c[view], false),
+      el("div", { class: "again" }, `This text was checked against the original file by itself: ${n(v.characters)} characters and ${n(v.elements)} other marks (tabs, breaks, symbols) kept from it, every change applied, ${n(v.paragraphsJoined)} paragraph(s) joined where a paragraph break was changed.`));
+  }
+  return box;
+}
+
+async function ingest(file) {
+  out.replaceChildren(el("div", { class: "card" }, `Reading ${file.name}…`));
+  try {
+    if (file.size > 64 * 1024 * 1024) throw new Error("the service takes documents up to 64 MiB");
+    const answer = await fetch("/v1/documents", { method: "POST", body: await file.arrayBuffer() });
+    const receiptText = await answer.text();
+    if (!answer.ok) throw new Error(errorOf(receiptText, answer.status));
+    const receipt = JSON.parse(receiptText);
+    const served = await fetch(`/v1/documents/${receipt.document}`);
+    const resultText = await served.text();
+    const result = JSON.parse(resultText);
+    if (served.status === 409 && result.verification) return disagreed(file.name, receipt, result.verification);
+    if (!served.ok) throw new Error(errorOf(resultText, served.status));
+    const verdicts = (await (await fetch(`/v1/documents/${receipt.document}/verification`)).json()).verifications;
+    show(file.name, receipt, receiptText, result, resultText, answer.status, verdicts);
+  } catch (failure) {
+    out.replaceChildren(el("div", { class: "card" },
+      el("div", { class: "verdict" }, el("span", { class: "badge refused" }, "Not shown"), el("strong", {}, file.name)),
+      el("div", { class: "refusal" }, String(failure.message || failure))));
+  }
+}
+
+// The service's error message, or the status where the answer is not its JSON.
+function errorOf(text, status) {
+  try { return JSON.parse(text).error || `answer ${status}`; } catch { return `answer ${status}`; }
+}
+
+// What Word said about a .docx read.
+function wordLine(verdicts) {
+  if (!verdicts.length) return el("div", { class: "again" }, "Not checked against Microsoft Word (start the service with --word on, on a Mac with Word).");
+  const v = verdicts[verdicts.length - 1];
+  return el("div", { class: "again" + (v.differs.length ? "" : " same") },
+    `Checked against ${v.application}: list numbers, note marks, fields, text, print, emphasis, headers, footers and comments: ${v.verdict}.`);
+}
+
+// The browser showed a section otherwise than the result reads: the result is not shown.
+function disagreed(name, receipt, verdict) {
+  const card = el("div", { class: "card" },
+    el("div", { class: "verdict" }, el("span", { class: "badge refused" }, "Not served"), el("strong", {}, name)),
+    el("div", { class: "refusal" }, `${verdict.application} shows this document otherwise than the reader read it: `,
+      verdict.differs.map(d => (d.section ? `section ${d.section} (${d.where})` : d.where)).join("; "),
+      el("div", { class: "legend" }, "Kept for review; never served while the browser disagrees.")));
+  out.replaceChildren(card);
+}
+
+// What the browser said about an ePI read.
+function browserLine(verdicts) {
+  if (!verdicts.length) return el("div", { class: "again" }, "Not checked against a browser (Chrome not installed here).");
+  const v = verdicts[verdicts.length - 1];
+  return el("div", { class: "again same" },
+    `Checked against ${v.application}: ${v.agrees} of ${v.sections - v.refused} sections read show exactly as the browser shows them, text and formatting.`);
+}
+
+function show(name, receipt, receiptText, result, resultText, status, verdicts) {
+  const card = el("div", { class: "card" });
+  const read = receipt.outcome !== "refused";
+  const part = receipt.outcome === "read-in-part";
+  const partsRefused = result.refusedSections ?? result.refusedParts ??
+    Math.max(result.tracked?.accepted.refusedParts ?? 0, result.tracked?.original.refusedParts ?? 0);
+  card.append(el("div", { class: "verdict" },
+    el("span", { class: "badge " + (part ? "part" : read ? "read" : "refused") },
+      (part ? `Read exactly, ${partsRefused} ${result.sections ? "section(s)" : "header, footer or comment part(s)"} refused` : read ? "Read exactly" : "Refused") +
+        (result.tracked ? ` — two texts, ${receipt.trackedChanges.toLocaleString()} tracked change(s)` : "")),
+    el("strong", {}, name)));
+  const facts = el("dl", { class: "facts" });
+  const add = (term, value) => facts.append(el("dt", {}, term), el("dd", {}, value));
+  add("Document SHA-256", receipt.document);
+  add("Result SHA-256", receipt.result.sha256);
+  add("Reader", receipt.reader);
+  add("Format", receipt.format);
+  card.append(facts);
+  const seen = receipts.get(receipt.document);
+  const again = el("div", { class: "again" + (seen !== undefined && seen === receiptText ? " same" : "") },
+    seen === undefined
+      ? (status === 201 ? "First time this document was ingested." : "Already kept: this is the stored answer.")
+      : (seen === receiptText ? "Same document again: the receipt is identical, byte for byte." : "Receipt differs from the earlier one."));
+  receipts.set(receipt.document, receiptText);
+  card.append(again);
+  if (!read) {
+    card.append(el("div", { class: "refusal" },
+      el("code", {}, receipt.refusal.code), " — ", receipt.refusal.detail,
+      el("div", { class: "legend" }, "The reader will not guess: nothing is returned for a document it cannot read exactly.")));
+  }
+  if (result.tracked) card.append(trackedProof(result.certificate));
+  else if (result.certificate) card.append(proof(result.certificate, result.sections !== undefined));
+  if (result.sections !== undefined && read) card.append(browserLine(verdicts));
+  if (result.sections === undefined && read) card.append(wordLine(verdicts));
+  out.replaceChildren(card);
+  if (read) {
+    const doc = el("div", { class: "card" });
+    doc.append(el("div", { class: "legend" },
+      el("span", { class: "label" }, "1.2"), el("span", {}, "list label (computed)"),
+      el("span", { class: "note" }, "1"), el("span", {}, "note mark"),
+      el("span", { class: "page" }, "page #"), el("span", {}, "page number (set by layout)")));
+    if (result.sections) for (const item of result.sections) doc.append(section(item));
+    else if (result.tracked) doc.append(trackedView(result.tracked));
+    else doc.append(docxParts(result));
+    out.append(doc);
+  }
+  out.append(el("div", { class: "card" },
+    el("details", {}, el("summary", {}, "Receipt (canonical JSON)"), el("pre", {}, receiptText)),
+    el("details", {}, el("summary", {}, `Result (canonical JSON, ${resultText.length.toLocaleString()} characters)`),
+       el("pre", {}, resultText))));
+}
+
+input.addEventListener("change", () => { if (input.files[0]) ingest(input.files[0]); input.value = ""; });
+drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", e => {
+  e.preventDefault(); drop.classList.remove("over");
+  if (e.dataTransfer.files[0]) ingest(e.dataTransfer.files[0]);
+});
+</script>
+</body>
+</html>

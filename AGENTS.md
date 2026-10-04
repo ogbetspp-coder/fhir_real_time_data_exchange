@@ -40,6 +40,9 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
   floor, Agent): `scripts/check-all.sh`. Needs Python 3.14 and uv 0.12.17 (`agent/.uv-bootstrap`,
   `zone-a/.uv-bootstrap`, `$UV` or `PATH`); `test/ci/check-all.test.ts` holds its commands, job by
   job, to `.github/workflows/ci.yml`.
+- Label reader (`label-docx-reader/`, its own Python project, brought in with its history): its
+  five checks, as its README's "Development" lists them, run in that folder; CI runs them in
+  `.github/workflows/label-docx-reader.yml` when it changes. Its `AGENTS.md` rules its code.
 - Renderer: `npm run renderer:image`, then the `renderer:*` checks, each run in that image by
   `scripts/render/run.mjs` (Docker).
 - Build: `npm run build`
@@ -73,7 +76,7 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 
 ## Toolchain
 
-Node 22.22.0 (`.nvmrc`, the version CI uses and ADR 0003 pins), Python 3.14 with uv for `zone-a/` and `agent/`
+Node 22.22.0 (`.nvmrc`, the version CI uses and ADR 0003 pins), Python 3.14 with uv for `zone-a/`, `agent/` and `label-docx-reader/`
 (`.python-version`), Java 21 for the official HL7 validator, and Terraform 1.16+.
 Python follows the Google Python Style Guide as `docs/python-style.md` states (ruff enforces
 it). Read-only development and unit tests need no cloud credentials. Real-cloud smoke tests use

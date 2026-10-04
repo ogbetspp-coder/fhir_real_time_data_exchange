@@ -35,6 +35,10 @@ agent/src/verifiable_answer_agent/contracts/query-tools.schema.json
 agent/src/verifiable_answer_agent/contracts/agent-turn.schema.json
 agent/src/verifiable_answer_agent/contracts/code-points.json
 
+# The label reader (Python), with its own gate (.github/workflows/label-docx-reader.yml) and its
+# own formatter; its JSON corpus and locks are compared byte for byte.
+label-docx-reader/
+
 # Agent worktrees that Claude Code creates under the repository; each is its own checkout and
 # is never part of this tree's gate or its commits.
 .claude/worktrees/

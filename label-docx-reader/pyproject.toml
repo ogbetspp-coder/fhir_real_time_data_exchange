@@ -1,0 +1,114 @@
+[project]
+name = "label-docx"
+version = "0.1.0"
+description = "A deterministic, fail-closed reader for the text of a label (a Word .docx: body, notes, headers, footers, comments; or an EMA ePI): the exact text, or a refusal with a reason"
+readme = "README.md"
+# The Unicode Character Database ships with the interpreter, and the reader's refusals use it
+# (str.strip and str.split decide what is blank). 3.14.x ships Unicode 16.0.0. A different minor
+# Python is a different UCD, so the range is closed; tests/test_environment.py asserts it.
+requires-python = ">=3.14,<3.15"
+# No runtime dependencies: the reader uses the standard library only (zipfile, ElementTree).
+dependencies = []
+
+[project.scripts]
+label-docx = "label_docx.cli:main"
+label-docx-service = "label_docx.cli:service_main"
+
+[dependency-groups]
+dev = ["mypy==2.3.1", "pytest==9.1.1", "pytest-cov==7.1.0", "ruff==0.16.9"]
+
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+# The build backend and its closure, pinned: `uv sync` builds this project with hatchling, and
+# unpinned build dependencies would reach every machine unreviewed.
+build-constraint-dependencies = [
+  "hatchling==1.32.4",
+  "packaging==26.3",
+  "pathspec==1.1.1",
+  "pluggy==1.6.0",
+  "tomlkit==0.15.1",
+  "trove-classifiers==2026.9.21.13",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/label_docx"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests", "scripts"]
+target-version = "py314"
+# The virtualenv uv is installed into (README, "Development").
+extend-exclude = [".uv-bootstrap"]
+
+[tool.ruff.format]
+skip-magic-trailing-comma = true
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = false
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "W",
+  "I",
+  "N",
+  "UP",
+  "B",
+  "A",
+  "C4",
+  "PIE",
+  "PT",
+  "RET",
+  "SIM",
+  "ARG",
+  "PTH",
+  "ERA",
+  "RUF",
+  "S101",
+  "BLE",
+  "PLE",
+  "PLW",
+  "PLC1802",
+  "D",
+]
+ignore = ["D107"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["S101", "D"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+files = ["src", "tests", "scripts"]
+# scripts/lock.py is imported by tests/test_locks.py.
+mypy_path = "src:scripts"
+warn_unreachable = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+pythonpath = ["scripts"]
+addopts = "-ra --strict-markers --strict-config"
+xfail_strict = true
+
+[tool.coverage.run]
+source = ["label_docx"]
+# Run only as `python -m label_docx`, in a subprocess (tests/test_determinism.py).
+# word.py drives Microsoft Word through AppleScript (macOS with Word): its answers are held by
+# the recorded corpus runs (tests/test_word_oracle.py), and a live run by LABEL_TEST_WORD=1.
+omit = ["src/label_docx/__main__.py", "src/label_docx/word.py"]
+
+[tool.coverage.report]
+fail_under = 97
+precision = 2
+show_missing = true
+skip_covered = true
+exclude_also = ['if __name__ == "__main__":']

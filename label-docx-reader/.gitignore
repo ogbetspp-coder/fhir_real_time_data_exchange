@@ -1,0 +1,15 @@
+.venv/
+.uv-bootstrap/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+.DS_Store
+.word-progress.json
+.mutants-progress.json
+.mutants-progress.tmp
+.mutants-killers.json

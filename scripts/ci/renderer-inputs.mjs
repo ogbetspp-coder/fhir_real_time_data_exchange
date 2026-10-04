@@ -13,12 +13,13 @@ import { fileURLToPath } from "node:url";
 //   node scripts/ci/renderer-inputs.mjs >> "$GITHUB_OUTPUT"
 
 // Trees and files no renderer check reads (test/ci/renderer-inputs.test.ts holds every path the
-// checks do read outside them): documentation, the Python deployables and the infrastructure,
+// checks do read outside them): documentation, the Python deployables, the label reader, the infrastructure,
 // assistant settings, and Markdown anywhere.
 export const NOT_INPUTS = [
   /^docs\//u,
   /^agent\//u,
   /^zone-a\//u,
+  /^label-docx-reader\//u,
   /^infra\//u,
   /^\.claude\//u,
   /^\.cursor\//u,

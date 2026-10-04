@@ -1,0 +1,240 @@
+{
+  "schemaVersion": "1.0.0",
+  "note": "Synthetic tracked-change cases written by scripts/tracked_cases.py.",
+  "sources": [
+    {
+      "name": "A word replaced: one view has each.",
+      "file": "text-inserted-deleted.docx",
+      "sha256": "a45235f2a19a1d5eaf2f6daf72f09304452b64c3fe8fb713fbf2aee6172d950c",
+      "bytes": 3634
+    },
+    {
+      "name": "A deleted paragraph mark: whose properties the joined paragraph keeps.",
+      "file": "mark-deleted-styles.docx",
+      "sha256": "67e59518b3d929ceec36900e50d7703e91ba981891a681c9707fe03cf8c23ecf",
+      "bytes": 3580
+    },
+    {
+      "name": "An inserted paragraph mark: the original joins the two paragraphs.",
+      "file": "mark-inserted-styles.docx",
+      "sha256": "f1e5eb109802c2669f731683f5b7d5efa0775cb3fbb701f0b1fbd4809948090e",
+      "bytes": 3643
+    },
+    {
+      "name": "A list item joined to the next one: how the list counts after it.",
+      "file": "mark-deleted-list.docx",
+      "sha256": "e24b167e20b003413eb33b836192bbe7d7ab01f85cc9eeddd2d2ed9bfe690e8e",
+      "bytes": 3882
+    },
+    {
+      "name": "A list item joined to a plain paragraph: the joined one is not in the list.",
+      "file": "mark-deleted-list-to-plain.docx",
+      "sha256": "8a50a64b24f2e50713878027c7a864cbf03fcd5e3b0bbf4350a28c9d4cd69abd",
+      "bytes": 3806
+    },
+    {
+      "name": "A list item deleted, text and mark: the items after it count one less.",
+      "file": "item-deleted-whole.docx",
+      "sha256": "3089cb660a6735272b50fe1d7aa85bf85d6fd60c418445c8e06d55c4cfaf111d",
+      "bytes": 3961
+    },
+    {
+      "name": "A list item inserted, text and mark: the items after it count one more.",
+      "file": "item-inserted-whole.docx",
+      "sha256": "b8e15955d53019e1de6b91ee7e573cb0ab4a9de277d6b2dc7f1540dcaece2df5",
+      "bytes": 3816
+    },
+    {
+      "name": "Three paragraphs joined by two deleted marks.",
+      "file": "marks-deleted-chain.docx",
+      "sha256": "1d7f7a9e1b8aa34443364accafc3d6774f32216572787abf73386fd4fbdb16c7",
+      "bytes": 3683
+    },
+    {
+      "name": "Text moved from one paragraph to another.",
+      "file": "moved-text.docx",
+      "sha256": "d3e7ce2356f3ff775601c0bf0f69512414af2d572201188654aa1bb81f6d9b18",
+      "bytes": 3898
+    },
+    {
+      "name": "Bold applied: the original has the former properties.",
+      "file": "format-bold.docx",
+      "sha256": "8e6b48cd34b8ae16943a630e856e4494be31281fd916637553dc6479c7be4760",
+      "bytes": 3476
+    },
+    {
+      "name": "A run's font changed from Symbol: the original's m is drawn as mu, 50 \u03bcg not 50 mg.",
+      "file": "format-symbol-font.docx",
+      "sha256": "41a48e58134fb1e2700524df88ed6df2696b82a85a585017f7390f62b422f7e7",
+      "bytes": 3637
+    },
+    {
+      "name": "A paragraph's style changed: the original has the former style.",
+      "file": "format-paragraph-style.docx",
+      "sha256": "68e867432f91e3fec40e432f788da386af7771559f0abb12bfa96db4161749ce",
+      "bytes": 3506
+    },
+    {
+      "name": "A paragraph put in a list: the original is not in it, and the list counts without it.",
+      "file": "format-paragraph-numbering.docx",
+      "sha256": "ea90a2c9dd740f18c75cf9823e8f4134c278753dee32999ff440e512ddfe8db0",
+      "bytes": 3761
+    },
+    {
+      "name": "A whole field deleted.",
+      "file": "field-deleted-whole.docx",
+      "sha256": "3417c62af22caa3e4e2a35dac9ed6d994e30974703a8496d664cd54f287bd906",
+      "bytes": 3732
+    },
+    {
+      "name": "Only a field's separator deleted (the reader refuses the change).",
+      "file": "field-separator-deleted.docx",
+      "sha256": "40fe5d8a2b9c5d100917616032b9d933d58e1f406b4784fa1ba088320954c958",
+      "bytes": 3670
+    },
+    {
+      "name": "Text one author inserted and another deleted: in neither view.",
+      "file": "inserted-then-deleted.docx",
+      "sha256": "8ab0a2485164489f3e2b908d70fb5353a80b20874f3f1ed434048def86e25e5a",
+      "bytes": 3617
+    },
+    {
+      "name": "A tab and a line break deleted with text.",
+      "file": "breaks-and-tabs-deleted.docx",
+      "sha256": "6e967a5e4b767cff2589e477a1a93490958b4592a8a3504f1a4e9b0f1e7a8456",
+      "bytes": 3538
+    },
+    {
+      "name": "A change inside a footnote.",
+      "file": "footnote-text-changed.docx",
+      "sha256": "d38a4e65a2d0c69fc069e3ee92c3b3c0bb1379d75127919e51758d73c7392d78",
+      "bytes": 4477
+    },
+    {
+      "name": "A change in a header only.",
+      "file": "header-text-changed.docx",
+      "sha256": "392ea91b70c5f490065124141f9a43313e5888a8730c308080fb94361f6c61bd",
+      "bytes": 4355
+    },
+    {
+      "name": "A deleted paragraph mark before a table: the text joins the first cell.",
+      "file": "mark-deleted-before-table.docx",
+      "sha256": "ff1b7c394b8bce207d611fea41f13f93926b461fd04aa750051e1fe133c62803",
+      "bytes": 3622
+    },
+    {
+      "name": "A deleted paragraph mark before a table whose first cell starts with a table.",
+      "file": "mark-deleted-before-nested-table.docx",
+      "sha256": "42b2cf83b177ebea8136e07b9b71d32060c474d0ebc1058d904823a88c7a6134",
+      "bytes": 3796
+    },
+    {
+      "name": "A deleted mark before a table: whose properties the joined paragraph keeps.",
+      "file": "mark-deleted-before-table-styled.docx",
+      "sha256": "c2ef9e498233563b81e1495ac6b2a4f9b41c20f49e7715df5a01e73e790580f5",
+      "bytes": 3719
+    },
+    {
+      "name": "The mark of a cell's last paragraph deleted: a cell's end cannot be joined.",
+      "file": "mark-deleted-last-in-cell.docx",
+      "sha256": "35b57d5e28223a3ea448d136dcbd77822aaeb13d6e69c6b12cd5633bdda6731f",
+      "bytes": 3736
+    },
+    {
+      "name": "The body's last paragraph mark deleted.",
+      "file": "mark-deleted-last-in-body.docx",
+      "sha256": "5db4c68d6384d62b96fd10208f00bfc180258fb447aa38171b2e606f8a233c3b",
+      "bytes": 3484
+    },
+    {
+      "name": "A deleted mark that ends a section.",
+      "file": "mark-deleted-section-end.docx",
+      "sha256": "2088d014e0ad9291c1f5fcfa90fb61ebc5ba46b16b97d1c0fe441789f57a4722",
+      "bytes": 3507
+    },
+    {
+      "name": "A table row deleted.",
+      "file": "row-deleted.docx",
+      "sha256": "31791b4bc578fcdbecf27b66bbb996b4d410697a045bedcba736491900b42dbb",
+      "bytes": 3820
+    },
+    {
+      "name": "Table, row and cell properties changed: the original has the former ones.",
+      "file": "format-table.docx",
+      "sha256": "70325cc7fb886924b9e30ba91c2df73b4bd305067ceaf57de787037054d30f45",
+      "bytes": 3882
+    },
+    {
+      "name": "Section properties changed: the original has the former ones.",
+      "file": "format-section.docx",
+      "sha256": "3719a4dc0c160f41e8db05b2108027bebfbbf2337065ca22e880838be68a6aec",
+      "bytes": 3540
+    },
+    {
+      "name": "Every row of a table deleted: whether the table goes, and how later tables count.",
+      "file": "table-deleted-whole.docx",
+      "sha256": "8d4420dd6a9bffbfcf3084a56d8ad08ad5cfb1fc25215af618604b361300cd39",
+      "bytes": 3866
+    },
+    {
+      "name": "Every row of a table inserted: the original has no table there.",
+      "file": "table-inserted-whole.docx",
+      "sha256": "5ce82e7808ad91ad345061af3b25001230c34f9eb42efa155233a009b337c4ac",
+      "bytes": 3853
+    },
+    {
+      "name": "A deleted mark before a table whose first row is deleted: which paragraph it joins.",
+      "file": "mark-deleted-before-table-first-row-deleted.docx",
+      "sha256": "4a302c2452b605baf3ca2bf85c4909b8eef96def7aae4b61de0988d109f39227",
+      "bytes": 3902
+    },
+    {
+      "name": "A footnote's reference deleted: whether the note goes with it.",
+      "file": "footnote-reference-deleted.docx",
+      "sha256": "b6c9f2d32ebf78d29a8f61b9a3b0c6ecf3be302d7057e32e52ba43780d0bb24e",
+      "bytes": 4403
+    },
+    {
+      "name": "A footnote's reference inserted: whether the original has the note.",
+      "file": "footnote-reference-inserted.docx",
+      "sha256": "af7b6cdb0658d98f1c2cd38913fd45a58ea6e257923fb848584ac2f0c09ac5bb",
+      "bytes": 4403
+    },
+    {
+      "name": "A content control whose whole content is inserted: what the original shows (the reader refuses it).",
+      "file": "content-control-emptied.docx",
+      "sha256": "5487dce92ac404f6ac1ee8e04381762112cb1f06da6a3abbc526de01d496b6de",
+      "bytes": 3552
+    },
+    {
+      "name": "A section's footnote numbering changed: which marks each view draws.",
+      "file": "format-section-note-numbers.docx",
+      "sha256": "a8d972a9ab052d8ca524536558c745c6580204ebf1f3064e3a8155a32c96dbc4",
+      "bytes": 4466
+    },
+    {
+      "name": "A style's definition changed: whether Reject All restores it (the reader refuses it).",
+      "file": "style-definition-changed.docx",
+      "sha256": "b0faf317970cd834b4b071dc71b405109fc097a9d7fa96456df3ab6a29e1904f",
+      "bytes": 3612
+    },
+    {
+      "name": "A paragraph style's definition changed (its list and alignment): whether Reject All restores it.",
+      "file": "style-paragraph-definition-changed.docx",
+      "sha256": "7e5e6e77a710130af2c0d604d90b594b2ae546c8d00029eb7747ed599452eec1",
+      "bytes": 3717
+    },
+    {
+      "name": "A list level's definition changed (its format): whether Reject All restores it.",
+      "file": "list-definition-changed.docx",
+      "sha256": "cf2abfd21e8d42d13a2b66ea3cbf07a4fafb84d33f749d730ed1db337f162270",
+      "bytes": 3564
+    },
+    {
+      "name": "A table row inserted: the original has no such row.",
+      "file": "row-inserted.docx",
+      "sha256": "7c2045d0b39df4bdc9d817007f7014697cf827050d123756412696744e40f1a0",
+      "bytes": 3708
+    }
+  ]
+}

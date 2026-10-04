@@ -13,6 +13,7 @@ on:
     # labels/ holds the pinned EMA ePIs and their conformance results, read by zone-a/, by the
     # importer's golden vectors (src/authority/vectors.ts, under npm run check) and by the
     # renderer checks (scripts/render/); no image copies it, so nothing deployed reads it.
+    # label-docx-reader/ is the label reader, with its own gate; no image or deploy step reads it.
     # .claude/ and .cursor/ hold coding-assistant settings and hooks, read by editors on a
     # developer's machine and never by a build or the deploy.
     # workflow_dispatch below deploys on demand whatever changed.
@@ -23,6 +24,7 @@ on:
       - "test/**"
       - "agent/**"
       - "zone-a/**"
+      - "label-docx-reader/**"
       - "qrd/**"
       - "labels/**"
       - ".github/CODEOWNERS"
@@ -31,6 +33,7 @@ on:
       - ".github/workflows/plan.yml"
       - ".github/workflows/vulnerabilities.yml"
       - ".github/workflows/pin-freshness.yml"
+      - ".github/workflows/label-docx-reader.yml"
       - "osv-scanner.toml"
       - ".gitleaks.toml"
       - ".claude/**"

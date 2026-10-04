@@ -1,0 +1,134 @@
+{
+  "schemaVersion": "1.0.0",
+  "page": "https://www.ema.europa.eu/en/human-regulatory-overview/marketing-authorisation/product-information-requirements/product-information-qrd-templates-human",
+  "retrieved": "2026-09-30",
+  "note": "EMA documents, reproduced with acknowledgement of the source as the EMA permits; byte copies of the files linked from the page above on the retrieval date. The English templates not in corpus/ema-qrd, and five others kept for what they hold: a VML picture (et), smart-tag properties (es), a stray private-use character the reader refuses (es), and Cyrillic and Greek text (bg, el).",
+  "sources": [
+    {
+      "name": "atmp product information template version 11 (en)",
+      "file": "atmp-product-information-template-version-11_en.docx",
+      "url": "https://www.ema.europa.eu/en/documents/template-form/atmp-product-information-template-version-11_en.docx",
+      "sha256": "82314e8c204360c836f2a8cca35fd625f3b88d99a3678dcdd2514695acdf941d",
+      "bytes": 77087
+    },
+    {
+      "name": "mutual recognition decentralised referral product information template version 42 (en)",
+      "file": "mutual-recognition-decentralised-referral-product-information-template-version-42_en.docx",
+      "url": "https://www.ema.europa.eu/en/documents/template-form/mutual-recognition-decentralised-referral-product-information-template-version-42_en.docx",
+      "sha256": "12af462b1f204731ebc191fe674b549b2b56690742863c7544943709701f432b",
+      "bytes": 55050
+    },
+    {
+      "name": "psusa nationally authorised products template (en)",
+      "file": "psusa-nationally-authorised-products-template_en.docx",
+      "url": "https://www.ema.europa.eu/en/documents/template-form/psusa-nationally-authorised-products-template_en.docx",
+      "sha256": "b91a3f2258687a08e53ea6a351d5fe22ac8a1198baeabf6782fb56e2c51889d6",
+      "bytes": 26352
+    },
+    {
+      "name": "qrd annex iv conditional positive template (en)",
+      "file": "qrd-annex-iv-conditional-positive-template_en.docx",
+      "url": "https://www.ema.europa.eu/en/documents/template-form/qrd-annex-iv-conditional-positive-template_en.docx",
+      "sha256": "336bb1d2fd0b7982d4caf2947d21152b338a5c078eb7a13f640511409a3e044b",
+      "bytes": 15218
+    },
+    {
+      "name": "qrd annex iv exceptional circumstances positive template (en)",
+      "file": "qrd-annex-iv-exceptional-circumstances-positive-template_en.docx",
+      "url": "https://www.ema.europa.eu/en/documents/template-form/qrd-annex-iv-exceptional-circumstances-positive-template_en.docx",
+      "sha256": "e1ede3cde3f46e81a8646df0dd6abebc09b9d2b38ee11fd10ab145c33d399629",
+      "bytes": 15166
+    },
+    {
+      "name": "qrd annex iv standard positive template (en)",
+      "file": "qrd-annex-iv-standard-positive-template_en.docx",
+      "url": "https://www.ema.europa.eu/en/documents/template-form/qrd-annex-iv-standard-positive-template_en.docx",
+      "sha256": "6c5c80ba204ca0e7504a343f572cdad287ae6f6effe15c614791024c89d5bfc8",
+      "bytes": 21674
+    },
+    {
+      "name": "qrd annex related article 127a template (en)",
+      "file": "qrd-annex-related-article-127a-template_en.docx",
+      "url": "https://www.ema.europa.eu/en/documents/template-form/qrd-annex-related-article-127a-template_en.docx",
+      "sha256": "758769ff386c7893373c428bb197a2d30f917329e38ac49e87a9d350d441fd4c",
+      "bytes": 19451
+    },
+    {
+      "name": "qrd annex template (en)",
+      "file": "qrd-annex-template_en.docx",
+      "url": "https://www.ema.europa.eu/en/documents/template-form/qrd-annex-template_en.docx",
+      "sha256": "7c2abdee2313fda45c8fc1e87d1d9ee9251954b79c9c9c3de1d46913377e2bf4",
+      "bytes": 34708
+    },
+    {
+      "name": "qrd appendix i statements use section 46 pregnancy lactation summary product characteristics cover page (en)",
+      "file": "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics-cover-page_en.docx",
+      "url": "https://www.ema.europa.eu/en/documents/template-form/qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics-cover-page_en.docx",
+      "sha256": "116d6fdba94491658865b984f7ba0d9ca686cfc166d14034c309502ae5de7746",
+      "bytes": 116676
+    },
+    {
+      "name": "qrd appendix ii medical dictionary regulatory activities terminology be used section 48 undesirable effects summary product characteristics cover page (en)",
+      "file": "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics-cover-page_en.docx",
+      "url": "https://www.ema.europa.eu/en/documents/template-form/qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics-cover-page_en.docx",
+      "sha256": "b88d0a6bc5ecf4817de10e1ecfb310f68ada720499742e214332dd2d55c4cc51",
+      "bytes": 117448
+    },
+    {
+      "name": "qrd appendix iii quality review documents templates human medicinal products cover page (en)",
+      "file": "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products-cover-page_en.docx",
+      "url": "https://www.ema.europa.eu/en/documents/template-form/qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products-cover-page_en.docx",
+      "sha256": "a9a5a12650d3552697aa9ae8604c4067bd7f7969c5a47df025b92e59ad90f5d0",
+      "bytes": 117656
+    },
+    {
+      "name": "qrd appendix v adverse drug reaction reporting details (en)",
+      "file": "qrd-appendix-v-adverse-drug-reaction-reporting-details_en.docx",
+      "url": "https://www.ema.europa.eu/en/documents/template-form/qrd-appendix-v-adverse-drug-reaction-reporting-details_en.docx",
+      "sha256": "819865682208fc41a0105f6ee20b98d637693065dc232a3bb20a02d8273e41a0",
+      "bytes": 137923
+    },
+    {
+      "name": "qrd psur annex iv template (en)",
+      "file": "qrd-psur-annex-iv-template_en.docx",
+      "url": "https://www.ema.europa.eu/en/documents/template-form/qrd-psur-annex-iv-template_en.docx",
+      "sha256": "34a0e572d1894939df0bbe9989a601c6d7fb860f7277b43d25e29a7fec9b2e43",
+      "bytes": 26225
+    },
+    {
+      "name": "mutual recognition decentralised referral product information template version 42 (et)",
+      "file": "mutual-recognition-decentralised-referral-product-information-template-version-42_et.docx",
+      "url": "https://www.ema.europa.eu/et/documents/template-form/mutual-recognition-decentralised-referral-product-information-template-version-42_et.docx",
+      "sha256": "c71142ece1273c5002050c8639a9023bbef04d29153271deadfc86b913039c1a",
+      "bytes": 67307
+    },
+    {
+      "name": "qrd annex template (es)",
+      "file": "qrd-annex-template_es.docx",
+      "url": "https://www.ema.europa.eu/es/documents/template-form/qrd-annex-template_es.docx",
+      "sha256": "b72a6e90971d35c0c6a27815e7558805127c208062f79b4aae7cd2a861ac56ad",
+      "bytes": 19433
+    },
+    {
+      "name": "qrd product information template version 104 (es)",
+      "file": "qrd-product-information-template-version-104_es.docx",
+      "url": "https://www.ema.europa.eu/es/documents/template-form/qrd-product-information-template-version-104_es.docx",
+      "sha256": "ec5001be6de714288fc1b89d85fb882cc4773eb25ca1cce60ea558d6016b85c5",
+      "bytes": 64731
+    },
+    {
+      "name": "atmp product information template version 11 (bg)",
+      "file": "atmp-product-information-template-version-11_bg.docx",
+      "url": "https://www.ema.europa.eu/bg/documents/scientific-guideline/atmp-product-information-template-version-11_bg.docx",
+      "sha256": "b99d4fec71cfcc28a6923c6062f82d7468011a36e20d9bb9942e3a1d1b50e842",
+      "bytes": 78443
+    },
+    {
+      "name": "atmp product information template version 11 (el)",
+      "file": "atmp-product-information-template-version-11_el.docx",
+      "url": "https://www.ema.europa.eu/el/documents/scientific-guideline/atmp-product-information-template-version-11_el.docx",
+      "sha256": "abc62efb3273c38074dc8a1a5c71458603aaeca3fabdbfbde6a65ca34cb2acfa",
+      "bytes": 76662
+    }
+  ]
+}

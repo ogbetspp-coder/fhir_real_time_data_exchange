@@ -116,14 +116,15 @@ describe("the renderer's inputs", () => {
     }
   });
 
-  it("skip only documentation, the Python deployables, the infrastructure, assistant settings and Markdown", () => {
-    expect(NOT_INPUTS).toHaveLength(7);
+  it("skip only documentation, the Python deployables, the label reader, the infrastructure, assistant settings and Markdown", () => {
+    expect(NOT_INPUTS).toHaveLength(8);
     for (const file of [
       "docs/design/authority-import-renderer.md",
       "README.md",
       "labels/ema-epi/README.md",
       "agent/src/a.py",
       "zone-a/tests/test_x.py",
+      "label-docx-reader/tests/test_x.py",
       "infra/main.tf",
       ".claude/settings.json",
       ".cursor/rules/x.mdc",
