@@ -66,7 +66,7 @@ from another web page.
 
 ```json
 {"certificate": {…}, "comments": [], "endnotes": [], "footers": [], "footnotes": [],
- "format": "label-docx-json/1.15.0", "headers": [],
+ "format": "label-docx-json/1.15.1", "headers": [],
  "paragraphs": [{"comments": [], "markHidden": false,
    "marks": [{"end": 5, "kind": "superscript", "start": 4}], "notes": [], "numbering": null,
    "pages": [], "style": "Heading2", "table": null, "text": "x 109/l"}],

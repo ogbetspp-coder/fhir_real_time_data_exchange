@@ -104,23 +104,12 @@ _MATCH_PLACE = '_match(mine, paragraph, f"{where} {index + 1}")'
 _SECTION_PLACE = 'section(mine, theirs, f"section {index + 1}")'
 _SUBSECTION_PLACE = 'section(child, other, f"{where}.{index + 1}")'
 _NOTE_PLACE = 'part, theirs_by_id[note_id]["paragraphs"], f"{kind} {note_id} paragraph"'
-_SHORTCUT = (
-    "the shortcut for a part the view keeps as it is is then never taken: the part is checked "
-    "in full, as without it"
-)
 _ATTRIBUTES = (
     "outside a namespace declaration an attribute is read only for its references, which the "
     "XML parser has checked first (_parse)"
 )
 _GUARD = '_ATTRIBUTE.findall(body, len(name)) if "xmlns" in body or "&" in body else ()'
 EQUIVALENT: dict[tuple[str, str, str, int], str] = {
-    (
-        "certify_tracked",
-        "name: any(e.tag in _REVISIONS for e in root.iter()) for name, root in roots.items()",
-        "compare:0",
-        0,
-    ): _SHORTCUT,
-    ("certify_tracked", "continue", "statement", 1): _SHORTCUT,
     ("_raw_texts", _GUARD, "compare:0", 1): _ATTRIBUTES,
     ("_raw_texts", _GUARD, "str:'&'", 0): _ATTRIBUTES,
     (
@@ -344,6 +333,42 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
         )
         for which in (0, 1)
     },
+    # certify survivors, part b
+    ("_in_line", "return False", "statement", 0): (
+        "its one caller reads it as true or false, and None is as false as False"
+    ),
+    ("_typed", "return False", "statement", 0): (
+        "its callers read it with not, and None is as false as False"
+    ),
+    ("_typed", 'if found.rsplit("/", 1)[-1] == kind:', "int:1", 0): (
+        "splitting once more leaves the last segment, the type's name, the same"
+    ),
+    ("<module>", "mark_hidden: bool = False", "bool", 0): (
+        "the one place a paragraph is made sets whether its mark is hidden"
+    ),
+    ("<module>", '"wholeTable",', "str:'wholeTable'", 0): (
+        "the whole table is in every look and every cell: emphasis there is refused over any "
+        "text, as a part the check does not know is"
+    ),
+    (
+        "_unescape.one",
+        'digits = (found.group(2) or found.group(3)).lstrip("0") or "0"',
+        "str:'0'",
+        1,
+    ): (
+        "a reference to character 0 is refused by the XML parser first (_parse); any other "
+        "keeps a digit"
+    ),
+    ("_canon.add", "continue", "statement", 3): (
+        "a change (ins, del, moveFrom, moveTo) is a revision outside _SAME_AS and no cell "
+        "change: the test after it passes over it too"
+    ),
+    ("_run_tokens.walk", "continue", "statement", 3): (
+        "the element has no children: walking it reads nothing"
+    ),
+    ("_agree", "and all(_agree(a, b) for a, b in zip(expected, found, strict=True))", "bool", 0): (
+        _STRICT
+    ),
 }
 
 _COMPARE = {

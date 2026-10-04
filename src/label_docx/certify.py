@@ -104,11 +104,10 @@ _NOTE_MARKS = {"footnoteReference", "endnoteReference", "footnoteRef", "endnoteR
 _HEX = re.compile(r"[0-9A-Fa-f]{1,4}")
 # The walk reads a closed list of elements and refuses any other: what it does not know may hold
 # text it would pass over. Containers it reads through, around blocks or rows (content controls,
-# custom XML), and around runs (also hyperlinks, smart tags and bidirectional embeddings).
+# custom XML), and around runs (also hyperlinks and smart tags; bidirectional embeddings are read
+# through on their own, as complex script).
 _CONTAINERS = {f"{{{W}}}{name}" for name in ("sdt", "sdtContent", "customXml")}
-_RUN_CONTAINERS = _CONTAINERS | {
-    f"{{{W}}}{name}" for name in ("hyperlink", "smartTag", "dir", "bdo")
-}
+_RUN_CONTAINERS = _CONTAINERS | {f"{{{W}}}{name}" for name in ("hyperlink", "smartTag")}
 # Elements it passes over, which must hold no text: properties, and markers of a place.
 _INERT = {
     f"{{{W}}}{name}"
@@ -2243,9 +2242,8 @@ def certify_tracked(source: bytes, views: dict[str, bytes]) -> dict[str, Json]:
                     for note in [n for n in source_root if n.get(_w("id")) in dropped]:
                         source_root.remove(note)
                     if not dropped and not any(e.tag in _REVISIONS for e in source_root.iter()):
-                        if before != after:
-                            raise CertificationError(f"{view} view: {name} is changed")
-                        continue
+                        # Not the source's bytes (those are passed over above), yet nothing to undo.
+                        raise CertificationError(f"{view} view: {name} is changed")
                     drops = _VIEW_DROPS[view]
                     expected, joins = _run_tokens(source_root, drops)
                     # Every paragraph's content and make, and everything outside paragraphs.
