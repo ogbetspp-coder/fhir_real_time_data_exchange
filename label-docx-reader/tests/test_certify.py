@@ -3774,16 +3774,10 @@ def test_anything_defined_twice_is_never_certified(
 def _entries(data: bytes, *extra: tuple[str, str]) -> bytes:
     """``data`` with more zip entries, under names it may already hold."""
     import io
-    import warnings
     import zipfile
 
     out = io.BytesIO()
-    with (
-        warnings.catch_warnings(),
-        zipfile.ZipFile(io.BytesIO(data)) as source,
-        zipfile.ZipFile(out, "w") as target,
-    ):
-        warnings.simplefilter("ignore")  # zipfile warns of a duplicate name, as it should
+    with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(out, "w") as target:
         for info in source.infolist():
             target.writestr(info, source.read(info))
         for name, content in extra:
@@ -3791,6 +3785,8 @@ def _entries(data: bytes, *extra: tuple[str, str]) -> bytes:
     return out.getvalue()
 
 
+# zipfile warns of a duplicate name, as it should.
+@pytest.mark.filterwarnings("ignore:Duplicate name")
 def test_a_part_name_twice_in_any_case_or_a_part_named_twice_is_never_certified() -> None:
     from test_reader import document_xml
 
