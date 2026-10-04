@@ -41,9 +41,10 @@ def test_fresh_processes_under_other_hash_seeds_and_locales_write_the_same_bytes
     outputs = set()
     for process in running:
         stdout, _ = process.communicate()
-        # Read or refused (corpus/numbering-cases holds one refusal), never an error; what the
-        # process wrote to stderr is not shown, as it could quote the document.
-        assert process.returncode in (0, 2), f"{path.name}: exit {process.returncode}"
+        # Read, refused (corpus/numbering-cases holds one refusal) or read in part (a template
+        # whose headers are refused), never an error; what the process wrote to stderr is not
+        # shown, as it could quote the document.
+        assert process.returncode in (0, 2, 3), f"{path.name}: exit {process.returncode}"
         outputs.add(sha256_hex(stdout))
     assert outputs == {sha256_hex(read(path.read_bytes())[0])}
 
