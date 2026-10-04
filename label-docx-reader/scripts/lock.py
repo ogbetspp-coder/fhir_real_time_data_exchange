@@ -170,14 +170,15 @@ def expected(folder: Path) -> dict[str, dict[str, str]]:
             continue
         data = path.read_bytes()
         entry = {"sha256": hashlib.sha256(data).hexdigest()}
-        entry |= _result(epi_output.read(data)[0])
+        served = epi_output.read(data)[0]
+        entry |= _result(served)
         try:
             document = read_epi(data)
             body = canonical([epi_output.section(s) for s in document.sections])
             entry["sectionsSha256"] = hashlib.sha256(body).hexdigest()
             refused = sum(1 for s in epi.walk(document.sections) if s.refusal)
             entry["refusedSections"] = str(refused)
-            entry |= _certificate(epi_output.read(data)[0])
+            entry |= _certificate(served)
         except EpiRefusedError as refused_document:
             entry["refusal"] = refused_document.code
         out[path.name] = entry

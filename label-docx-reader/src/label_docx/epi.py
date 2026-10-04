@@ -141,6 +141,7 @@ served as written, a raw FHIR string: its whitespace is not collapsed.
 from __future__ import annotations
 
 import bisect
+import functools
 import json
 import re
 import unicodedata
@@ -308,7 +309,10 @@ _STYLE_CHARS = re.compile(r"[A-Za-z0-9 \t\n\r\f#%!.,:;'\"()-]*")
 _QUOTED_FAMILY = re.compile(r"'[^'\";]*'|\"[^'\";]*\"|[^'\";]*")
 
 
-def _declarations(style: str) -> list[tuple[str, str]]:
+# A style is read many times over (each element's checks, each character's marks); the reading is
+# a function of the string alone, and a refusal is raised again each time (no exception is kept).
+@functools.lru_cache(maxsize=4096)
+def _declarations(style: str) -> tuple[tuple[str, str], ...]:
     if not _STYLE_CHARS.fullmatch(style):
         raise _RefusedError("unsupported-style", "a character CSS tokenizes other than the reader")
     # A bracket in a quoted font family name is part of the name ('CG Times (WN)').
@@ -328,7 +332,7 @@ def _declarations(style: str) -> list[tuple[str, str]]:
         ):
             raise _RefusedError("unsupported-style", f"a quote in {name.strip()!r}")
         out.append((name.strip().lower(), value.strip().lower().removesuffix("!important").strip()))
-    return out
+    return tuple(out)
 
 
 # Colour names the reader accepts: CSS's basic colours, the ones Word writes, and keywords.
@@ -533,7 +537,8 @@ def _valid_border(part: str, token: str) -> bool:
     return _WIDTH.fullmatch(token) is not None
 
 
-def _importance_ordered(style: str) -> list[tuple[str, str]]:
+@functools.lru_cache(maxsize=4096)
+def _importance_ordered(style: str) -> tuple[tuple[str, str], ...]:
     """The declarations in the order a browser applies them: normal ones, then ``!important``."""
     normal: list[tuple[str, str]] = []
     important: list[tuple[str, str]] = []
@@ -544,7 +549,7 @@ def _importance_ordered(style: str) -> list[tuple[str, str]]:
         value = value.strip().lower()
         target = important if value.endswith("!important") else normal
         target.append((name.strip().lower(), value.removesuffix("!important").strip()))
-    return normal + important
+    return (*normal, *important)
 
 
 def _inline_borders(style: str, builder: _Builder) -> set[str]:
@@ -957,6 +962,8 @@ _TINY_POINTS: Final = 2.0
 # --- paragraphs -----------------------------------------------------------------------------
 
 
+# A function of the character and the interpreter's Unicode data alone, asked once per character.
+@functools.cache
 def _check_character(character: str) -> None:
     """Refuse a character a browser does not show as itself (or the reader's U+FFFC)."""
     if character == OBJECT:
@@ -1121,7 +1128,11 @@ def _marks(kinds: list[frozenset[str]]) -> tuple[Mark, ...]:
     kinds = [frozenset("faint" if k == _FAINT_COLOUR else k for k in each) for each in kinds]
     out: list[Mark] = []
     started: dict[str, int] = {}  # each kind open at this character, from where
+    previous: frozenset[str] | None = None
     for index, each in enumerate([*kinds, frozenset()]):
+        if each == previous:
+            continue  # what is open is already ``each``
+        previous = each
         for kind in [kind for kind in started if kind not in each]:
             out.append(Mark(started.pop(kind), index, kind))
         for kind in each:
@@ -1701,6 +1712,8 @@ def _html_otherwise(div: str) -> bool:
         return True
     for run in _NAME_RUN.finditer(div):
         text = run.group()
+        if "<" not in text:
+            continue
         names = (
             text[at + 1 :] if len(text) - at <= 4 else None
             for at in range(len(text) - 1)
