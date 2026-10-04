@@ -12,19 +12,20 @@ implemented from the published artefacts, and it records — in the last section
 every place where it could not be.
 
 The second reads documents and checks them against the EMA's QRD template, and proposes; it never
-changes a word of a label. `zone_a.docx.reader` reads a Word body and `zone_a.epi.reader` an EMA
-ePI Bundle's sections into paragraphs and marks, exactly or with a refusal and its reason;
-`zone_a.qrd.registry` builds the QRD template registry (`qrd/registry/`) from the pinned EMA files
-(`docs/design/qrd-registry.md`); `zone_a.qrd.check` checks every ePI pinned in
-`labels/ema-epi/` against it and the section mapping and writes the results to
-`labels/ema-epi/checks/` (`docs/design/qrd-conformance-check.md`). `zone_a.underline` decides
-what an underline can change, and writes two inputs the authority importer reads
-(`src/authority/data/underline-letters.json`, `test/fixtures/authority/underline-cases.json`);
-`scripts/generate_style_cases.py` writes the CSS cases the importer's T shares with the ePI
-reader (`test/fixtures/authority/style-cases.json`). The readers', the registry's and the
-check's versions are tied to their code by `versions.lock.json` (`scripts/lock_versions.py`).
-These read authority-published labels under the scoped exception in `AGENTS.md`; nothing here
-logs their text.
+changes a word of a label. It reads labels with the label reader (`label-docx-reader/`, a path
+dependency): `zone_a.certified` takes its certified reads of a Word body and of an EMA ePI
+Bundle's sections, paragraphs and marks exactly or a refusal with its reason, and a result the
+reader's independent check cannot certify is a refusal; `zone_a.qrd.registry` builds the QRD
+template registry (`qrd/registry/`) from the pinned EMA files (`docs/design/qrd-registry.md`);
+`zone_a.qrd.check` checks every ePI pinned in `labels/ema-epi/` against it and the section mapping
+and writes the results to `labels/ema-epi/checks/` (`docs/design/qrd-conformance-check.md`).
+`zone_a.underline` decides what an underline can change, and writes two inputs the authority
+importer reads (`src/authority/data/underline-letters.json`,
+`test/fixtures/authority/underline-cases.json`); `scripts/generate_style_cases.py` writes the CSS
+cases the importer's T shares with the ePI reader (`test/fixtures/authority/style-cases.json`).
+The readers', the registry's and the check's versions are tied to their code by
+`versions.lock.json` (`scripts/lock_versions.py`). These read authority-published labels under the
+scoped exception in `AGENTS.md`; nothing here logs their text.
 
 Nothing under `src/`, `docs/fidelity-normalization.md`, or the ADRs was changed to make any of
 this pass. Where the Python and the TypeScript disagreed, the TypeScript decided and the Python
@@ -44,9 +45,8 @@ that run them. None of that changes a byte of what the pipeline computes.
 | The two implementations agree off the vectors as well                  | `tests/test_differential.py`                  |
 | The runtime's Unicode Character Database is the pinned one             | `tests/test_environment.py`                   |
 | No test prints narrative and no file here quotes a vector              | `tests/test_no_narrative_leak.py`             |
-| A Word body is read exactly, or refused with a reason                  | `tests/test_docx_reader.py`                   |
+| A label is read only through the label reader's certified reads        | `tests/test_certified.py`                     |
 | The QRD registry is what the pinned EMA files build                    | `tests/test_qrd_registry.py`                  |
-| An EMA ePI section is read exactly, or refused with a reason           | `tests/test_epi_reader.py`                    |
 | The conformance results are what the pinned ePIs give                  | `tests/test_qrd_check.py`                     |
 | An underline is judged by what it can change, and the importer's port  | `tests/test_underline.py`                     |
 | is held to the same cases                                              |                                               |

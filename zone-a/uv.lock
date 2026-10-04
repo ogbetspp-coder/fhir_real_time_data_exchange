@@ -245,6 +245,21 @@ wheels = [
 ]
 
 [[package]]
+name = "label-docx"
+version = "0.1.0"
+source = { editable = "../label-docx-reader" }
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "mypy", specifier = "==2.3.1" },
+    { name = "pytest", specifier = "==9.1.1" },
+    { name = "pytest-cov", specifier = "==7.1.0" },
+    { name = "ruff", specifier = "==0.16.9" },
+]
+
+[[package]]
 name = "librt"
 version = "0.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -599,6 +614,7 @@ name = "zone-a"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "label-docx" },
     { name = "pydantic" },
 ]
 
@@ -612,7 +628,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic", specifier = "==2.13.5" }]
+requires-dist = [
+    { name = "label-docx", editable = "../label-docx-reader" },
+    { name = "pydantic", specifier = "==2.13.5" },
+]
 
 [package.metadata.requires-dev]
 dev = [

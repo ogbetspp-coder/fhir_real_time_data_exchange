@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 
 import { transformDocument } from "../../src/authority/t/document.js";
 
-// T and the QRD check's ePI reader (zone_a.epi.reader) read the same EMA divs, each against a
-// closed CSS list of its own. zone-a/scripts/generate_style_cases.py writes the shared cases
+// T and the QRD check's ePI reader (the label reader's, label_docx.epi) read the same EMA divs,
+// each against a closed CSS list of its own. zone-a/scripts/generate_style_cases.py writes the shared cases
 // with the reader's answer, and T's where the two differ on purpose, with why; T must give the
 // reader's answer on every other case. A change to T's closed lists that moves a case fails here
 // until the case is recorded there (and a change to the reader changes the file).

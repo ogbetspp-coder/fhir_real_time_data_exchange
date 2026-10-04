@@ -17,9 +17,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from label_docx.epi import Document, Section, SectionRefusal
+from label_docx.reader import Mark, Paragraph
 
-from zone_a.docx.reader import Mark, Paragraph
-from zone_a.epi.reader import Document, Section, SectionRefusal
 from zone_a.qrd.check import check
 from zone_a.qrd.pattern import parse
 
@@ -408,6 +408,49 @@ def test_an_underline_over_what_it_changes_is_a_formatting_finding(
     paragraph = Paragraph(text, None, None, None, marks=(Mark(start, end, "underline"),))
     result = check(document(smpc_1=(paragraph,)), REGISTRY, MAPPING)
     assert len(findings(result, "formatting")) == (1 if reported else 0)
+
+
+@pytest.mark.parametrize(
+    ("marks", "reported"),
+    [
+        # A link as the reader marks it: underlined and drawn in the browser's link colour.
+        ((Mark(4, 15, "color-#0000ee"), Mark(4, 15, "underline")), []),
+        ((Mark(4, 15, "color-#0000ee"), Mark(0, 15, "underline")), []),
+        # The link colour where no underline covers it whole, and another colour under one.
+        ((Mark(4, 15, "color-#0000ee"),), ["color-#0000ee"]),
+        ((Mark(0, 15, "color-#0000ee"), Mark(4, 15, "underline")), ["color-#0000ee"]),
+        ((Mark(4, 15, "color-red"), Mark(4, 15, "underline")), ["color-red"]),
+    ],
+)
+def test_the_link_colour_under_its_underline_is_not_a_finding(
+    marks: tuple[Mark, ...], reported: list[str]
+) -> None:
+    paragraph = Paragraph("see section 4.4", None, None, None, marks=marks)
+    result = check(document(smpc_1=(paragraph,)), REGISTRY, MAPPING)
+    assert [f["mark"] for f in findings(result, "formatting")] == reported
+
+
+@pytest.mark.parametrize(
+    ("link", "reported"),
+    [
+        ('<a href="https://example.org/">section 4.4</a>', []),
+        # Not underlined, the link's colour is all that sets it apart, and it is reported.
+        (
+            '<a href="https://example.org/" style="text-decoration: none">section 4.4</a>',
+            ["color-#0000ee"],
+        ),
+    ],
+)
+def test_a_link_read_by_the_reader_is_judged_by_its_underline(
+    link: str, reported: list[str]
+) -> None:
+    from label_docx.epi import read_div
+
+    div = f'<div xmlns="http://www.w3.org/1999/xhtml"><p>see {link}</p></div>'
+    paragraphs, refused, _ = read_div(div)
+    assert refused is None
+    result = check(document(smpc_1=paragraphs), REGISTRY, MAPPING)
+    assert [f["mark"] for f in findings(result, "formatting")] == reported
 
 
 # --- what the check finds in the pinned EMA ePIs --------------------------------------------------
@@ -1220,7 +1263,7 @@ def test_a_statement_used_mid_sentence_after_an_omitted_opening_segment_is_found
 
 
 def test_text_hidden_on_its_own_colour_is_not_a_match() -> None:
-    from zone_a.epi.reader import read_div
+    from label_docx.epi import read_div
 
     text = "Zeta has no or negligible influence on the ability to drive and use machines."
     for style, used in (
@@ -1239,7 +1282,7 @@ def test_text_hidden_on_its_own_colour_is_not_a_match() -> None:
 
 def _read_as(key: str, inner: str) -> Document:
     """A conformant document whose section ``key`` is the div as the ePI reader reads it."""
-    from zone_a.epi.reader import read_div
+    from label_docx.epi import read_div
 
     paragraphs, refused, notes = read_div(
         f'<div xmlns="http://www.w3.org/1999/xhtml">{inner}</div>'

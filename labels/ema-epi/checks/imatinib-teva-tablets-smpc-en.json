@@ -3,12 +3,12 @@
     "file": "imatinib-teva-tablets-smpc-en.json",
     "sha256": "0cad9db87d0b60ac0d589d6cfb611efcacda0ce6d36b0c0f15182157af582037"
   },
-  "reader": "epi-reader/1.2.0",
+  "reader": "epi-reader/1.3.0",
   "inputs": {
-    "registrySha256": "37e919ac8e4f2b02b36e8ba2577522844a09aff42adfa67b1bcaff97da4f1d98",
+    "registrySha256": "321faa31dc509cc13248612c71e4256b28b58e04e60e54ca5a621937b6119949",
     "mappingSha256": "2fc44a767ebd85985cc2f4dd83c10bc09f67bbc9dcb502d83baaccf4b4e5b749"
   },
-  "checker": "qrd-check/1.2.0",
+  "checker": "qrd-check/1.3.0",
   "template": {
     "family": "EMA QRD product-information template, centralised procedure",
     "version": "10.4",
@@ -17,7 +17,7 @@
     "document": "Summary of product characteristics",
     "language": "en"
   },
-  "registryVersion": "1.0.0",
+  "registryVersion": "1.1.0",
   "mappingVersion": "1.3.0",
   "document": {
     "title": "Imatinib Teva",

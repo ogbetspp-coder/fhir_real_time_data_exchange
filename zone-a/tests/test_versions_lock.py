@@ -8,7 +8,8 @@ import os
 from pathlib import Path
 from types import ModuleType
 
-from zone_a.docx import reader as docx_reader
+from label_docx import reader as docx_reader
+
 from zone_a.qrd import registry
 
 ZONE_A = Path(__file__).resolve().parents[1]
@@ -49,7 +50,7 @@ def test_a_version_not_in_the_lock_is_refused() -> None:
 
 def test_the_hash_covers_every_file_by_name_and_content() -> None:
     script = _script()
-    component = script.COMPONENTS["epi-reader"]
+    component = script.COMPONENTS["qrd-check"]
     fewer = script.Component(component.module, component.constant, component.files[:1])
     assert script.source_sha256(fewer) != script.source_sha256(component)
     for name, each in script.COMPONENTS.items():

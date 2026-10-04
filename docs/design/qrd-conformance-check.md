@@ -2,7 +2,8 @@
 
 - Status: Built and run on every EMA-published English SmPC pinned in
   `labels/ema-epi/sources.lock.json` (five)
-- Date: 2026-09-23; updated 2026-09-28 (`qrd-check/1.2.0`, `epi-reader/1.2.0`)
+- Date: 2026-09-23; updated 2026-09-28 (`qrd-check/1.2.0`, `epi-reader/1.2.0`) and 2026-10-04
+  (`qrd-check/1.3.0`, the label reader's `epi-reader/1.3.0`)
 - Related: `docs/design/qrd-registry.md` (the registry it checks against), `docs/roadmap.md`
   item 8, `AGENTS.md` (the scoped exception for authority-published ePI)
 
@@ -44,9 +45,13 @@ does.
 
 ## The reader
 
-`zone-a/src/zone_a/epi/reader.py` reads an ePI Bundle into sections of paragraphs, with the
-Word reader's `Paragraph` and `Mark` model. It is written to the Word reader's rule: the text a
-browser shows, exactly, or a refusal with a reason, for the text and its marks; its module
+The label reader's ePI reader (`label-docx-reader/src/label_docx/epi.py`) reads an ePI Bundle
+into sections of paragraphs, with the Word reader's `Paragraph` and `Mark` model. The check takes
+only its certified read (`label_docx.epi_output.read`, through `zone-a/src/zone_a/certified.py`):
+the reader's independent check (`label_docx.certify`) accounts for every character of the result,
+a result it cannot account for is refused (`uncertified`) like any other refusal, and the
+sections the check reads are rebuilt from that certified JSON, field for field. It is written to
+the Word reader's rule: the text a browser shows, exactly, or a refusal with a reason, for the text and its marks; its module
 docstring lists every rule. It does not lay the page out: CSS that places or paints one text
 over another is refused only in the cases the reader lists, and the rest is a stated residual of
 the check (below). Nor does it parse as a browser does: it parses the div as XML, a browser as
@@ -68,7 +73,7 @@ purpose where their jobs differ: T redraws the text and must know how it is draw
 needs only the characters a browser shows. `test/fixtures/authority/style-cases.json`
 (`zone-a/scripts/generate_style_cases.py`) holds the shared cases: each style with the reader's
 answer and, where T answers otherwise, T's answer and why (contrast under 4.5:1, fonts beyond the
-renderer's, borders and widths outside tables, struck text, some shifts, a few Word-only
+renderer's, borders outside tables, struck text, some shifts, a few Word-only
 properties); `test/authority/style-cases.test.ts` holds T to the reader's answer on every other
 case, so a change to either list shows until it is recorded. From `epi-reader/1.2.0` the reader
 takes Word's `tab-stops` and a `position: relative` shift as T does (a shift of a point or more
@@ -203,7 +208,12 @@ Every finding below was confirmed by reading the source div.
   shading (`#e6e6e6` behind a table heading) as none; none of these is reported. From
   `epi-reader/1.1.0` and `qrd-check/1.1.0` an underline over text it can change
   (`zone_a.underline`) is a formatting finding too, and so is a border beside or over inline
-  text (the reader's `border` mark, read side by side as a browser cascades the styles): Brukinsa writes ">1", ">5" and ">2" in 5.1 with the ">" underlined, which the
+  text (the reader's `border` mark, read side by side as a browser cascades the styles). From
+  `qrd-check/1.3.0` the colour a browser draws a link in (`#0000ee`: the label reader marks an `a`
+  with an `href` in it, under the link's underline) is the browser's, not the label's, and is not
+  a finding; that colour where no underline covers it whole still is. Bold and italic, which the
+  label reader marks, are not findings either. Brukinsa writes ">1", ">5" and ">2" in 5.1 with
+  the ">" underlined, which the
   EMA's viewer draws as "≥" while the text says ">", and Jentadueto underlines a 5.1 heading
   holding "≥". Underlines over words, digits, e-mail addresses and plain punctuation (the
   Brukinsa 4.5 subheadings, for example) change nothing and are not reported. Faint and

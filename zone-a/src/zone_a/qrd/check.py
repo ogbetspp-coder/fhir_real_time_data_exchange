@@ -1,7 +1,7 @@
 """Check an SmPC against the QRD template registry.
 
-The checker compares a document read by ``zone_a.epi.reader`` with the registry
-(``qrd/registry/cap-smpc-en-10.4.json``) and the section mapping
+The checker compares a document read by the label reader (``zone_a.certified.read_epi``) with
+the registry (``qrd/registry/cap-smpc-en-10.4.json``) and the section mapping
 (``fhir/mappings/cap-smpc-en.json``) and proposes findings for a person to review. It never
 changes, corrects or completes the label's text, and it states how it reached each finding so
 the person can check it.
@@ -79,7 +79,8 @@ by a stated rule are ``xhtml-defect`` findings. Colour, shading, strike-through 
 over text are ``formatting`` findings: coloured, highlighted or struck text in a published SmPC
 is usually a left-over from review. So is an underline over text it can change
 (``zone_a.underline``: an underlined "<" is drawn "≤"), which the text alone reads as the plain
-sign.
+sign. The colour a browser draws a link in (``#0000ee``, under the link's underline) is the
+browser's, not the label's, and is not a finding.
 """
 
 from __future__ import annotations
@@ -92,8 +93,10 @@ from collections import Counter, deque
 from dataclasses import dataclass, replace
 from typing import Any
 
-from zone_a.docx.reader import Paragraph
-from zone_a.epi.reader import READER_VERSION, Document, Section, read_epi, walk
+from label_docx.epi import READER_VERSION, Document, Section, walk
+from label_docx.reader import Mark, Paragraph
+
+from zone_a.certified import read_epi
 from zone_a.qrd.headings import collapse, index, match_heading
 from zone_a.qrd.pattern import Token, children, parse
 from zone_a.underline import underline_changes
@@ -101,7 +104,7 @@ from zone_a.underline import underline_changes
 # The version of the rules in this module and in headings.py, pattern.py and zone_a.underline.
 # A change to any of them changes its hash in versions.lock.json, and
 # tests/test_versions_lock.py then requires a new version here.
-CHECKER_VERSION = "qrd-check/1.2.0"
+CHECKER_VERSION = "qrd-check/1.3.0"
 SIMILARITY = 0.85
 MIN_LITERAL = 12
 FILL_LIMIT = 300
@@ -1302,7 +1305,7 @@ def check(document: Document, registry: dict[str, Any], mapping: dict[str, Any])
     statement and subheading of the registry has exactly one status.
 
     Args:
-        document: The ePI as ``zone_a.epi.reader.read_epi`` returns it.
+        document: The ePI as ``zone_a.certified.read_epi`` returns it.
         registry: The parsed QRD registry (``qrd/registry/cap-smpc-en-10.4.json``).
         mapping: The parsed section mapping (``fhir/mappings/cap-smpc-en.json``).
     """
@@ -1467,6 +1470,17 @@ def check(document: Document, registry: dict[str, Any], mapping: dict[str, Any])
 
 
 _PICTURE = frozenset("\ufffc")
+# The colour a browser draws a link in (an ``a`` with an ``href``, which the reader also marks
+# underlined), unless the link's own style gives one.
+_LINK_COLOUR = "color-#0000ee"
+
+
+def _link_colour(paragraph: Paragraph, mark: Mark) -> bool:
+    """Whether ``mark`` is the link colour, over text that one underline covers whole."""
+    return mark.kind == _LINK_COLOUR and any(
+        other.kind == "underline" and other.start <= mark.start and mark.end <= other.end
+        for other in paragraph.marks
+    )
 
 
 def _formatting(report: _Report, section: str, number: int, paragraph: Paragraph) -> None:
@@ -1503,7 +1517,7 @@ def _formatting(report: _Report, section: str, number: int, paragraph: Paragraph
         if not any(c.isalnum() for c in covered):
             # A coloured picture or shaded space shows no text differently.
             continue
-        if mark.kind.startswith("color-"):
+        if mark.kind.startswith("color-") and not _link_colour(paragraph, mark):
             report.finding(
                 "formatting",
                 section=section,

@@ -3,15 +3,17 @@
     uv run --frozen python scripts/generate_style_cases.py          # write
     uv run --frozen python scripts/generate_style_cases.py --check  # fail on drift
 
-Two readers read the same EMA divs: zone_a.epi.reader, for the QRD check, and the authority
-importer's T (src/authority/t/), which decides what an import keeps. Each checks CSS against a
-closed list of its own, and they differ on purpose where their jobs differ (T redraws the text
-and must know how it is drawn; the reader only needs the characters a browser shows). Each case
-here is a style on an element in a small div, with the reader's answer (the marks it reads, or
-its refusal) and, where T answers otherwise, T's answer and why the two differ. The TypeScript
-test (test/authority/style-cases.test.ts) holds T to the reader's answer on every other case, so
-a change to either closed list shows as a failing case until it is recorded here: a change to
-the reader changes this file (tests/test_style_cases.py), and a change to T fails that test.
+Two readers read the same EMA divs: the label reader's (label_docx.epi), for the QRD check, and
+the authority importer's T (src/authority/t/), which decides what an import keeps. Each checks CSS
+against a closed list of its own, and they differ on purpose where their jobs differ (T redraws
+the text and must know how it is drawn; the reader only needs the characters a browser shows).
+Each case here is a style on an element in a small div, with the reader's answer (the marks it
+reads, or its refusal: its rule for the div, label_docx.epi.read_div; the certificate of a
+label's read accounts for its characters, not for a case's CSS) and, where T answers otherwise,
+T's answer and why the two differ. The TypeScript test (test/authority/style-cases.test.ts)
+holds T to the reader's answer on every other case, so a change to either closed list shows as a
+failing case until it is recorded here: a change to the reader changes this file
+(tests/test_style_cases.py), and a change to T fails that test.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ import json
 import sys
 from pathlib import Path
 
-from zone_a.epi.reader import read_div
+from label_docx.epi import read_div
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGET = ROOT / "test" / "fixtures" / "authority" / "style-cases.json"
@@ -178,15 +180,10 @@ _BIG_FONT = (
 )
 _BOXES = (
     "T takes borders, widths and heights on table parts only (T3); the reader marks a hairline "
-    "border on inline text as an underline or a border, and takes a block's border and a width "
-    "as layout"
+    "border on inline text as an underline or a border, and takes a block's border as layout"
 )
 _STRIKE = (
     "T takes only an underline (T3); the reader marks struck text, which the QRD check reports"
-)
-_VERTICAL_ALIGN = (
-    "T takes baseline, super, sub or a length on inline text (T4); the reader also takes top, "
-    "middle and bottom as layout"
 )
 _SHIFT = (
     "T refuses a shift it can neither drop (under 0.1 of the font) nor write as sup or sub (from "
@@ -227,15 +224,12 @@ DIVERGENCES: dict[tuple[str, str], tuple[str, str]] = {
     ("span", "font-size: 20pt"): ("accepted", _BIG_FONT),
     ("span", "font-family: Verdana"): ("refused:font", _FONTS),
     ("span", "text-decoration: line-through"): ("refused:css-value", _STRIKE),
-    ("span", "vertical-align: top"): ("refused:css-value", _VERTICAL_ALIGN),
     ("span", "position: relative; top: 1.5pt"): ("refused:baseline-shift", _SHIFT),
     ("span", "layout-grid-mode: line"): ("refused:css-property", _WORD_ONLY),
     ("span", "text-autospace: none"): ("accepted", _NOT_ON_READERS_LIST),
     ("span", "widows: 2"): ("accepted", _NOT_ON_READERS_LIST),
     ("span", "border-bottom: 1px solid"): ("refused:css-property", _BOXES),
     ("span", "border-top: 1px solid"): ("refused:css-property", _BOXES),
-    ("span", "width: 10pt"): ("refused:css-property", _BOXES),
-    ("p", "width: 100pt"): ("refused:css-property", _BOXES),
     ("p", "border-bottom: 1px solid"): ("refused:css-property", _BOXES),
     ("span", "visibility: visible"): ("refused:css-property", _VISIBILITY),
     ("span", "background: black; background: none"): ("refused:css-value", _BACKGROUND_NONE),
