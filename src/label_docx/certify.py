@@ -472,7 +472,7 @@ class _Fonts:
             raise CertificationError("characters in a dingbat or symbol-encoded font")
         if not named:
             return "text"
-        family = named.pop()
+        family = min(named)  # the one family named
         hints = [level.find(_w("rFonts")) for level in levels]
         if (
             families["ascii"] != family

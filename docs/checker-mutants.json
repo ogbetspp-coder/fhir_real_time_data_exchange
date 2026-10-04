@@ -1,6 +1,6 @@
 {
-  "killed": 2456,
-  "mutants": 2614,
+  "killed": 2541,
+  "mutants": 2627,
   "survivors": [
     {
       "code": "return False",
@@ -15,7 +15,7 @@
       "equivalent": "its callers read it with not, and None is as false as False",
       "function": "_typed",
       "kind": "statement",
-      "line": 1329,
+      "line": 1334,
       "occurrence": 0
     },
     {
@@ -23,7 +23,7 @@
       "equivalent": "the xml prefix can never name Word's namespace, the only one the tokenizer looks for",
       "function": "<module>",
       "kind": "str:'http://www.w3.org/XML/1998/namespace'",
-      "line": 1709,
+      "line": 1714,
       "occurrence": 0
     },
     {
@@ -31,7 +31,7 @@
       "equivalent": "a function that ends without a return gives None, which is as false as False here",
       "function": "_refused",
       "kind": "statement",
-      "line": 2145,
+      "line": 2150,
       "occurrence": 0
     },
     {
@@ -71,7 +71,7 @@
       "equivalent": "a row group is always met beside a table or a row, which end the paragraph; text directly in one is refused by the reader",
       "function": "<module>",
       "kind": "str:'thead'",
-      "line": 2486,
+      "line": 2491,
       "occurrence": 0
     },
     {
@@ -79,7 +79,7 @@
       "equivalent": "a row group is always met beside a table or a row, which end the paragraph; text directly in one is refused by the reader",
       "function": "<module>",
       "kind": "str:'tbody'",
-      "line": 2487,
+      "line": 2492,
       "occurrence": 0
     },
     {
@@ -107,27 +107,11 @@
       "occurrence": 0
     },
     {
-      "code": "loose = self.off_grid[row] or self.merged",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "boolop",
-      "line": 1050,
-      "occurrence": 0
-    },
-    {
-      "code": "why.append(\"two corners over one cell\")",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "call",
-      "line": 1117,
-      "occurrence": 0
-    },
-    {
       "code": "depth_of_capture = -1",
       "equivalent": "the depth is set whenever a capture begins, before it is read",
       "function": "_raw_texts",
       "kind": "int:1",
-      "line": 1748,
+      "line": 1753,
       "occurrence": 0
     },
     {
@@ -135,7 +119,7 @@
       "equivalent": "the counts follow from the sequences, which are equal by then: the ledger is a second statement of the same fact, stated in the certificate",
       "function": "DocxSource.certify",
       "kind": "statement",
-      "line": 2077,
+      "line": 2082,
       "occurrence": 0
     },
     {
@@ -143,7 +127,7 @@
       "equivalent": "the parser starts at the div, a block, which ends the (empty) paragraph and clears it",
       "function": "_Div.__init__",
       "kind": "bool",
-      "line": 2510,
+      "line": 2515,
       "occurrence": 0
     },
     {
@@ -151,7 +135,7 @@
       "equivalent": "the div ends with its own end tag, so nothing is left buffered",
       "function": "EpiSource._section",
       "kind": "call",
-      "line": 2605,
+      "line": 2610,
       "occurrence": 0
     },
     {
@@ -159,7 +143,7 @@
       "equivalent": "the div's end tag, a block's, has ended the last paragraph",
       "function": "EpiSource._section",
       "kind": "call",
-      "line": 2606,
+      "line": 2611,
       "occurrence": 0
     },
     {
@@ -167,7 +151,7 @@
       "equivalent": "the counts follow from the sequences, which are equal by then: the ledger is a second statement of the same fact, stated in the certificate",
       "function": "EpiSource.certify",
       "kind": "statement",
-      "line": 2676,
+      "line": 2681,
       "occurrence": 0
     },
     {
@@ -219,43 +203,11 @@
       "occurrence": 1
     },
     {
-      "code": "self.top += 1",
-      "equivalent": null,
-      "function": "_Applied.__init__",
-      "kind": "int:1",
-      "line": 1020,
-      "occurrence": 0
-    },
-    {
-      "code": "continue",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "statement",
-      "line": 1085,
-      "occurrence": 1
-    },
-    {
-      "code": "if {\"firstRow\", \"lastRow\"} <= found or {\"firstCol\", \"lastCol\"} <= found:",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "compare:0",
-      "line": 1114,
-      "occurrence": 1
-    },
-    {
-      "code": "if len(found & {\"nwCell\", \"neCell\", \"swCell\", \"seCell\"}) > 1:",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "int:1",
-      "line": 1116,
-      "occurrence": 0
-    },
-    {
       "code": "scopes: list[dict[str, str]] = [{\"xml\": _XML_NS}]",
       "equivalent": "the xml prefix can never name Word's namespace, the only one the tokenizer looks for",
       "function": "_raw_texts",
       "kind": "str:'xml'",
-      "line": 1745,
+      "line": 1750,
       "occurrence": 0
     },
     {
@@ -263,7 +215,7 @@
       "equivalent": "a '<' at the very start finds no capture open, so the chunk is never used there",
       "function": "_raw_texts",
       "kind": "compare:0",
-      "line": 1752,
+      "line": 1757,
       "occurrence": 0
     },
     {
@@ -271,7 +223,7 @@
       "equivalent": "the word only names the place in a refusal's detail",
       "function": "DocxSource.certify",
       "kind": "str:'paragraph'",
-      "line": 2024,
+      "line": 2029,
       "occurrence": 0
     },
     {
@@ -279,7 +231,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "_refused",
       "kind": "str:' paragraph'",
-      "line": 2144,
+      "line": 2149,
       "occurrence": 0
     },
     {
@@ -287,7 +239,7 @@
       "equivalent": "a change (ins, del, moveFrom, moveTo) is a revision outside _SAME_AS and no cell change: the test after it passes over it too",
       "function": "_canon.add",
       "kind": "statement",
-      "line": 2269,
+      "line": 2274,
       "occurrence": 3
     },
     {
@@ -295,7 +247,7 @@
       "equivalent": "the table count is compared only between two walks that both make it: any step but zero numbers the same tables apart, so a table added or lost shows either way",
       "function": "_run_tokens.table",
       "kind": "binop",
-      "line": 2317,
+      "line": 2322,
       "occurrence": 0
     },
     {
@@ -303,7 +255,7 @@
       "equivalent": "a paragraph holds no paragraph and run content no run the walk reads: walking either again only adds to a list outside any paragraph, which is never read",
       "function": "_run_tokens.walk",
       "kind": "statement",
-      "line": 2350,
+      "line": 2355,
       "occurrence": 0
     },
     {
@@ -311,8 +263,16 @@
       "equivalent": "the element has no children: walking it reads nothing",
       "function": "_run_tokens.walk",
       "kind": "statement",
-      "line": 2374,
+      "line": 2379,
       "occurrence": 3
+    },
+    {
+      "code": "if \"dingbat\" in named or len(named) > 1:",
+      "equivalent": null,
+      "function": "_Fonts.drawn",
+      "kind": "int:1",
+      "line": 471,
+      "occurrence": 0
     },
     {
       "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
@@ -347,51 +307,11 @@
       "occurrence": 0
     },
     {
-      "code": "self.table_sizes = (_size_of(table, \"Row\"), _size_of(table, \"Col\"))",
-      "equivalent": null,
-      "function": "_Applied.__init__",
-      "kind": "str:'Col'",
-      "line": 1000,
-      "occurrence": 0
-    },
-    {
-      "code": "why: list[str] = [\"a part defined twice\"] if self.twice else []",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:'a part defined twice'",
-      "line": 1045,
-      "occurrence": 0
-    },
-    {
-      "code": "f\"a part of type {k!r}\" for k in sorted(self.setting - {*_PART_ORDER, \"wholeTable\"})",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:'a part of type '",
-      "line": 1047,
-      "occurrence": 0
-    },
-    {
-      "code": "why.append(\"first and last over one cell\")",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:'first and last over one cell'",
-      "line": 1115,
-      "occurrence": 0
-    },
-    {
-      "code": "why.append(\"two corners over one cell\")",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:'two corners over one cell'",
-      "line": 1117,
-      "occurrence": 0
-    },
-    {
       "code": "if found.rsplit(\"/\", 1)[-1] == kind:",
       "equivalent": "splitting once more leaves the last segment, the type's name, the same",
       "function": "_typed",
       "kind": "int:1",
-      "line": 1327,
+      "line": 1332,
       "occurrence": 0
     },
     {
@@ -399,7 +319,7 @@
       "equivalent": "a tenth place is never used: list levels are 0 to 8",
       "function": "_Numbering.label",
       "kind": "int:9",
-      "line": 1519,
+      "line": 1524,
       "occurrence": 0
     },
     {
@@ -407,7 +327,7 @@
       "equivalent": "a tenth place is never used: list levels are 0 to 8",
       "function": "_Numbering.label",
       "kind": "int:9",
-      "line": 1521,
+      "line": 1526,
       "occurrence": 0
     },
     {
@@ -415,7 +335,7 @@
       "equivalent": "a tenth place is never used: list levels are 0 to 8",
       "function": "_Numbering.label",
       "kind": "int:9",
-      "line": 1522,
+      "line": 1527,
       "occurrence": 0
     },
     {
@@ -423,7 +343,7 @@
       "equivalent": "a reference to character 0 is refused by the XML parser first (_parse); any other keeps a digit",
       "function": "_unescape.one",
       "kind": "str:'0'",
-      "line": 1722,
+      "line": 1727,
       "occurrence": 1
     },
     {
@@ -431,7 +351,7 @@
       "equivalent": "a '<' at the very start finds no capture open, so the chunk is never used there",
       "function": "_raw_texts",
       "kind": "int:0",
-      "line": 1752,
+      "line": 1757,
       "occurrence": 0
     },
     {
@@ -439,7 +359,7 @@
       "equivalent": "the comments' metadata lists are compared just before, so the lengths are equal",
       "function": "DocxSource.certify",
       "kind": "bool",
-      "line": 2065,
+      "line": 2070,
       "occurrence": 0
     },
     {
@@ -447,7 +367,7 @@
       "equivalent": "called only after certify has compared the lengths",
       "function": "DocxSource._pairs",
       "kind": "bool",
-      "line": 2112,
+      "line": 2117,
       "occurrence": 0
     },
     {
@@ -455,7 +375,7 @@
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "_paragraphs",
       "kind": "bool",
-      "line": 2132,
+      "line": 2137,
       "occurrence": 0
     },
     {
@@ -463,7 +383,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "_paragraphs",
       "kind": "str:' '",
-      "line": 2133,
+      "line": 2138,
       "occurrence": 0
     },
     {
@@ -471,7 +391,7 @@
       "equivalent": "the table count is compared only between two walks that both make it: any step but zero numbers the same tables apart, so a table added or lost shows either way",
       "function": "_run_tokens.table",
       "kind": "int:1",
-      "line": 2317,
+      "line": 2322,
       "occurrence": 0
     },
     {
@@ -499,99 +419,11 @@
       "occurrence": 0
     },
     {
-      "code": "said, False if said == \"off\" else None",
-      "equivalent": null,
-      "function": "_one_look",
-      "kind": "compare:0",
-      "line": 968,
-      "occurrence": 0
-    },
-    {
-      "code": "said, False if said == \"off\" else None",
-      "equivalent": null,
-      "function": "_one_look",
-      "kind": "bool",
-      "line": 968,
-      "occurrence": 0
-    },
-    {
-      "code": "if {\"firstRow\", \"lastRow\"} <= found or {\"firstCol\", \"lastCol\"} <= found:",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:'firstCol'",
-      "line": 1114,
-      "occurrence": 0
-    },
-    {
-      "code": "if {\"firstRow\", \"lastRow\"} <= found or {\"firstCol\", \"lastCol\"} <= found:",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:'lastCol'",
-      "line": 1114,
-      "occurrence": 0
-    },
-    {
-      "code": "bool(found & self.inherited) or not found <= ours.keys(),",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "boolop",
-      "line": 1121,
-      "occurrence": 0
-    },
-    {
-      "code": "\"a part through basedOn\",",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:'a part through basedOn'",
-      "line": 1122,
-      "occurrence": 0
-    },
-    {
-      "code": "(self.marked[row] and row >= self.top, \"a header row below a row that is none\"),",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:'a header row below a row that is none'",
-      "line": 1124,
-      "occurrence": 0
-    },
-    {
-      "code": "(self.off_grid[row], \"a row off the grid\"),",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:'a row off the grid'",
-      "line": 1125,
-      "occurrence": 0
-    },
-    {
-      "code": "(self.merged, \"merged cells\"),",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:'merged cells'",
-      "line": 1126,
-      "occurrence": 0
-    },
-    {
-      "code": "(self.elsewhere, \"a nested table, or a note, header, footer or comment\"),",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:'a nested table, or a note, header, footer or comment'",
-      "line": 1127,
-      "occurrence": 0
-    },
-    {
-      "code": "(any(n.tag == _w(\"tbl\") for n in self.cells[row][column].iter()), \"a table in it\"),",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:'a table in it'",
-      "line": 1128,
-      "occurrence": 0
-    },
-    {
       "code": "section = sections[min(paragraph.section, len(sections) - 1)] if sections else None",
       "equivalent": "a paragraph's section is at most the number of sections closed before the last, len(sections) - 1, so the bound never takes",
       "function": "_note_marks",
       "kind": "binop",
-      "line": 1676,
+      "line": 1681,
       "occurrence": 0
     },
     {
@@ -599,7 +431,7 @@
       "equivalent": "the parts and their uses are compared just before, so the lengths are equal",
       "function": "DocxSource.certify",
       "kind": "bool",
-      "line": 2048,
+      "line": 2053,
       "occurrence": 0
     },
     {
@@ -607,7 +439,7 @@
       "equivalent": "called only after certify has compared the lengths",
       "function": "DocxSource._pairs",
       "kind": "bool",
-      "line": 2109,
+      "line": 2114,
       "occurrence": 0
     },
     {
@@ -615,7 +447,7 @@
       "equivalent": "a refused comment is served with no paragraphs (certify holds it to that): counting it adds nothing to the output",
       "function": "DocxSource._pairs",
       "kind": "str:'#'",
-      "line": 2113,
+      "line": 2118,
       "occurrence": 0
     },
     {
@@ -623,7 +455,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "_paragraphs",
       "kind": "binop",
-      "line": 2133,
+      "line": 2138,
       "occurrence": 0
     },
     {
@@ -631,7 +463,7 @@
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "EpiSource.certify",
       "kind": "bool",
-      "line": 2667,
+      "line": 2672,
       "occurrence": 0
     },
     {
@@ -639,167 +471,15 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "EpiSource.certify",
       "kind": "str:'section '",
-      "line": 2668,
-      "occurrence": 0
-    },
-    {
-      "code": "out[name] = {\"1\": True, \"true\": True, \"on\": True, \"0\": False, \"false\": False}.get(",
-      "equivalent": null,
-      "function": "_one_look",
-      "kind": "str:'true'",
-      "line": 967,
-      "occurrence": 0
-    },
-    {
-      "code": "out[name] = {\"1\": True, \"true\": True, \"on\": True, \"0\": False, \"false\": False}.get(",
-      "equivalent": null,
-      "function": "_one_look",
-      "kind": "str:'on'",
-      "line": 967,
-      "occurrence": 0
-    },
-    {
-      "code": "out[name] = {\"1\": True, \"true\": True, \"on\": True, \"0\": False, \"false\": False}.get(",
-      "equivalent": null,
-      "function": "_one_look",
-      "kind": "str:'false'",
-      "line": 967,
-      "occurrence": 0
-    },
-    {
-      "code": "out[name] = {\"1\": True, \"true\": True, \"on\": True, \"0\": False, \"false\": False}.get(",
-      "equivalent": null,
-      "function": "_one_look",
-      "kind": "bool",
-      "line": 967,
-      "occurrence": 1
-    },
-    {
-      "code": "out[name] = {\"1\": True, \"true\": True, \"on\": True, \"0\": False, \"false\": False}.get(",
-      "equivalent": null,
-      "function": "_one_look",
-      "kind": "bool",
-      "line": 967,
-      "occurrence": 2
-    },
-    {
-      "code": "out[name] = {\"1\": True, \"true\": True, \"on\": True, \"0\": False, \"false\": False}.get(",
-      "equivalent": null,
-      "function": "_one_look",
-      "kind": "bool",
-      "line": 967,
-      "occurrence": 4
-    },
-    {
-      "code": "said, False if said == \"off\" else None",
-      "equivalent": null,
-      "function": "_one_look",
-      "kind": "str:'off'",
-      "line": 968,
-      "occurrence": 0
-    },
-    {
-      "code": "self.inherited: set[str] = set().union(*setting[1:])",
-      "equivalent": null,
-      "function": "_Applied.__init__",
-      "kind": "int:1",
-      "line": 1014,
-      "occurrence": 0
-    },
-    {
-      "code": "props.find(_w(\"vMerge\")) is not None",
-      "equivalent": null,
-      "function": "_Applied.__init__",
-      "kind": "compare:0",
-      "line": 1032,
-      "occurrence": 0
-    },
-    {
-      "code": "or props.find(_w(\"hMerge\")) is not None",
-      "equivalent": null,
-      "function": "_Applied.__init__",
-      "kind": "compare:0",
-      "line": 1033,
-      "occurrence": 0
-    },
-    {
-      "code": "why.append(f\"{kind}: a corner Word was not asked about\")",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:': a corner Word was not asked about'",
-      "line": 1076,
-      "occurrence": 0
-    },
-    {
-      "code": "s[slot] is not None for s in self.sizes[1:]",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "compare:0",
-      "line": 1088,
-      "occurrence": 0
-    },
-    {
-      "code": "why.append(f\"{way} band size not on record\")",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:' band size not on record'",
-      "line": 1090,
-      "occurrence": 0
-    },
-    {
-      "code": "why.append(f\"{way} banding in a row off the grid or among merged cells\")",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "call",
-      "line": 1096,
-      "occurrence": 0
-    },
-    {
-      "code": "if len(found & {\"nwCell\", \"neCell\", \"swCell\", \"seCell\"}) > 1:",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:'nwCell'",
-      "line": 1116,
-      "occurrence": 0
-    },
-    {
-      "code": "if len(found & {\"nwCell\", \"neCell\", \"swCell\", \"seCell\"}) > 1:",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:'neCell'",
-      "line": 1116,
-      "occurrence": 0
-    },
-    {
-      "code": "if len(found & {\"nwCell\", \"neCell\", \"swCell\", \"seCell\"}) > 1:",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:'swCell'",
-      "line": 1116,
-      "occurrence": 0
-    },
-    {
-      "code": "if len(found & {\"nwCell\", \"neCell\", \"swCell\", \"seCell\"}) > 1:",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:'seCell'",
-      "line": 1116,
+      "line": 2673,
       "occurrence": 0
     },
     {
       "code": "(self.marked[row] and row >= self.top, \"a header row below a row that is none\"),",
-      "equivalent": null,
+      "equivalent": "the header rows at the top end at the first unmarked row, so row top is never marked",
       "function": "_Applied.at",
       "kind": "compare:0",
-      "line": 1124,
-      "occurrence": 0
-    },
-    {
-      "code": "why.append(f\"{kind} sets a mark Word was not asked about\")",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:' sets a mark Word was not asked about'",
-      "line": 1138,
+      "line": 1129,
       "occurrence": 0
     },
     {
@@ -807,7 +487,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "DocxSource.certify",
       "kind": "str:' '",
-      "line": 2041,
+      "line": 2046,
       "occurrence": 0
     },
     {
@@ -815,7 +495,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "DocxSource.certify",
       "kind": "str:' paragraph'",
-      "line": 2041,
+      "line": 2046,
       "occurrence": 0
     },
     {
@@ -823,7 +503,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "_paragraphs",
       "kind": "int:1",
-      "line": 2133,
+      "line": 2138,
       "occurrence": 0
     },
     {
@@ -831,7 +511,7 @@
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "EpiSource.certify.section",
       "kind": "bool",
-      "line": 2652,
+      "line": 2657,
       "occurrence": 0
     },
     {
@@ -839,7 +519,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "EpiSource.certify.section",
       "kind": "str:'.'",
-      "line": 2654,
+      "line": 2659,
       "occurrence": 0
     },
     {
@@ -847,55 +527,15 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "EpiSource.certify",
       "kind": "binop",
-      "line": 2668,
+      "line": 2673,
       "occurrence": 0
     },
     {
       "code": "for i, found in zip(style_ids, self.styles, strict=True)",
-      "equivalent": null,
+      "equivalent": "self.styles is made from style_ids one for one, so zip(strict=True) never raises",
       "function": "_Applied.__init__",
       "kind": "bool",
       "line": 997,
-      "occurrence": 0
-    },
-    {
-      "code": "or r.find(f\"{_w('trPr')}/{_w('gridAfter')}\") is not None",
-      "equivalent": null,
-      "function": "_Applied.__init__",
-      "kind": "str:'/'",
-      "line": 1023,
-      "occurrence": 0
-    },
-    {
-      "code": "why.append(f\"{kind} under a look not on record\")",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:' under a look not on record'",
-      "line": 1078,
-      "occurrence": 0
-    },
-    {
-      "code": "ours, below = self.styles[0], {k for s in self.styles[1:] for k in s}",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "int:1",
-      "line": 1079,
-      "occurrence": 0
-    },
-    {
-      "code": "elif (start[0] in below and start[0] not in ours) or (",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "boolop",
-      "line": 1097,
-      "occurrence": 0
-    },
-    {
-      "code": "why.append(f\"{way} banding past a {start[0]} not on record\")",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "call",
-      "line": 1100,
       "occurrence": 0
     },
     {
@@ -903,7 +543,7 @@
       "equivalent": "the default is only compared with 'eachSect', which 'Xontinuous' is not either",
       "function": "_note_marks",
       "kind": "str:'continuous'",
-      "line": 1699,
+      "line": 1704,
       "occurrence": 0
     },
     {
@@ -911,7 +551,7 @@
       "equivalent": "the default only has to be outside the layout types, as 'Xormal' is",
       "function": "DocxSource.__init__",
       "kind": "str:'normal'",
-      "line": 1872,
+      "line": 1877,
       "occurrence": 0
     },
     {
@@ -919,7 +559,7 @@
       "equivalent": "a paragraph mark's change markers are empty: dropping one drops no content",
       "function": "_run_tokens.walk",
       "kind": "str:'rPr'",
-      "line": 2375,
+      "line": 2380,
       "occurrence": 0
     },
     {
@@ -927,7 +567,7 @@
       "equivalent": "the cell count starts again at each row; only the row count's start matters, and its mutant is caught",
       "function": "_Div.handle_starttag",
       "kind": "int:1",
-      "line": 2537,
+      "line": 2542,
       "occurrence": 1
     },
     {
@@ -935,7 +575,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "EpiSource.certify.section",
       "kind": "binop",
-      "line": 2654,
+      "line": 2659,
       "occurrence": 0
     },
     {
@@ -943,31 +583,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "EpiSource.certify",
       "kind": "int:1",
-      "line": 2668,
-      "occurrence": 0
-    },
-    {
-      "code": "out[name] = None if raw is None else bool(int(raw, 16) >> (position + 5) & 1)",
-      "equivalent": null,
-      "function": "_one_look",
-      "kind": "int:16",
-      "line": 965,
-      "occurrence": 0
-    },
-    {
-      "code": "or (span is not None and span.get(_w(\"val\")) != \"1\")",
-      "equivalent": null,
-      "function": "_Applied.__init__",
-      "kind": "str:'1'",
-      "line": 1034,
-      "occurrence": 0
-    },
-    {
-      "code": "why.append(f\"{way} banding not on record\")",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:' banding not on record'",
-      "line": 1094,
+      "line": 2673,
       "occurrence": 0
     },
     {
@@ -975,7 +591,7 @@
       "equivalent": "both lists have one entry per character of the text, which was compared just before",
       "function": "_match",
       "kind": "bool",
-      "line": 1242,
+      "line": 1247,
       "occurrence": 0
     },
     {
@@ -983,7 +599,7 @@
       "equivalent": "a tag's first character is its name's, never '>' or a quote, so matching from one character later finds the same end",
       "function": "_raw_texts",
       "kind": "int:1",
-      "line": 1769,
+      "line": 1774,
       "occurrence": 0
     },
     {
@@ -991,7 +607,7 @@
       "equivalent": "outside a namespace declaration an attribute is read only for its references, which the XML parser has checked first (_parse)",
       "function": "_raw_texts",
       "kind": "compare:0",
-      "line": 1788,
+      "line": 1793,
       "occurrence": 1
     },
     {
@@ -999,7 +615,7 @@
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "_agree",
       "kind": "bool",
-      "line": 2229,
+      "line": 2234,
       "occurrence": 0
     },
     {
@@ -1007,7 +623,7 @@
       "equivalent": "where a difference is found only words the refusal",
       "function": "EpiSource.certify.section",
       "kind": "compare:0",
-      "line": 2634,
+      "line": 2639,
       "occurrence": 0
     },
     {
@@ -1015,16 +631,8 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "EpiSource.certify.section",
       "kind": "int:1",
-      "line": 2654,
+      "line": 2659,
       "occurrence": 0
-    },
-    {
-      "code": "or ((n := _numbering_of(self.fonts, p)) is not None and n[0] != 0)",
-      "equivalent": null,
-      "function": "_Story.table",
-      "kind": "compare:0",
-      "line": 634,
-      "occurrence": 1
     },
     {
       "code": "self.ledger.symbol += sum(1 for a, b in zip(text, mapped, strict=True) if a != b)",
@@ -1035,83 +643,11 @@
       "occurrence": 0
     },
     {
-      "code": "or r.find(f\"{_w('trPr')}/{_w('gridAfter')}\") is not None",
-      "equivalent": null,
-      "function": "_Applied.__init__",
-      "kind": "str:'trPr'",
-      "line": 1023,
-      "occurrence": 0
-    },
-    {
-      "code": "or r.find(f\"{_w('trPr')}/{_w('gridAfter')}\") is not None",
-      "equivalent": null,
-      "function": "_Applied.__init__",
-      "kind": "str:'gridAfter'",
-      "line": 1023,
-      "occurrence": 0
-    },
-    {
-      "code": "props.find(_w(\"vMerge\")) is not None",
-      "equivalent": null,
-      "function": "_Applied.__init__",
-      "kind": "str:'vMerge'",
-      "line": 1032,
-      "occurrence": 0
-    },
-    {
-      "code": "or props.find(_w(\"hMerge\")) is not None",
-      "equivalent": null,
-      "function": "_Applied.__init__",
-      "kind": "str:'hMerge'",
-      "line": 1033,
-      "occurrence": 0
-    },
-    {
-      "code": "s[slot] is not None for s in self.sizes[1:]",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "int:1",
-      "line": 1088,
-      "occurrence": 0
-    },
-    {
-      "code": "why.append(f\"{way} banding in a row off the grid or among merged cells\")",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:' banding in a row off the grid or among merged cells'",
-      "line": 1096,
-      "occurrence": 0
-    },
-    {
-      "code": "elif (start[0] in below and start[0] not in ours) or (",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "compare:0",
-      "line": 1097,
-      "occurrence": 1
-    },
-    {
-      "code": "start[0] in ours and self.look[start[1]] is None",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "compare:0",
-      "line": 1098,
-      "occurrence": 0
-    },
-    {
-      "code": "elif start[0] in ours and self.look[start[1]] and way == \"Horz\" and self.top > 1:",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "compare:0",
-      "line": 1101,
-      "occurrence": 2
-    },
-    {
       "code": "name = body.split(None, 1)[0] if body.strip() else \"\"",
       "equivalent": "splitting once more leaves the first word, the name, the same",
       "function": "_raw_texts",
       "kind": "int:1",
-      "line": 1783,
+      "line": 1788,
       "occurrence": 0
     },
     {
@@ -1119,156 +655,44 @@
       "equivalent": "outside a namespace declaration an attribute is read only for its references, which the XML parser has checked first (_parse)",
       "function": "_raw_texts",
       "kind": "str:'&'",
-      "line": 1788,
+      "line": 1793,
       "occurrence": 0
     },
     {
-      "code": "or ((n := _numbering_of(self.fonts, p)) is not None and n[0] != 0)",
-      "equivalent": null,
-      "function": "_Story.table",
-      "kind": "int:0",
-      "line": 634,
-      "occurrence": 1
-    },
-    {
-      "code": "or (span is not None and span.get(_w(\"val\")) != \"1\")",
-      "equivalent": null,
-      "function": "_Applied.__init__",
-      "kind": "str:'val'",
-      "line": 1034,
-      "occurrence": 0
-    },
-    {
-      "code": "why.append(f\"{way} banding past a {start[0]} not on record\")",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:' banding past a '",
-      "line": 1100,
-      "occurrence": 0
-    },
-    {
-      "code": "why.append(f\"{way} banding past a {start[0]} not on record\")",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:' not on record'",
-      "line": 1100,
-      "occurrence": 0
-    },
-    {
-      "code": "why.append(\"banding past several header rows\")",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:'banding past several header rows'",
-      "line": 1102,
-      "occurrence": 0
-    },
-    {
-      "code": "and index == count - 1",
+      "code": "index == count - 1",
       "equivalent": null,
       "function": "_Applied.at",
       "kind": "compare:0",
-      "line": 1106,
-      "occurrence": 0
-    },
-    {
-      "code": "or ((n := _numbering_of(self.fonts, p)) is not None and n[0] != 0)",
-      "equivalent": null,
-      "function": "_Story.table",
-      "kind": "int:0",
-      "line": 634,
-      "occurrence": 0
-    },
-    {
-      "code": "elif (start[0] in below and start[0] not in ours) or (",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "int:0",
-      "line": 1097,
-      "occurrence": 0
-    },
-    {
-      "code": "elif (start[0] in below and start[0] not in ours) or (",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "int:0",
-      "line": 1097,
-      "occurrence": 1
-    },
-    {
-      "code": "start[0] in ours and self.look[start[1]] is None",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "int:0",
-      "line": 1098,
+      "line": 1104,
       "occurrence": 0
     },
     {
       "code": "elif start[0] in ours and self.look[start[1]] and way == \"Horz\" and self.top > 1:",
-      "equivalent": null,
+      "equivalent": "for Horz both names are firstRow; for Vert the test of way is false whichever is looked for",
       "function": "_Applied.at",
       "kind": "int:0",
       "line": 1101,
       "occurrence": 0
     },
     {
-      "code": "why.append(f\"{way} banding past a {start[0]} not on record\")",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "int:0",
-      "line": 1100,
-      "occurrence": 0
-    },
-    {
-      "code": "and index == count - 1",
+      "code": "index == count - 1",
       "equivalent": null,
       "function": "_Applied.at",
       "kind": "int:1",
-      "line": 1106,
-      "occurrence": 0
-    },
-    {
-      "code": "why.append(f\"{way} banding over a {end[0]} not on record\")",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:' banding over a '",
-      "line": 1108,
-      "occurrence": 0
-    },
-    {
-      "code": "why.append(f\"{way} banding over a {end[0]} not on record\")",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "str:' not on record'",
-      "line": 1108,
-      "occurrence": 0
-    },
-    {
-      "code": "(end[0] in ours or end[0] in below)",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "int:0",
       "line": 1104,
-      "occurrence": 1
+      "occurrence": 0
     },
     {
-      "code": "why.append(f\"{way} banding over a {end[0]} not on record\")",
+      "code": "or (end[0] in ours and self.look[end[1]] is None)",
       "equivalent": null,
       "function": "_Applied.at",
       "kind": "int:0",
       "line": 1108,
       "occurrence": 0
-    },
-    {
-      "code": "found.add(f\"band{(index - past) // int(size) % 2 + 1}{way}\")",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "binop",
-      "line": 1112,
-      "occurrence": 1
     }
   ],
   "target": "src/label_docx/certify.py",
-  "targetSha256": "b19b25c93933cbc9c5661423a249e291635abc367437d505efc3c6e91510fc3b",
+  "targetSha256": "f761b5ba22cbac76a1026668279b75f47944de39d8ee0ec648b15dc067174c80",
   "tests": [
     "tests/test_certify.py",
     "tests/test_headers_comments.py",
@@ -1277,5 +701,5 @@
     "tests/test_robustness.py",
     "tests/test_output.py"
   ],
-  "testsSha256": "24e0a883544b8316bd0fc152cb363e3737abc5fae664fafd0b9bedc99b6e1180"
+  "testsSha256": "adfd7b186e8c737e35ce3c35b37b7aac090b752b38680ca5d080cf9e30c476b9"
 }
