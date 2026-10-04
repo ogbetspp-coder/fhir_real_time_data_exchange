@@ -20,6 +20,7 @@ from label_docx.epi import (
     read_epi,
     walk,
 )
+from test_no_label_leak import sha256_hex
 
 SOURCES = Path(__file__).resolve().parents[1] / "corpus" / "ema-epi"
 XHTML = "http://www.w3.org/1999/xhtml"
@@ -248,28 +249,31 @@ def _read(name: str) -> list[Any]:
 
 
 def test_what_the_pinned_epis_refuse_and_note() -> None:
+    # Titles by digest: a failure prints no section's title (tests/test_no_label_leak.py).
     brukinsa = _read("brukinsa-smpc-en.json")
-    assert [(s.title, s.refusal.code) for s in brukinsa if s.refusal] == [
-        ("4.8 Undesirable effects", "embedded-comment")
+    assert [(sha256_hex(s.title), s.refusal.code) for s in brukinsa if s.refusal] == [
+        (sha256_hex("4.8 Undesirable effects"), "embedded-comment")
     ]
     nuvaxovid = _read("nuvaxovid-smpc-en.json")
-    assert [(s.title, s.refusal.code) for s in nuvaxovid if s.refusal] == [
-        ("SUMMARY OF PRODUCT CHARACTERISTICS", "malformed-xhtml")
+    assert [(sha256_hex(s.title), s.refusal.code) for s in nuvaxovid if s.refusal] == [
+        (sha256_hex("SUMMARY OF PRODUCT CHARACTERISTICS"), "malformed-xhtml")
     ]
     jentadueto = _read("jentadueto-smpc-en.json")
-    assert not [s for s in jentadueto if s.refusal]
+    assert [s.refusal.code for s in jentadueto if s.refusal] == []
     assert sum(1 for s in jentadueto if s.notes) == 7
     # From epi-reader/1.2.0 Word's tab-stops (section 1) and the relative shifts of 4.2 are read,
     # as the importer's T reads them; 5.1's line height under 12pt still refuses.
     for name in ("imatinib-teva-smpc-en.json", "imatinib-teva-tablets-smpc-en.json"):
-        assert [(s.title, s.refusal.detail) for s in _read(name) if s.refusal] == [
-            ("5.1 Pharmacodynamic properties", "p line-height: 11.7pt")
+        assert [(sha256_hex(s.title), s.refusal.detail) for s in _read(name) if s.refusal] == [
+            (sha256_hex("5.1 Pharmacodynamic properties"), "p line-height: 11.7pt")
         ], name
 
 
 def test_the_black_triangle_is_read_where_the_markup_is_well_formed() -> None:
     root = _read("brukinsa-smpc-en.json")[0]
-    assert root.paragraphs[0].text.startswith("\ufffcThis medicinal product is subject to")
+    # Worked out first: the assertion would print the paragraph.
+    marked = root.paragraphs[0].text.startswith("\ufffcThis medicinal product is subject to")
+    assert marked
 
 
 # --- review round 1 -----------------------------------------------------------------------
@@ -1197,9 +1201,10 @@ def test_a_changed_letter_changes_the_reading_or_refuses(name: str) -> None:
         raw["text"]["div"] = div[:at] + swapped + div[at + 1 :]
         after = _sections_of(json.dumps(bundle).encode())
         raw["text"]["div"] = div
-        assert after[index].refusal is not None or (
-            after[index].paragraphs != before[index].paragraphs
-        ), f"{name} section {index + 1}"
+        # Worked out first: the assertion would print both readings of the section.
+        refused = after[index].refusal is not None
+        read_otherwise = after[index].paragraphs != before[index].paragraphs
+        assert refused or read_otherwise, f"{name} section {index + 1}"
         changed += 1
     assert changed >= 10
 
@@ -1209,8 +1214,11 @@ def test_a_change_a_browser_does_not_show_leaves_the_reading_unchanged() -> None
     bundle = json.loads(data)
     # The same Bundle written with other JSON whitespace and key order reads the same.
     respelled = json.dumps(bundle, indent=1, sort_keys=True, ensure_ascii=True).encode()
-    assert respelled != data
-    assert _sections_of(respelled) == _sections_of(data)
+    # Worked out first: the assertions would print the Bundle and its readings.
+    respelled_otherwise = respelled != data
+    read_the_same = _sections_of(respelled) == _sections_of(data)
+    assert respelled_otherwise
+    assert read_the_same
 
 
 @pytest.mark.parametrize(
@@ -1542,9 +1550,12 @@ def test_markup_read_otherwise_is_found_in_linear_time_as_before() -> None:
 
         bundle_ = json.loads(path.read_bytes())
         visit(bundle_["entry"][0]["resource"]["section"])
-    assert len(divs) > 4000
+    # Each count and outcome worked out first: the assertions would print the markup.
+    count = len(divs)
+    assert count > 4000
     for each in divs:
-        assert _html_otherwise(each) == bool(_OLD_HTML_OTHERWISE.search(each)), each[:0]
+        now, before = _html_otherwise(each), bool(_OLD_HTML_OTHERWISE.search(each))
+        assert now == before
 
 
 @pytest.mark.parametrize(

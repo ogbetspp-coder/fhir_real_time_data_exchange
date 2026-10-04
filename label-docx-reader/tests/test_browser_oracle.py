@@ -47,7 +47,9 @@ def test_every_section_the_reader_reads_is_what_the_browser_shows() -> None:
         recorded = json.loads((folder / "browser.json").read_text("utf-8"))["sections"]
         for name, answers in recorded.items():
             mine = sections(folder / name)
-            assert len(mine) == len(answers), name
+            # Counted first: len(mine) in the assertion would print the sections read.
+            counted = len(mine)
+            assert counted == len(answers), name
             for index, (section, answer) in enumerate(zip(mine, answers, strict=True)):
                 if section.refusal is not None:
                     continue

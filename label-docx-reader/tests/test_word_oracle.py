@@ -605,7 +605,7 @@ def test_words_note_marks_and_fields_are_on_record_for_every_document_with_them(
         answers = _record(record)
         for path in sorted(record.parent.glob("*.docx")):
             if _has_computed_fields(path):
-                assert path.name in answers["fields"], path.name
+                assert any(name == path.name for name in answers["fields"]), path.name
             try:
                 document = read_document(path.read_bytes())
             except DocxRefusedError:

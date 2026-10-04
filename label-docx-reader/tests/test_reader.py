@@ -1210,6 +1210,9 @@ def test_tiny_complex_script_text_is_faint() -> None:
 
 
 # --- the pinned EMA files -----------------------------------------------------------------
+#
+# Their text is checked through any(...) and counts, whose failures pytest shows as an outcome
+# alone: a failed `x in texts` would print every paragraph (tests/test_no_label_leak.py).
 
 
 def _read(name: str) -> list[str]:
@@ -1218,7 +1221,8 @@ def _read(name: str) -> list[str]:
 
 def test_every_pinned_source_reads_without_refusal() -> None:
     for path in sorted(SOURCES.glob("*.docx")):
-        assert read_docx(path.read_bytes()), path.name
+        paragraphs = read_docx(path.read_bytes())
+        assert paragraphs, path.name
 
 
 def test_appendix_ii_keeps_the_greater_than_or_equal_signs() -> None:
@@ -1226,7 +1230,7 @@ def test_appendix_ii_keeps_the_greater_than_or_equal_signs() -> None:
         "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48"
         "-undesirable-effects-summary-product-characteristics_en.docx"
     )
-    assert "<Very common (\u2265\u00a01/10)>" in texts
+    assert any(text == "<Very common (\u2265\u00a01/10)>" for text in texts)
     assert sum(text.count("\u2265") for text in texts) == 4
 
 
@@ -1234,7 +1238,7 @@ def test_appendix_iii_keeps_the_degree_signs() -> None:
     texts = _read(
         "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx"
     )
-    assert "<Store below <25\u00a0\u00b0C> <30\u00a0\u00b0C>.>" in texts
+    assert any(text == "<Store below <25\u00a0\u00b0C> <30\u00a0\u00b0C>.>" for text in texts)
     assert sum(text.count("\u00b0") for text in texts) == 21
 
 
@@ -1243,22 +1247,24 @@ def test_the_template_keeps_its_symbol_font_braces_and_its_own_drift() -> None:
     with zipfile.ZipFile(io.BytesIO(data)) as package:
         xml = package.read("word/document.xml").decode("utf-8")
     # Four opening and four closing braces are stored as Symbol-font glyphs, not as text.
-    assert xml.count('w:char="F07B"') == 4
-    assert xml.count('w:char="F07D"') == 4
+    assert (xml.count('w:char="F07B"'), xml.count('w:char="F07D"')) == (4, 4)
     texts = [paragraph.text for paragraph in read_docx(data)]
     # They are the Czech local representative's placeholders; a text-only reader shows "Nazev".
-    assert "{N\u00e1zev}" in texts
-    assert "CZ {m\u011bsto}>" in texts
-    assert "Tel: +{telefonn\u00ed \u010d\u00edslo}" in texts
+    assert any(text == "{N\u00e1zev}" for text in texts)
+    assert any(text == "CZ {m\u011bsto}>" for text in texts)
+    assert any(text == "Tel: +{telefonn\u00ed \u010d\u00edslo}" for text in texts)
     # EMA's own drift: the Polish representative's "<{Adres:" never closes its brace.
-    assert "<{Adres:" in texts
+    assert any(text == "<{Adres:" for text in texts)
     # "5.1" is followed by a space and then a tab in EMA's file; the reader keeps both.
-    assert "5.1 \tPharmacodynamic properties" in texts
-    # The black triangle of the additional-monitoring statement is a picture.
+    assert any(text == "5.1 \tPharmacodynamic properties" for text in texts)
+    # The black triangle of the additional-monitoring statement is a picture: two paragraphs,
+    # each starting so (zip(strict=True) refuses any other number).
     triangle = [text for text in texts if "\ufffc" in text]
-    assert len(triangle) == 2
-    assert triangle[0].startswith("<\ufffcThis medicinal product is subject to additional")
-    assert triangle[1].startswith("<\ufffcThis medicine is subject to additional monitoring")
+    starts = (
+        "<\ufffcThis medicinal product is subject to additional",
+        "<\ufffcThis medicine is subject to additional monitoring",
+    )
+    assert [t.startswith(s) for t, s in zip(triangle, starts, strict=True)] == [True, True]
 
 
 # --- accounting: no text passed over (docx-reader/1.2.0) -----------------------------------
