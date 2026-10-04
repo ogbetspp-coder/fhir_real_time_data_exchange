@@ -44,6 +44,7 @@ from test_reader import (
     ALL_LOOKS,
     APPLIED,
     HEADERS,
+    LAST_LEFT_OUT,
     LINE,
     NO_LOOKS,
     NOT_ASKED,
@@ -3231,8 +3232,7 @@ _PART_REASONS = {
     **{
         name: (*NOT_ASKED[name], reason)
         for name, reason in (
-            ("banded-defined-last-row", "Horz banding over a lastRow not on record"),
-            ("banded-defined-last-column", "Vert banding over a lastCol not on record"),
+            ("banded-last-row-look-unsaid", "Horz banding over a lastRow not on record"),
             ("corner-one-look", "nwCell: a corner Word was not asked about"),
             ("no-look-last-row", "lastRow under a look not on record"),
             ("band-size-zero", "Horz banding not on record"),
@@ -3414,13 +3414,20 @@ _PART_GRIDS = {
         ),
         "|".join([". B . B"] * 4),
     ),
-    # A last column the style defines: only that column's banding is not on record.
-    "banded-before-a-defined-last-column": (
-        _only_text(
-            t_table(_V_BANDS + ' w:lastColumn="1"/>'),
-            *(f"r{i}c{j}" for i in range(3) for j in range(2)),
-        ),
+    # A last column the style defines, its look on, setting nothing the check reads: left out
+    # of banding all the same; as where both styles define it.
+    "banding-before-a-defined-last-column": (
+        t_table(_V_BANDS + ' w:lastColumn="1"/>'),
         t_style(("band1Vert", "<w:b/>"), base=SIZE_ONE + _shaded("lastCol")),
+        "B . .|B . .|B . .",
+    ),
+    "last-column-in-both": (
+        t_table(_V_BANDS + ' w:lastColumn="1"/>'),
+        t_style(
+            ("band1Vert", "<w:b/>"),
+            base=_ON_U + SIZE_ONE + _shaded("lastCol"),
+            extra=_based_on(_shaded("lastCol")),
+        ),
         "B . .|B . .|B . .",
     ),
     # Cell properties that merge nothing.
@@ -3456,6 +3463,15 @@ _PART_GRIDS = {
         "|".join([". . . B B"] * 5),
     ),
 }
+
+
+@pytest.mark.parametrize(
+    ("body", "styles", "shown"), LAST_LEFT_OUT.values(), ids=LAST_LEFT_OUT.keys()
+)
+def test_the_check_leaves_a_last_row_or_column_the_style_defines_out_of_banding(
+    body: str, styles: str, shown: str
+) -> None:
+    assert _checked_grid(body, styles) == shown
 
 
 @pytest.mark.parametrize(("body", "styles", "shown"), _PART_GRIDS.values(), ids=_PART_GRIDS.keys())

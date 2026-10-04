@@ -871,6 +871,42 @@
       "file": "table-style-italic-toggle-para.docx",
       "sha256": "0c85b83a53d478098476406831d4827c0eac7735cd836b557e9277ab1c2d9308",
       "bytes": 3982
+    },
+    {
+      "name": "band1Horz b, row size 2, firstRow part, first row on",
+      "file": "table-style-row2-after-first.docx",
+      "sha256": "5c8bd17e90d4188006dd8c50c9606a4949b3585071211aa77ef95ae0ebac0952",
+      "bytes": 3869
+    },
+    {
+      "name": "band1Horz b, row size 3",
+      "file": "table-style-row3.docx",
+      "sha256": "396c789d94edc72275452ffa5f82c4da5895148c93f70c6074dbb2cd5a015f41",
+      "bytes": 3786
+    },
+    {
+      "name": "band1Vert b, col size 2",
+      "file": "table-style-col2.docx",
+      "sha256": "f7b2d16a9d9c8bd403ea6f525aaf9354fb291a180c2c003135e73a0063419f00",
+      "bytes": 3806
+    },
+    {
+      "name": "band1Vert b, col size 3, firstCol part, first col on",
+      "file": "table-style-col3-after-first.docx",
+      "sha256": "b68be8836a81a1e4deeef21614b273098ebb853d8020fc064e25ea53cd65272d",
+      "bytes": 3892
+    },
+    {
+      "name": "band1Horz b, row size 2, lastRow part, last row on",
+      "file": "table-style-row2-lastrow-part.docx",
+      "sha256": "0ba04c8eb9b151d6d9fa13ad5011f598f1a0abbb065b818ab3a8af58c6ced5e1",
+      "bytes": 3867
+    },
+    {
+      "name": "band2Horz b, row size 1, lastRow part, last row on",
+      "file": "table-style-row1-lastrow-part.docx",
+      "sha256": "52463eb118007c5ca140b661409fdf83af49852cd1be88334e2c5a1748c065c6",
+      "bytes": 3867
     }
   ]
 }

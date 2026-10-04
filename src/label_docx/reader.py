@@ -307,7 +307,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 # The version of the rules above; versions.lock.json ties it to this file (tests/test_locks.py).
-READER_VERSION = "docx-reader/1.24.0"
+READER_VERSION = "docx-reader/1.25.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -3641,15 +3641,17 @@ class _TableLayout:
     ``tblHeader`` at the top; a corner needs both its row's and its column's look on; the
     whole-table part is never applied; bands only where the style sets a band size (n rows or
     columns to a band) and the look does not turn them off, counted past the first row (column)
-    only where its look is on and the style defines that part. Nearest first: corner, row,
+    only where its look is on and the style defines that part, and leaving out the last row
+    (column) where its look is on and the style defines that part. Nearest first: corner, row,
     column, vertical band, horizontal band. ``cell`` names what is not on record, which is
     refused over text: a look or band size not on record; a corner without both looks on, or on
-    a header row past the first; the last row or column under banding where the style defines
-    it; first and last row (or column, or two corners) over one cell; header rows below a row
-    that is none, or past the first under banding; parts or band sizes from a ``basedOn`` style,
-    or the table's own band size; a part of no known type; and, where a part applies, a row off
-    the grid (``gridBefore``, ``gridAfter``), merged cells, a nested table, or a table in a
-    note, header, footer, comment or another table.
+    a header row past the first; the last row or column under banding where only a basedOn
+    style defines it, or under a look not on record; first and last row (or column, or two
+    corners) over one cell; header rows below a row that is none, or past the first under
+    banding; parts or band sizes from a ``basedOn`` style, or the table's own band size; a part
+    of no known type; and, where a part applies, a row off the grid (``gridBefore``,
+    ``gridAfter``), merged cells, a nested table, or a table in a note, header, footer, comment
+    or another table.
     """
 
     def __init__(
@@ -3780,9 +3782,12 @@ class _TableLayout:
             and self.looks[look_last] is not False
             and index == number - 1
         ):
-            # Whether banding passes over a last row (column) the style defines: not on record.
-            # Where it defines none, banding goes on (table-style-hband-lastrow, -vband-lastcol).
-            return "", f"(band{way}) over a {last} not on record"
+            if last not in self.defined or self.looks[look_last] is None:
+                return "", f"(band{way}) over a {last} not on record"
+            # Left out of banding where the style defines it and its look is on
+            # (table-style-row2-lastrow-part, -row1-lastrow-part); banded where the style
+            # defines none (table-style-hband-lastrow, -vband-lastcol).
+            return "", None
         position = index - skip
         if position < 0:
             return "", None

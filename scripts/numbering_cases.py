@@ -1145,11 +1145,12 @@ BAND_SIZES = (
 OFF = '<w:b w:val="0"/>'
 
 
-def styled_table(look: str = ALL_LOOKS, cell_rpr: str = "", size: int = 3) -> str:
-    """A size-by-size table in style T with the look given, and a paragraph after it."""
+def styled_table(look: str = ALL_LOOKS, cell_rpr: str = "", size: int = 3, cols: int = 0) -> str:
+    """A table in style T, ``size`` rows by ``cols`` (or ``size``) columns, a paragraph after."""
+    cols = cols or size
     out = (
         f'<w:tbl><w:tblPr><w:tblStyle w:val="T"/>{look}</w:tblPr><w:tblGrid>'
-        + '<w:gridCol w:w="2000"/>' * size
+        + '<w:gridCol w:w="2000"/>' * cols
         + "</w:tblGrid>"
     )
     run = f"<w:rPr>{cell_rpr}</w:rPr>" if cell_rpr else ""
@@ -1157,7 +1158,7 @@ def styled_table(look: str = ALL_LOOKS, cell_rpr: str = "", size: int = 3) -> st
         out += (
             "<w:tr>"
             + "".join(
-                f"<w:tc><w:p><w:r>{run}<w:t>r{i}c{j}</w:t></w:r></w:p></w:tc>" for j in range(size)
+                f"<w:tc><w:p><w:r>{run}<w:t>r{i}c{j}</w:t></w:r></w:p></w:tc>" for j in range(cols)
             )
             + "</w:tr>"
         )
@@ -1191,12 +1192,22 @@ def _ts(
     *parts: tuple[str, str],
     cell_rpr: str = "",
     size: int = 3,
+    cols: int = 0,
     base: str = "",
     extra: str = "",
 ) -> Case:
     """A table-style case: its table, and style T with ``extra`` styles after it."""
     styles = table_style(*parts, base=base) + extra
-    return Case(question, "", styled_table(look, cell_rpr, size), styles=styles)
+    return Case(question, "", styled_table(look, cell_rpr, size, cols), styles=styles)
+
+
+def band_size(way: str, size: int) -> str:
+    """Style T's ``tblPr`` setting the row (``Row``) or column (``Col``) band size alone."""
+    return f'<w:tblPr><w:tblStyle{way}BandSize w:val="{size}"/></w:tblPr>'
+
+
+H_BANDS = 'w:noHBand="0" w:noVBand="1"'
+V_BANDS = 'w:noHBand="1" w:noVBand="0"'
 
 
 PARTS = [
@@ -1411,6 +1422,60 @@ TABLE_STYLE_CASES: dict[str, Case] = {
         base=BAND_SIZES,
         size=4,
         extra=normal("<w:i/>"),
+    ),
+    # Band sizes over 5x3 (3x5) tables, counted past a first row (column) the style defines;
+    # a last row the style defines, its look on, is left out of banding.
+    "row2-after-first": _ts(
+        "band1Horz b, row size 2, firstRow part, first row on",
+        FOUR_LOOK.format(f'w:firstRow="1" {H_BANDS}'),
+        ("firstRow", "<w:i/>"),
+        ("band1Horz", "<w:b/>"),
+        base=band_size("Row", 2),
+        size=5,
+        cols=3,
+    ),
+    "row3": _ts(
+        "band1Horz b, row size 3",
+        FOUR_LOOK.format(H_BANDS),
+        ("band1Horz", "<w:b/>"),
+        base=band_size("Row", 3),
+        size=5,
+        cols=3,
+    ),
+    "col2": _ts(
+        "band1Vert b, col size 2",
+        FOUR_LOOK.format(V_BANDS),
+        ("band1Vert", "<w:b/>"),
+        base=band_size("Col", 2),
+        size=3,
+        cols=5,
+    ),
+    "col3-after-first": _ts(
+        "band1Vert b, col size 3, firstCol part, first col on",
+        FOUR_LOOK.format(f'w:firstColumn="1" {V_BANDS}'),
+        ("firstCol", "<w:i/>"),
+        ("band1Vert", "<w:b/>"),
+        base=band_size("Col", 3),
+        size=3,
+        cols=5,
+    ),
+    "row2-lastrow-part": _ts(
+        "band1Horz b, row size 2, lastRow part, last row on",
+        FOUR_LOOK.format(f'w:lastRow="1" {H_BANDS}'),
+        ("lastRow", "<w:i/>"),
+        ("band1Horz", "<w:b/>"),
+        base=band_size("Row", 2),
+        size=5,
+        cols=3,
+    ),
+    "row1-lastrow-part": _ts(
+        "band2Horz b, row size 1, lastRow part, last row on",
+        FOUR_LOOK.format(f'w:lastRow="1" {H_BANDS}'),
+        ("lastRow", "<w:i/>"),
+        ("band2Horz", "<w:b/>"),
+        base=band_size("Row", 1),
+        size=5,
+        cols=3,
     ),
 }
 CASES.update({f"table-style-{name}": case for name, case in TABLE_STYLE_CASES.items()})

@@ -84,7 +84,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT, WINGDINGS_BULLETS
 
-CHECKER_VERSION = "conservation-check/1.12.0"
+CHECKER_VERSION = "conservation-check/1.13.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -1101,11 +1101,16 @@ class _Applied:
             elif start[0] in ours and self.look[start[1]] and way == "Horz" and self.top > 1:
                 why.append("banding past several header rows")
             elif (
-                (end[0] in ours or end[0] in below)
+                index == count - 1
                 and self.look[end[1]] is not False
-                and index == count - 1
+                and (
+                    (end[0] in below and end[0] not in ours)
+                    or (end[0] in ours and self.look[end[1]] is None)
+                )
             ):
                 why.append(f"{way} banding over a {end[0]} not on record")
+            elif index == count - 1 and end[0] in ours and self.look[end[1]]:
+                pass  # Word leaves a last row (column) the style defines, look on, out of bands
             else:
                 past = 1 if start[0] in ours and self.look[start[1]] else 0
                 if index >= past:

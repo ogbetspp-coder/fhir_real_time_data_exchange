@@ -3240,15 +3240,65 @@ def _nested_table(look: str = ALL_LOOKS) -> str:
     return t_table().replace("<w:t>r0c0</w:t></w:r></w:p>", "<w:t>r0c0</w:t></w:r></w:p>" + inner)
 
 
-NOT_ASKED = {
-    # The last row (column) under banding, where the style defines it.
+# Banding leaves out the last row (column) where the style defines that part and its look is on
+# (table-style-row2-lastrow-part, -row1-lastrow-part): only the last row's own part applies there.
+_LAST_ROW_ON = '<w:tblLook w:val="0000" w:lastRow="1" w:noHBand="0" w:noVBand="1"/>'
+_LAST_COL_ON = '<w:tblLook w:val="0000" w:lastColumn="1" w:noHBand="1" w:noVBand="0"/>'
+LAST_LEFT_OUT = {
     "banded-defined-last-row": (
         t_table(ALL_LOOKS),
         t_style(("band1Horz", "<w:b/>"), ("lastRow", "<w:i/>"), base=SIZE_ONE),
+        "B B B|. . .|I I I",
     ),
     "banded-defined-last-column": (
         t_table(ALL_LOOKS),
         t_style(("band1Vert", "<w:b/>"), ("lastCol", "<w:i/>"), base=SIZE_ONE),
+        "B . I|B . I|B . I",
+    ),
+    "row-bands-of-two": (
+        t_table(_LAST_ROW_ON, 5),
+        t_style(
+            ("lastRow", "<w:i/>"),
+            ("band1Horz", "<w:b/>"),
+            base='<w:tblPr><w:tblStyleRowBandSize w:val="2"/></w:tblPr>',
+        ),
+        "|".join(["B B B B B"] * 2 + [". . . . ."] * 2 + ["I I I I I"]),
+    ),
+    "row-bands-of-one": (
+        t_table(_LAST_ROW_ON, 5),
+        t_style(("lastRow", "<w:i/>"), ("band2Horz", "<w:b/>"), base=SIZE_ONE),
+        "|".join([". . . . .", "B B B B B"] * 2 + ["I I I I I"]),
+    ),
+    "column-bands-of-two": (
+        t_table(_LAST_COL_ON, 5),
+        t_style(
+            ("lastCol", "<w:i/>"),
+            ("band1Vert", "<w:b/>"),
+            base='<w:tblPr><w:tblStyleColBandSize w:val="2"/></w:tblPr>',
+        ),
+        "|".join(["B B . . I"] * 5),
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("body", "styles", "shown"), LAST_LEFT_OUT.values(), ids=LAST_LEFT_OUT.keys()
+)
+def test_banding_leaves_out_a_last_row_or_column_the_style_defines(
+    body: str, styles: str, shown: str
+) -> None:
+    assert grid(body, styles) == shown
+
+
+NOT_ASKED = {
+    # The last row under banding, where the style defines it and its look is not on record.
+    "banded-last-row-look-unsaid": (
+        t_table('<w:tblLook w:noHBand="0" w:noVBand="1"/>'),
+        t_style(("band1Horz", "<w:b/>"), base=SIZE_ONE).replace(
+            "</w:style>",
+            '<w:tblStylePr w:type="lastRow"><w:tcPr><w:shd w:val="clear" '
+            'w:fill="D9D9D9"/></w:tcPr></w:tblStylePr></w:style>',
+        ),
     ),
     # A corner without both its looks on; on a header row past the first.
     "corner-one-look": (
