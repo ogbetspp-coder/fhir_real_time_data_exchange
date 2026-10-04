@@ -81,7 +81,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT, WINGDINGS_BULLETS
 
-CHECKER_VERSION = "conservation-check/1.10.1"
+CHECKER_VERSION = "conservation-check/1.11.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -1091,6 +1091,7 @@ def _docx_parts(data: bytes) -> tuple[zipfile.ZipFile, str, dict[str, str]]:
             "comments",
             "numbering",
             "fontTable",
+            "settings",
         )
         if (targets := _relations(archive, main[0], kind))
     }
@@ -1702,6 +1703,14 @@ class DocxSource:
                 "footer": [],
             }
             main_rels: dict[str | None, list[ET.Element]] | None = None
+            # Which parts Word shows on some page: a section naming no part of a type keeps the
+            # one before; a first part shows only under titlePg, an even one only when the
+            # settings turn even pages on; else Word draws the default one there.
+            settings = _parse(archive, related["settings"]) if "settings" in related else None
+            even_pages = settings is not None and _on(settings.find(_w("evenAndOddHeaders")))
+            in_force: dict[tuple[str, str], str] = {}
+            self.shown: set[str] = set()
+            self.sizes: dict[str, int] = {}
             for section, properties in enumerate(parse[main].iter(_w("sectPr"))):
                 named = [
                     (_local(c.tag), c.get(_w("type"), "default"))
@@ -1720,14 +1729,25 @@ class DocxSource:
                     if main_rels is None:
                         main_rels = _by_id(archive, main)
                     name = _relation(main_rels, main, reference.get(f"{{{_R}}}id"), kind)
-                    use = {"section": section, "type": reference.get(_w("type"), "default")}
+                    page_type = reference.get(_w("type"), "default")
+                    use = {"section": section, "type": page_type}
+                    in_force[(kind, page_type)] = name
                     found = next((e for e in self.stories[kind] if e[0] == name), None)
                     if found is not None:
                         found[1].append(use)
                         continue
                     root = _parse(archive, name)
+                    self.sizes[name] = _text_size(root)
                     index = len(self.stories[kind])
                     self.stories[kind].append((name, [use], self._optional(root, (kind, index))))
+                title_page = _on(properties.find(_w("titlePg")))
+                for (_, page), name in in_force.items():
+                    if (
+                        page == "default"
+                        or (page == "first" and title_page)
+                        or (page == "even" and even_pages)
+                    ):
+                        self.shown.add(name)
             # Comments, as stored, each with what the part says of it.
             self.comments: list[tuple[dict[str, Json], _Part]] = []
             comments_part = related.get("comments")
@@ -1808,6 +1828,7 @@ class DocxSource:
         """The certificate for ``value``, a .docx result, or ``CertificationError``."""
         read = [self.body]
         refused: list[str] = []
+        not_read = dict(self.not_read)
         _paragraphs(self.body, value["paragraphs"], "paragraph")
         marked = [
             (n["kind"], n["id"], n["mark"]) for p in _every_paragraph(value) for n in p["notes"]
@@ -1833,7 +1854,14 @@ class DocxSource:
             if [(t["part"], t["uses"]) for t in theirs] != [(n, u) for n, u, _ in found]:
                 raise CertificationError(f"the {kind}s are not the ones the sections refer to")
             for (name, _, part), story in zip(found, theirs, strict=True):
-                if _refused(part, story, name):
+                never = (story["refusal"] or {}).get("code") == "never-shown"
+                if never != (name not in self.shown):
+                    raise CertificationError(f"{name}: shown or not, as the check finds, otherwise")
+                if never:
+                    if story["paragraphs"]:
+                        raise CertificationError(f"{name}: never shown, yet with paragraphs")
+                    not_read[name] = self.sizes[name]
+                elif _refused(part, story, name):
                     refused.append(name)
                 else:
                     read.append(part)
@@ -1874,7 +1902,7 @@ class DocxSource:
             },
             "symbolMapped": ledger.symbol,
             "marksChecked": sorted(CHECKED_MARKS),
-            "notRead": dict(self.not_read),
+            "notRead": dict(sorted(not_read.items())),
         }
 
     def _pairs(

@@ -9,6 +9,7 @@ check covers them all.
 
 from __future__ import annotations
 
+import copy
 import io
 import json
 import zipfile
@@ -434,21 +435,40 @@ REFERENCES += reference("header", "h3", "even")
 
 
 @pytest.mark.parametrize("off", ["", '<w:titlePg w:val="0"/>'])
-def test_a_first_or_even_header_word_never_shows_is_refused_on_its_own(off: str) -> None:
-    # Without titlePg and evenAndOddHeaders Word prints the default header on every page.
-    # Word's case: three pages, each header's printed text, with and without the switches.
+def test_a_first_or_even_header_word_never_shows_is_not_read_and_not_refused(off: str) -> None:
+    # Without titlePg and evenAndOddHeaders Word prints the default header on every page: its page
+    # setup says so (different first page and odd and even pages both off).
     data = _three_headers(REFERENCES + off, "")
     refusals = [(h.part, h.refusal and h.refusal[0]) for h in read_document(data).headers]
     assert refusals == [
         ("word/header1.xml", None),
-        ("word/header2.xml", "unread-content"),
-        ("word/header3.xml", "unread-content"),
+        ("word/header2.xml", "never-shown"),
+        ("word/header3.xml", "never-shown"),
     ]
     value = json.loads(output.read(data)[0])
-    assert value["refusedParts"] == 2
+    assert value["refusedParts"] == 0
+    assert {"word/header2.xml", "word/header3.xml"} <= set(value["certificate"]["notRead"])
     # With both switches on, each is shown and read.
     shown = _three_headers(REFERENCES + "<w:titlePg/>", "<w:evenAndOddHeaders/>")
     assert all(h.refusal is None for h in read_document(shown).headers)
+
+
+def test_the_check_holds_which_headers_word_shows() -> None:
+    data = _three_headers(REFERENCES, "")
+    value = json.loads(output.read(data)[0])
+    source = DocxSource(data)
+    source.certify(value)
+    # A header Word shows, claimed never shown; one it never shows, claimed read or refused.
+    hidden_default = copy.deepcopy(value)
+    hidden_default["headers"][0].update(
+        refusal={"code": "never-shown", "detail": "x"}, paragraphs=[]
+    )
+    refused_unused = copy.deepcopy(value)
+    refused_unused["headers"][1]["refusal"] = {"code": "unread-content", "detail": "x"}
+    refused_unused["refusedParts"] = 1
+    for wrong in (hidden_default, refused_unused):
+        with pytest.raises(CertificationError):
+            source.certify(wrong)
 
 
 def test_two_references_of_one_type_in_a_section_are_refused() -> None:

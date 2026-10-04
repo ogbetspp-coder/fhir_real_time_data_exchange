@@ -278,11 +278,11 @@ never in ``text``; every comment must be anchored exactly once. Fields the reade
 (SEQ, STYLEREF, REF, NOTEREF) and lists are refused there, since how Word counts them outside
 the body is not on record; PAGE, NUMPAGES and SECTIONPAGES are placed, PAGEREF refused. A
 header, footer or comment the reader cannot read exactly is refused on its own
-(``Story.refusal``, ``Comment.refusal``): the body
-is read all the same. A header or footer Word shows on no page is refused on its own as
-``unread-content``: a ``first`` part shows only in a section with ``titlePg``, an ``even`` part
-only with the settings' ``evenAndOddHeaders``, and a section naming no part of a type takes the
-one before it. The glossary (building blocks) is not read.
+(``Story.refusal``, ``Comment.refusal``): the body is read all the same. A header or footer Word
+shows on no page is not read and is marked ``never-shown``, which is no refusal (the certificate
+lists its size under ``notRead``): a ``first`` part shows only in a section with ``titlePg``, an
+``even`` part only with the settings' ``evenAndOddHeaders``, and a section naming no part of a
+type takes the one before it. The glossary (building blocks) is not read.
 """
 
 from __future__ import annotations
@@ -301,7 +301,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 # The version of the rules above; versions.lock.json ties it to this file (tests/test_locks.py).
-READER_VERSION = "docx-reader/1.22.1"
+READER_VERSION = "docx-reader/1.23.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -3685,9 +3685,7 @@ def read_document(data: bytes) -> Document:
             _story(kind, name, tuple(uses), root, index, styles)
             if shown
             # Word shows it on no page; its text is in the file all the same.
-            else Story(
-                kind, name, tuple(uses), (), ("unread-content", f"a {kind} Word never shows")
-            )
+            else Story(kind, name, tuple(uses), (), ("never-shown", f"a {kind} Word never shows"))
             for index, (name, uses, root, shown) in enumerate(found)
         )
         for kind, found in stories.items()

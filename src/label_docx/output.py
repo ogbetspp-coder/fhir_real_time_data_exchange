@@ -87,7 +87,7 @@ from label_docx.reader import (
 
 # The version of the shape above, and of the check that certifies it: versions.lock.json ties
 # it to both files (tests/test_locks.py).
-FORMAT_VERSION = "label-docx-json/1.14.1"
+FORMAT_VERSION = "label-docx-json/1.15.0"
 
 type Json = str | int | bool | list[Json] | dict[str, Json] | None
 
@@ -213,7 +213,9 @@ def content(document: Document) -> dict[str, Json]:
         "footers": stories(document.footers),
         "comments": comments(document.comments),
         "refusedParts": sum(
-            1 for item in (*document.headers, *document.footers, *document.comments) if item.refusal
+            1
+            for item in (*document.headers, *document.footers, *document.comments)
+            if item.refusal and item.refusal[0] != "never-shown"
         ),
     }
 
