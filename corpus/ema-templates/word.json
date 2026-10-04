@@ -20139,7 +20139,21 @@
       "Symbol"
     ]
   },
-  "method": "list labels: convert numbers to text, what each list item gained; fonts and at: the font Word gave each label and its body paragraph, from its copy saved after; sha256: the bytes each file's answers are for; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text",
+  "method": "list labels: convert numbers to text, what each list item gained; fonts and at: the font Word gave each label and its body paragraph, from its copy saved after; sha256: the bytes each file's answers are for; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text; noteText: each footnote's and endnote's text",
+  "noteText": {
+    "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products-cover-page_en.docx": {
+      "endnote": [],
+      "footnote": [
+        "\u0002  Formatting and editorial changes in all languages\n"
+      ]
+    },
+    "qrd-appendix-v-adverse-drug-reaction-reporting-details_en.docx": {
+      "endnote": [],
+      "footnote": [
+        "\u0002 Changes implemented in the different revisions:\nV.33: HU details updated (3 October 2025)\nV.34: LT details updated (16 December 2025)\nV.35: PL and CZ details updated (20 March 2026)\n\n\n\nFor the UK, as from 1.1.2021, EU Law applies only to the territory of Northern Ireland (NI) to the extent foreseen in the Protocol on Ireland/NI, also referred to as the Windsor Framework.\n"
+      ]
+    }
+  },
   "notes": {
     "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products-cover-page_en.docx": {
       "body": [
@@ -24295,5 +24309,5 @@
       "[list]>"
     ]
   },
-  "verifier": "word-verifier/1.0.1"
+  "verifier": "word-verifier/1.0.4"
 }

@@ -4164,7 +4164,8 @@
       null
     ]
   },
-  "method": "list labels: convert numbers to text, what each list item gained; fonts and at: the font Word gave each label and its body paragraph, from its copy saved after; sha256: the bytes each file's answers are for; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text",
+  "method": "list labels: convert numbers to text, what each list item gained; fonts and at: the font Word gave each label and its body paragraph, from its copy saved after; sha256: the bytes each file's answers are for; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text; noteText: each footnote's and endnote's text",
+  "noteText": {},
   "notes": {},
   "prints": {
     "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": true,
@@ -5063,5 +5064,5 @@
       "<The following information is intended for healthcare professionals only:>"
     ]
   },
-  "verifier": "word-verifier/1.0.1"
+  "verifier": "word-verifier/1.0.4"
 }

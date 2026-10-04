@@ -3270,7 +3270,115 @@
       null
     ]
   },
-  "method": "list labels: convert numbers to text, what each list item gained; fonts and at: the font Word gave each label and its body paragraph, from its copy saved after; sha256: the bytes each file's answers are for; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text",
+  "method": "list labels: convert numbers to text, what each list item gained; fonts and at: the font Word gave each label and its body paragraph, from its copy saved after; sha256: the bytes each file's answers are for; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text; noteText: each footnote's and endnote's text",
+  "noteText": {
+    "fields-noteref.docx": {
+      "endnote": [],
+      "footnote": [
+        "\u0002 note 1\n",
+        "\u0002 note 2\n"
+      ]
+    },
+    "notes-chicago.docx": {
+      "endnote": [],
+      "footnote": [
+        "\u0002 note 1\n",
+        "\u0002 note 2\n",
+        "\u0002 note 3\n",
+        "\u0002 note 4\n",
+        "\u0002 note 5\n",
+        "\u0002 note 6\n"
+      ]
+    },
+    "notes-continuous.docx": {
+      "endnote": [],
+      "footnote": [
+        "\u0002 note 1\n",
+        "\u0002 note 2\n",
+        "\u0002 note 3\n"
+      ]
+    },
+    "notes-document-format.docx": {
+      "endnote": [],
+      "footnote": [
+        "\u0002 note 1\n",
+        "\u0002 note 2\n"
+      ]
+    },
+    "notes-each-section.docx": {
+      "endnote": [],
+      "footnote": [
+        "\u0002 note 1\n",
+        "\u0002 note 2\n",
+        "\u0002 note 3\n",
+        "\u0002 note 4\n"
+      ]
+    },
+    "notes-endnotes.docx": {
+      "endnote": [
+        "\u0002 note 1\n",
+        "\u0002 note 2\n"
+      ],
+      "footnote": []
+    },
+    "notes-in-table.docx": {
+      "endnote": [],
+      "footnote": [
+        "\u0002 note 1\n",
+        "\u0002 note 2\n"
+      ]
+    },
+    "notes-mixed.docx": {
+      "endnote": [
+        "\u0002 note 1\n"
+      ],
+      "footnote": [
+        "\u0002 note 1\n",
+        "\u0002 note 2\n"
+      ]
+    },
+    "notes-section-chicago.docx": {
+      "endnote": [],
+      "footnote": [
+        "\u0002 note 1\n",
+        "\u0002 note 2\n",
+        "\u0002 note 3\n",
+        "\u0002 note 4\n",
+        "\u0002 note 5\n",
+        "\u0002 note 6\n"
+      ]
+    },
+    "notes-section-format.docx": {
+      "endnote": [],
+      "footnote": [
+        "\u0002 note 1\n",
+        "\u0002 note 2\n",
+        "\u0002 note 3\n"
+      ]
+    },
+    "notes-section-rules.docx": {
+      "endnote": [],
+      "footnote": [
+        "\u0002 note 1\n",
+        "\u0002 note 2\n"
+      ]
+    },
+    "notes-section-start-continuous.docx": {
+      "endnote": [],
+      "footnote": [
+        "\u0002 note 1\n",
+        "\u0002 note 2\n",
+        "\u0002 note 3\n"
+      ]
+    },
+    "notes-start-format.docx": {
+      "endnote": [],
+      "footnote": [
+        "\u0002 note 1\n",
+        "\u0002 note 2\n"
+      ]
+    }
+  },
   "notes": {
     "fields-noteref-stale.docx": {
       "body": [
@@ -4117,5 +4225,5 @@
       "item 3"
     ]
   },
-  "verifier": "word-verifier/1.0.1"
+  "verifier": "word-verifier/1.0.4"
 }

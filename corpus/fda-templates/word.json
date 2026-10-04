@@ -2409,7 +2409,16 @@
       "Symbol"
     ]
   },
-  "method": "list labels: convert numbers to text, what each list item gained; fonts and at: the font Word gave each label and its body paragraph, from its copy saved after; sha256: the bytes each file's answers are for; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text",
+  "method": "list labels: convert numbers to text, what each list item gained; fonts and at: the font Word gave each label and its body paragraph, from its copy saved after; sha256: the bytes each file's answers are for; text: the body's text as Word shows it, paragraph by paragraph; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text, between and in field results; stories: each section's headers and footers by type (unless linked to the previous section's) with their page-number fields' results, and each comment's author and text; noteText: each footnote's and endnote's text",
+  "noteText": {
+    "fda-prescribing-information-template.docx": {
+      "endnote": [],
+      "footnote": [
+        "\u0002 For purposes of prescription drug labeling, an adverse reaction is an undesirable effect, reasonably associated with use of a drug, that may occur as part of the pharmacological action of the drug or may be unpredictable in its occurrence. This definition does not include all adverse events observed during use of a drug, only those adverse events for which there is some basis to believe there is a causal relationship between the drug and the occurrence of the adverse event.\n",
+        "\u0002 If the baseline demographics in the safety and efficacy populations are generally the same and the description of the baseline demographics are included the CLINICAL STUDIES section, instead of repeating the same baseline demographics in the ADVERSE REACTIONS section, the ADVERSE REACTIONS section can cross-reference the CLINICAL STUDIES section.\n"
+      ]
+    }
+  },
   "notes": {
     "fda-prescribing-information-template.docx": {
       "body": [
@@ -2858,5 +2867,5 @@
       "If the distributor is included must include one of the following phrases: \u201cManufactured for Firm-D\u201d, \u201cDistributed by Firm-D\u201d, \u201cManufactured by Firm-M for Firm-D\u201d, \u201cManufactured for Firm-D by Firm-M\u201d, \u201cDistributor: Firm-D\u201d, or \u201cMarketed by Firm-D\u201d.]]"
     ]
   },
-  "verifier": "word-verifier/1.0.1"
+  "verifier": "word-verifier/1.0.4"
 }
