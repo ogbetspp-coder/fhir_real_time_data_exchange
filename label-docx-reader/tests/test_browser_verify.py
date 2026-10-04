@@ -11,6 +11,9 @@ from __future__ import annotations
 
 import copy
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -247,6 +250,41 @@ def test_the_oracle_reads_the_bundle_as_strictly_as_the_reader() -> None:
     for data in (repeated, json.dumps(moved).encode(), EPI[:-1] + b', "x": NaN}'):
         with pytest.raises(epi.EpiRefusedError):
             browser.verify_epi(data, {}, Path("/nonexistent"))
+
+
+def test_the_devtools_pipe_reaches_fds_3_and_4_without_a_shell() -> None:
+    # Debian's /bin/sh (dash) refuses ``3<&N`` for N above 9, as pytest's pipe fds are: the
+    # pipe is moved by Python, never by a shell.
+    to_child, write = os.pipe()
+    read, from_child = os.pipe()
+    high = (os.dup2(to_child, 40), os.dup2(from_child, 41))
+    for fd in (to_child, from_child):
+        os.close(fd)
+    child = [sys.executable, "-c", "import os; os.write(4, os.read(3, 5).upper())"]
+    command = browser._on_fds_3_and_4(child, *high)
+    assert command[0] == sys.executable
+    assert "/bin/sh" not in command
+    process = subprocess.Popen(command, pass_fds=high)
+    for fd in high:
+        os.close(fd)
+    os.write(write, b"hello")
+    assert process.wait() == 0
+    assert os.read(read, 5) == b"HELLO"
+    os.close(write)
+    os.close(read)
+
+
+def test_a_chrome_that_closes_its_pipe_says_why(tmp_path: Path) -> None:
+    fake = tmp_path / "chrome"
+    fake.write_text("#!/bin/sh\necho no chrome here >&2\n")
+    fake.chmod(0o755)
+    tools = browser._DevTools(fake, str(tmp_path))
+    try:
+        tools.process.wait()
+        with pytest.raises(browser.BrowserError, match="no chrome here"):
+            tools.call("Browser.getVersion")
+    finally:
+        tools.close()
 
 
 @pytest.mark.skipif(CHROME is None, reason="Chrome is not installed")

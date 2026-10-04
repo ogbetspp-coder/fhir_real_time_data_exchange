@@ -1,7 +1,7 @@
 {
   "application": "Google Chrome 154.0.8037.93",
   "method": "each section's div parsed as HTML into its own element of one page, laid out with the browser's default style sheet; the text of the section selected whole, and each text node's place in it and computed style",
-  "recorded": "2026-10-03",
+  "recorded": "2026-10-04",
   "sections": {
     "atrovent-solution-labelling-sv-805dfbc5.json": [
       {
@@ -17065,5 +17065,5 @@
     "zoladex-trimestral-pl-es-524828c6.json": "f319a3283fbaef699bb550447d4f3e21d37f62ca5086f166d91219511bf91b40",
     "zoladex-trimestral-smpc-es-e8401567.json": "7622a141b53674156d96d9164208c063c31cd329902356f20c925d0133d19719"
   },
-  "verifier": "browser-verifier/1.0.0"
+  "verifier": "browser-verifier/1.0.1"
 }

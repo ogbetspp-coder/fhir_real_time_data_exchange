@@ -25,11 +25,12 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 from label_docx import epi, output
 from label_docx.reader import Paragraph
@@ -38,7 +39,7 @@ from label_docx.reader import Paragraph
 TIMEOUT_SECONDS = 300
 # What Chrome is asked and how its answers are judged: a change to this file changes it
 # (``scripts/lock.py``). A kept verdict of another version does not count as Chrome's now.
-VERIFIER = "browser-verifier/1.0.0"
+VERIFIER = "browser-verifier/1.0.1"
 
 
 class BrowserError(Exception):
@@ -421,33 +422,59 @@ document.title = "ready";
 """
 
 
+# Puts the fds given as its first two arguments on 3 and 4 and execs the rest. Python, not a
+# shell: dash (Debian's /bin/sh) refuses ``3<&N`` for N above 9. Each is first copied above 4,
+# so neither is overwritten by the other's move whatever their numbers.
+_LAUNCHER = (
+    "import fcntl, os, sys\n"
+    "fds = [int(a) for a in sys.argv[1:3]]\n"
+    "high = [fcntl.fcntl(fd, fcntl.F_DUPFD, 5) for fd in fds]\n"
+    "for fd, low in zip(high, (3, 4)):\n"
+    "    os.dup2(fd, low)\n"
+    "for fd in {*fds, *high} - {3, 4}:\n"
+    "    os.close(fd)\n"
+    "os.execv(sys.argv[3], sys.argv[3:])\n"
+)
+
+
+def _on_fds_3_and_4(command: list[str], read_fd: int, write_fd: int) -> list[str]:
+    """``command`` run with ``read_fd`` on fd 3 and ``write_fd`` on fd 4 (pass both to Popen).
+
+    Nothing runs between fork and exec in this (threaded) process: the move is done by a
+    separate Python that then becomes ``command``.
+    """
+    return [sys.executable, "-c", _LAUNCHER, str(read_fd), str(write_fd), *command]
+
+
 class _DevTools:
     """Chrome driven over its DevTools pipe (file descriptors 3 and 4): no dependency."""
 
     def __init__(self, chrome: Path, folder: str) -> None:
         to_chrome, self._write = os.pipe()
         self._read, from_chrome = os.pipe()
-        # Chrome reads its DevTools pipe on fd 3 and writes on fd 4; a shell puts them there,
-        # so nothing runs between fork and exec in this (threaded) process.
-        self.process = subprocess.Popen(
-            [
-                "/bin/sh",
-                "-c",
-                f'exec "$0" "$@" 3<&{to_chrome} 4>&{from_chrome}',
-                str(chrome),
-                "--headless",
-                "--disable-gpu",
-                "--disable-extensions",
-                "--no-first-run",
-                "--no-default-browser-check",
-                f"--user-data-dir={folder}/profile",
-                "--remote-debugging-pipe",
-                "about:blank",
-            ],
-            pass_fds=(to_chrome, from_chrome),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        # Chrome's own stderr, kept so that a Chrome that closes its pipe says why.
+        self._log = Path(folder) / "chrome.log"
+        with self._log.open("wb") as log:
+            self.process = subprocess.Popen(
+                _on_fds_3_and_4(
+                    [
+                        str(chrome),
+                        "--headless",
+                        "--disable-gpu",
+                        "--disable-extensions",
+                        "--no-first-run",
+                        "--no-default-browser-check",
+                        f"--user-data-dir={folder}/profile",
+                        "--remote-debugging-pipe",
+                        "about:blank",
+                    ],
+                    to_chrome,
+                    from_chrome,
+                ),
+                pass_fds=(to_chrome, from_chrome),
+                stdout=subprocess.DEVNULL,
+                stderr=log,
+            )
         for fd in (to_chrome, from_chrome):
             os.close(fd)
         self._timer = threading.Timer(TIMEOUT_SECONDS, self.process.kill)
@@ -461,7 +488,10 @@ class _DevTools:
         message: dict[str, Any] = {"id": self._next, "method": method, "params": params or {}}
         if self.session is not None:
             message["sessionId"] = self.session
-        os.write(self._write, json.dumps(message).encode() + b"\0")
+        try:
+            os.write(self._write, json.dumps(message).encode() + b"\0")
+        except BrokenPipeError:
+            self._closed()
         while True:
             while b"\0" in self._buffer:
                 raw, self._buffer = self._buffer.split(b"\0", 1)
@@ -473,8 +503,12 @@ class _DevTools:
                     return result
             chunk = os.read(self._read, 1 << 20)
             if not chunk:
-                raise BrowserError("Chrome closed its DevTools pipe")
+                self._closed()
             self._buffer += chunk
+
+    def _closed(self) -> NoReturn:
+        tail = self._log.read_bytes()[-2000:].decode("utf-8", errors="replace")
+        raise BrowserError(f"Chrome closed its DevTools pipe; its stderr ends: {tail!r}")
 
     def close(self) -> None:
         self._timer.cancel()
