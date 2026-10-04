@@ -2738,3 +2738,268 @@ def test_symbol_text_drawn_as_complex_script_is_never_certified() -> None:
         with pytest.raises(CertificationError):
             DocxSource(docx(body))
     assert DocxSource(docx(_p(run))).certify(_value("\u03b1"))["symbolMapped"] == 1
+
+
+# --- mutation survivors, part b ----------------------------------------------------------------
+
+
+def _zipped(data: bytes, name: str, content: bytes, compression: int = 0) -> bytes:
+    """``data`` with the part ``name`` added (or written again), stored as ``compression``."""
+    import io
+    import zipfile
+
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(out, "w") as target:
+        for info in source.infolist():
+            if info.filename != name:
+                target.writestr(info, source.read(info))
+        target.writestr(zipfile.ZipInfo(name), content, compression)
+    return out.getvalue()
+
+
+def test_the_check_reads_only_part_names_stored_or_deflated_beside_content_types() -> None:
+    import io
+    import zipfile
+
+    data = docx(_p("<w:r><w:t>a</w:t></w:r>"))
+    DocxSource(data).certify(_value("a"))
+    xml = b"<x/>"
+    for name in ("word/./x.xml", "word/../x.xml", "word//x.xml", "word\\x.xml"):
+        with pytest.raises(CertificationError, match="not a part name"):
+            DocxSource(_zipped(data, name, xml))
+    for compression in (zipfile.ZIP_BZIP2, zipfile.ZIP_LZMA):
+        with pytest.raises(CertificationError, match="neither stored nor deflated"):
+            DocxSource(_zipped(data, "word/document.xml", _part(data), compression))
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(out, "w") as target:
+        for info in source.infolist():
+            if info.filename != "[Content_Types].xml":
+                target.writestr(info, source.read(info))
+    with pytest.raises(CertificationError, match="Content_Types"):
+        DocxSource(out.getvalue())
+
+
+def _part(data: bytes, name: str = "word/document.xml") -> bytes:
+    import io
+    import zipfile
+
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        return archive.read(name)
+
+
+def test_segoe_ui_symbol_is_read_as_stored() -> None:
+    name = "Segoe UI Symbol"
+    data = docx(
+        _p(f'<w:r><w:rPr><w:rFonts w:ascii="{name}" w:hAnsi="{name}"/></w:rPr><w:t>☐</w:t></w:r>')
+    )
+    DocxSource(data).certify(_docx_value(data))
+    DocxSource(data).certify(_value("☐"))
+
+
+def test_alternate_content_whose_choice_is_not_one_drawing_is_never_certified() -> None:
+    for choice in (SHAPE + SHAPE, f"<w:pict><v:shape {_VML}/></w:pict>"):
+        with pytest.raises(CertificationError, match="not one drawing"):
+            DocxSource(docx(_p("<w:r>" + _alternate(choice) + "</w:r>")))
+
+
+@pytest.mark.parametrize("code", [r"PAGEREF \x \* MERGEFORMAT", r"PAGEREF \p"])
+def test_a_pageref_whose_first_word_is_a_switch_is_never_certified(code: str) -> None:
+    with pytest.raises(CertificationError, match="without its bookmark"):
+        DocxSource(docx(_p("<w:r><w:t>p</w:t></w:r>" + _field(code, "5"))))
+
+
+@pytest.mark.parametrize("hidden", ["<w:vanish/>", "<w:specVanish/>"])
+def test_a_list_label_over_a_hidden_paragraph_mark_is_never_certified(hidden: str) -> None:
+    numbering = _list(_level(0, "%1.")) + _NUM
+    assert _labels_certified(docx(_item(1, 0), numbering=numbering)) == [(1, "1.", "tab")]
+    with pytest.raises(CertificationError, match="hidden paragraph mark"):
+        DocxSource(docx(_item(1, 0, f"<w:rPr>{hidden}</w:rPr>"), numbering=numbering))
+
+
+def test_a_label_takes_no_default_style_for_its_paragraph_mark() -> None:
+    # The mark names no character style: no style's font, whatever its kind, is the label's.
+    styles = f'<w:style w:type="Xharacter" w:default="1" w:styleId="X">{_SYMBOL}</w:style>'
+    letters = _list(_level(0, "%1)", "lowerLetter")) + _NUM
+    assert _labels_certified(docx(_item(1, 0), styles=styles, numbering=letters)) == [
+        (1, "a)", "tab")
+    ]
+
+
+@pytest.mark.parametrize(
+    "part",
+    ["lastRow", "firstCol", "lastCol", "band1Horz", "band2Horz", "band1Vert", "band2Vert",
+     "nwCell", "neCell", "swCell", "seCell"],
+)  # fmt: skip
+def test_emphasis_in_a_part_the_look_turns_off_or_the_cell_is_not_in_is_certified(
+    part: str,
+) -> None:
+    styles = (
+        f'<w:style w:type="table" w:styleId="T"><w:tblStylePr w:type="{part}">'
+        "<w:rPr><w:b/></w:rPr></w:tblStylePr></w:style>"
+    )
+
+    def row(middle: str) -> str:
+        return "<w:tr>" + "".join(_cell(_p(x)) for x in ("", middle, "")) + "</w:tr>"
+
+    # No first or last row or column, no banding: the middle cell is in no part but corners'.
+    body = (
+        '<w:tbl><w:tblPr><w:tblStyle w:val="T"/><w:tblLook w:val="0600"/></w:tblPr>'
+        + row("")
+        + row("<w:r><w:t>a</w:t></w:r>")
+        + row("")
+        + "</w:tbl>"
+    )
+    data = docx(body, styles=styles)
+    DocxSource(data).certify(_docx_value(data))
+
+
+def _headed(section: str, settings: str | None = None, footers: bool = False) -> bytes:
+    from test_headers_comments import _three_headers, header, with_parts
+
+    data = _three_headers(section, settings)
+    parts = {f"footer{i}.xml": header(_p(f"<w:r><w:t>f{i}</w:t></w:r>"), "ftr") for i in (1, 2)}
+    rels = [(f"f{i}", "footer", f"footer{i}.xml") for i in (1, 2)]
+    return with_parts(data, parts, rels) if footers else data
+
+
+def test_an_even_header_is_shown_when_the_settings_turn_even_pages_on() -> None:
+    from test_headers_comments import REFERENCES
+
+    data = _headed(REFERENCES, "<w:evenAndOddHeaders/>")
+    value = _docx_value(data)
+    refusals = [(h["part"], (h["refusal"] or {}).get("code")) for h in value["headers"]]
+    assert refusals == [
+        ("word/header1.xml", None),
+        ("word/header2.xml", "never-shown"),
+        ("word/header3.xml", None),
+    ]
+    DocxSource(data).certify(value)
+    # A part never shown is held to no paragraphs.
+    wrong = copy.deepcopy(value)
+    wrong["headers"][1]["paragraphs"] = wrong["headers"][0]["paragraphs"]
+    with pytest.raises(CertificationError, match="never shown, yet with paragraphs"):
+        DocxSource(data).certify(wrong)
+
+
+def test_one_type_named_twice_by_its_default_or_as_a_footer_is_never_certified() -> None:
+    from test_headers_comments import R, reference
+
+    untyped = f'<w:headerReference xmlns:r="{R}" r:id="h1"/>'
+    for twice in (
+        untyped + reference("header", "h2"),
+        reference("footer", "f1") + reference("footer", "f2"),
+    ):
+        with pytest.raises(CertificationError, match="names one type of header twice"):
+            DocxSource(_headed(twice, footers=True))
+
+
+@pytest.mark.parametrize("change", ["cellDel", "cellMerge"])
+def test_every_cell_change_is_never_applied_by_the_check(change: str) -> None:
+    from label_docx.certify import certify_tracked
+    from test_tracked import WHO, ins, t
+
+    marked = f'<w:{change} w:id="1" {WHO}/>'
+    cell = f"<w:tc><w:tcPr>{marked}</w:tcPr>{_p(t('x'))}</w:tc>"
+    source = docx(f"<w:tbl><w:tr>{cell}</w:tr></w:tbl>" + _p(ins(t("y"))))
+    view = _with_part(
+        source,
+        "word/document.xml",
+        _part(source)
+        .decode()
+        .replace(marked, "")
+        .replace(f'<w:ins w:id="1" {WHO}>', "")
+        .replace("</w:ins>", ""),
+    )
+    with pytest.raises(CertificationError, match=change):
+        certify_tracked(source, {"accepted": view})
+
+
+def _views_of(body: str, *changes: tuple[str, str]) -> tuple[bytes, list[bytes]]:
+    """A source with ``body`` and an insertion after it; its accepted view; and that view with
+    each change (old, new) made."""
+    from test_tracked import WHO, ins, t
+
+    source = docx(body + _p(ins(t("y"))))
+    accepted = _part(source).decode().replace(f'<w:ins w:id="1" {WHO}>', "").replace("</w:ins>", "")
+    out = []
+    for old, new in changes:
+        assert old in accepted, old
+        out.append(_with_part(source, "word/document.xml", accepted.replace(old, new, 1)))
+    return source, [_with_part(source, "word/document.xml", accepted), *out]
+
+
+def _held(source: bytes, views: list[bytes], view: str = "accepted") -> None:
+    """The first view is certified; every other is refused."""
+    from label_docx.certify import certify_tracked
+
+    certify_tracked(source, {view: views[0]})
+    for wrong in views[1:]:
+        with pytest.raises(CertificationError, match="does not hold its content"):
+            certify_tracked(source, {view: wrong})
+
+
+def test_a_view_holds_every_empty_element_of_a_paragraph() -> None:
+    bookmark = '<w:bookmarkStart w:id="0" w:name="b"/>'
+    _held(*_views_of(_p(bookmark + "<w:r><w:t>a</w:t></w:r>"), (bookmark, "")))
+
+
+def test_a_view_holds_a_text_box_and_the_changes_in_it() -> None:
+    from test_tracked import WHO, ins, t
+
+    box = (
+        f"<w:r><w:pict><v:shape {_VML}><v:textbox><w:txbxContent>"
+        f"{_p(ins(t('in'), 2))}</w:txbxContent></v:textbox></v:shape></w:pict></w:r>"
+    )
+    source, views = _views_of(_p(box), (">in<", ">on<"))
+    # The box's own insertion, accepted, stays as its text.
+    kept = [
+        _with_part(
+            source,
+            "word/document.xml",
+            _part(v).decode().replace(f'<w:ins w:id="2" {WHO}>', "").replace("</w:ins>", ""),
+        )
+        for v in views
+    ]
+    _held(source, kept)
+
+
+def test_a_view_holds_text_elements_by_their_namespace() -> None:
+    foreign = '<w:r><x:delText xmlns:x="urn:x">a</x:delText></w:r>'
+    _held(*_views_of(_p(foreign), (foreign, "<w:r><w:t>a</w:t></w:r>")))
+
+
+def test_a_view_holds_the_former_properties_of_a_deleted_paragraph_mark() -> None:
+    from test_tracked import WHO
+
+    deleted = f'<w:pPr><w:rPr><w:del w:id="3" {WHO}/></w:rPr></w:pPr>'
+    body = _p(deleted + "<w:r><w:t>a</w:t></w:r>") + _p("<w:r><w:t>b</w:t></w:r>")
+    source = docx(body + _p(f'<w:ins w:id="1" {WHO}><w:r><w:t>y</w:t></w:r></w:ins>'))
+    original = (
+        _part(source)
+        .decode()
+        .replace(f'<w:ins w:id="1" {WHO}><w:r><w:t>y</w:t></w:r></w:ins>', "")
+        .replace(f'<w:del w:id="3" {WHO}/>', "")
+    )
+    views = [
+        _with_part(source, "word/document.xml", x)
+        for x in (original, original.replace("<w:rPr></w:rPr>", "<w:rPr><w:b/></w:rPr>", 1))
+    ]
+    assert views[0] != views[1]
+    _held(source, views, "original")
+
+
+def test_a_view_holds_each_paragraph_to_its_table_cell() -> None:
+    cells = _cell(_p("<w:r><w:t>a</w:t></w:r>")) + _cell(_p("<w:r><w:t>b</w:t></w:r>"))
+    moved = _cell(_p("<w:r><w:t>a</w:t></w:r>") + _p("<w:r><w:t>b</w:t></w:r>")) + "<w:tc></w:tc>"
+    _held(*_views_of(f"<w:tbl><w:tr>{cells}</w:tr></w:tbl>", (cells, moved)))
+
+
+def test_a_view_holds_a_paragraph_wherever_it_stands() -> None:
+    # Even in properties, outside a paragraph or in a cell: never passed over.
+    stray = "<w:pPr><w:p><w:r><w:t>a</w:t></w:r></w:p></w:pPr>"
+    body = stray + f"<w:tbl><w:tr><w:tc>{stray}{_p('')}</w:tc></w:tr></w:tbl>"
+    source, views = _views_of(body, (">a<", ">x<"))
+    in_cell = _part(views[0]).decode()
+    at = in_cell.index(">a<", in_cell.index(">a<") + 1)
+    views.append(_with_part(source, "word/document.xml", in_cell[:at] + ">x<" + in_cell[at + 3 :]))
+    _held(source, views)
