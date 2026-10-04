@@ -70,7 +70,7 @@ from another web page.
  "paragraphs": [{"comments": [], "markHidden": false,
    "marks": [{"end": 5, "kind": "superscript", "start": 4}], "notes": [], "numbering": null,
    "pages": [], "style": "Heading2", "table": null, "text": "x 109/l"}],
- "reader": "docx-reader/1.25.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"}}
+ "reader": "docx-reader/1.26.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"}}
 ```
 
 - Offsets (`marks`, `notes`, `pages`, `comments`) count Unicode code points of `text`.
