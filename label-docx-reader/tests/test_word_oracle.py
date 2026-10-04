@@ -317,6 +317,56 @@ def test_a_paragraph_word_did_not_measure_is_not_agreement(tmp_path: Path) -> No
     assert emphasis_verdict({"0": measured}, path) == "agrees"
 
 
+def test_a_paragraph_partly_so_that_word_finds_wholly_so_is_a_difference(tmp_path: Path) -> None:
+    path = tmp_path / "a.docx"
+    path.write_bytes(docx(p(r("<w:rPr><w:b/></w:rPr><w:t>Hello</w:t>") + r("<w:t>world</w:t>"))))
+    # Word's false is "not wholly bold", which a paragraph partly bold is; its true is not.
+    assert emphasis_verdict({"0": [False] * 4}, path) == "agrees"
+    assert emphasis_verdict({"0": [True, False, False, False]}, path).startswith(
+        "differs at paragraph 1: Word bold True"
+    )
+
+
+def test_which_headers_are_shown_is_held_both_ways_to_words_page_setup(tmp_path: Path) -> None:
+    # A first page's header with no titlePg: the reader finds it never shown.
+    body = p(
+        r("<w:t>Body</w:t>"),
+        f"<w:sectPr>{reference('header', 'h1')}{reference('header', 'h2', 'first')}</w:sectPr>",
+    )
+    parts = {
+        "header1.xml": header(p(r("<w:t>Product</w:t>"))),
+        "header2.xml": header(p(r("<w:t>Warning</w:t>"))),
+    }
+    path = tmp_path / "a.docx"
+    path.write_bytes(
+        _document(body, parts, [("h1", "header", "header1.xml"), ("h2", "header", "header2.xml")])
+    )
+    (first,) = [h for h in read_document(path.read_bytes()).headers if h.refusal]
+    assert first.refusal is not None and first.refusal[0] == "never-shown"
+    stories = [
+        ["header", 0, "default", "Product\r", []],
+        ["header", 0, "first", "Warning\r", []],
+        ["header", 0, "even", "\r", []],
+    ]
+
+    def judged(first_page: bool) -> str:
+        word = {"stories": stories, "comments": [], "setups": [[0, first_page, False]]}
+        return story_verdict(word, path)
+
+    assert judged(first_page=False) == "agrees"
+    # Word shows the first page's own header, which the reader finds never shown.
+    assert judged(first_page=True) == "differs: Word shows a header first in section 1"
+    # Not asked which are shown: not agreement.
+    assert story_verdict({"stories": stories, "comments": []}, path).startswith("differs")
+    # A header the reader reads, of a type Word does not show there.
+    titled = body.replace("<w:sectPr>", "<w:sectPr><w:titlePg/>")
+    path.write_bytes(
+        _document(titled, parts, [("h1", "header", "header1.xml"), ("h2", "header", "header2.xml")])
+    )
+    assert judged(first_page=False) == "differs: Word never shows the header first of section 1"
+    assert judged(first_page=True) == "agrees"
+
+
 def _story_cases() -> list[tuple[Path, dict[str, list[list[Any]]]]]:
     out: list[tuple[Path, dict[str, list[list[Any]]]]] = []
     for record in RECORDS:
@@ -453,7 +503,8 @@ def test_what_word_was_not_asked_about_is_not_agreement(tmp_path: Path) -> None:
     answers = _answers(text=["Body"], emphasis={"0": [False] * 4})
     assert judge(path, answers) == "differs: Word was not asked about headers, footers and comments"
     shown = [["header", 0, "default", "Product\r", []]]
-    assert judge(path, answers | {"stories": {"stories": shown, "comments": []}}) == "agrees"
+    told = {"stories": shown, "comments": [], "setups": [[0, False, False]]}
+    assert judge(path, answers | {"stories": told}) == "agrees"
 
 
 def _replaced(data: bytes, name: str, content: str) -> bytes:
@@ -480,7 +531,8 @@ def test_every_comment_read_is_one_of_words_and_word_has_no_more(tmp_path: Path)
     ]
 
     def judged(*comments: list[str]) -> str:
-        return story_verdict({"stories": [], "comments": [list(c) for c in comments]}, path)
+        word = {"stories": [], "comments": [list(c) for c in comments], "setups": []}
+        return story_verdict(word, path)
 
     assert judged(["Reviewer", "Check this dose.\r"], ["Reviewer", "x\r"]) == "agrees"
     # One refused, the one read wrong, or Word's count otherwise: never agreement.
@@ -504,7 +556,8 @@ def test_words_story_answer_is_parsed_whole_and_its_own_codes_mapped(
         _document(body, {"header1.xml": header(hyphenated)}, [("h1", "header", "header1.xml")])
     )
     monkeypatch.setattr(word_module, "CONTAINER", tmp_path / "container")
-    answer = "header\x1c0\x1cdefault\x1cCo\x1eamoxiclav\r\x1c\x1b"
+    answer = "setup\x1c0\x1cfalse\x1cfalse\x1b"
+    answer += "header\x1c0\x1cdefault\x1cCo\x1eamoxiclav\r\x1c\x1b"
     answer += "comment\x1cReviewer\x1cAmoxi\x1fcillin\r\x1b"
 
     def word_answers(text: str) -> None:
@@ -516,9 +569,15 @@ def test_words_story_answer_is_parsed_whole_and_its_own_codes_mapped(
     assert stories == {
         "stories": [["header", 0, "default", "Co\x1eamoxiclav\r", []]],
         "comments": [["Reviewer", "Amoxi\x1fcillin\r"]],
+        "setups": [[0, False, False]],
     }
     assert story_verdict(stories | {"comments": []}, path) == "agrees"
-    for broken in ("header\x1c0\x1cdefault\x1b", "comment\x1cA\x1cB\x1cC\x1b"):
+    broken_answers = (
+        "header\x1c0\x1cdefault\x1b",
+        "comment\x1cA\x1cB\x1cC\x1b",
+        "setup\x1c0\x1cyes\x1cfalse\x1b",
+    )
+    for broken in broken_answers:
         word_answers(broken)
         with pytest.raises(SystemExit):
             word_stories(path)
