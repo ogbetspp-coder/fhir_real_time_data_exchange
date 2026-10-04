@@ -347,15 +347,20 @@ def test_which_headers_are_shown_is_held_both_ways_to_words_page_setup(tmp_path:
         _document(body, parts, [("h1", "header", "header1.xml"), ("h2", "header", "header2.xml")])
     )
     (first,) = [h for h in read_document(path.read_bytes()).headers if h.refusal]
-    assert first.refusal is not None and first.refusal[0] == "never-shown"
-    stories = [
+    assert first.refusal is not None
+    assert first.refusal[0] == "never-shown"
+    stories: list[list[Any]] = [
         ["header", 0, "default", "Product\r", []],
         ["header", 0, "first", "Warning\r", []],
         ["header", 0, "even", "\r", []],
     ]
 
     def judged(first_page: bool) -> str:
-        word = {"stories": stories, "comments": [], "setups": [[0, first_page, False]]}
+        word: dict[str, list[list[Any]]] = {
+            "stories": stories,
+            "comments": [],
+            "setups": [[0, first_page, False]],
+        }
         return story_verdict(word, path)
 
     assert judged(first_page=False) == "agrees"

@@ -26,8 +26,9 @@ What Word is asked, each by a script on a copy of the document:
 - **Emphasis:** whether each body paragraph is bold, italic, in capitals and struck through,
   over the text it shows (between its own fields, and each field's result), its white space's
   formatting aside. Word answers false for a paragraph that is partly so, so where the reader
-  finds it partly so only Word's true is a difference. Paragraphs with a note reference or a page number, and those a hidden
-  paragraph mark joins, are not held (Word's answer would count the mark or the number).
+  finds it partly so only Word's true is a difference. Paragraphs with a note reference or a page
+  number, and those a hidden paragraph mark joins, are not held (Word's answer would count the
+  mark or the number).
 - **Headers, footers and comments:** each section's by type, and each comment's author and text.
 - **Tracked changes:** Word's own Accept All and Reject All files (``word_views``).
 
@@ -1396,9 +1397,9 @@ def story_verdict(word: dict[str, list[list[Any]]], path: Path) -> str:
         for section, type_ in story.uses
     }
     for kind, section, type_, text, _ in word["stories"]:
-        if word_shows(section, type_) and _paragraphs_shown(text):
-            if (kind, section, type_) not in accounted:
-                return f"differs: Word shows a {kind} {type_} in section {section + 1}"
+        shown_here = word_shows(section, type_) and bool(_paragraphs_shown(text))
+        if shown_here and (kind, section, type_) not in accounted:
+            return f"differs: Word shows a {kind} {type_} in section {section + 1}"
     for story in (*document.headers, *document.footers):
         if story.refusal is not None:
             continue
