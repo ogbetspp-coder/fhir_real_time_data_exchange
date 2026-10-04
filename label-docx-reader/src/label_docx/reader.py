@@ -116,15 +116,16 @@ STYLEREF finds the nearest paragraph of the style (a number n is "heading n") be
 after it, and shows its text, or with ``\s`` its list label without the final period; a paragraph
 with a page number is refused. Each rule is Word's answer to a case in ``corpus/numbering-cases``. A
 ``\*`` format on REF or STYLEREF (but MERGEFORMAT or CHARFORMAT), SEQ identifiers that differ only
-in case, a field code with whitespace other than spaces and tabs, other switches, a computed field
-(SEQ, STYLEREF, REF or NOTEREF) or a PAGEREF in a note, any of the four with a field in its own code
-or nested in another field's code, and a result that runs past its paragraph are refused. Any other
-field whose result would be shown (DATE, IF, a formula...) is refused, because Word recomputes it on
-display or print. The code is the first word of the instruction; a field nested in the instruction
-ahead of or inside that word makes the code unknown, and the field is refused. So are a field with
-no stored result (no ``separate``, as a form checkbox or a SYMBOL field, but a hidden SEQ; or an
-empty ``fldSimple``), a form field, a field marked for update, any field in a document whose
-settings ask Word to update fields on open, and field code outside an instruction.
+in case, a field code with whitespace other than spaces and tabs outside quotes, other switches, a
+computed field (SEQ, STYLEREF, REF or NOTEREF) or a PAGEREF in a note, any of the four with a field
+in its own code or nested in another field's code, and a result that runs past its paragraph are
+refused. Any other field whose result would be shown (DATE, IF, a formula...) is refused, because
+Word recomputes it on display or print. The code is the first word of the instruction; a field
+nested in the instruction ahead of or inside that word makes the code unknown, and the field is
+refused. So are a field with no stored result (no ``separate``, as a form checkbox or a SYMBOL
+field, but a hidden SEQ; or an empty ``fldSimple``), a form field, a field marked for update, any
+field in a document whose settings ask Word to update fields on open, and field code outside an
+instruction.
 
 List labels. Word draws "4.8", "b)" or a bullet before a numbered paragraph from the numbering part;
 the reader computes that label by Word's rules, each of which is Word's own answer to a case in
@@ -2297,9 +2298,11 @@ _COMPUTED_FIELDS = {"SEQ", "STYLEREF", "REF", "NOTEREF"}
 
 
 def _code(instruction: str) -> str:
-    if any(c.isspace() and c not in " \t" for c in instruction):
+    unquoted = re.sub(r'"[^"]*"', "", instruction)
+    if any(c.isspace() and c not in " \t" for c in unquoted):
         # Word's set of characters that separate a field code's words is not on record: a
-        # no-break space or a line break may join two words or part them.
+        # no-break space or a line break may join two words or part them. Inside quotes (a
+        # hyperlink's tooltip, say) it parts nothing: the quotes make one word.
         raise DocxRefusedError("computed-field", "a field code with whitespace other than spaces")
     words = instruction.split()
     return words[0].upper() if words else ""

@@ -347,6 +347,9 @@ def test_a_field_code_with_whitespace_other_than_spaces_is_refused(space: str) -
             "a field code with whitespace other than spaces",
         )
     assert _read_text(docx(marked + p(_field("REF\tbm", "below")))) == ["below", "below"]
+    # Inside quotes it parts no words: a hyperlink's tooltip.
+    tooltip = f'HYPERLINK "https://example.org" \\o "see{space}here"'
+    assert _read_text(docx(p(_field(tooltip, "link")))) == ["link"]
 
 
 @pytest.mark.parametrize(

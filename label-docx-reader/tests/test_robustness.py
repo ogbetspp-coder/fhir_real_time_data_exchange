@@ -11,13 +11,17 @@ from __future__ import annotations
 import io
 import json
 import random
+import time
 import tracemalloc
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 from label_docx import documents, reader
+from label_docx.epi import EpiRefusedError, read_epi
+from label_docx.epi import _html_otherwise as epi_html_otherwise
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 DOCUMENTS = [
@@ -99,3 +103,25 @@ def test_a_compressed_xml_bomb_is_refused_before_it_is_built(
         "detail": "parts over 10000 XML elements",
     }
     assert peak < 32 * 1024 * 1024, peak
+
+
+def _seconds(read: Callable[[], object]) -> float:
+    started = time.perf_counter()
+    read()
+    return time.perf_counter() - started
+
+
+def test_a_bundle_built_to_make_a_pattern_backtrack_is_refused_at_once() -> None:
+    # A string never closed: from each quote in turn, the depth check's pattern once scanned to
+    # the end (quadratic: 32 KB took seconds, 1 MB hours). Not JSON either way.
+    attack = b'{"' + b'\\"' * 512_000
+    with pytest.raises(EpiRefusedError) as refused:
+        read_epi(attack)
+    assert refused.value.code == "invalid-bundle"
+    assert _seconds(lambda: documents.kind(attack).read(attack)) < 5
+
+
+def test_a_section_built_to_rescan_its_attributes_is_read_at_once() -> None:
+    # Each "<a" in an attribute value once re-scanned every attribute after it for "/>".
+    div = '<div xmlns="http://www.w3.org/1999/xhtml"><p' + ' x="&lt;a"' * 50_000 + ">t</p></div>"
+    assert _seconds(lambda: epi_html_otherwise(div.replace("&lt;", "<"))) < 5

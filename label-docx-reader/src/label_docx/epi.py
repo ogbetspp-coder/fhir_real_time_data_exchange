@@ -1697,7 +1697,29 @@ _HTML_OTHERWISE = re.compile(
 )
 # A run a tag name cannot leave, and what may follow a name up to "/>" (quoted attributes).
 _NAME_RUN = re.compile(r"[^\s/>]+")
-_SELF_CLOSING_TAIL = re.compile(r"(?:\s+[^\s=/>]+\s*=\s*(?:\"[^\"]*\"|'[^']*'))*\s*/>")
+_ATTRIBUTE = re.compile(r"\s+[^\s=/>]+\s*=\s*(?:\"[^\"]*\"|'[^']*')")
+_CLOSING = re.compile(r"\s*/>")
+
+
+def _self_closing_tail(div: str, at: int, known: dict[int, bool]) -> bool:
+    """Whether quoted attributes from ``at`` run on to "/>", each place's answer kept in ``known``.
+
+    An attribute matches one way only, and "/>" never follows where one does (a name cannot
+    begin with "/"), so the attributes from any place lead to one end, which answers for every
+    place on the way. Keeping the answers scans each attribute once, where scanning the tail
+    afresh from each "<" in the attribute values ahead of it took quadratic time.
+    """
+    passed: list[int] = []
+    while at not in known:
+        attribute = _ATTRIBUTE.match(div, at)
+        if attribute is None:
+            known[at] = _CLOSING.match(div, at) is not None
+            break
+        passed.append(at)
+        at = attribute.end()
+    for place in passed:
+        known[place] = known[at]
+    return known[at]
 
 
 def _html_otherwise(div: str) -> bool:
@@ -1710,6 +1732,7 @@ def _html_otherwise(div: str) -> bool:
     """
     if _HTML_OTHERWISE.search(div):
         return True
+    known: dict[int, bool] = {}
     for run in _NAME_RUN.finditer(div):
         text = run.group()
         if "<" not in text:
@@ -1720,7 +1743,7 @@ def _html_otherwise(div: str) -> bool:
             if text[at] == "<" and text[at + 1].isascii() and text[at + 1].isalpha()
         )
         if any(name not in ("br", "hr", "img") for name in names) and (
-            _SELF_CLOSING_TAIL.match(div, run.end())
+            _self_closing_tail(div, run.end(), known)
         ):
             return True
     return False
@@ -1829,7 +1852,9 @@ def read_epi(data: bytes) -> Document:
 # How deep a Bundle's arrays and objects may nest (the pinned ePIs reach 17): the JSON parser
 # recurses, and how deep it can go depends on the thread's stack.
 _JSON_DEPTH: Final = 100
-_JSON_STRING = re.compile(r'"[^"\\]*(?:\\.[^"\\]*)*"', re.S)
+# A string, or one never closed, which runs to the end: tried from each quote in turn, a string
+# never closed was scanned to the end from every one, in quadratic time. Not JSON either way.
+_JSON_STRING = re.compile(r'"[^"\\]*+(?:\\.[^"\\]*+)*+(?:"|\\?\Z)', re.S)
 
 
 def _one_reading(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
