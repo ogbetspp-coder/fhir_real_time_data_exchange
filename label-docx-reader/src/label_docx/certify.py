@@ -244,8 +244,9 @@ _CHECKED_TOGGLES = {
     "dstrike": "dstrike",
 }
 CHECKED_MARKS = frozenset({*_CHECKED_TOGGLES.values(), "superscript", "subscript", "underline"})
-# Every mark kind a .docx result may name (``reader.Mark``): the checked ones, the others held
-# to Word, and highlight and shading, named after their colour.
+# Every mark kind a .docx result may name (``reader.Mark``): the checked ones, the others (held
+# only by the reader's tests; Word is not asked about them), and highlight and shading, named
+# after their colour.
 _MARK_KINDS = CHECKED_MARKS | {"position", "rtl", "faint"}
 _MARK_PATTERN = re.compile(r"(?:highlight|shading)-.+", re.DOTALL)
 
