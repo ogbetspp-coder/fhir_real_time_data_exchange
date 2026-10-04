@@ -55,9 +55,14 @@ def current_versions() -> dict[str, tuple[str, str]]:
     """Each component's current version and the hash of the file that decides it."""
     return {
         "reader": (READER_VERSION, _sha256(Path(reader.__file__))),
-        # From label-docx-json/1.4.0 the format is also decided by the check that certifies it.
-        "format": (FORMAT_VERSION, _sha256(Path(output.__file__), Path(str(certify.__file__)))),
-        "epi-reader": (epi.READER_VERSION, _sha256(Path(epi.__file__))),
+        # From label-docx-json/1.4.0 the format is also decided by the check that certifies it,
+        # and from 1.15.6 by documents, which says which reader reads the bytes.
+        "format": (
+            FORMAT_VERSION,
+            _sha256(*(Path(str(m.__file__)) for m in (output, certify, documents))),
+        ),
+        # From epi-reader/1.3.1 also by reader, whose marks, numbering and paragraphs it builds.
+        "epi-reader": (epi.READER_VERSION, _sha256(Path(epi.__file__), Path(reader.__file__))),
         # The ePI format is written by epi_output with output's paragraphs, for the documents
         # documents.kind sends it.
         "epi-format": (

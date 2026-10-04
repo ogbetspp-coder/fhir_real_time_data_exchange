@@ -75,6 +75,7 @@ import io
 import json
 import posixpath
 import re
+import unicodedata
 import xml.etree.ElementTree as ET
 import zipfile
 from collections.abc import Iterator
@@ -84,7 +85,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT, WINGDINGS_BULLETS
 
-CHECKER_VERSION = "conservation-check/1.13.0"
+CHECKER_VERSION = "conservation-check/1.14.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -136,6 +137,25 @@ _INERT = {
         "commentRangeEnd",
     )
 }
+# Characters of a text element Word does not show as themselves: format characters (zero-width
+# and bidirectional controls, which reorder what is around them), controls (a tab or a line
+# break stored as text: Word writes those as elements), unassigned code points, and the rest of
+# Unicode's Default_Ignorable_Code_Point (16.0), which are none of these and are drawn as nothing.
+_UNSHOWN = {"Cf", "Cc", "Cn"}
+_IGNORED = frozenset(
+    chr(code)
+    for low, high in (
+        (0x034F, 0x034F),
+        (0x115F, 0x1160),
+        (0x17B4, 0x17B5),
+        (0x180B, 0x180F),
+        (0x3164, 0x3164),
+        (0xFE00, 0xFE0F),
+        (0xFFA0, 0xFFA0),
+        (0xE0100, 0xE01EF),
+    )
+    for code in range(low, high + 1)
+)
 # Drawings it reads as one character: a picture, or a shape (whose text it refuses).
 _DRAWN = {
     "http://schemas.openxmlformats.org/drawingml/2006/picture",
@@ -279,6 +299,9 @@ class _Fonts:
                 style_id = style.get(_w("styleId"))
                 if style_id is None:
                     continue
+                if style_id in self.kind:
+                    # Which definition Word takes is not on record.
+                    raise CertificationError(f"style {style_id} is defined twice")
                 kind = style.get(_w("type"), "paragraph")
                 based = style.find(_w("basedOn"))
                 self.kind[style_id] = kind
@@ -675,6 +698,10 @@ class _Story:
             raise CertificationError("a paragraph mark hidden by one reading and not by another")
         self.current = here
         self.inline(element)
+        if self.in_instruction() or self.layout:
+            # What follows would be code, or a page number, as the walk reads it: Word's reading
+            # of a field's code or page number across a paragraph mark is not on record.
+            raise CertificationError("a paragraph ends inside a field's code or page number")
         self.paragraphs.append(here)
 
     def inline(self, element: ET.Element) -> None:
@@ -797,6 +824,9 @@ class _Story:
                 if self.fields[-1][0]:
                     self.fields[-1][1].append(token)
             elif self.layout:
+                if length and hidden is not False:
+                    # Word shows no page number there, or one not on record.
+                    raise CertificationError("a hidden page number")
                 self.ledger.page_numbers += length
             elif not token and local == "br":
                 self.ledger.page_breaks += 1
@@ -812,11 +842,19 @@ class _Story:
             text = child.text or ""
             if len(child):
                 raise CertificationError("an element inside a text element")
+            if text != text.strip(" ") and child.get(f"{{{_XML_NS}}}space") != "preserve":
+                # Spaces at an edge an XML consumer may drop: what Word shows is not certain.
+                raise CertificationError("spaces at the edge of a text element not preserved")
             self.ledger.text += len(text)
             if symbol:
                 mapped = _symbol_reading(text)
                 self.ledger.symbol += sum(1 for a, b in zip(text, mapped, strict=True) if a != b)
                 return mapped
+            # Text Python finds printable holds no character of _UNSHOWN's categories.
+            if not _IGNORED.isdisjoint(text) or (
+                not text.isprintable() and any(unicodedata.category(c) in _UNSHOWN for c in text)
+            ):
+                raise CertificationError("a character Word does not show as itself")
             return text
         self.ledger.elements += 1
         if local in ("tab", "ptab"):
@@ -1183,6 +1221,28 @@ def _inert(element: ET.Element) -> bool:
     return True
 
 
+def _control(sdt: ET.Element) -> None:
+    """A content control whose text Word shows from elsewhere than its content is refused.
+
+    One bound to data (Word shows the data; the content is a cache), and one whose content shows
+    nothing while it names a placeholder or says it shows one (Word shows the placeholder's
+    text, kept elsewhere). A placeholder Word shows from the content is the content's text.
+    """
+    properties = sdt.find(_w("sdtPr"))
+    if properties is None:
+        return
+    if any(_local(c.tag) == "dataBinding" for c in properties):
+        raise CertificationError("a content control bound to data")
+    content = sdt.find(_w("sdtContent"))
+    shows = any(
+        (node.tag == _w("t") and node.text) or _local(node.tag) in _STANDS | _NOTE_MARKS
+        for node in ([] if content is None else content.iter())
+    )
+    placeholder = properties.find(f"{_w('placeholder')}/{_w('docPart')}") is not None
+    if not shows and (placeholder or _on(properties.find(_w("showingPlcHdr")))):
+        raise CertificationError("an empty content control showing a placeholder")
+
+
 def _page_field(instruction: str) -> bool:
     r"""Whether a field is a page number; one with a switch Word has not answered is refused.
 
@@ -1273,25 +1333,32 @@ def _docx_parts(data: bytes) -> tuple[zipfile.ZipFile, str, dict[str, str]]:
             raise CertificationError("a zip entry whose name is not a part name")
         if info.compress_type not in (0, 8):
             raise CertificationError("a part neither stored nor deflated")
-    if "[Content_Types].xml" not in archive.namelist():
+    names = archive.namelist()
+    # Part names are compared without regard to case: two entries under one name, in any case,
+    # are two parts zipfile would read as one (the last).
+    if len({name.casefold() for name in names}) != len(names):
+        raise CertificationError("a part name occurs twice")
+    if "[Content_Types].xml" not in names:
         raise CertificationError("no [Content_Types].xml")
     main = _relations(archive, "", "officeDocument")
     if len(main) != 1:
         raise CertificationError("not one main document part")
-    related = {
-        kind: targets[0]
-        for kind in (
-            "styles",
-            "theme",
-            "footnotes",
-            "endnotes",
-            "comments",
-            "numbering",
-            "fontTable",
-            "settings",
-        )
-        if (targets := _relations(archive, main[0], kind))
-    }
+    related: dict[str, str] = {}
+    for kind in (
+        "styles",
+        "theme",
+        "footnotes",
+        "endnotes",
+        "comments",
+        "numbering",
+        "fontTable",
+        "settings",
+    ):
+        targets = _relations(archive, main[0], kind)
+        if len(targets) > 1:
+            raise CertificationError(f"two {kind} parts")
+        if targets:
+            related[kind] = targets[0]
     return archive, main[0], related
 
 
@@ -1458,6 +1525,16 @@ def _list_level(element: ET.Element) -> _ListLevel:
     )
 
 
+def _once[T](pairs: Iterator[tuple[int, T]]) -> dict[int, T]:
+    """``pairs`` as a dict of list levels; a level given twice is refused."""
+    out: dict[int, T] = {}
+    for level, value in pairs:
+        if level in out:
+            raise CertificationError(f"list level {level} is defined twice")
+        out[level] = value
+    return out
+
+
 class _Numbering:
     """The labels of a document's lists, counted in document order."""
 
@@ -1465,25 +1542,38 @@ class _Numbering:
         self.fonts = fonts
         self.abstracts: dict[int, tuple[dict[int, _ListLevel], str | None, str | None]] = {}
         self.nums: dict[int, tuple[int, dict[int, int], dict[int, _ListLevel]]] = {}
+        # Anything defined twice (a list, a list's definition, a level of either) is refused:
+        # which one Word takes is not on record.
         for element in [] if root is None else root.findall(_w("abstractNum")):
-            levels = {
-                int(lvl.get(_w("ilvl"), "")): _list_level(lvl) for lvl in element.findall(_w("lvl"))
-            }
+            levels = _once(
+                (int(lvl.get(_w("ilvl"), "")), _list_level(lvl))
+                for lvl in element.findall(_w("lvl"))
+            )
             link = element.find(_w("numStyleLink"))
             back = element.find(_w("styleLink"))
-            self.abstracts[int(element.get(_w("abstractNumId"), ""))] = (
+            abstract_id = int(element.get(_w("abstractNumId"), ""))
+            if abstract_id in self.abstracts:
+                raise CertificationError(f"abstractNum {abstract_id} is defined twice")
+            self.abstracts[abstract_id] = (
                 levels,
                 None if link is None else link.get(_w("val")),
                 None if back is None else back.get(_w("val")),
             )
+        num_ids: set[int] = set()
         for element in [] if root is None else root.findall(_w("num")):
+            num_id = int(element.get(_w("numId"), ""))
+            if num_id in num_ids:
+                raise CertificationError(f"numId {num_id} is defined twice")
+            num_ids.add(num_id)
             abstract = element.find(_w("abstractNumId"))
             if abstract is None:
                 # A list naming no abstractNum is as one not defined.
                 continue
             starts: dict[int, int] = {}
             looks: dict[int, _ListLevel] = {}
-            for override in element.findall(_w("lvlOverride")):
+            overrides = element.findall(_w("lvlOverride"))
+            _once((int(o.get(_w("ilvl"), "")), o) for o in overrides)
+            for override in overrides:
                 level = int(override.get(_w("ilvl"), ""))
                 start = override.find(_w("startOverride"))
                 if start is not None:
@@ -1491,7 +1581,7 @@ class _Numbering:
                 if override.find(_w("lvl")) is not None:
                     looks[level] = _list_level(override.find(_w("lvl")))  # type: ignore[arg-type]
             key = int(abstract.get(_w("val"), ""))
-            self.nums[int(element.get(_w("numId"), ""))] = (key, starts, looks)
+            self.nums[num_id] = (key, starts, looks)
         # Each abstractNum's counts, shared by its lists: the values, the startOverrides
         # applied, where a restarted level restarts from, and what a level counted only through
         # a deeper paragraph shows meanwhile.
@@ -2003,8 +2093,12 @@ class DocxSource:
 
     def _part(self, element: ET.Element, story: tuple[str, int] | None) -> _Part:
         ledger = _Ledger()
+        for control in element.iter(_w("sdt")):
+            _control(control)
         walk = _Story(self.fonts, ledger, story)
         walk.blocks(element, None, None)
+        if walk.fields:
+            raise CertificationError("a field still open where its story ends")
         if story is not None:
             for paragraph in walk.paragraphs:
                 paragraph.numbering = self._label(paragraph, story)

@@ -60,6 +60,15 @@ document read: every changed result is refused, and every unchanged result is ce
   markers it passes over, which must hold no text. Anything else (alternate content around
   runs or paragraphs, ruby, a chunk of another format, a chart, a paragraph in a table outside
   its cells, a note defined twice) is never certified.
+- It never certifies what Word may show otherwise than the source stores, or what it may read
+  in more than one way: a paragraph that ends inside a field's code or page number, a story that
+  ends with a field open, a hidden page number; a text element with spaces at an edge and no
+  `xml:space="preserve"`, or holding a format character (a bidirectional control, a zero-width
+  character...), a control (a tab or line break stored as text), an unassigned or any other
+  default-ignorable code point; a content control bound to data, or empty while it names or
+  shows a placeholder (one Word shows from its content is its content's text); a style, list,
+  list definition or list level defined twice; a part name stored twice in any case, and a
+  related part (styles, lists, notes...) named twice.
 
 Beyond the text, the check works out on its own, by Word's rules written apart from the reader's,
 the key marks (bold, italic, caps, small caps, strike, double strike, super- and subscript,
