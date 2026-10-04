@@ -1,5 +1,5 @@
 {
-  "killed": 2541,
+  "killed": 2545,
   "mutants": 2627,
   "survivors": [
     {
@@ -265,14 +265,6 @@
       "kind": "statement",
       "line": 2379,
       "occurrence": 3
-    },
-    {
-      "code": "if \"dingbat\" in named or len(named) > 1:",
-      "equivalent": null,
-      "function": "_Fonts.drawn",
-      "kind": "int:1",
-      "line": 471,
-      "occurrence": 0
     },
     {
       "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
@@ -659,40 +651,16 @@
       "occurrence": 0
     },
     {
-      "code": "index == count - 1",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "compare:0",
-      "line": 1104,
-      "occurrence": 0
-    },
-    {
       "code": "elif start[0] in ours and self.look[start[1]] and way == \"Horz\" and self.top > 1:",
       "equivalent": "for Horz both names are firstRow; for Vert the test of way is false whichever is looked for",
       "function": "_Applied.at",
       "kind": "int:0",
       "line": 1101,
       "occurrence": 0
-    },
-    {
-      "code": "index == count - 1",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "int:1",
-      "line": 1104,
-      "occurrence": 0
-    },
-    {
-      "code": "or (end[0] in ours and self.look[end[1]] is None)",
-      "equivalent": null,
-      "function": "_Applied.at",
-      "kind": "int:0",
-      "line": 1108,
-      "occurrence": 0
     }
   ],
   "target": "src/label_docx/certify.py",
-  "targetSha256": "f761b5ba22cbac76a1026668279b75f47944de39d8ee0ec648b15dc067174c80",
+  "targetSha256": "2428339a680d584fcef234b3e79654b1fb2583a934910e949af6f6fda80a3065",
   "tests": [
     "tests/test_certify.py",
     "tests/test_headers_comments.py",
@@ -701,5 +669,5 @@
     "tests/test_robustness.py",
     "tests/test_output.py"
   ],
-  "testsSha256": "adfd7b186e8c737e35ce3c35b37b7aac090b752b38680ca5d080cf9e30c476b9"
+  "testsSha256": "48aea053cb9063b8e96d91c081276facaf7565ea0c703e0d56856c25a2661626"
 }
