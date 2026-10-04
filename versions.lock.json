@@ -68,6 +68,7 @@
     "docx-reader/1.9.0": "c7bfc0234b6c1ecbe6101ce7ac0295ad9ce936dfb7ffe282cb1fdf55d270fcdd"
   },
   "word-verifier": {
-    "word-verifier/1.0.0": "4a6eb9cd9f45e499e53481137cf68e7043bd54dbb3b8391976adbab615ee0649"
+    "word-verifier/1.0.0": "4a6eb9cd9f45e499e53481137cf68e7043bd54dbb3b8391976adbab615ee0649",
+    "word-verifier/1.0.1": "4b229956da673a09a779feb4fccd108bc18da34a2c1f24a1da6fc096bcbe3f7b"
   }
 }

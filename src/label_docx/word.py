@@ -74,7 +74,7 @@ from label_docx.reader import (
 WORD = Path("/Applications/Microsoft Word.app")
 # What Word is asked and how its answers are judged: a change to this file changes it
 # (``scripts/lock.py``). A kept verdict or recorded answer of another version is not reused.
-VERIFIER = "word-verifier/1.0.0"
+VERIFIER = "word-verifier/1.0.1"
 
 
 class WordError(Exception):
@@ -336,18 +336,22 @@ def _run_alone(command: list[str], script: str) -> subprocess.CompletedProcess[s
     # Word's scripts find the document by its name: one of that name already open would be the
     # one asked about.
     name = Path(command[2]).name
-    try:
-        opened = subprocess.run(
-            ["osascript", "-", name],
-            input=OPEN_NAMED,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            check=False,
-            timeout=120,
-        )
-    except subprocess.TimeoutExpired as hung:
-        raise SystemExit("Word did not answer within 2 minutes") from hung
+    for attempt in (1, 2):
+        try:
+            opened = subprocess.run(
+                ["osascript", "-", name],
+                input=OPEN_NAMED,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=False,
+                timeout=120,
+            )
+        except subprocess.TimeoutExpired as hung:
+            raise SystemExit("Word did not answer within 2 minutes") from hung
+        if attempt == 2 or not _quit(opened):
+            break
+        _restart()
     if opened.returncode != 0 or opened.stdout.strip() != "0":
         raise SystemExit(f"a document named {name} may be open in Word ({opened.stdout.strip()})")
     for attempt in (1, 2, 3):
@@ -363,21 +367,31 @@ def _run_alone(command: list[str], script: str) -> subprocess.CompletedProcess[s
             )
         except subprocess.TimeoutExpired as hung:
             raise SystemExit(f"Word did not answer within 15 minutes ({command[2]})") from hung
-        if attempt == 3 or not re.search(r"\((-609|-600)\)", done.stderr or ""):
+        if attempt == 3 or not _quit(done):
             return done
-        subprocess.run(["open", "-g", "-a", str(WORD)], check=False)
-        for _second in range(120):
-            alive = subprocess.run(
-                ["osascript", "-e", 'tell application "Microsoft Word" to name'],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if alive.returncode == 0:
-                break
-            time.sleep(1)
-        time.sleep(5)
+        _restart()
     raise AssertionError  # pragma: no cover
+
+
+def _quit(done: subprocess.CompletedProcess[str]) -> bool:
+    """Whether Word had quit ("Connection is invalid", -609; "not running", -600)."""
+    return bool(re.search(r"\((-609|-600)\)", done.stderr or ""))
+
+
+def _restart() -> None:
+    """Start Word again and wait until it answers, up to two minutes."""
+    subprocess.run(["open", "-g", "-a", str(WORD)], check=False)
+    for _second in range(120):
+        alive = subprocess.run(
+            ["osascript", "-e", 'tell application "Microsoft Word" to name'],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if alive.returncode == 0:
+            break
+        time.sleep(1)
+    time.sleep(5)
 
 
 def word_version() -> str:
