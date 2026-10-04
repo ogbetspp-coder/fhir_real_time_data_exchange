@@ -20192,7 +20192,7 @@
     "qrd-product-information-template-version-104_es.docx": true,
     "qrd-psur-annex-iv-template_en.docx": true
   },
-  "recorded": "2026-10-03",
+  "recorded": "2026-10-04",
   "sha256": {
     "atmp-product-information-template-version-11_bg.docx": "b99d4fec71cfcc28a6923c6062f82d7468011a36e20d9bb9942e3a1d1b50e842",
     "atmp-product-information-template-version-11_el.docx": "abc62efb3273c38074dc8a1a5c71458603aaeca3fabdbfbde6a65ca34cb2acfa",
@@ -20216,6 +20216,13 @@
   "stories": {
     "atmp-product-information-template-version-11_bg.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          true,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -20265,6 +20272,13 @@
     },
     "atmp-product-information-template-version-11_el.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          true,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -20314,6 +20328,13 @@
     },
     "atmp-product-information-template-version-11_en.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          true,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -20363,6 +20384,13 @@
     },
     "mutual-recognition-decentralised-referral-product-information-template-version-42_en.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          true,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -20414,6 +20442,13 @@
     },
     "mutual-recognition-decentralised-referral-product-information-template-version-42_et.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          true,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -20465,6 +20500,13 @@
     },
     "psusa-nationally-authorised-products-template_en.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          false,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -20516,6 +20558,13 @@
     },
     "qrd-annex-iv-conditional-positive-template_en.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          false,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -20565,6 +20614,13 @@
     },
     "qrd-annex-iv-exceptional-circumstances-positive-template_en.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          false,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -20614,6 +20670,13 @@
     },
     "qrd-annex-iv-standard-positive-template_en.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          false,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -20663,6 +20726,13 @@
     },
     "qrd-annex-related-article-127a-template_en.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          true,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -20714,6 +20784,13 @@
     },
     "qrd-annex-template_en.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          true,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -20764,6 +20841,13 @@
     },
     "qrd-annex-template_es.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          false,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -20814,6 +20898,13 @@
     },
     "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics-cover-page_en.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          true,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -20861,6 +20952,13 @@
     },
     "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics-cover-page_en.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          true,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -20911,6 +21009,13 @@
     },
     "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products-cover-page_en.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          true,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -20958,6 +21063,13 @@
     },
     "qrd-appendix-v-adverse-drug-reaction-reporting-details_en.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          true,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -21008,6 +21120,13 @@
     },
     "qrd-product-information-template-version-104_es.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          true,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -21059,6 +21178,13 @@
     },
     "qrd-psur-annex-iv-template_en.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          false,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -24309,5 +24435,5 @@
       "[list]>"
     ]
   },
-  "verifier": "word-verifier/1.0.4"
+  "verifier": "word-verifier/1.0.5"
 }

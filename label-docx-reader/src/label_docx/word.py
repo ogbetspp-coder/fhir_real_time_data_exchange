@@ -24,9 +24,9 @@ What Word is asked, each by a script on a copy of the document:
 - **Print:** the whole text as shown and after saving as PDF, page numbers aside: any field that
   Word reprints differently is caught.
 - **Emphasis:** whether each body paragraph is bold, italic, in capitals and struck through,
-  over the text it shows (between its own fields, and each field's result). Word answers false
-  for a paragraph that is partly so, so a paragraph is held only where the reader finds it
-  wholly so or wholly not. Paragraphs with a note reference or a page number, and those a hidden
+  over the text it shows (between its own fields, and each field's result), its white space's
+  formatting aside. Word answers false for a paragraph that is partly so, so where the reader
+  finds it partly so only Word's true is a difference. Paragraphs with a note reference or a page number, and those a hidden
   paragraph mark joins, are not held (Word's answer would count the mark or the number).
 - **Headers, footers and comments:** each section's by type, and each comment's author and text.
 - **Tracked changes:** Word's own Accept All and Reject All files (``word_views``).
@@ -74,7 +74,7 @@ from label_docx.reader import (
 WORD = Path("/Applications/Microsoft Word.app")
 # What Word is asked and how its answers are judged: a change to this file changes it
 # (``scripts/lock.py``). A kept verdict or recorded answer of another version is not reused.
-VERIFIER = "word-verifier/1.0.4"
+VERIFIER = "word-verifier/1.0.5"
 
 
 class WordError(Exception):
@@ -164,7 +164,8 @@ end run
 """
 
 # Every header and footer Word has for each section and type, unless linked to the previous
-# section's, with the results of its page-number fields; and every comment, author and text.
+# section's, with the results of its page-number fields; whether each section shows a first page's
+# and even pages' own; and every comment, author and text.
 STORIES = """
 on resultOf(g)
   tell application "Microsoft Word"
@@ -209,6 +210,10 @@ on run argv
       set kinds to {header footer primary, header footer first page, header footer even pages}
       set names to {"default", "first", "even"}
       repeat with s from 1 to (count of sections of d)
+        set ps to page setup of section s of d
+        set out to out & "setup" & unit & (s - 1) & unit ¬
+          & (different first page header footer of ps) & unit ¬
+          & (odd and even pages header footer of ps) & record_
         repeat with i from 1 to 3
           set h to get header (section s of d) index (item i of kinds)
           if (s is 1 or not (link to previous of h)) then
@@ -1050,10 +1055,16 @@ def emphasis_verdict(word: dict[str, list[bool]], path: Path) -> str:
         if answer is None:
             # Word measures every paragraph with text: one it did not is not judged as agreeing.
             return f"differs at paragraph {index + 1}: Word measured no emphasis there"
+        # Word's answer for a range leaves out how its white space is formatted: a paragraph
+        # whose letters are all bold is bold to it, with a space before them that is not.
+        letters = [at for at, character in enumerate(paragraph.text) if not character.isspace()]
         for kind, shown in zip(TOGGLES, answer, strict=True):
             covered = [m for m in paragraph.marks if m.kind == kind]
-            whole = any(m.start == 0 and m.end == len(paragraph.text) for m in covered)
-            if (whole or not covered) and whole != shown:
+            inside = [any(m.start <= at < m.end for m in covered) for at in letters]
+            whole = all(inside)
+            # Word's false is "not wholly so", which a part covered is; its true is "wholly so",
+            # which no reading of a part covered is.
+            if whole != shown and (whole or shown or not any(inside)):
                 return f"differs at paragraph {index + 1}: Word {kind} {shown}, reader {whole}"
     return "agrees"
 
@@ -1263,7 +1274,8 @@ def word_stories(path: Path) -> dict[str, list[list[Any]]] | None:
 
     Headers and footers are (kind, section, type, text, page-number results), comments (author,
     text). A header or footer is listed for each section and type unless Word links it to the
-    previous section's; the first section's are always listed.
+    previous section's; the first section's are always listed, shown or not. ``setups`` gives,
+    for each section, whether it shows a first page's and even pages' own (Word's page setup).
     """
     if not _has_stories(path):
         return None
@@ -1276,18 +1288,24 @@ def word_stories(path: Path) -> dict[str, list[list[Any]]] | None:
         raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
     stories: list[list[Any]] = []
     comments: list[list[Any]] = []
+    setups: list[list[Any]] = []
     for entry in done.stdout.rstrip("\n").split(_RECORD):
         if not entry:
             continue
         fields = entry.split(_UNIT)
-        if fields[0] == "comment" and len(fields) == 3:
+        flags = ("true", "false")
+        if fields[0] == "setup" and len(fields) == 4 and fields[1].isdigit():
+            if fields[2] not in flags or fields[3] not in flags:
+                raise SystemExit(f"{path.name}: Word's page setup does not parse")
+            setups.append([int(fields[1]), fields[2] == "true", fields[3] == "true"])
+        elif fields[0] == "comment" and len(fields) == 3:
             comments.append([fields[1], fields[2]])
         elif fields[0] in ("header", "footer") and len(fields) == 5 and fields[1].isdigit():
             pages = fields[4].split(SEPARATOR) if fields[4] else []
             stories.append([fields[0], int(fields[1]), fields[2], fields[3], pages])
         else:
             raise SystemExit(f"{path.name}: Word's headers, footers and comments do not parse")
-    return {"stories": stories, "comments": comments}
+    return {"stories": stories, "comments": comments, "setups": setups}
 
 
 def word_note_texts(path: Path) -> dict[str, list[str]] | None:
@@ -1349,7 +1367,10 @@ def story_verdict(word: dict[str, list[list[Any]]], path: Path) -> str:
 
     Each header or footer a section names must be, paragraph by paragraph, the one Word has for
     that section and type, with Word's page numbers where the reader sets them aside. A part the
-    reader refuses on its own is not compared. The comments must be Word's, author and text.
+    reader refuses on its own is not compared. Which are shown is held both ways to Word's page
+    setup: one the reader reads must be of a type Word shows in that section, and one with text
+    that Word shows must be one the reader reads or refuses on its own, never one it finds never
+    shown. The comments must be Word's, author and text.
     """
     try:
         document = read_document(path.read_bytes())
@@ -1359,10 +1380,32 @@ def story_verdict(word: dict[str, list[list[Any]]], path: Path) -> str:
         (kind, section, type_): (text, pages)
         for kind, section, type_, text, pages in word["stories"]
     }
+    if "setups" not in word:
+        return "differs: Word was not asked which headers and footers it shows"
+    setups = {section: (first, even) for section, first, even in word["setups"]}
+
+    def word_shows(section: int, type_: str) -> bool:
+        first, even = setups.get(section, (False, False))
+        return type_ == "default" or (type_ == "first" and first) or (type_ == "even" and even)
+
+    # What the reader reads, or refuses on its own (a part it finds never shown it does neither).
+    accounted = {
+        (story.kind, section, type_)
+        for story in (*document.headers, *document.footers)
+        if story.refusal is None or story.refusal[0] != "never-shown"
+        for section, type_ in story.uses
+    }
+    for kind, section, type_, text, _ in word["stories"]:
+        if word_shows(section, type_) and _paragraphs_shown(text):
+            if (kind, section, type_) not in accounted:
+                return f"differs: Word shows a {kind} {type_} in section {section + 1}"
     for story in (*document.headers, *document.footers):
         if story.refusal is not None:
             continue
         for section, type_ in story.uses:
+            if not word_shows(section, type_):
+                where = f"{story.kind} {type_} of section {section + 1}"
+                return f"differs: Word never shows the {where}"
             answer = shown.get((story.kind, section, type_))
             if answer is None:
                 return f"differs: Word has no {story.kind} {type_} in section {section + 1}"
