@@ -94,7 +94,7 @@ describe("pin freshness", () => {
   });
 
   // A tool installed in several places was read from one of them (audit B07, review round 1,
-  // L-3): uv is pinned in four steps across three workflows.
+  // L-3): uv is pinned in five steps across four workflows.
   it("holds every tool the workflows install to one version, wherever it is installed", () => {
     const actions = new Set<string>();
     for (const file of readdirSync(".github/workflows")) {
@@ -121,7 +121,7 @@ describe("pin freshness", () => {
       }
     }
     expect(repeated).toBeGreaterThanOrEqual(5);
-    expect(workflowInputs("astral-sh/setup-uv", "version")).toHaveLength(4);
+    expect(workflowInputs("astral-sh/setup-uv", "version")).toHaveLength(5);
   });
 
   // A setup step with no version input installs whatever is newest, which the equality above

@@ -93,7 +93,7 @@ jobs:
             exit 1
           fi
           git rev-parse -q --verify HEAD^2 >/dev/null || { echo "::error::Expected the pull request's merge commit." >&2; exit 1; }
-          unread='^(package\.json|package-lock\.json|(agent|zone-a)/(pyproject\.toml|uv\.lock)|Dockerfile(\.[a-z]+)?|\.github/workflows/(ci|deploy|vulnerabilities)\.yml)$'
+          unread='^(package\.json|package-lock\.json|(agent|zone-a|label-docx-reader)/(pyproject\.toml|uv\.lock)|Dockerfile(\.[a-z]+)?|\.github/workflows/(ci|deploy|vulnerabilities|label-docx-reader)\.yml)$'
           # --no-renames: a rename is listed as its deletion and its addition, so moving a file the
           # plan reads to an allowed name still names the path it left.
           read="$(git diff --no-renames --name-only HEAD^1 HEAD | grep -Ev "$unread" || true)"

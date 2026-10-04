@@ -20,6 +20,8 @@ export default tseslint.config(
       // The agent's two virtualenvs, for the same reason.
       "agent/.venv/**",
       "agent/.uv-bootstrap/**",
+      // The label reader: Python only, with its own gate (.github/workflows/label-docx-reader.yml).
+      "label-docx-reader/**",
     ],
   },
   eslint.configs.recommended,

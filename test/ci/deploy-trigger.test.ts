@@ -30,6 +30,7 @@ const deployable = [
   "package-lock.json",
   "tsconfig.build.json",
   ".github/workflows/deploy.yml",
+  ".gcloudignore",
 ];
 
 function matches(pattern: string, file: string): boolean {
@@ -48,13 +49,15 @@ function matches(pattern: string, file: string): boolean {
 }
 
 describe("the deploy trigger", () => {
-  it("skips merges that touch only documentation, tests, the agent, Zone A, the QRD registry or assistant settings", () => {
+  it("skips merges that touch only documentation, tests, the agent, Zone A, the label reader, the QRD registry or assistant settings", () => {
     expect(ignored.length).toBeGreaterThan(5);
     for (const file of [
       "docs/foundations.md",
       "README.md",
       "test/ci/x.test.ts",
       "agent/src/a.py",
+      "label-docx-reader/src/label_docx/reader.py",
+      ".github/workflows/label-docx-reader.yml",
       "qrd/registry/cap-smpc-en-10.4.json",
       "qrd/sources.lock.json",
       "labels/ema-epi/sources/brukinsa-smpc-en.json",
