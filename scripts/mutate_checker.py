@@ -343,10 +343,6 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
     ("<module>", "mark_hidden: bool = False", "bool", 0): (
         "the one place a paragraph is made sets whether its mark is hidden"
     ),
-    ("<module>", '"wholeTable",', "str:'wholeTable'", 0): (
-        "the whole table is in every look and every cell: emphasis there is refused over any "
-        "text, as a part the check does not know is"
-    ),
     (
         "_unescape.one",
         'digits = (found.group(2) or found.group(3)).lstrip("0") or "0"',
