@@ -380,7 +380,7 @@
     },
     {
       "code": "(0xE0100, 0xE01EF),",
-      "equivalent": null,
+      "equivalent": "U+E01F0, one past the range, is unassigned and refused as such before and after",
       "function": "<module>",
       "kind": "int:917999",
       "line": 155,
@@ -669,5 +669,5 @@
     "tests/test_robustness.py",
     "tests/test_output.py"
   ],
-  "testsSha256": "b026137074718df781889be560f75aa15c7c7f5e95173182c1c3889b1474777c"
+  "testsSha256": "31452d8f7f8057738e648e17125abf3f9ededdade3204e735cc7a7a2781fb28b"
 }

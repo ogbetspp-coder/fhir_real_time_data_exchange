@@ -57,10 +57,14 @@ result, was_read = kind(data).read(data)  # canonical JSON bytes, and whether it
 | Request                                   | Answer                                                    |
 | ----------------------------------------- | --------------------------------------------------------- |
 | `POST /v1/documents` (.docx or ePI)       | the receipt: 201 the first time, 200 after, same bytes    |
-| `GET /v1/documents/<sha256>`              | the result; 409 if Word or Chrome shows it otherwise, or (`require`) has not checked it |
+| `GET /v1/documents/<sha256>`              | the result, its `Outcome` header the receipt's; 409 if Word or Chrome shows it otherwise, or (`require`) has not checked it |
 | `GET /v1/documents/<sha256>/source`       | the bytes as ingested                                     |
 | `GET /v1/documents/<sha256>/verification` | Word's or Chrome's verdicts                               |
 | `GET /v1/health`                          | reader, format, Python and Unicode versions               |
+
+An error answers `{"code": …, "error": …}`: `code` is one of `label_docx.service.ERRORS` (for
+example `no-such-document`, `too-large`, `shown-otherwise`), for a program to act on, and `error`
+says it in words.
 
 `--browser` (ePI, default `auto`) and `--word` (.docx, macOS with Word, default `off`) hold each
 ingested document to the application: `auto` where installed, `on` always, `require` always and
@@ -78,7 +82,7 @@ from another web page.
 
 ```json
 {"certificate": {…}, "comments": [], "endnotes": [], "footers": [], "footnotes": [],
- "format": "label-docx-json/1.15.6", "headers": [],
+ "format": "label-docx-json/1.15.7", "headers": [],
  "paragraphs": [{"comments": [], "markHidden": false,
    "marks": [{"end": 5, "kind": "superscript", "start": 4}], "notes": [], "numbering": null,
    "pages": [], "style": "Heading2", "table": null, "text": "x 109/l"}],

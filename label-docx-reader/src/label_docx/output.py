@@ -28,7 +28,10 @@ layout) and its ``paragraphs``. ``comments`` lists each comment as stored, with 
 ``author``, ``initials`` and ``date`` as written (null where absent) and its ``paragraphs``. A
 header, footer or comment the reader cannot read exactly is refused on its own: its ``refusal``
 gives the code and detail and it has no paragraphs, the rest is read, and ``refusedParts``
-counts them (the receipt then says ``read-in-part``);
+counts them (the receipt then says ``read-in-part``). A header or footer no section shows (a
+first page's own where no section has a different first page, an even pages' own where the
+settings do not set them apart) has the ``refusal`` code ``never-shown`` and no paragraphs: Word
+never draws it, so it is not refused, and ``refusedParts`` does not count it;
 each paragraph's ``comments`` gives where a comment's mark stands (``offset``) and which comment
 it is (``id``).
 
@@ -87,7 +90,7 @@ from label_docx.reader import (
 
 # The version of the shape above, and of the check that certifies it: versions.lock.json ties
 # it to both files (tests/test_locks.py).
-FORMAT_VERSION = "label-docx-json/1.15.6"
+FORMAT_VERSION = "label-docx-json/1.15.7"
 
 type Json = str | int | bool | list[Json] | dict[str, Json] | None
 
