@@ -52,6 +52,7 @@ from test_reader import (
     LINE,
     NO_LOOKS,
     NOT_ASKED,
+    PICTURE_CASES,
     SHAPE,
     SIZE_ONE,
     WP,
@@ -63,6 +64,7 @@ from test_reader import (
     t_table,
     tbl,
     tc,
+    with_media,
 )
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
@@ -373,6 +375,39 @@ def _change_the_grid(value: dict[str, Any], rng: random.Random) -> bool:
     return True
 
 
+# Each way a picture's entry can be said otherwise: a field changed, or the entry dropped or added.
+_PICTURE_CHANGES: list[Callable[[dict[str, Any]], Any]] = [
+    lambda x: x.update(offset=x["offset"] + 1),
+    lambda x: x.update(kind={"picture": "shape", "shape": "picture"}[x["kind"]]),
+    lambda x: x.update(part=(x["part"] or "word/media/image1.png") + "x"),
+    lambda x: x.update(sha256=hashlib.sha256((x["sha256"] or "").encode()).hexdigest()),
+    lambda x: x.update(type="jpeg" if x["type"] != "jpeg" else "png"),
+    lambda x: x.update(pixels=[w + 1 for w in x["pixels"] or [0, 0]]),
+    lambda x: x.update(extent=[w + 1 for w in x["extent"] or [0, 0]]),
+    lambda x: x.update(crop={"b": 0, "l": 1, "r": 0, "t": 0} if x["crop"] is None else None),
+    lambda x: x.update(reason="effects" if x["reason"] is None else None),
+]
+
+
+def _change_a_picture(value: dict[str, Any], rng: random.Random) -> bool:
+    # What a U+FFFC stands for said otherwise: where it stands, its kind, part, digest, type,
+    # pixels, extent, crop or reason; or its entry dropped, or one added where none stands.
+    if "sections" in value:
+        return False
+    pictured = [p for p in _paragraphs(value) if p["pictures"]]
+    if not pictured:
+        return False
+    paragraph = rng.choice(pictured)
+    roll = rng.randrange(len(_PICTURE_CHANGES) + 2)
+    if roll < len(_PICTURE_CHANGES):
+        _PICTURE_CHANGES[roll](rng.choice(paragraph["pictures"]))
+    elif roll == len(_PICTURE_CHANGES):
+        paragraph["pictures"].remove(rng.choice(paragraph["pictures"]))
+    else:
+        paragraph["pictures"].append(dict(paragraph["pictures"][-1]))
+    return True
+
+
 def _change_title(value: dict[str, Any], rng: random.Random) -> bool:
     if "sections" not in value:
         return False
@@ -485,6 +520,7 @@ CHANGES: list[Change] = [
     _move_note_mark,
     _move_table_cell,
     _change_the_grid,
+    _change_a_picture,
     _change_title,
     _hide_a_refusal,
     _change_a_mark,
@@ -989,6 +1025,7 @@ def _value(*paragraphs: str | dict[str, Any], **notes: list[dict[str, Any]]) -> 
             "style": None,
             "pages": [],
             "notes": [],
+            "pictures": [],
             "table": None,
         }
         out.append(
@@ -1125,6 +1162,7 @@ def test_text_before_a_mark_in_the_same_run_stands_before_it() -> None:
                 "marks": [],
                 "markHidden": False,
                 "numbering": None,
+                "pictures": [],
                 "style": None,
             }
         ],
@@ -1173,11 +1211,43 @@ _DRAWING = (
 )
 
 
+@pytest.mark.parametrize(
+    ("run", "media", "rels", "reason"),
+    [case[1:] for case in PICTURE_CASES],
+    ids=[case[0] for case in PICTURE_CASES],
+)
+def test_every_picture_is_held_to_the_source_by_the_checks_own_rules(
+    run: str, media: dict[str, bytes], rels: dict[str, str] | None, reason: str | None
+) -> None:
+    data = with_media(docx(_p(f"<w:r><w:t>a</w:t>{run}</w:r>")), media, rels)
+    value, source = _docx_value(data), DocxSource(data)
+    (found,) = value["paragraphs"][0]["pictures"]
+    assert (found["offset"], found["reason"]) == (1, reason)
+    source.certify(value)
+    for change in _PICTURE_CHANGES:
+        changed = copy.deepcopy(value)
+        change(changed["paragraphs"][0]["pictures"][0])
+        with pytest.raises(CertificationError, match="pictures"):
+            source.certify(changed)
+    for wrong in ([], [found, found]):
+        changed = copy.deepcopy(value)
+        changed["paragraphs"][0]["pictures"] = wrong
+        with pytest.raises(CertificationError, match="pictures"):
+            source.certify(changed)
+
+
+def _standing(reason: str, offset: int = 0, kind: str = "picture") -> dict[str, Any]:
+    """What a U+FFFC stands for where the source names no image part."""
+    nothing = dict.fromkeys(("crop", "extent", "part", "pixels", "sha256", "type"))
+    return {**nothing, "kind": kind, "offset": offset, "reason": reason}
+
+
 @pytest.mark.parametrize("inner", ["", "<w:t>x</w:t>", "<w:txbx/>", "<w:txbxContent/>"])
 def test_a_drawing_is_one_character_unless_it_holds_text(inner: str) -> None:
     data = docx(_p("<w:r>" + _DRAWING.format(inner=inner) + "</w:r>"))
     if not inner:
-        assert DocxSource(data).certify(_value("\ufffc"))["source"]["elements"] == 1
+        value = _value({"text": "\ufffc", "pictures": [_standing("no-part")]})
+        assert DocxSource(data).certify(value)["source"]["elements"] == 1
         return
     with pytest.raises(CertificationError):
         DocxSource(data)
@@ -1189,7 +1259,7 @@ def test_a_drawing_is_one_character_unless_it_holds_text(inner: str) -> None:
 def test_a_vml_picture_is_one_character_unless_it_holds_text(inner: str) -> None:
     data = docx(_p(f"<w:r><w:pict><v:shape {_VML}><v:imagedata/>{inner}</v:shape></w:pict></w:r>"))
     if not inner:
-        DocxSource(data).certify(_value("\ufffc"))
+        DocxSource(data).certify(_value({"text": "\ufffc", "pictures": [_standing("vml")]}))
         return
     with pytest.raises(CertificationError):
         DocxSource(data)
@@ -1223,16 +1293,17 @@ def test_a_floating_drawing_is_set_aside_and_counted_and_one_in_line_is_one_char
     anchored = inline.replace("wp:inline", "wp:anchor")
     vml = f'<w:pict><v:shape {_VML} style="{{}}width:9pt"><v:imagedata/></v:shape></w:pict>'
     shape = _alternate(SHAPE.replace("wp:anchor", "wp:inline"), LINE)
-    for drawing, in_line in (
-        (inline, True),
-        (anchored, False),
-        (vml.format(""), True),
-        (vml.format("position: ABSOLUTE;"), False),
-        (shape, True),
+    for drawing, standing in (
+        (inline, [_standing("no-part", 1)]),
+        (anchored, None),
+        (vml.format(""), [_standing("vml", 1)]),
+        (vml.format("position: ABSOLUTE;"), None),
+        (shape, [_standing("shape", 1, "shape")]),
     ):
         source = DocxSource(docx(_p(f"<w:r><w:t>a</w:t>{drawing}<w:t>b</w:t></w:r>")))
-        right, wrong = ("a￼b", "ab") if in_line else ("ab", "a￼b")
-        assert source.certify(_value(right))["setAside"]["floatingObjects"] == (not in_line)
+        right = {"text": "a￼b", "pictures": standing} if standing else {"text": "ab"}
+        wrong = {"text": "ab"} if standing else {"text": "a￼b", "pictures": [_standing("vml", 1)]}
+        assert source.certify(_value(right))["setAside"]["floatingObjects"] == (not standing)
         with pytest.raises(CertificationError):
             source.certify(_value(wrong))
     for drawing in (
@@ -2144,7 +2215,14 @@ def _noted(note: dict[str, Any], *notes: dict[str, Any]) -> dict[str, Any]:
 
 def _note(text: str, note: int = 1, **paragraph: Any) -> dict[str, Any]:
     base = {"text": text, "markHidden": False, "style": None, "numbering": None}
-    shape: dict[str, Any] = {"comments": [], "marks": [], "pages": [], "notes": [], "table": None}
+    shape: dict[str, Any] = {
+        "comments": [],
+        "marks": [],
+        "pages": [],
+        "notes": [],
+        "pictures": [],
+        "table": None,
+    }
     return {"id": note, "mark": str(note), "paragraphs": [{**shape, **base, **paragraph}]}
 
 

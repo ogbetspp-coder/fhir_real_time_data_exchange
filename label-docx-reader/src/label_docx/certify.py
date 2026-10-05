@@ -57,7 +57,11 @@ reader's, the key marks (``CHECKED_MARKS``), every list label and every note mar
 must be the check's. So must each body table's grid (``_grid``): its columns, each row's cells
 laid on them by ``gridBefore`` and ``gridSpan``, filling them exactly with ``gridAfter``, and each
 cell's vertical merge as stored; or, where Word's is not on record, no grid and the same reason
-for it. An ePI's other marks are
+for it. So must what each U+FFFC stands for (``DocxSource._picture``): the image part through
+the story part's own relationships, its bytes' SHA-256, PNG or JPEG by signature, its pixels from
+its chunks or segments, the drawing's extent and crop, and the first reason (``_NOT_AS_IS``) its
+bytes may not be what Word draws, by a closed list of what a drawing may hold. An ePI's other
+marks are
 held to Chrome (``tests/test_browser_oracle.py``); a .docx's (highlight, shading, faint, raised
 text, right-to-left) to nothing but the reader's tests. A table style's conditional parts it
 applies on its own (``_Applied``), as Word's answers have them (corpus/numbering-cases,
@@ -75,13 +79,16 @@ leaves unchecked.
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import posixpath
 import re
+import struct
 import unicodedata
 import xml.etree.ElementTree as ET
 import zipfile
+import zlib
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
@@ -89,7 +96,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT, WINGDINGS_BULLETS
 
-CHECKER_VERSION = "conservation-check/1.15.0"
+CHECKER_VERSION = "conservation-check/1.16.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -234,6 +241,9 @@ class _Paragraph:
     # and its list label.
     mark_hidden: bool = False
     numbering: dict[str, Any] | None = None
+    # Each drawing read as U+FFFC, in order, and what each stands for (``DocxSource._picture``).
+    drawings: list[ET.Element] = field(default_factory=list)
+    pictures: list[dict[str, Json]] = field(default_factory=list)
 
 
 # The marks the check works out itself and holds every result to. The others (highlight,
@@ -845,6 +855,8 @@ class _Story:
                 self.ledger.floating += 1
             else:
                 shown.append(token)
+                if local in ("drawing", "pict", "AlternateContent"):
+                    here.drawings.append(child)
         self.flush_run(shown, hidden, kinds)
 
     def token(self, child: ET.Element, local: str, symbol: bool) -> str:
@@ -1290,6 +1302,275 @@ def _grid_number(holder: ET.Element | None, name: str, absent: int) -> int:
     return int(raw)
 
 
+# --- pictures: what each U+FFFC stands for ------------------------------------------------
+
+# Why a picture's image part, its bytes stretched over its extent, is not what Word draws: the
+# first that holds, in this order.
+_NOT_AS_IS = (
+    "shape",
+    "vml",
+    "linked",
+    "no-part",
+    "not-png-or-jpeg",
+    "bad-image-header",
+    "animated",
+    "orientation",
+    "bad-number",
+    "cropped",
+    "rotated",
+    "flipped",
+    "effects",
+)
+_IMAGE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
+# Short names for the namespaces a picture's drawing is written in.
+_PREFIXES = {
+    W: "w",
+    _R: "r",
+    _WP: "wp",
+    "http://schemas.openxmlformats.org/markup-compatibility/2006": "mc",
+    "http://schemas.openxmlformats.org/drawingml/2006/main": "a",
+    "http://schemas.openxmlformats.org/drawingml/2006/picture": "pic",
+    "http://schemas.microsoft.com/office/drawing/2010/main": "a14",
+    "http://schemas.microsoft.com/office/word/2010/wordprocessingShape": "wps",
+}
+# A PNG's colour types, each with the bit depths it may have.
+_PNG_KINDS = {
+    *((0, depth) for depth in (1, 2, 4, 8, 16)),
+    *((3, depth) for depth in (1, 2, 4, 8)),
+    *((colour, depth) for colour in (2, 4, 6) for depth in (8, 16)),
+}
+
+
+def _short(name: str) -> str:
+    """A tag or attribute name as ``prefix:local`` (``a:blip``), or as is in no known namespace."""
+    if not name.startswith("{"):
+        return name
+    space, local = name[1:].split("}", 1)
+    return f"{_PREFIXES[space]}:{local}" if space in _PREFIXES else name
+
+
+def _kids(element: ET.Element) -> list[str]:
+    return [_short(child.tag) for child in element]
+
+
+def _keys(element: ET.Element) -> set[str]:
+    return {_short(key) for key in element.attrib}
+
+
+def _empty(element: ET.Element) -> bool:
+    """No attributes and no children."""
+    return not element.attrib and not len(element)
+
+
+def _child(element: ET.Element | None, name: str) -> ET.Element | None:
+    """``element``'s first child named ``name`` (``prefix:local``)."""
+    found = [] if element is None else [c for c in element if _short(c.tag) == name]
+    return found[0] if found else None
+
+
+def _whole(
+    element: ET.Element | None,
+    names: tuple[str, ...],
+    why: set[str],
+    signed: bool,
+    absent: str = "",
+) -> list[int] | None:
+    """The attributes as whole numbers (an absent one ``absent``), or None and ``bad-number``."""
+    pattern = ("-?" if signed else "") + "[0-9]{1,15}"
+    raw = [None if element is None else element.get(n, absent or None) for n in names]
+    if any(value is None or not re.fullmatch(pattern, value) for value in raw):
+        why.add("bad-number")
+        return None
+    return [int(value) for value in raw if value is not None]
+
+
+def _blip_fill(fill: ET.Element, blip: ET.Element, why: set[str]) -> dict[str, int] | None:
+    """The crop a picture's fill names; what in it may change Word's drawing is ``effects``."""
+    stretch = _child(fill, "a:stretch")
+    if fill.attrib or _kids(fill) not in (
+        ["a:blip", "a:stretch"],
+        ["a:blip", "a:srcRect", "a:stretch"],
+    ):
+        why.add("effects")
+    if stretch is None or stretch.attrib or _kids(stretch) != ["a:fillRect"]:
+        why.add("effects")
+    if stretch is not None and not all(_empty(c) for c in stretch):
+        why.add("effects")
+    if not _keys(blip) <= {"r:embed", "r:link", "cstate"}:
+        why.add("effects")
+    if "r:link" in _keys(blip):
+        why.add("linked")
+    for holder in blip:
+        if _short(holder.tag) != "a:extLst":
+            why.add("effects")
+        for extension in holder:
+            # Word's compression setting alone, which leaves the drawing as it is.
+            dpi = extension.get("uri") == "{28A0092B-C50C-407E-A947-70E740481C1C}"
+            if not (dpi and _short(extension.tag) == "a:ext"):
+                why.add("effects")
+            if _kids(extension) != ["a14:useLocalDpi"]:
+                why.add("effects")
+    source = _child(fill, "a:srcRect")
+    if source is None:
+        return None
+    if len(source) or not _keys(source) <= {"l", "t", "r", "b"}:
+        why.add("effects")
+    sides = _whole(source, ("l", "t", "r", "b"), why, True, "0")
+    if sides is None:
+        return None
+    if any(sides):
+        why.add("cropped")
+    return dict(zip(("l", "t", "r", "b"), sides, strict=True))
+
+
+def _shape_properties(shape: ET.Element | None, extent: list[int] | None, why: set[str]) -> None:
+    """What in a picture's shape properties may change how Word draws its image."""
+    if shape is None:
+        return
+    names = _kids(shape)
+    if (
+        not _keys(shape) <= {"bwMode"}
+        or sorted(set(names)) != sorted(names)
+        or not set(names) <= {"a:xfrm", "a:prstGeom", "a:noFill", "a:ln"}
+    ):
+        why.add("effects")
+    transform = _child(shape, "a:xfrm")
+    if transform is not None:
+        inside = _kids(transform)
+        if not _keys(transform) <= {"rot", "flipH", "flipV"} or sorted(set(inside)) != sorted(
+            inside
+        ):
+            why.add("effects")
+        if not set(inside) <= {"a:off", "a:ext"}:
+            why.add("effects")
+        turn = _whole(transform, ("rot",), why, True, "0")
+        if turn and turn[0] != 0:
+            why.add("rotated")
+        for mirror in ("flipH", "flipV"):
+            said = transform.get(mirror, "0")
+            if said in ("true", "1"):
+                why.add("flipped")
+            elif said not in ("false", "0"):
+                why.add("bad-number")
+        offset = _child(transform, "a:off")
+        if offset is not None and _whole(offset, ("x", "y"), why, True) != [0, 0]:
+            why.add("effects")
+        size = _child(transform, "a:ext")
+        if size is not None and _whole(size, ("cx", "cy"), why, False) != extent:
+            why.add("effects")
+    outline = _child(shape, "a:prstGeom")
+    if outline is not None:
+        if _keys(outline) != {"prst"} or outline.get("prst") != "rect":
+            why.add("effects")
+        if _kids(outline) not in ([], ["a:avLst"]) or not all(_empty(c) for c in outline):
+            why.add("effects")
+    fill = _child(shape, "a:noFill")
+    if fill is not None and not _empty(fill):
+        why.add("effects")
+    line = _child(shape, "a:ln")
+    if line is not None and (_kids(line) != ["a:noFill"] or not _empty(line[0])):
+        why.add("effects")
+
+
+def _png_facts(data: bytes) -> tuple[list[int] | None, set[str]]:
+    """A PNG's pixels, by chunks read whole with their CRCs from IHDR to IEND, and its reasons."""
+    broken: tuple[None, set[str]] = (None, {"bad-image-header"})
+    kinds: list[bytes] = []
+    bodies: list[bytes] = []
+    at = 8
+    while b"IEND" not in kinds[-1:]:
+        if len(data) - at < 12:
+            return broken
+        length, kind = struct.unpack_from(">I4s", data, at)
+        stop = at + length + 12
+        if length >= 1 << 31 or stop > len(data):
+            return broken
+        if struct.unpack_from(">I", data, stop - 4)[0] != zlib.crc32(data[at + 4 : stop - 4]):
+            return broken
+        kinds.append(kind)
+        bodies.append(data[at + 8 : stop - 4])
+        at = stop
+    if kinds[0] != b"IHDR" or len(bodies[0]) != 13 or b"IDAT" not in kinds:
+        return broken
+    width, height, depth, colour, method, filtering, interlace = struct.unpack(
+        ">IIBBBBB", bodies[0]
+    )
+    if (
+        not (1 <= width < 1 << 31 and 1 <= height < 1 << 31)
+        or (colour, depth) not in _PNG_KINDS
+        or (method, filtering) != (0, 0)
+        or interlace not in (0, 1)
+    ):
+        return broken
+    why = _exif_turn([b for k, b in zip(kinds, bodies, strict=True) if k == b"eXIf"])
+    if b"acTL" in kinds:
+        why.add("animated")
+    return [width, height], why
+
+
+def _jpeg_facts(data: bytes) -> tuple[list[int] | None, set[str]]:
+    """A JPEG's pixels, by its one frame header among whole segments before its scan."""
+    broken: tuple[None, set[str]] = (None, {"bad-image-header"})
+    frames: list[tuple[int, bytes]] = []
+    exif: list[bytes] = []
+    at = 2
+    while True:
+        if data[at : at + 1] != b"\xff":
+            return broken
+        while data[at : at + 1] == b"\xff":
+            at += 1
+        if at >= len(data):
+            return broken
+        code = data[at]
+        at += 1
+        if code == 0x01 or code & 0xF8 == 0xD0:
+            continue  # TEM and RST0 to RST7 stand alone
+        if code in (0x00, 0xD8, 0xD9) or len(data) - at < 2:
+            return broken
+        (length,) = struct.unpack_from(">H", data, at)
+        if length < 2 or at + length > len(data):
+            return broken
+        segment = data[at + 2 : at + length]
+        at += length
+        if code == 0xDA:
+            break
+        if code & 0xF0 == 0xC0 and code not in (0xC4, 0xC8, 0xCC):
+            frames.append((code, segment))
+        elif code == 0xE1 and segment[:6] == b"Exif\x00\x00":
+            exif.append(segment[6:])
+    if len(frames) != 1 or frames[0][0] > 0xC2 or len(frames[0][1]) < 6:
+        return broken
+    _, height, width = struct.unpack_from(">BHH", frames[0][1])
+    if not (width and height):
+        return broken
+    return [width, height], _exif_turn(exif)
+
+
+def _exif_turn(blocks: list[bytes]) -> set[str]:
+    """``orientation`` where Exif data turns or mirrors the image (its tag 0x0112 not 1)."""
+    if not blocks:
+        return set()
+    tiff = blocks[0]
+    order = {b"II": "<", b"MM": ">"}.get(tiff[:2])
+    if len(blocks) != 1 or order is None or len(tiff) < 8:
+        return {"bad-image-header"}
+    magic, directory = struct.unpack_from(order + "HI", tiff, 2)
+    if magic != 42 or directory + 2 > len(tiff):
+        return {"bad-image-header"}
+    (count,) = struct.unpack_from(order + "H", tiff, directory)
+    if directory + 2 + 12 * count > len(tiff):
+        return {"bad-image-header"}
+    for index in range(count):
+        tag, kind, many, value = struct.unpack_from(
+            order + "HHIH", tiff, directory + 2 + 12 * index
+        )
+        if tag == 0x0112:
+            if (kind, many) != (3, 1):
+                return {"bad-image-header"}
+            return set() if value == 1 else {"orientation"}
+    return set()
+
+
 def _inert(element: ET.Element) -> bool:
     """Whether the walk passes over ``element``: one of ``_INERT``, holding no text."""
     if element.tag not in _INERT:
@@ -1367,6 +1648,12 @@ def _match(paragraph: _Paragraph, value: dict[str, Json], where: str) -> None:
             notes.append((position, segment.marker[1]))
     if text != "".join(expected):
         raise CertificationError(f"{where}: the text is not the document's")
+    # What each U+FFFC stands for, where it stands.
+    places = [at for at, character in enumerate(text) if character == _OBJECT]
+    if len(places) != len(paragraph.pictures) or value["pictures"] != [
+        {**picture, "offset": at} for at, picture in zip(places, paragraph.pictures, strict=True)
+    ]:
+        raise CertificationError(f"{where}: not the pictures the document holds")
     # The marks this check works out, character by character.
     shown = [
         kinds for segment in paragraph.segments for kinds in [segment.kinds] * len(segment.text)
@@ -1446,6 +1733,8 @@ def _by_id(archive: zipfile.ZipFile, source: str) -> dict[str | None, list[ET.El
     folder, base = posixpath.split(source)
     name = posixpath.join(folder, "_rels", base + ".rels")
     out: dict[str | None, list[ET.Element]] = {}
+    if name not in archive.namelist():
+        return out
     for rel in ET.fromstring(archive.read(name)).iter(f"{{{_RELS}}}Relationship"):
         out.setdefault(rel.get("Id"), []).append(rel)
     return out
@@ -2011,6 +2300,11 @@ class DocxSource:
     def __init__(self, data: bytes) -> None:
         archive, main, related = _docx_parts(data)
         with archive:
+            # Read while the archive is open, for the pictures (``_picture``).
+            self.archive = archive
+            self.names = set(archive.namelist())
+            self.rels: dict[str, dict[str | None, list[ET.Element]]] = {}
+            self.images: dict[str, dict[str, Json]] = {}
             parse = {name: _parse(archive, name) for name in {main, *related.values()}}
             for kind in ("styles", "theme", "numbering"):
                 root = parse.get(related.get(kind, ""))
@@ -2029,7 +2323,7 @@ class DocxSource:
             body = parse[main].find(_w("body"))
             if body is None:
                 raise CertificationError("no body")
-            self.body = self._part(body, None)
+            self.body = self._part(body, None, main)
             self.lists = _Numbering(parse.get(related.get("numbering", "")), self.fonts)
             for paragraph in self.body.paragraphs:
                 paragraph.numbering = self._label(paragraph, None)
@@ -2057,7 +2351,7 @@ class DocxSource:
                     if note_id in self.notes[kind]:
                         # Its text would be counted once, the other's nowhere.
                         raise CertificationError(f"{kind} {note_id} is defined twice")
-                    self.notes[kind][note_id] = self._part(note, (kind, note_id))
+                    self.notes[kind][note_id] = self._part(note, (kind, note_id), part or "")
                     echo = ("note", (kind, note_id))
                     if self.note_marks.get((kind, note_id), "") is None and any(
                         s.marker == echo
@@ -2109,7 +2403,9 @@ class DocxSource:
                     root = _parse(archive, name)
                     self.sizes[name] = _text_size(root)
                     index = len(self.stories[kind])
-                    self.stories[kind].append((name, [use], self._optional(root, (kind, index))))
+                    self.stories[kind].append(
+                        (name, [use], self._optional(root, (kind, index), name))
+                    )
                 title_page = _on(properties.find(_w("titlePg")))
                 for (_, page), name in in_force.items():
                     if (
@@ -2129,7 +2425,9 @@ class DocxSource:
                     "id": comment_id,
                     "initials": comment.get(_w("initials")),
                 }
-                self.comments.append((stored, self._optional(comment, ("comment", comment_id))))
+                self.comments.append(
+                    (stored, self._optional(comment, ("comment", comment_id), comments_part or ""))
+                )
             self.parts = {
                 main,
                 *(related[k] for k in ("footnotes", "endnotes", "comments") if k in related),
@@ -2174,7 +2472,7 @@ class DocxSource:
         text, suffix = self.lists.label(num_id, level, paragraph)
         return {"level": level, "numId": num_id, "suffix": suffix, "text": text}
 
-    def _part(self, element: ET.Element, story: tuple[str, int] | None) -> _Part:
+    def _part(self, element: ET.Element, story: tuple[str, int] | None, source: str) -> _Part:
         ledger = _Ledger()
         for control in element.iter(_w("sdt")):
             _control(control)
@@ -2185,16 +2483,106 @@ class DocxSource:
         if story is not None:
             for paragraph in walk.paragraphs:
                 paragraph.numbering = self._label(paragraph, story)
+        for paragraph in walk.paragraphs:
+            paragraph.pictures = [self._picture(d, source) for d in paragraph.drawings]
         return _Part(walk.paragraphs, ledger, tables=walk.met)
 
-    def _optional(self, element: ET.Element, story: tuple[str, int]) -> _Part:
+    def _picture(self, drawing: ET.Element, source: str) -> dict[str, Json]:
+        """What one U+FFFC stands for, read from the source by this check's own rules.
+
+        A VML picture's image is its first ``imagedata``'s; a DrawingML one's the ``blip`` of
+        the one ``pic:pic`` of the one ``graphicData`` its ``wp:inline`` holds; a ``wps`` shape
+        has none. Each reason found is kept; the first of ``_NOT_AS_IS`` is the result's.
+        """
+        why: set[str] = set()
+        found: dict[str, Json] = dict.fromkeys(
+            ("crop", "extent", "part", "pixels", "reason", "sha256", "type")
+        )
+        found["kind"] = "picture"
+        if _short(drawing.tag) == "w:pict":
+            image = next(n for n in drawing.iter() if _local(n.tag) == "imagedata")
+            why |= {"vml", *self._image(image.get(f"{{{_R}}}id"), source, found)}
+            found["reason"] = next(w for w in _NOT_AS_IS if w in why)
+            return found
+        if _short(drawing.tag) == "mc:AlternateContent":
+            drawing = next(c for c in drawing if _short(c.tag) == "mc:Choice")[0]
+        frame = drawing[0]
+        extent = _whole(_child(frame, "wp:extent"), ("cx", "cy"), why, False)
+        found["extent"] = extent
+        spread = _child(frame, "wp:effectExtent")
+        if spread is not None and _whole(spread, ("l", "t", "r", "b"), why, True) != [0] * 4:
+            why.add("effects")
+        data = [n for n in frame.iter() if _short(n.tag) == "a:graphicData"]
+        if any(
+            d.get("uri") == "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+            for d in data
+        ):
+            found["kind"], found["reason"] = "shape", "shape"
+            return found
+        picture = data[0][0] if len(data) == 1 and _kids(data[0]) == ["pic:pic"] else None
+        fill = _child(picture, "pic:blipFill")
+        blip = _child(fill, "a:blip")
+        if picture is None or fill is None or blip is None:
+            why.add("no-part")
+        if picture is not None:
+            if _kids(picture) != ["pic:nvPicPr", "pic:blipFill", "pic:spPr"]:
+                why.add("effects")
+            names = _child(_child(picture, "pic:nvPicPr"), "pic:cNvPr")
+            if names is not None and names.get("hidden") in ("true", "1"):
+                why.add("effects")
+            _shape_properties(_child(picture, "pic:spPr"), extent, why)
+        if picture is not None and fill is not None and blip is not None:
+            found["crop"] = _blip_fill(fill, blip, why)
+            why |= self._image(blip.get(f"{{{_R}}}embed"), source, found)
+        found["reason"] = next((w for w in _NOT_AS_IS if w in why), None)
+        return found
+
+    def _image(self, rid: str | None, source: str, found: dict[str, Json]) -> set[str]:
+        """The image part ``source``'s relationship ``rid`` names, into ``found``; its reasons.
+
+        Only an internal relationship of the image type, once, to a part under that very name.
+        """
+        if source not in self.rels:
+            self.rels[source] = _by_id(self.archive, source)
+        rels = [] if rid is None else self.rels[source].get(rid, [])
+        if len(rels) != 1 or rels[0].get("TargetMode") == "External":
+            return {"no-part"}
+        if rels[0].get("Type") != _IMAGE:
+            return {"no-part"}
+        target = rels[0].get("Target", "")
+        folder = posixpath.dirname(source)
+        name = posixpath.normpath(
+            target[1:] if target.startswith("/") else posixpath.join(folder, target)
+        )
+        if name not in self.names:
+            return {"no-part"}
+        if name not in self.images:
+            data = self.archive.read(name)
+            if data[:8] == b"\x89PNG\r\n\x1a\n":
+                kind, (pixels, why) = "png", _png_facts(data)
+            elif data[:3] == b"\xff\xd8\xff":
+                kind, (pixels, why) = "jpeg", _jpeg_facts(data)
+            else:
+                kind, pixels, why = None, None, {"not-png-or-jpeg"}
+            digest = hashlib.sha256(data).hexdigest()
+            self.images[name] = {
+                "why": sorted(why),
+                "pixels": pixels,
+                "sha256": digest,
+                "type": kind,
+            }
+        image = self.images[name]
+        found.update(part=name, pixels=image["pixels"], sha256=image["sha256"], type=image["type"])
+        return set(image["why"])
+
+    def _optional(self, element: ET.Element, story: tuple[str, int], source: str) -> _Part:
         """A part the reader may refuse on its own: what the check cannot read is kept as such.
 
         Whatever stops the check (a number that is not one too) is kept: the result must then
         refuse the part (``_refused``).
         """
         try:
-            return self._part(element, story)
+            return self._part(element, story, source)
         except Exception as error:  # noqa: BLE001 - kept, and certified only as refused
             return _Part([], _Ledger(), str(error))
 

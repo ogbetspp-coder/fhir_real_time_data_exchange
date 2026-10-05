@@ -10,7 +10,8 @@ normalises or repairs.
   characters; Symbol-font glyphs ("≥", "°", "μ") and Wingdings bullets ("▪") map through closed
   tables. A picture in line with the text is U+FFFC, as is a shape in alternate content that
   holds no text (any other shape is refused); a floating one is not in the text, as in Word, and
-  the certificate counts it. Formatting that changes meaning (bold, italic, super/subscript,
+  the certificate counts it. Each U+FFFC says what it stands for: the image part, its SHA-256,
+  type, pixels, extent and crop, or why its bytes are not the picture Word draws. Formatting that changes meaning (bold, italic, super/subscript,
   underline, strike, caps, highlight, shading, faint text) is reported as marks over the text,
   never folded in.
 - **What Word shows.** List labels ("4.8", "b)", "•"), footnote marks and computed fields (SEQ,
@@ -82,11 +83,14 @@ from another web page.
 
 ```json
 {"certificate": {…}, "comments": [], "endnotes": [], "footers": [], "footnotes": [],
- "format": "label-docx-json/1.16.0", "headers": [],
+ "format": "label-docx-json/1.17.0", "headers": [],
  "paragraphs": [{"comments": [], "markHidden": false,
    "marks": [{"end": 5, "kind": "superscript", "start": 4}], "notes": [], "numbering": null,
-   "pages": [], "style": "Heading2", "table": [0, 1, 0], "text": "x 109/l"}],
- "reader": "docx-reader/1.27.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
+   "pages": [], "pictures": [{"crop": null, "extent": [76200, 76200], "kind": "picture",
+     "offset": 8, "part": "word/media/image1.png", "pixels": [8, 8], "reason": null,
+     "sha256": "…", "type": "png"}],
+   "style": "Heading2", "table": [0, 1, 0], "text": "x 109/l \ufffc"}],
+ "reader": "docx-reader/1.28.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
  "tables": [{"grid": {"columns": 2, "rows": [
    {"after": 0, "before": 0, "cells": [{"column": 0, "merge": null, "span": 2}]},
    {"after": 1, "before": 0, "cells": [{"column": 0, "merge": null, "span": 1}]}]},
@@ -107,6 +111,19 @@ from another web page.
   (a row that does not fill the grid exactly). The text is read either way. A body paragraph's
   `table` indexes `tables` (its own table, nested or not). Tables in notes, headers, footers and
   comments are not listed; there `table` is the outermost table's cell.
+- `pictures` says, for each U+FFFC of a paragraph's `text` (body, notes, headers, footers,
+  comments), in order, what it stands for: its `offset`, `kind` (`picture` or `shape`), the image
+  `part` its relationship names and the `sha256` of its bytes, its `type` by signature alone
+  (`png` or `jpeg`), its `pixels` from the image's header, its `extent` in EMU (`wp:extent`) and
+  its `crop` (`a:srcRect`, thousandths of a percent). The bytes are not in the result: read the
+  part from the source and hold it to `sha256`. `reason` is null where those bytes stretched over
+  the extent are the picture Word draws, else the first of `shape`, `vml`, `linked`, `no-part`,
+  `not-png-or-jpeg`, `bad-image-header`, `animated`, `orientation` (Exif turns it),
+  `bad-number`, `cropped`, `rotated`, `flipped` and `effects` (anything else that may change the
+  drawing, by a closed list: recolouring, transparency, SVG, a border, a shape, a shadow...).
+  Whether Word draws it larger than its pixels is the caller's to judge (9525 EMU a pixel at 96
+  dpi). No picture refuses a read; the closed lists: "Pictures" in
+  [`reader.py`](src/label_docx/reader.py).
 - A refusal has `"refusal": {"code": …, "detail": …}` in place of the text.
 - A tracked document has `"tracked": {"accepted": {…}, "original": {…}, "changes": […]}` in place
   of the text; each view has the shape above.

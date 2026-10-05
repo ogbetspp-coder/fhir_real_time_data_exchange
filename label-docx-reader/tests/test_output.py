@@ -50,6 +50,7 @@ def test_a_read_is_canonical_and_names_its_source_and_versions() -> None:
         "notes",
         "numbering",
         "pages",
+        "pictures",
         "style",
         "table",
         "text",
@@ -158,7 +159,7 @@ def test_a_read_the_check_cannot_account_for_is_refused_not_served(
 ) -> None:
     # A reader fault, simulated: one character of the template's text dropped on its way out.
     data = TEMPLATE.read_bytes()
-    original = output.paragraphs
+    original = output.docx_paragraphs
 
     def faulty(items: list[Paragraph]) -> list[Json]:
         out = original(items)
@@ -167,7 +168,7 @@ def test_a_read_the_check_cannot_account_for_is_refused_not_served(
             first["text"] = first["text"][1:]  # type: ignore[index]
         return out
 
-    monkeypatch.setattr(output, "paragraphs", faulty)
+    monkeypatch.setattr(output, "docx_paragraphs", faulty)
     result, ok = output.read(data)
     value = json.loads(result)
     assert not ok
