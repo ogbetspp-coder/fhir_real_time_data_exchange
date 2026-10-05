@@ -103,6 +103,9 @@ COMPONENTS: dict[str, Component] = {
         "DRAWING_VERSION",
         ("src/zone_a/drawing.py", "src/zone_a/word_epi.py", f"{_LABEL_DOCX}/browser.py"),
     ),
+    "product": Component(
+        "zone_a.product", "PRODUCT_VERSION", ("src/zone_a/product.py", "src/zone_a/structure.py")
+    ),
     "qrd-check": Component(
         "zone_a.qrd.check",
         "CHECKER_VERSION",

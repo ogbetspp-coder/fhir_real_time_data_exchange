@@ -530,6 +530,7 @@ def test_the_script_writes_the_sections_the_structure_or_the_refusal(tmp_path: P
     assert script.main([str(label), "--no-drawing", "--out", str(out)]) == 0
     result = json.loads(out.read_text("utf-8"))
     assert result["epi"]["builder"] == "word-epi/1.0.0"
+    assert result["product"]["products"] == ["EU/1/12/780"]
     assert result["drawing"] is None
     assert len(result["epi"]["sections"]) == sum(OUTCOMES["jentadueto-smpc-en"].values())
     # A structure a person must still confirm: the structure alone.
