@@ -15,50 +15,62 @@ Two outputs, written by separate code from the same read, so that the fidelity c
 
 - ``narrative`` (decision 3): an XHTML div. A paragraph is a ``p``; a run of list paragraphs is a
   ``ul`` or an ``ol``; a table is a ``table`` of ``tr`` and ``td`` with ``colspan`` and
-  ``rowspan``; a line break is ``br``; bold, italic, superscript and subscript are ``b``, ``i``,
-  ``sup`` and ``sub``. The div must pass the fidelity scanner (``zone_a.fidelity.xhtml``).
+  ``rowspan`` (each merged cell's rows worked out from Word's grid); a line break is ``br``;
+  bold, italic, superscript and subscript are ``b``, ``i``, ``sup`` and ``sub``. The div must
+  pass the fidelity scanner (``zone_a.fidelity.xhtml``).
 - ``page`` (decision 2): the section's text as section 7 of the fidelity specification writes a
   page. It begins with a line break, as the scanner's text does, and each paragraph is a line:
   the list label Word draws and a space (in a table cell a bullet is left out), then the text,
   with a raised or lowered digit or sign written as its superscript or subscript code point; a
-  line break inside a paragraph stays a line break, and one in a cell is a space. A table is
-  U+FDD0, a line per row (U+FDD2, then each grid slot: U+0009 U+FDD3 U+0009 and the cell's text
-  where a cell starts, U+0009 U+FDD4 U+0009 where a cell to the left spans it, U+0009 U+FDD5
-  U+0009 where a cell above does), and U+FDD1. Every line ends in U+000A.
+  line break inside a paragraph stays a line break (with a tab before a line that starts with a
+  bullet glyph, which is then content), and one in a cell is a space. A table is U+FDD0, a line
+  per row of Word's grid, read row by row (U+FDD2, then each slot: U+0009 U+FDD3 U+0009 and the
+  cell's text where a cell starts, U+0009 U+FDD4 U+0009 where a cell to the left spans it, U+0009
+  U+FDD5 U+0009 where a merged cell above covers it), and U+FDD1. Every line ends in U+000A.
 
 What is carried, a closed list. A section is refused on the first paragraph that holds anything
 else, with the code in parentheses:
 
 - marks: bold, italic, superscript and subscript (not both at once: ``script``). An underline is
-  left out where it cannot change what the text says (``zone_a.underline``), else
-  (``underline``). The QRD template's own grey over the 4.8 reporting statement is left out where
-  the registry names it exactly (same section, same text, same range); any other mark, capitals,
-  small capitals, strike-through, highlight, shading, faint, raised or lowered by position, or
-  right-to-left text, is refused (``formatting``);
+  left out where it cannot change what the text says (``zone_a.underline``, and a hyphen inside
+  an underlined word), else (``underline``). The QRD template's own grey over the 4.8 reporting
+  statement is left out where the registry names it exactly (same section, same text, same
+  range), and so are capitals and small capitals over text that capitals draw the same ("4.");
+  any other mark, capitals elsewhere, strike-through, highlight, shading, faint, raised or lowered
+  by position, or right-to-left text, is refused (``formatting``);
 - raised or lowered text: letters, the digits and signs of the specification's fold tables, and
   other punctuation and symbols that no rule there reads as a number or a sign (categories Po,
   So, Pi, Pf, Pc, Zs), and lowered only, infinity and one half (as fidelity-norm/3.1.0 keeps
   them in ``sub``); anything else (``script``);
 - lists: a bullet "•", or an ordinal with a full stop whose labels are exactly the sequence an
-  ``ol`` of one type draws (decimal, letters, roman), all at one level (``list-label``,
-  ``list-level``); a paragraph that draws a label and holds no text (``empty-numbered``);
+  ``ol`` of one type draws (decimal, letters, roman), followed by a tab or a space
+  (``list-label``); one list level in the section, since nesting is not carried
+  (``list-level``); no paragraph that draws a label and holds no text (``empty-numbered``);
 - tables: one level, with Word's grid on record, no grid columns left out at a row's ends, and
   every vertically merged cell under a cell of the same columns that starts or continues the
   merge, with no text of its own (``table-grid``, ``table-shape``, ``nested-table``); a table
   wholly inside one section (``table-across-sections``);
 - text: no soft hyphen (``soft-hyphen``), tab (``tab``: Word draws it as a jump to a tab stop),
-  picture (``picture``: not yet carried) or line that starts with a bullet glyph after a line
-  break (``bullet-after-break``: section 3 step 4 would read it as a list bullet);
+  picture (``picture``: not yet carried), line or paragraph separator (``line-separator``), or
+  line that starts with a bullet glyph after a line break (``bullet-after-break``: section 3 step
+  4 would read it as a list bullet);
 - no comment (``comment``) and no hidden paragraph mark (``hidden-mark``, the paragraph runs on
   into the next).
 
-A paragraph of only whitespace with no label is drawn as nothing and left out of both. A
-document with a floating object is refused whole (``floating-object``): it is drawn but not in
-the text, and the certificate does not say which part holds it.
+A paragraph of only whitespace with no label is drawn as nothing and left out of both; a section
+of such paragraphs has no narrative and the empty page. The heading itself is held to the text
+rules above and may carry only bold, italic, an underline that cannot change it and capitals over
+text they draw the same (``heading-formatting``), since its line is the section's title.
+
+A document is refused whole where Word draws something the read does not say: a floating picture
+or shape (``floating-object``, counted by the certificate but not placed), or one of
+``Body.layout`` (``floating-table``, ``frame``, ``right-to-left-table``, a ``page-break`` between
+two words).
 """
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import itertools
 import unicodedata
@@ -72,7 +84,7 @@ from zone_a.certified import Body
 from zone_a.fidelity.normalize import NormalizationError, normalize_text
 from zone_a.fidelity.xhtml import XhtmlError, list_marker, xhtml_to_text
 from zone_a.structure import line
-from zone_a.underline import underline_changes
+from zone_a.underline import is_underline_letter, underline_changes
 
 # The narrative builder's and the page serialiser's version: one, as they are one closed list.
 WORD_EPI_VERSION: Final = "word-epi/1.0.0"
@@ -133,6 +145,12 @@ def blank(paragraph: Paragraph) -> bool:
     return not _label(paragraph) and all(c in WHITESPACE for c in paragraph.text)
 
 
+# Section 3 step 5's whitespace but the line feed: what step 4 reads past at a line's start.
+_INLINE_WHITESPACE: Final = "".join(sorted(WHITESPACE - {"\n"}))
+# What may separate a list label from the paragraph: a tab or a space, as an HTML list draws one.
+_SUFFIXES: Final = frozenset({"tab", "space"})
+
+
 def _check(index: int, paragraph: Paragraph) -> None:
     """The refusals of the module docstring that do not depend on marks.
 
@@ -149,11 +167,49 @@ def _check(index: int, paragraph: Paragraph) -> None:
         raise RefusedError("tab", index, "a tab")
     if "\ufffc" in text:
         raise RefusedError("picture", index, "a picture")
+    if "\u2028" in text or "\u2029" in text:
+        # What Word draws for a line or paragraph separator is not on record.
+        raise RefusedError("line-separator", index, "U+2028 or U+2029")
     for rest in text.split("\n")[1:]:
-        if rest.lstrip(" \u00a0")[:1] in BULLETS:
+        if rest.lstrip(_INLINE_WHITESPACE)[:1] in BULLETS:
             raise RefusedError("bullet-after-break", index, "a bullet glyph after a line break")
     if _label(paragraph) and all(c in WHITESPACE for c in text):
         raise RefusedError("empty-numbered", index, "a label with no text")
+    if _label(paragraph) and paragraph.numbering and paragraph.numbering.suffix not in _SUFFIXES:
+        # "1." with nothing after it runs into "5 mg": Word draws "1.5 mg".
+        raise RefusedError("list-label", index, f"a label followed by {paragraph.numbering.suffix}")
+
+
+_HYPHENS: Final = frozenset("-\u2010\u2011")
+CAPITALS: Final = frozenset({"caps", "smallCaps"})
+
+
+def unchanged_by_capitals(text: str) -> bool:
+    """No character has another form in capitals ("4.", "ABC"): capitals draw it the same.
+
+    Judged by Python's own upper case; "\u00b5" (which Word keeps and Python does not) and "\u00df"
+    are changed, and refused.
+    """
+    return all(character.upper() == character for character in text)
+
+
+def _underline_changes(text: str, start: int, end: int) -> bool:
+    """``zone_a.underline``'s rule, with one more allowance: a hyphen inside an underlined word.
+
+    A hyphen (U+002D, U+2010, U+2011) between two letters, with the line running under the letters
+    on both sides ("Long-term" underlined whole), cannot read as "=": it is checked as the gap
+    between two underlined pieces. A hyphen at the line's edge, or any other dash, is judged by
+    the rule itself, which refuses it.
+    """
+    cuts = [
+        at
+        for at in range(start + 1, end - 1)
+        if text[at] in _HYPHENS
+        and is_underline_letter(text[at - 1])
+        and is_underline_letter(text[at + 1])
+    ]
+    edges = [start, *(x for at in cuts for x in (at, at + 1)), end]
+    return any(underline_changes(text, a, b) for a, b in zip(edges[::2], edges[1::2], strict=True))
 
 
 def _marks(index: int, paragraph: Paragraph, section: str, greys: Sequence[_Grey]) -> list[Mark]:
@@ -163,9 +219,10 @@ def _marks(index: int, paragraph: Paragraph, section: str, greys: Sequence[_Grey
         if mark.kind in CARRIED:
             out.append(mark)
         elif mark.kind == "underline":
-            # A hyphen between two letters ("Long-term") cannot read as "=" (zone_a.underline).
-            if underline_changes(paragraph.text, mark.start, mark.end, hyphens_in_words=True):
+            if _underline_changes(paragraph.text, mark.start, mark.end):
                 raise RefusedError("underline", index, "an underline that can change the text")
+        elif mark.kind in CAPITALS and unchanged_by_capitals(paragraph.text[mark.start : mark.end]):
+            pass
         elif not (
             mark.kind in GREY
             and any(
@@ -341,8 +398,6 @@ def _flow(indices: Sequence[int], body: Body, marks: Mapping[int, list[Mark]]) -
             assert paragraph.numbering is not None  # noqa: S101
             if previous.num_id != paragraph.numbering.num_id:
                 close()
-            elif previous.level != paragraph.numbering.level:
-                raise RefusedError("list-level", i, "a list item at another level")
         items.append(i)
     close()
     return "".join(out)
@@ -428,7 +483,8 @@ def _line(index: int, paragraph: Paragraph, marks: Sequence[Mark], in_cell: bool
         return head + " ".join(lines)
     # A line that goes on after a break and starts with a bullet glyph is no list item.
     return head + "\n".join(
-        [lines[0]] + ["\t" + x if x.lstrip(" \u00a0")[:1] in BULLETS else x for x in lines[1:]]
+        [lines[0]]
+        + ["\t" + x if x.lstrip(_INLINE_WHITESPACE)[:1] in BULLETS else x for x in lines[1:]]
     )
 
 
@@ -443,18 +499,27 @@ def page(indices: Sequence[int], body: Body, marks: Mapping[int, list[Mark]]) ->
                 if not blank(body.paragraphs[i])
             ]
             continue
-        columns, rows = _grid(table, run, body)
+        # The slots straight from Word's grid, each row on its own, by code apart from the
+        # builder's (which works out each merged cell's rows): the fidelity check then compares
+        # the two readings of the grid.
+        by_cell: dict[tuple[int, int], list[int]] = {}
+        for i in run:
+            where = body.paragraphs[i].table
+            assert where is not None  # noqa: S101 - a table's run
+            by_cell.setdefault((where[1], where[2]), []).append(i)
         out.append("\ufdd0\n")
-        for row in rows:
-            slots = ["\t\ufdd5\t"] * columns  # covered from above unless a cell starts
-            for cell in row:
-                slots[cell.column] = "\t\ufdd3\t" + " ".join(
+        for r, row in enumerate(body.tables[table]["grid"]["rows"]):
+            slots: list[str] = []
+            for c, cell in enumerate(row["cells"]):
+                if cell["merge"] == "continue":
+                    slots += ["\t\ufdd5\t"] * cell["span"]
+                    continue
+                text = " ".join(
                     _line(i, body.paragraphs[i], marks[i], in_cell=True)
-                    for i in cell.paragraphs
+                    for i in by_cell[r, c]
                     if not blank(body.paragraphs[i])
                 )
-                for column in range(cell.column + 1, cell.column + cell.span):
-                    slots[column] = "\t\ufdd4\t"
+                slots += ["\t\ufdd3\t" + text] + ["\t\ufdd4\t"] * (cell["span"] - 1)
             out.append("\ufdd2" + "".join(slots) + "\n")
         out.append("\ufdd1\n")
     # Like the scanner's text, a page begins with a line break: the start of a text is no line
@@ -483,6 +548,13 @@ def _section(
     for i in indices:
         _check(i, paragraphs[i])
         marks[i] = _marks(i, paragraphs[i], key, greys)
+    # One list level in a section: a list inside a list would be drawn as one flat list.
+    levels = [(paragraphs[i].numbering.level, i) for i in indices if _label(paragraphs[i])]  # type: ignore[union-attr]
+    for level, i in levels:
+        if level != levels[0][0]:
+            raise RefusedError("list-level", i, "lists at two levels")
+    if all(blank(paragraphs[i]) for i in indices):
+        return None, ""
     div = narrative(indices, body, marks)
     text = page(indices, body, marks)
     try:
@@ -492,7 +564,28 @@ def _section(
         raise RefusedError("narrative", None, error.code) from error
     if scanned != paged:  # a fault in this module, never in the label: refused all the same
         raise RefusedError("page-differs", None, "the narrative does not read as the page")
-    return (div if any(not blank(paragraphs[i]) for i in indices) else None), text
+    return div, text
+
+
+def _heading(index: int, paragraph: Paragraph) -> None:
+    """The heading's own refusals: its line is the section's title, plain text.
+
+    A tab is a gap the title reads as a space; any mark but bold, italic, an underline that cannot
+    change the text and capitals over text they draw the same, and a label run into the text,
+    would draw the title otherwise.
+    """
+    _check(index, dataclasses.replace(paragraph, text=paragraph.text.replace("\t", " ")))
+    for mark in paragraph.marks:
+        text = paragraph.text[mark.start : mark.end]
+        if not (
+            mark.kind in ("bold", "italic")
+            or (mark.kind in CAPITALS and unchanged_by_capitals(text))
+            or (
+                mark.kind == "underline"
+                and not _underline_changes(paragraph.text, mark.start, mark.end)
+            )
+        ):
+            raise RefusedError("heading-formatting", index, mark.kind)
 
 
 def sections(
@@ -501,13 +594,18 @@ def sections(
     """Each section with a heading, in the template's order, as JSON values.
 
     Raises:
-        RefusedError: The document has a floating object (``floating-object``).
+        RefusedError: The document has a floating picture or shape (``floating-object``), or
+            something else Word draws that the read does not yet say (``Body.layout``: a
+            ``floating-table``, a ``frame``, a ``right-to-left-table``, a ``page-break`` between
+            two words).
         ValueError: The structure is not ready, or not of this body.
     """
     if not structured["ready"]:
         raise ValueError("the structure is not ready")
     if body.floating:
         raise RefusedError("floating-object", None, f"{body.floating} floating objects")
+    if body.layout:
+        raise RefusedError(body.layout[0], None, "Word draws it; the read does not yet say how")
     paragraphs = body.paragraphs
     end = len(paragraphs) if structured["end"] is None else structured["end"]
     headings = sorted(s["heading"] for s in structured["sections"] if s["heading"] is not None)
@@ -535,6 +633,7 @@ def sections(
         try:
             if paragraphs[heading].table is not None:
                 raise RefusedError("heading-in-table", heading, "a heading in a table")
+            _heading(heading, paragraphs[heading])
             entry["narrative"], entry["page"] = _section(section["key"], indices, body, greys)
         except RefusedError as refused:
             entry["refusal"] = {

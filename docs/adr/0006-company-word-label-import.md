@@ -178,14 +178,20 @@ The record does not admit this today, for reasons this ADR has to answer rather 
 - **P1, tables** (2026-10-05): the reader reports each body table's grid (`docx-reader/1.27.0`,
   `label-docx-json/1.16.0`), certified by the conservation check and held to Word's own saves.
 - **P3** (2026-10-05): `zone_a.word_epi` (`word-epi/1.0.0`) builds each section's narrative and
-  page text from the certified read by separate code, under decision 3's closed lists, and refuses
-  a section on the first thing they do not list; it checks that the fidelity scanner reads the
+  page text from the certified read by separate code (the page reads Word's grid row by row, the
+  narrative works out each merged cell's rows), under decision 3's closed lists, and refuses a
+  section on the first thing they do not list; it checks that the fidelity scanner reads the
   narrative as the page. `zone_a.drawing` (`word-drawing/1.0.0`) is decision 1's drawing check:
-  Chrome draws each narrative, compared line by line, mark by mark and list marker by list marker
-  with the read, which is what Word draws. Until the reader reports pictures (P1), a section with a
-  picture is refused; a document with a floating object is refused whole, since the certificate
-  counts floating objects but does not say where. On five SmPCs Word wrote from the pinned EMA
-  ePIs (`zone-a/tests/fixtures/word-smpc/`), 145 of 160 sections are carried, Chrome draws every
-  one as read, and each reads as the EMA's own text but where the fixtures' README says why not;
-  the 15 refused are shading the narrative cannot carry and underlines over "+" or "≥".
-- **Still to do:** P1's pictures and floating objects in the reader, P2, P4 and P5.
+  Chrome draws each narrative, compared line by line and mark by mark with the read, which is what
+  Word draws, and a section it draws otherwise, or does not draw, is refused. Until the reader
+  reports pictures (P1), a section with a picture is refused. A document is refused whole where
+  Word draws what the read does not yet say: a floating picture or shape (the certificate's
+  count), and, by a conservative scan of the package until the reader reports them, a floating
+  table, a frame, a right-to-left table or a page break between two words. On five SmPCs Word
+  wrote from the pinned EMA ePIs (`zone-a/tests/fixtures/word-smpc/`), 147 of 160 sections are
+  carried, Chrome draws every one as read, and each reads as the EMA's own text but where the
+  fixtures' README says why not; the 13 refused are shading the narrative cannot carry and
+  underlines over "+" or "≥". An independent review found ten holes, each fixed and tested
+  (`zone-a/tests/test_word_epi.py`, "the independent review's cases").
+- **Still to do:** in the reader (P1), pictures carried and floating tables, frames,
+  right-to-left tables and page breaks reported in place of the scan; P2, P4 and P5.

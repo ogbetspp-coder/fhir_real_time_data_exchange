@@ -6,7 +6,8 @@
 The label is read with zone_a.certified, structured with zone_a.structure (``--assign`` as in
 scripts/structure_label.py) and built with zone_a.word_epi; where Chrome is installed and
 ``--no-drawing`` is not given, each narrative is then held to what Chrome draws
-(zone_a.drawing), and ``drawing`` is null otherwise. The result is written as canonical JSON to
+(zone_a.drawing); a section Chrome draws otherwise, or that it did not draw (no Chrome, or
+``--no-drawing``), is refused. The result is written as canonical JSON to
 FILE, or to standard output, with the file's SHA-256 and every version that decided it. A file
 the reader refuses, or one with a floating object, gives its refusal; a structure a person must
 still confirm gives the structure alone (``ready`` false). See ADR 0006.
@@ -62,8 +63,9 @@ def build(data: bytes, assignments: dict[str, int], chrome: Path | None) -> dict
         built = word_epi.sections(body, structured, registry)
     except word_epi.RefusedError as refused:
         return result | {"refusal": {"code": refused.code, "detail": refused.detail}}
-    result["epi"] = built
-    result["drawing"] = None if chrome is None else drawing.check(body, built, chrome)
+    verdict = None if chrome is None else drawing.check(body, built, chrome)
+    result["epi"] = drawing.refuse(built, verdict)
+    result["drawing"] = verdict
     return result
 
 

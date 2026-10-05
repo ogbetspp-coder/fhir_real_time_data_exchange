@@ -1,19 +1,26 @@
 """The drawing check of ADR 0006 decision 1: what Chrome draws for each narrative, held to the read.
 
 Each carried section's narrative (``zone_a.word_epi``) is drawn by headless Chrome
-(``label_docx.browser``, the reader's own Chrome oracle) and compared, line by line, with the
-section's paragraphs as the label reader read them, which is what Word draws (the reader's Word
-oracle): the text of each line, the marks of each character, and the list marker before each
-item.
+(``label_docx.browser``, the reader's own Chrome oracle) and compared with the section's
+paragraphs as the label reader read them, which is what Word draws (the reader's Word oracle):
+the text of each line, the marks of each character, and the list markers in order. A table's
+cells are lines like any other, in reading order (Chrome's tab between cells is a line's end);
+where a cell stands in the grid is the fidelity check's to prove, from the page.
 
 Both sides are compared as a reader of the page sees them. Spaces, tabs and line feeds collapse
 to one space and lines are trimmed, as a browser lays out text and as Word's extra spaces read;
 empty lines are none. Marks are compared on the characters that are not whitespace. On the
 read's side, the marks the narrative leaves out by its closed list (an underline, the template's
-grey) are left out here too; any other mark the narrative did not carry differs.
+grey, capitals over what they draw the same) are left out here too, so this check is no second
+guard of those rules; any other mark the narrative did not carry differs.
 
-Nothing here decides what is carried: a section that differs is refused. Chrome is not a
-dependency of Zone A; where it is not installed, ``check`` raises ``BrowserError``.
+Not compared: a list's indentation and nesting (the builder refuses two levels in a section), and
+which line a bullet stands before (bullets are compared in order, and section 3 step 4 removes
+them from both texts the fidelity check reads).
+
+``check`` gives the verdicts; ``refuse`` turns a section that differs, or one Chrome did not draw,
+into a refusal (``drawn-otherwise``, ``not-drawn``). Chrome is not a dependency of Zone A; where it
+is not installed, ``check`` raises ``BrowserError``.
 """
 
 from __future__ import annotations
@@ -27,7 +34,7 @@ from label_docx import browser
 from label_docx.reader import Paragraph
 
 from zone_a.certified import Body
-from zone_a.word_epi import GREY, WHITESPACE, blank
+from zone_a.word_epi import CAPITALS, GREY, WHITESPACE, blank, unchanged_by_capitals
 
 DRAWING_VERSION: Final = "word-drawing/1.0.0"
 LEFT_OUT: Final = frozenset({"underline"}) | GREY
@@ -75,7 +82,9 @@ def read_lines(paragraphs: Sequence[Paragraph]) -> list[Line]:
         for mark in paragraph.marks:
             if mark.kind not in LEFT_OUT:
                 for at in range(mark.start, mark.end):
-                    kinds[at].add(mark.kind)
+                    # Capitals over a character they draw the same are no mark on it.
+                    if not (mark.kind in CAPITALS and unchanged_by_capitals(paragraph.text[at])):
+                        kinds[at].add(mark.kind)
         characters += [(c, frozenset(k)) for c, k in zip(paragraph.text, kinds, strict=True)]
         characters.append(("\n", frozenset()))
     return _without_whitespace_marks(_shown(characters))
@@ -124,4 +133,35 @@ def check(body: Body, built: Mapping[str, Any], chrome: Path = browser.CHROME) -
         "checker": DRAWING_VERSION,
         "application": browser.chrome_version(chrome),
         "sections": verdicts,
+    }
+
+
+def refuse(built: Mapping[str, Any], verdict: Mapping[str, Any] | None) -> dict[str, Any]:
+    """``built`` with each carried narrative that Chrome did not draw as read refused.
+
+    ``verdict`` is ``check``'s for ``built``, or None where Chrome did not draw it: then every
+    carried narrative is refused (``not-drawn``), since no narrative is carried undrawn.
+    """
+    agrees = {} if verdict is None else {v["key"]: v for v in verdict["sections"]}
+    sections: list[dict[str, Any]] = []
+    for section in built["sections"]:
+        out = dict(section)
+        if section["refusal"] is None and section["narrative"]:
+            seen = agrees.get(section["key"])
+            if seen is None:
+                out["refusal"] = {"code": "not-drawn", "paragraph": None, "detail": "not drawn"}
+            elif not seen["agrees"]:
+                out["refusal"] = {
+                    "code": "drawn-otherwise",
+                    "paragraph": None,
+                    "detail": seen["where"],
+                }
+            if out["refusal"] is not None:
+                out["narrative"], out["page"] = None, None
+        sections.append(out)
+    return {
+        **built,
+        "drawing": None if verdict is None else {k: verdict[k] for k in ("checker", "application")},
+        "sections": sections,
+        "refused": sum(1 for s in sections if s["refusal"] is not None),
     }

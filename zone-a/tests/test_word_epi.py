@@ -9,9 +9,13 @@ from __future__ import annotations
 
 import dataclasses
 import importlib.util
+import io
 import json
 import random
+import xml.etree.ElementTree as ET
+import zipfile
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +23,7 @@ import pytest
 from label_docx import browser
 from label_docx.reader import CommentReference, Mark, Numbering, Paragraph
 
-from zone_a import drawing
+from zone_a import certified, drawing, word_epi
 from zone_a.certified import Body, read_body
 from zone_a.fidelity.normalize import normalize_text
 from zone_a.fidelity.xhtml import xhtml_to_text
@@ -31,6 +35,7 @@ REGISTRY = json.loads((REPOSITORY / "qrd/registry/cap-smpc-en-10.4.json").read_t
 MAPPING = json.loads((REPOSITORY / "fhir/mappings/cap-smpc-en.json").read_text("utf-8"))
 TEMPLATE = REPOSITORY / "qrd/sources/qrd-product-information-template-version-104_en.docx"
 GREYS = _greys(REGISTRY)
+W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _SPEC = importlib.util.spec_from_file_location(
     "word_fixtures", Path(__file__).parents[1] / "scripts" / "word_fixtures.py"
 )
@@ -201,7 +206,7 @@ def test_the_templates_grey_is_left_out_only_where_the_registry_names_it() -> No
     ("paragraph", "code"),
     [
         (_p("struck", (0, 6, "strike")), "formatting"),
-        (_p("CAPS", (0, 4, "caps")), "formatting"),
+        (_p("Caps", (0, 4, "caps")), "formatting"),
         (_p("faint", (0, 5, "faint")), "formatting"),
         (_p("raised", (0, 6, "position")), "formatting"),
         (_p("x", (0, 1, "highlight-yellow")), "formatting"),
@@ -525,3 +530,190 @@ def test_the_script_writes_the_sections_the_structure_or_the_refusal(tmp_path: P
     broken.write_bytes(b"not a zip")
     assert script.main([str(broken), "--out", str(out)]) == 0
     assert json.loads(out.read_text("utf-8"))["refusal"]["code"] == "invalid-package"
+
+
+# ---- the independent review's cases (2026-10-05) -------------------------------------------------
+
+
+def test_the_drawing_check_refuses_what_chrome_drew_otherwise_or_did_not_draw(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    name = "jentadueto-smpc-en"
+    body, built = _fixture(name)
+    _replay(monkeypatch, name, built)
+    section = next(s for s in built["sections"] if s["key"] == "smpc.4.1")
+    at = next(i for i in range(*section["paragraphs"]) if not blank(body.paragraphs[i]))
+    tampered = _tampered(body, at, text=body.paragraphs[at].text + "x")
+    refused = drawing.refuse(built, drawing.check(tampered, built))
+    by_key = {s["key"]: s for s in refused["sections"]}
+    assert by_key["smpc.4.1"]["refusal"]["code"] == "drawn-otherwise"
+    assert by_key["smpc.4.1"]["narrative"] is None
+    assert by_key["smpc.4.3"]["refusal"] is None
+    undrawn = drawing.refuse(built, None)
+    assert {
+        s["refusal"]["code"] for s in undrawn["sections"] if s["narrative"] is None and s["refusal"]
+    } >= {"not-drawn"}
+    assert all(s["refusal"] is not None for s in undrawn["sections"] if s["page"])
+
+
+def _rewritten(name: str, change: Callable[[str], str]) -> bytes:
+    """The fixture with its document part rewritten."""
+    out = io.BytesIO()
+    with (
+        zipfile.ZipFile(FIXTURES / f"{name}.docx") as source,
+        zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as target,
+    ):
+        for item in source.infolist():
+            data = source.read(item)
+            if item.filename == "word/document.xml":
+                changed = change(data.decode("utf-8"))
+                assert changed != data.decode("utf-8")
+                data = changed.encode("utf-8")
+            target.writestr(item, data)
+    return out.getvalue()
+
+
+@pytest.mark.parametrize(
+    ("change", "code"),
+    [
+        (
+            lambda x: x.replace(
+                "<w:tblPr>", '<w:tblPr><w:tblpPr w:vertAnchor="text" w:tblpY="7200"/>', 1
+            ),
+            "floating-table",
+        ),
+        (lambda x: x.replace("<w:tblPr>", "<w:tblPr><w:bidiVisual/>", 1), "right-to-left-table"),
+        (
+            lambda x: x.replace(
+                "<w:pPr>", '<w:pPr><w:framePr w:hAnchor="page" w:x="8000" w:y="2000"/>', 1
+            ),
+            "frame",
+        ),
+        (
+            lambda x: x.replace(
+                "glycaemic control",
+                'glycaemic</w:t></w:r><w:r><w:br w:type="page"/><w:t>control',
+                1,
+            ),
+            "page-break",
+        ),
+    ],
+)
+def test_what_word_draws_and_the_read_does_not_say_refuses_the_document(
+    change: Callable[[str], str], code: str
+) -> None:
+    body = read_body(_rewritten("jentadueto-smpc-en", change))
+    assert body.layout == (code,)
+    structured = structure(body.paragraphs, REGISTRY, MAPPING)
+    with pytest.raises(RefusedError) as refused:
+        sections(body, structured, REGISTRY)
+    assert refused.value.code == code
+
+
+def test_a_page_break_beside_a_space_or_alone_is_layout_only() -> None:
+    for xml in (
+        '<w:p><w:r><w:t xml:space="preserve">a </w:t><w:br w:type="page"/><w:t>b</w:t></w:r></w:p>',
+        '<w:p><w:r><w:br w:type="page"/><w:t>Heading</w:t></w:r></w:p>',
+        '<w:p><w:r><w:t>Last</w:t><w:br w:type="column"/></w:r></w:p>',
+    ):
+        assert not certified._break_between_words(
+            ET.fromstring(xml.replace("<w:p>", f'<w:p xmlns:w="{W}">', 1))
+        )
+    joined = '<w:p xmlns:w="W"><w:r><w:t>10</w:t><w:br w:type="page"/><w:t>5 mg</w:t></w:r></w:p>'
+    assert certified._break_between_words(ET.fromstring(joined.replace('"W"', f'"{W}"')))
+
+
+def test_one_list_level_in_a_section() -> None:
+    with pytest.raises(RefusedError) as refused:
+        _build(
+            _p("hepatic impairment", label="\u2022", num=1),
+            _p("Child-Pugh C", label="\u2022", num=2, level=1),
+            _p("renal impairment", label="\u2022", num=1),
+        )
+    assert refused.value.code == "list-level"
+    with pytest.raises(RefusedError):
+        _build(_p("a", label="\u2022"), _p("between"), _p("b", label="\u2022", level=1))
+
+
+def test_a_label_run_into_its_text_is_refused() -> None:
+    nothing = Paragraph("5 mg", None, Numbering(1, 0, "1.", "nothing"), None)
+    with pytest.raises(RefusedError) as refused:
+        _build(nothing)
+    assert refused.value.code == "list-label"
+
+
+def test_a_hyphen_may_be_underlined_only_inside_an_underlined_word() -> None:
+    _build(_p("Long-term use", (0, 9, "underline")))
+    for text, mark in (
+        ("CL-CR", (2, 3)),
+        ("CL-CR", (0, 3)),
+        ("a\u2e40b", (0, 3)),
+        ("a\u30a0b", (0, 3)),
+    ):
+        with pytest.raises(RefusedError) as refused:
+            _build(_p(text, (*mark, "underline")))
+        assert refused.value.code == "underline"
+
+
+def test_capitals_are_left_out_only_where_they_draw_the_same() -> None:
+    div, _ = _build(_p("4. ABC 10", (0, 9, "caps")))
+    assert "4. ABC 10" in div
+    for text in ("abc", "5 \u00b5g", "Stra\u00dfe"):
+        with pytest.raises(RefusedError):
+            _build(_p(text, (0, len(text), "smallCaps")))
+
+
+def test_every_line_start_bullet_after_a_break_is_refused() -> None:
+    for space in ("", " ", "\u00a0", "\u2003", "\u3000"):
+        with pytest.raises(RefusedError) as refused:
+            _build(_p(f"x\n{space}\u2022 y"))
+        assert refused.value.code == "bullet-after-break"
+    with pytest.raises(RefusedError) as refused:
+        _build(_p("a\u2028b"))
+    assert refused.value.code == "line-separator"
+
+
+def test_a_section_of_blank_paragraphs_and_cells_has_no_narrative_and_the_empty_page() -> None:
+    table = (_grid(2, [(0, 1, None), (1, 1, None)]),)
+    div, text = _build(
+        _p(" "), _p("", table=(0, 0, 0)), _p("\u00a0", table=(0, 0, 1)), tables=table
+    )
+    assert (div, text) == ("", "")
+
+
+def test_a_heading_is_plain_text() -> None:
+    body = Body((_p("4.1\tY", (0, 3, "caps")), _p("text"), _p("4.2 Z")), (), 0)
+    built = sections(body, _structured({"smpc.4.1": 0, "smpc.4.2": 2}), REGISTRY)
+    assert built["refused"] == 0
+    for heading, code in (
+        (_p("4.1 Y", (4, 5, "strike")), "heading-formatting"),
+        (_p("4.1 Y", (4, 5, "superscript")), "heading-formatting"),
+        (_p("4.1 y", (4, 5, "caps")), "heading-formatting"),
+        (_p("4.1 Y", mark_hidden=True), "hidden-mark"),
+        (_p("4.1 Y", comments=(CommentReference(0, 1),)), "comment"),
+    ):
+        body = Body((heading, _p("text"), _p("4.2 Z")), (), 0)
+        built = sections(body, _structured({"smpc.4.1": 0, "smpc.4.2": 2}), REGISTRY)
+        assert built["sections"][0]["refusal"]["code"] == code
+
+
+def test_the_page_reads_the_grid_apart_from_the_builder(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A merge the builder misreads is seen: the page does not take the builder's reading."""
+    tables = (_grid(2, [(0, 1, "restart"), (1, 1, None)], [(0, 1, "continue"), (1, 1, None)]),)
+    paragraphs = (
+        _p("a", table=(0, 0, 0)),
+        _p("b", table=(0, 0, 1)),
+        _p("", table=(0, 1, 0)),
+        _p("c", table=(0, 1, 1)),
+    )
+    _build(*paragraphs, tables=tables)
+    real = word_epi._grid
+
+    def misread(table: int, members: Any, body: Body) -> Any:
+        columns, rows = real(table, members, body)
+        return columns, [[dataclasses.replace(cell, rows=1) for cell in row] for row in rows]
+
+    monkeypatch.setattr(word_epi, "_grid", misread)
+    with pytest.raises(RefusedError) as refused:
+        _build(*paragraphs, tables=tables)
+    assert refused.value.code in ("narrative", "page-differs")
