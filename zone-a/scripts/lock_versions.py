@@ -1,19 +1,19 @@
-"""Write, or check, the version lock of Zone A's readers, registry build and QRD check.
+"""Write, or check, the version lock of Zone A's readers, registry and checks.
 
     uv run --frozen python scripts/lock_versions.py           # add the current versions
     uv run --frozen python scripts/lock_versions.py --check   # fail on unlocked code
     uv run --frozen python scripts/lock_versions.py --amend   # re-lock an unreleased version
 
 Each component's results carry its version (a check result names ``reader``, ``format`` and
-``checker``, the registry ``readerVersion``, ``readerFormat`` and ``registryVersion``), so a change
-to what the code does must change the version. ``versions.lock.json`` records, for every version of
-every component, the SHA-256 of the source files that decide its output, as
-``src/authority/importer.lock.json`` does for the authority importer. A change to one of those files
-leaves the current version locked to other code, which tests/test_versions_lock.py refuses until the
-version is bumped and this script run. ``--amend`` re-locks a version to changed code, and refuses
-one any lock in main's first-parent history holds (``released``); the test holds every released
-entry unchanged too, as the importer's lock test does. Versions released before the lock existed are
-not in it.
+``checker``, the registry ``readerVersion``, ``readerFormat`` and ``registryVersion``, an
+implementation report ``checker`` and ``readers``), so a change to what the code does must change
+the version. ``versions.lock.json`` records, for every version of every component, the SHA-256 of
+the source files that decide its output, as ``src/authority/importer.lock.json`` does for the
+authority importer. A change to one of those files leaves the current version locked to other code,
+which tests/test_versions_lock.py refuses until the version is bumped and this script run.
+``--amend`` re-locks a version to changed code, and refuses one any lock in main's first-parent
+history holds (``released``); the test holds every released entry unchanged too, as the importer's
+lock test does. Versions released before the lock existed are not in it.
 """
 
 from __future__ import annotations
@@ -74,6 +74,11 @@ COMPONENTS: dict[str, Component] = {
             "src/zone_a/underline.py",
             "src/zone_a/fidelity/normalize.py",
         ),
+    ),
+    "implementation-check": Component(
+        "zone_a.implementation",
+        "IMPLEMENTATION_VERSION",
+        ("src/zone_a/implementation.py", "src/zone_a/certified.py"),
     ),
     "qrd-check": Component(
         "zone_a.qrd.check",

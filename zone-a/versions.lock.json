@@ -17,6 +17,9 @@
     "epi-reader/1.3.0": "8472b97178b5c8315f87f090828b158cf294a73025d3e6ef351e18b6f5c6a3e6",
     "epi-reader/1.3.1": "d8ab4b095fc1c77fe71e7c16de12226d363532f63df20fe8bdc4341302ce351c"
   },
+  "implementation-check": {
+    "implementation-check/1.0.0": "8d0188c8c37aecdfce10776597c2645f99c7083d0326da4080a46d9512a7c031"
+  },
   "qrd-check": {
     "qrd-check/1.2.0": "731151adfff83d6948e3269d090099b214af594e8ffee153a7621acf4fe920b2",
     "qrd-check/1.3.0": "739a42528d6620118a42471714358d5c9451350adc7bb77dc259e38eefb44542",
