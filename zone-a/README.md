@@ -18,7 +18,12 @@ Bundle's sections, paragraphs and marks exactly or a refusal with its reason, an
 reader's independent check cannot certify is a refusal; `zone_a.qrd.registry` builds the QRD
 template registry (`qrd/registry/`) from the pinned EMA files (`docs/design/qrd-registry.md`);
 `zone_a.qrd.check` checks every ePI pinned in `labels/ema-epi/` against it and the section mapping
-and writes the results to `labels/ema-epi/checks/` (`docs/design/qrd-conformance-check.md`).
+and writes the results to `labels/ema-epi/checks/` (`docs/design/qrd-conformance-check.md`);
+`zone_a.structure` finds an SmPC's sections in its Word text by the QRD template's own headings,
+each with its EMA code, flagging what only a person can confirm (`scripts/structure_label.py`,
+`docs/design/smpc-structure.md`); `zone_a.implementation` finds what changed between two CCDS versions and whether each label's text
+carries the new wording, the old, both or neither (`scripts/check_implementation.py`,
+`docs/design/ccds-implementation-check.md`).
 `zone_a.underline` decides what an underline can change, and writes two inputs the authority
 importer reads (`src/authority/data/underline-letters.json`,
 `test/fixtures/authority/underline-cases.json`); `scripts/generate_style_cases.py` writes the CSS
@@ -48,6 +53,8 @@ that run them. None of that changes a byte of what the pipeline computes.
 | A label is read only through the label reader's certified reads        | `tests/test_certified.py`                     |
 | The QRD registry is what the pinned EMA files build                    | `tests/test_qrd_registry.py`                  |
 | The conformance results are what the pinned ePIs give                  | `tests/test_qrd_check.py`                     |
+| A label carries a CCDS change only if its text holds the new wording   | `tests/test_implementation.py`                |
+| An SmPC's sections start only at the template's exact headings         | `tests/test_structure.py`                     |
 | An underline is judged by what it can change, and the importer's port  | `tests/test_underline.py`                     |
 | is held to the same cases                                              |                                               |
 | The ePI reader's CSS answers are the cases the importer's T is held to | `tests/test_style_cases.py`                   |

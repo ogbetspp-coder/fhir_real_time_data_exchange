@@ -57,10 +57,14 @@ result, was_read = kind(data).read(data)  # canonical JSON bytes, and whether it
 | Request                                   | Answer                                                    |
 | ----------------------------------------- | --------------------------------------------------------- |
 | `POST /v1/documents` (.docx or ePI)       | the receipt: 201 the first time, 200 after, same bytes    |
-| `GET /v1/documents/<sha256>`              | the result; 409 if Word or Chrome shows it otherwise, or (`require`) has not checked it |
+| `GET /v1/documents/<sha256>`              | the result, its `Outcome` header the receipt's; 409 if Word or Chrome shows it otherwise, or (`require`) has not checked it |
 | `GET /v1/documents/<sha256>/source`       | the bytes as ingested                                     |
 | `GET /v1/documents/<sha256>/verification` | Word's or Chrome's verdicts                               |
 | `GET /v1/health`                          | reader, format, Python and Unicode versions               |
+
+An error answers `{"code": …, "error": …}`: `code` is one of `label_docx.service.ERRORS` (for
+example `no-such-document`, `too-large`, `shown-otherwise`), for a program to act on, and `error`
+says it in words.
 
 `--browser` (ePI, default `auto`) and `--word` (.docx, macOS with Word, default `off`) hold each
 ingested document to the application: `auto` where installed, `on` always, `require` always and
@@ -78,17 +82,31 @@ from another web page.
 
 ```json
 {"certificate": {…}, "comments": [], "endnotes": [], "footers": [], "footnotes": [],
- "format": "label-docx-json/1.15.6", "headers": [],
+ "format": "label-docx-json/1.16.0", "headers": [],
  "paragraphs": [{"comments": [], "markHidden": false,
    "marks": [{"end": 5, "kind": "superscript", "start": 4}], "notes": [], "numbering": null,
-   "pages": [], "style": "Heading2", "table": null, "text": "x 109/l"}],
- "reader": "docx-reader/1.26.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"}}
+   "pages": [], "style": "Heading2", "table": [0, 1, 0], "text": "x 109/l"}],
+ "reader": "docx-reader/1.27.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
+ "tables": [{"grid": {"columns": 2, "rows": [
+   {"after": 0, "before": 0, "cells": [{"column": 0, "merge": null, "span": 2}]},
+   {"after": 1, "before": 0, "cells": [{"column": 0, "merge": null, "span": 1}]}]},
+   "parent": null, "reason": null}]}
 ```
 
 - Offsets (`marks`, `notes`, `pages`, `comments`) count Unicode code points of `text`.
 - `numbering` is the list label Word draws before the paragraph (`text`, `suffix`); it is not
   part of `text`. Its `level` counts from 0 in a .docx (Word's `ilvl`) and from 1 in an ePI (the
-  lists around the item). `table` is `[table, row, cell]`, counted from 0.
+  lists around the item). `table` is `[table, row, cell]`, counted from 0, `cell` among the
+  row's cells.
+- `tables` lists each body table, in document order, a nested table as its own entry with its
+  `parent` cell, and its `grid`: `columns` (`gridCol`), and each row's `before` and `after`
+  (grid columns left out) and `cells`, each with its first grid `column`, its `span`
+  (`gridSpan`) and its `merge` (`vMerge` as stored: null, `restart` or `continue`). Where Word's
+  grid is not on record, `grid` is null and `reason` says why: `no-grid`, `two-grids`,
+  `bad-number`, `h-merge` (a legacy horizontal merge), `bad-merge`, `bad-span` or `row-off-grid`
+  (a row that does not fill the grid exactly). The text is read either way. A body paragraph's
+  `table` indexes `tables` (its own table, nested or not). Tables in notes, headers, footers and
+  comments are not listed; there `table` is the outermost table's cell.
 - A refusal has `"refusal": {"code": …, "detail": …}` in place of the text.
 - A tracked document has `"tracked": {"accepted": {…}, "original": {…}, "changes": […]}` in place
   of the text; each view has the shape above.

@@ -38,6 +38,7 @@ def test_a_read_is_canonical_and_names_its_source_and_versions() -> None:
         "reader",
         "refusedParts",
         "source",
+        "tables",
     ]
     assert (value["format"], value["reader"]) == (FORMAT_VERSION, READER_VERSION)
     assert value["source"] == {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}

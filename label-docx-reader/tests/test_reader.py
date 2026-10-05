@@ -19,10 +19,15 @@ import pytest
 from label_docx import read as served
 from label_docx.certify import CertificationError, DocxSource
 from label_docx.reader import (
+    REASONS,
     Document,
     DocxRefusedError,
     NoteReference,
     Numbering,
+    Table,
+    TableCell,
+    TableGrid,
+    TableRow,
     read_document,
     read_docx,
 )
@@ -717,6 +722,116 @@ def test_tables_carry_their_position_and_numbering_is_metadata() -> None:
         ("c", (0, 1, 0)),
     ]
     assert paragraphs[0].numbering == Numbering(3, 1, "1)", "tab")
+    # It states no grid (tblGrid): it is read, and its grid is not reported.
+    assert read_document(docx(body, numbering=NUMBERING)).tables == (Table(None, None, "no-grid"),)
+
+
+# --- table grids (docx-reader/1.27.0) ---------------------------------------------------------
+
+# The grid of a one-column table.
+GRID1 = '<w:tblGrid><w:gridCol w:w="1000"/></w:tblGrid>'
+
+
+def tbl(columns: int | None, rows: str) -> str:
+    """A table of ``columns`` grid columns (None: no ``tblGrid``) holding ``rows``."""
+    grid = (
+        "" if columns is None else f"<w:tblGrid>{'<w:gridCol w:w="1000"/>' * columns}</w:tblGrid>"
+    )
+    return f"<w:tbl>{grid}{rows}</w:tbl>"
+
+
+def tc(text: str, props: str = "") -> str:
+    """A cell of one paragraph (empty for ``text`` ""), with ``props`` as its ``tcPr``."""
+    return (
+        f"<w:tc>{f'<w:tcPr>{props}</w:tcPr>' if props else ''}"
+        f"{p(r(f'<w:t>{text}</w:t>')) if text else p('')}</w:tc>"
+    )
+
+
+def test_a_body_tables_grid_is_reported_with_spans_merges_and_columns_left_out() -> None:
+    restart = '<w:gridSpan w:val="2"/><w:vMerge w:val="restart"/>'
+    continued = '<w:gridSpan w:val="2"/><w:vMerge/>'
+    body = tbl(
+        3,
+        f"<w:tr>{tc('wide', restart)}{tc('b')}</w:tr>"
+        f"<w:tr>{tc('', continued)}{tc('c')}</w:tr>"
+        '<w:tr><w:trPr><w:gridBefore w:val="1"/><w:gridAfter w:val="1"/></w:trPr>'
+        f"{tc('d')}</w:tr>",
+    )
+    document = read_document(docx(body + p(r("<w:t>after</w:t>"))))
+    assert [(x.text, x.table) for x in document.body] == [
+        ("wide", (0, 0, 0)),
+        ("b", (0, 0, 1)),
+        ("", (0, 1, 0)),
+        ("c", (0, 1, 1)),
+        ("d", (0, 2, 0)),
+        ("after", None),
+    ]
+    rows = (
+        TableRow(0, 0, (TableCell(0, 2, "restart"), TableCell(2, 1, None))),
+        TableRow(0, 0, (TableCell(0, 2, "continue"), TableCell(2, 1, None))),
+        TableRow(1, 1, (TableCell(1, 1, None),)),
+    )
+    assert document.tables == (Table(None, TableGrid(3, rows), None),)
+
+
+def test_a_nested_table_is_its_own_table_and_its_paragraphs_carry_it() -> None:
+    inner = tbl(2, f"<w:tr>{tc('x')}{tc('y')}</w:tr>")
+    outer = tbl(
+        1, f"<w:tr><w:tc>{p(r('<w:t>out</w:t>'))}{inner}{p(r('<w:t>back</w:t>'))}</w:tc></w:tr>"
+    )
+    document = read_document(docx(outer + tbl(1, f"<w:tr>{tc('next')}</w:tr>")))
+    assert [(x.text, x.table) for x in document.body] == [
+        ("out", (0, 0, 0)),
+        ("x", (1, 0, 0)),
+        ("y", (1, 0, 1)),
+        ("back", (0, 0, 0)),
+        ("next", (2, 0, 0)),
+    ]
+    assert [(t.parent, t.grid and t.grid.columns) for t in document.tables] == [
+        (None, 1),
+        ((0, 0, 0), 2),
+        (None, 1),
+    ]
+
+
+def _span(value: str) -> str:
+    return f'<w:gridSpan w:val="{value}"/>'
+
+
+_BEFORE = '<w:trPr><w:gridBefore w:val="-1"/></w:trPr>'
+_AFTER = '<w:trPr><w:gridAfter w:val="{}"/></w:trPr>'
+_H_MERGE = '<w:hMerge w:val="restart"/>'
+# Each reason a grid is not reported, the first one found, and a table that has it.
+_NO_GRID = {
+    "no-grid": ("no-grid", tbl(None, f"<w:tr>{tc('a')}</w:tr>")),
+    "two-grids": ("two-grids", tbl(1, f"{GRID1}<w:tr>{tc('a')}</w:tr>")),
+    "not-a-number": ("bad-number", tbl(1, f"<w:tr>{tc('a', _span('one'))}</w:tr>")),
+    "negative": ("bad-number", tbl(2, f"<w:tr>{_BEFORE}{tc('a', _span('3'))}</w:tr>")),
+    # Two cells that would fill the grid: where Word draws a legacy merge is not on record.
+    "h-merge": ("h-merge", tbl(2, f"<w:tr>{tc('a', _H_MERGE)}{tc('', '<w:hMerge/>')}</w:tr>")),
+    "bad-merge": ("bad-merge", tbl(1, f"<w:tr>{tc('a', '<w:vMerge w:val="down"/>')}</w:tr>")),
+    "bad-span": ("bad-span", tbl(1, f"<w:tr>{tc('a', _span('0'))}{tc('b')}</w:tr>")),
+    "short": ("row-off-grid", tbl(2, f"<w:tr>{tc('a')}</w:tr>")),
+    "long": ("row-off-grid", tbl(1, f"<w:tr>{tc('a')}{tc('b')}</w:tr>")),
+    "after": ("row-off-grid", tbl(2, f"<w:tr>{_AFTER.format(2)}{tc('a')}</w:tr>")),
+    # The first in order: the row's counts before its cells, a cell's merge before its span.
+    "row-count-first": (
+        "bad-number",
+        tbl(1, f"<w:tr>{_AFTER.format('x')}{tc('a', _H_MERGE)}</w:tr>"),
+    ),
+    "merge-first": ("h-merge", tbl(1, f"<w:tr>{tc('a', _H_MERGE + _span('0'))}</w:tr>")),
+}
+
+
+@pytest.mark.parametrize(("reason", "table"), _NO_GRID.values(), ids=_NO_GRID.keys())
+def test_a_grid_word_lays_out_by_rules_not_on_record_is_not_reported_and_the_text_is_read(
+    reason: str, table: str
+) -> None:
+    document = read_document(docx(table + p(r("<w:t>after</w:t>"))))
+    assert (document.body[0].text, document.body[-1].text) == ("a", "after")
+    assert document.tables == (Table(None, None, reason),)
+    assert reason in REASONS
 
 
 # --- second review: styles Word falls back to ----------------------------------------------
@@ -1945,12 +2060,16 @@ def test_note_numbering_that_depends_on_layout_or_language_is_refused(
 
 
 def test_a_table_in_a_note_is_read() -> None:
-    table = "<w:tbl><w:tr><w:tc>" + p(r("<w:t>cell</w:t>")) + "</w:tc></w:tr></w:tbl>"
+    # Its grid is not reported: a note's table, nested ones too, keeps its outermost cell.
+    inner = "<w:tbl><w:tr><w:tc>" + p(r("<w:t>inner</w:t>")) + "</w:tc></w:tr></w:tbl>"
+    table = "<w:tbl><w:tr><w:tc>" + p(r("<w:t>cell</w:t>")) + inner + "</w:tc></w:tr></w:tbl>"
     document = read(p(ref(1)), fnote(1, p(r("<w:footnoteRef/>")) + table))
     assert [(x.text, x.table) for x in document.footnotes[0].paragraphs] == [
         ("", None),
         ("cell", (0, 0, 0)),
+        ("inner", (0, 0, 0)),
     ]
+    assert document.tables == ()
 
 
 @pytest.mark.parametrize(
