@@ -3,7 +3,9 @@
     GET  /                             a page to read a document by hand (a demonstration)
     POST /v1/documents                 a .docx or an ePI Bundle (JSON); answers the receipt (201
                                        first, 200 after)
-    GET  /v1/documents/<id>            the reader's result (canonical JSON), read or refused
+    GET  /v1/documents/<id>            the reader's result (canonical JSON), read or refused; its
+                                       ``Outcome`` header is the receipt's (``read``,
+                                       ``read-in-part``, ``refused``)
     GET  /v1/documents/<id>/source     the document's bytes as ingested
     GET  /v1/documents/<id>/verification   Chrome's or Word's verdicts on the result
     GET  /v1/health                    the reader, format and runtime the service answers with
@@ -11,7 +13,9 @@
 ``<id>`` is the SHA-256 of the document's bytes. The same bytes always get the same receipt and
 the same result, byte for byte, whoever sends them and however often: the store keeps both once
 (``label_docx.store``). A refusal is a result like any other, with its code and detail. Bodies
-are canonical JSON, and every result names the reader and format versions that made it.
+are canonical JSON, and every result names the reader and format versions that made it. An error
+answers ``{"code", "error"}``: ``code`` is one of ``ERRORS``, for a program, and ``error`` says
+it in words.
 
 The service runs only on the interpreter the results are pinned to: the reader's notion of
 whitespace comes from its Unicode database (``check_environment``). It answers only requests
@@ -39,7 +43,7 @@ from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 from label_docx import browser, documents, word
 from label_docx.output import FORMAT_VERSION, Json, canonical
 from label_docx.reader import READER_VERSION
-from label_docx.store import Checker, Store, StoreError
+from label_docx.store import Checker, Store, StoreError, outcome
 
 # The largest document accepted, in bytes; the reader caps each part at 20 MiB.
 MAX_DOCUMENT_BYTES = 64 * 1024 * 1024
@@ -53,6 +57,25 @@ type StartResponse = Callable[[str, list[tuple[str, str]]], object]
 type Environ = dict[str, object]
 
 _DOCUMENT = re.compile(r"/v1/documents/([0-9a-f]{64})(/source|/verification)?")
+# The codes an error body may carry, beside its words (``error``).
+ERRORS = frozenset(
+    {
+        "wrong-host",
+        "wrong-origin",
+        "wrong-method",
+        "no-such-path",
+        "no-such-document",
+        "shown-otherwise",
+        "not-yet-verified",
+        "length-required",
+        "too-large",
+        "empty",
+        "timeout",
+        "cut-short",
+        "store-mismatch",
+        "internal",
+    }
+)
 # Reading is bound to one core (the reader is pure Python), so more at once only costs memory.
 READING = threading.BoundedSemaphore(2)
 
@@ -83,8 +106,11 @@ def health() -> bytes:
     )
 
 
-def _error(status: str, message: str) -> tuple[str, str, bytes]:
-    return status, JSON, canonical({"error": message})
+def _error(status: str, code: str, message: str) -> tuple[str, str, bytes]:
+    # ``code`` is for a program (one of ``ERRORS``), ``error`` for a person.
+    if code not in ERRORS:  # pragma: no cover - every call names one of them
+        raise ValueError(f"no such error code: {code}")
+    return status, JSON, canonical({"code": code, "error": message})
 
 
 class Service:
@@ -111,12 +137,10 @@ class Service:
         except Exception as failure:  # noqa: BLE001 - every answer is JSON, never a traceback
             # The log keeps the detail (a store path, a traceback); the client gets none of it.
             sys.stderr.write("".join(traceback.format_exception(failure)))
-            message = (
-                "the store holds other bytes than it wrote"
-                if isinstance(failure, StoreError)
-                else "internal error"
-            )
-            status, content_type, body = _error("500 Internal Server Error", message)
+            mismatch = isinstance(failure, StoreError)
+            code = "store-mismatch" if mismatch else "internal"
+            message = "the store holds other bytes than it wrote" if mismatch else "internal error"
+            status, content_type, body = _error("500 Internal Server Error", code, message)
             headers = []
         start_response(
             status, [("Content-Type", content_type), ("Content-Length", str(len(body))), *headers]
@@ -126,52 +150,72 @@ class Service:
     def _guarded(self, environ: Environ) -> tuple[str, str, bytes, list[tuple[str, str]]]:
         host = str(environ.get("HTTP_HOST", ""))
         if self.hosts is not None and host not in self.hosts:
-            return (*_error("421 Misdirected Request", "not a host this service answers"), [])
+            return (
+                *_error("421 Misdirected Request", "wrong-host", "not a host this service answers"),
+                [],
+            )
         origin = environ.get("HTTP_ORIGIN")
         if (
             environ.get("REQUEST_METHOD") == "POST"
             and origin is not None
             and origin != (f"http://{host}")
         ):
-            return (*_error("403 Forbidden", "a document is posted from this origin only"), [])
+            return (
+                *_error(
+                    "403 Forbidden", "wrong-origin", "a document is posted from this origin only"
+                ),
+                [],
+            )
         return self._route(environ)
 
     def _route(self, environ: Environ) -> tuple[str, str, bytes, list[tuple[str, str]]]:
         method, path = str(environ.get("REQUEST_METHOD", "")), str(environ.get("PATH_INFO", ""))
         if path == "/":
             if method != "GET":
-                return (*_error("405 Method Not Allowed", "use GET"), [("Allow", "GET")])
+                return (
+                    *_error("405 Method Not Allowed", "wrong-method", "use GET"),
+                    [("Allow", "GET")],
+                )
             page = importlib.resources.files("label_docx").joinpath("demo.html").read_bytes()
             return "200 OK", "text/html; charset=utf-8", page, []
         if path == "/v1/health":
             if method != "GET":
-                return (*_error("405 Method Not Allowed", "use GET"), [("Allow", "GET")])
+                return (
+                    *_error("405 Method Not Allowed", "wrong-method", "use GET"),
+                    [("Allow", "GET")],
+                )
             return "200 OK", JSON, health(), []
         if path == "/v1/documents":
             if method != "POST":
-                return (*_error("405 Method Not Allowed", "use POST"), [("Allow", "POST")])
+                return (
+                    *_error("405 Method Not Allowed", "wrong-method", "use POST"),
+                    [("Allow", "POST")],
+                )
             return self._ingest(environ)
         match = _DOCUMENT.fullmatch(path)
         if match is None:
-            return (*_error("404 Not Found", f"no such path: {path}"), [])
+            return (*_error("404 Not Found", "no-such-path", f"no such path: {path}"), [])
         if method != "GET":
-            return (*_error("405 Method Not Allowed", "use GET"), [("Allow", "GET")])
+            return (
+                *_error("405 Method Not Allowed", "wrong-method", "use GET"),
+                [("Allow", "GET")],
+            )
         document, part = match.group(1), match.group(2)
         if part == "/verification":
             if self.store.kind_of(document) is None:
-                return (*_error("404 Not Found", f"no document {document}"), [])
+                return (*_error("404 Not Found", "no-such-document", f"no document {document}"), [])
             verdicts = self.store.verifications(document)
             return "200 OK", JSON, canonical({"verifications": verdicts}), []
         if part == "/source":
             body = self.store.source(document)
             if body is None:
-                return (*_error("404 Not Found", f"no document {document}"), [])
+                return (*_error("404 Not Found", "no-such-document", f"no document {document}"), [])
             return "200 OK", FHIR_JSON if documents.kind(body) is documents.EPI else DOCX, body, []
         body = self.store.result(document)
         if body is None:
             source = self.store.source(document)
             if source is None:
-                return (*_error("404 Not Found", f"no document {document}"), [])
+                return (*_error("404 Not Found", "no-such-document", f"no document {document}"), [])
             # Kept, but not read by this reader version (or stopped before its receipt): read it.
             with READING:
                 self.store.ingest(source)
@@ -182,6 +226,7 @@ class Service:
         if disagreement is not None:
             # The application shows the document otherwise than the result reads: not served.
             message: Json = {
+                "code": "shown-otherwise",
                 "error": "the application shows it otherwise",
                 "verification": disagreement,
             }
@@ -204,27 +249,40 @@ class Service:
                 # Strict: a read no application has checked is not served.
                 application = "Chrome" if reading is documents.EPI else "Microsoft Word"
                 message = {
-                    "error": f"not yet checked by {application}, which this service requires"
+                    "code": "not-yet-verified",
+                    "error": f"not yet checked by {application}, which this service requires",
                 }
                 return "409 Conflict", JSON, canonical(message), []
-        return "200 OK", JSON, body, []
+        # What the receipt says of it, so a client need not work it out from the result.
+        return "200 OK", JSON, body, [("Outcome", outcome(json.loads(body)))]
 
     def _ingest(self, environ: Environ) -> tuple[str, str, bytes, list[tuple[str, str]]]:
         length = str(environ.get("CONTENT_LENGTH") or "")
         # ASCII digits only ("²" is a digit to str.isdigit), and no more than a size can need.
         if not (length.isascii() and length.isdigit() and len(length) <= 12):
-            return (*_error("411 Length Required", "send the document with a length"), [])
+            return (
+                *_error(
+                    "411 Length Required", "length-required", "send the document with a length"
+                ),
+                [],
+            )
         if int(length) > MAX_DOCUMENT_BYTES:
-            return (*_error("413 Content Too Large", f"over {MAX_DOCUMENT_BYTES} bytes"), [])
+            return (
+                *_error("413 Content Too Large", "too-large", f"over {MAX_DOCUMENT_BYTES} bytes"),
+                [],
+            )
         if int(length) == 0:
-            return (*_error("400 Bad Request", "no document"), [])
+            return (*_error("400 Bad Request", "empty", "no document"), [])
         stream = environ["wsgi.input"]
         try:
             data = stream.read(int(length))  # type: ignore[attr-defined]
         except OSError:  # the client stopped sending (the handler's timeout)
-            return (*_error("408 Request Timeout", "the document was not sent in time"), [])
+            return (
+                *_error("408 Request Timeout", "timeout", "the document was not sent in time"),
+                [],
+            )
         if len(data) != int(length):
-            return (*_error("400 Bad Request", "the document was cut short"), [])
+            return (*_error("400 Bad Request", "cut-short", "the document was cut short"), [])
         with READING:
             ingested = self.store.ingest(data)
         status = "201 Created" if ingested.created else "200 OK"
