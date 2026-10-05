@@ -11,15 +11,27 @@ units or bytes: a consumer in JavaScript must index by code point.
 
 A paragraph (``paragraph``; ``reader.Paragraph`` says what each means): ``text``, ``marks``
 (``start``, ``end``, ``kind``), ``style`` (the style id as written, or null), ``markHidden``,
-``table`` (``[table, row, cell]``, or null), ``numbering`` (null, or ``numId``, ``level``,
-``text`` and ``suffix``; ``level`` is Word's ``ilvl``, from 0), and ``notes``, ``pages`` and
-``comments`` as below.
+``table`` (``[table, row, cell]``, or null; see ``tables``), ``numbering`` (null, or ``numId``,
+``level``, ``text`` and ``suffix``; ``level`` is Word's ``ilvl``, from 0), and ``notes``,
+``pages`` and ``comments`` as below.
 
 A read::
 
     {"certificate": {...}, "comments": [...], "endnotes": [...], "footers": [...],
      "footnotes": [...], "format": ..., "headers": [...], "paragraphs": [...], "reader": ...,
-     "refusedParts": n, "source": {"bytes": n, "sha256": hex}}
+     "refusedParts": n, "source": {"bytes": n, "sha256": hex}, "tables": [...]}
+
+``tables`` lists each body table's grid (``reader.Table``; "Tables" in the reader's docstring), in
+document order, a nested table as its own entry after the table holding it: ``columns`` (its
+``gridCol`` count), ``parent`` (the ``[table, row, cell]`` a nested table stands in, else null) and
+``rows``, each with ``before`` and ``after`` (grid columns left out, ``gridBefore`` and
+``gridAfter``) and ``cells``, each with ``column`` (the first grid column it covers, from 0),
+``span`` (``gridSpan``) and ``merge`` (``vMerge`` as stored: null, ``restart`` or ``continue``).
+A body paragraph's ``table`` is ``[table, row, cell]`` of its own table (a nested table's, not
+the outermost's), ``cell`` counting the row's ``cells``, not grid columns. Every row fills its
+grid exactly; a document with a row that does not is refused. Tables in notes, headers, footers
+and comments are not listed; their paragraphs' ``table`` is the outermost table's cell, tables
+counted in that story.
 
 ``headers`` and ``footers`` list each header or footer part the sections refer to, once, in the
 order referred to: its ``part`` name, its ``uses`` (each ``section``, counted from 0, and the
@@ -55,12 +67,13 @@ A document with tracked changes::
      "tracked": {"accepted": {...}, "original": {...}, "changes": [...]}}
 
 ``tracked.accepted`` is the document with every change accepted, ``tracked.original`` with every
-change rejected, each with ``paragraphs``, the notes, headers, footers, comments and
-``refusedParts`` as a read above; there is no ``paragraphs`` outside them, so the caller names
-the view it takes. ``changes`` lists each change as stored: ``part``, ``kind`` (``insert``,
-``delete``, ``move-from``, ``move-to``, each also with ``-paragraph-mark``; ``insert-row``,
-``delete-row``; ``format``, ``format-paragraph``, ``format-table``, ``format-row``,
-``format-cell``, ``format-section``), ``id``, ``author`` and ``date`` (null where absent).
+change rejected, each with ``paragraphs``, the notes, headers, footers, comments,
+``refusedParts`` and ``tables`` as a read above; there is no ``paragraphs`` outside them, so the
+caller names the view it takes. ``changes`` lists each change as stored: ``part``, ``kind``
+(``insert``, ``delete``, ``move-from``, ``move-to``, each also with ``-paragraph-mark``;
+``insert-row``, ``delete-row``; ``format``, ``format-paragraph``, ``format-table``,
+``format-row``, ``format-cell``, ``format-section``), ``id``, ``author`` and ``date`` (null where
+absent).
 Each view is certified as a read is; ``certificate.views`` is the check's account of the views
 themselves (``certify_tracked``).
 
@@ -84,13 +97,14 @@ from label_docx.reader import (
     Note,
     Paragraph,
     Story,
+    Table,
     read_document,
     tracked,
 )
 
 # The version of the shape above, and of the check that certifies it: versions.lock.json ties
 # it to both files (tests/test_locks.py).
-FORMAT_VERSION = "label-docx-json/1.15.7"
+FORMAT_VERSION = "label-docx-json/1.16.0"
 
 type Json = str | int | bool | list[Json] | dict[str, Json] | None
 
@@ -206,9 +220,31 @@ def read(data: bytes) -> tuple[bytes, bool]:
     return certified(envelope, lambda: DocxSource(data).certify(envelope))
 
 
+def tables(items: tuple[Table, ...]) -> list[Json]:
+    """The body's tables as JSON: each one's grid, in document order."""
+    return [
+        {
+            "columns": t.columns,
+            "parent": None if t.parent is None else list(t.parent),
+            "rows": [
+                {
+                    "after": r.after,
+                    "before": r.before,
+                    "cells": [
+                        {"column": c.column, "merge": c.merge, "span": c.span} for c in r.cells
+                    ],
+                }
+                for r in t.rows
+            ],
+        }
+        for t in items
+    ]
+
+
 def content(document: Document) -> dict[str, Json]:
-    """A document's text as JSON: paragraphs, notes, headers, footers and comments."""
+    """A document's text as JSON: paragraphs, notes, headers, footers, comments; body tables."""
     return {
+        "tables": tables(document.tables),
         "paragraphs": paragraphs(list(document.body)),
         "footnotes": notes(document.footnotes),
         "endnotes": notes(document.endnotes),

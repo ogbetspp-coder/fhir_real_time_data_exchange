@@ -46,6 +46,7 @@ from lock import MANIFESTS
 from test_reader import (
     ALL_LOOKS,
     APPLIED,
+    GRID1,
     HEADERS,
     LAST_LEFT_OUT,
     LINE,
@@ -57,8 +58,12 @@ from test_reader import (
     W,
     _alternate,
     docx,
+    p,
+    r,
     t_style,
     t_table,
+    tbl,
+    tc,
 )
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
@@ -338,6 +343,31 @@ def _move_table_cell(value: dict[str, Any], rng: random.Random) -> bool:
     return True
 
 
+def _change_the_grid(value: dict[str, Any], rng: random.Random) -> bool:
+    # A body table's grid said otherwise: its columns, a nested table's cell, a row's columns
+    # left out, a cell's column, span or merge; or a table dropped.
+    tables = value.get("tables")
+    if not tables:
+        return False
+    table = rng.choice(tables)
+    cells = [c for row in table["rows"] for c in row["cells"]]
+    roll = rng.randrange(7) if cells else rng.choice((0, 1, 6))
+    if roll == 0:
+        table["columns"] += 1
+    elif roll == 1:
+        table["parent"] = [0, 0, 0] if table["parent"] is None else None
+    elif roll == 2:
+        rng.choice(table["rows"])[rng.choice(("before", "after"))] += 1
+    elif roll in (3, 4):
+        rng.choice(cells)["column" if roll == 3 else "span"] += 1
+    elif roll == 5:
+        cell = rng.choice(cells)
+        cell["merge"] = {None: "restart", "restart": "continue", "continue": None}[cell["merge"]]
+    else:
+        tables.remove(table)
+    return True
+
+
 def _change_title(value: dict[str, Any], rng: random.Random) -> bool:
     if "sections" not in value:
         return False
@@ -449,6 +479,7 @@ CHANGES: list[Change] = [
     _move_page_number,
     _move_note_mark,
     _move_table_cell,
+    _change_the_grid,
     _change_title,
     _hide_a_refusal,
     _change_a_mark,
@@ -523,6 +554,95 @@ def test_a_page_break_is_set_aside_and_a_line_break_kept() -> None:
     certificate = DocxSource(data).certify(_docx_value(data))
     assert certificate["setAside"]["pageBreaks"] == 1
     assert certificate["output"]["characters"] == len("ab\nc")
+
+
+_GRID_BODY = tbl(
+    3,
+    f"<w:tr>{tc('wide', '<w:gridSpan w:val="2"/><w:vMerge w:val="restart"/>')}{tc('b')}</w:tr>"
+    f"<w:tr>{tc('', '<w:gridSpan w:val="2"/><w:vMerge/>')}<w:tc>"
+    + tbl(1, f"<w:tr>{tc('in')}</w:tr>")
+    + p("")
+    + "</w:tc></w:tr>"
+    '<w:tr><w:trPr><w:gridBefore w:val="1"/><w:gridAfter w:val="1"/></w:trPr>'
+    f"{tc('d')}</w:tr>",
+)
+
+
+def _regrid(value: dict[str, Any], change: Callable[[list[Any]], None]) -> dict[str, Any]:
+    changed = copy.deepcopy(value)
+    change(changed["tables"])
+    return changed
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda t: t[0].update(columns=4),
+        lambda t: t[1].update(parent=[0, 1, 0]),
+        lambda t: t[1].update(parent=None),
+        lambda t: t[0]["rows"][2].update(before=0),
+        lambda t: t[0]["rows"][2].update(after=0),
+        lambda t: t[0]["rows"][2]["cells"][0].update(column=0),
+        lambda t: t[0]["rows"][0]["cells"][0].update(span=1),
+        lambda t: t[0]["rows"][1]["cells"][0].update(merge=None),
+        lambda t: t[0]["rows"][0]["cells"][0].update(merge="continue"),
+        lambda t: t[0]["rows"][1]["cells"].pop(),
+        lambda t: t[0]["rows"].pop(),
+        lambda t: t.pop(),
+        lambda t: t.append(t[1]),
+        lambda t: t.reverse(),
+    ],
+    ids=[
+        "columns",
+        "parent",
+        "no-parent",
+        "before",
+        "after",
+        "column",
+        "span",
+        "merge",
+        "restart-as-continue",
+        "cell-dropped",
+        "row-dropped",
+        "table-dropped",
+        "table-added",
+        "order",
+    ],
+)
+def test_a_tables_grid_is_the_one_the_document_stores_and_only_that(
+    change: Callable[[list[Any]], None],
+) -> None:
+    data = docx(_GRID_BODY)
+    source, value = DocxSource(data), _docx_value(data)
+    assert [(t["columns"], t["parent"]) for t in value["tables"]] == [(3, None), (1, [0, 1, 1])]
+    source.certify(value)
+    with pytest.raises(CertificationError, match=r"table|grid"):
+        source.certify(_regrid(value, change))
+
+
+@pytest.mark.parametrize(
+    ("table", "reason"),
+    [
+        (tbl(2, f"<w:tr>{tc('a')}</w:tr>"), "does not fill"),
+        (tbl(None, f"<w:tr>{tc('a')}</w:tr>"), "does not fill"),
+        (tbl(1, f"<w:tr>{tc('a', '<w:hMerge/>')}</w:tr>"), "a horizontal merge"),
+        (tbl(1, f"<w:tr>{tc('a', '<w:vMerge w:val="down"/>')}</w:tr>"), "a vertical merge"),
+        (tbl(1, f"<w:tr>{tc('a', '<w:gridSpan w:val="+1"/>')}</w:tr>"), "a gridSpan of"),
+        (tbl(1, f"<w:tr>{tc('a', '<w:gridSpan w:val="0"/>')}{tc('b')}</w:tr>"), "no column"),
+    ],
+    ids=["short", "no-grid", "hmerge", "vmerge", "signed", "no-span"],
+)
+def test_the_check_certifies_no_grid_word_lays_out_by_rules_of_its_own(
+    table: str, reason: str
+) -> None:
+    # Whatever the result says: the check reads the grid itself, apart from the reader.
+    text = [p(r(f"<w:t>{x}</w:t>")) for x in ("a", "b")]
+    value = _docx_value(docx(tbl(1, f"<w:tr>{tc('a')}</w:tr>") + text[1]))
+    if "<w:t>b</w:t>" in table:
+        value = _docx_value(docx(tbl(2, f"<w:tr>{tc('a')}{tc('b')}</w:tr>")))
+    source = DocxSource(docx(table + ("" if "<w:t>b</w:t>" in table else text[1])))
+    with pytest.raises(CertificationError, match=reason):
+        source.certify(value)
 
 
 def _symbol_case(run_properties: str, styles: str | None = None, theme: str | None = None) -> bytes:
@@ -875,7 +995,18 @@ def _value(*paragraphs: str | dict[str, Any], **notes: list[dict[str, Any]]) -> 
         "footers": [],
         "comments": [],
         "refusedParts": 0,
+        "tables": notes.get("tables", []),
     }
+
+
+# The grid of a table of one cell on one column, as a result states it.
+_ONE_CELL = [
+    {
+        "columns": 1,
+        "parent": None,
+        "rows": [{"after": 0, "before": 0, "cells": [{"column": 0, "merge": None, "span": 1}]}],
+    }
+]
 
 
 def _field(code: str, result: str) -> str:
@@ -1128,37 +1259,58 @@ def _cell(inner: str) -> str:
 
 
 def test_cells_are_counted_in_their_own_table_and_row() -> None:
+    two = "<w:tblGrid><w:gridCol/><w:gridCol/></w:tblGrid>"
     nested = (
-        "<w:tbl><w:tr>" + _cell(_p("<w:r><w:t>n</w:t></w:r>")) + _cell(_p("")) + "</w:tr></w:tbl>"
+        f"<w:tbl>{two}<w:tr>"
+        + _cell(_p("<w:r><w:t>n</w:t></w:r>"))
+        + _cell(_p(""))
+        + "</w:tr></w:tbl>"
     )
     body = (
-        "<w:tbl><w:tr>"
+        f"<w:tbl>{two}<w:tr>"
         + _cell(_p("<w:r><w:t>a</w:t></w:r>") + nested + _p(""))
         + "<w:customXml>"
         + _cell(_p("<w:r><w:t>b</w:t></w:r>"))
         + "</w:customXml>"
-        + "</w:tr><w:sdt><w:sdtContent><w:tr>"
+        + '</w:tr><w:sdt><w:sdtContent><w:tr><w:trPr><w:gridAfter w:val="1"/></w:trPr>'
         + _cell(_p("<w:r><w:t>c</w:t></w:r>"))
         + "</w:tr></w:sdtContent></w:sdt></w:tbl>"
         + _p("<w:r><w:t>d</w:t></w:r>")
     )
+    # A paragraph of the body is in its own table's cell, a nested table's too.
     cells = [
         ("a", [0, 0, 0]),
-        ("n", [0, 0, 0]),
-        ("", [0, 0, 0]),
+        ("n", [1, 0, 0]),
+        ("", [1, 0, 1]),
         ("", [0, 0, 0]),
         ("b", [0, 0, 1]),
         ("c", [0, 1, 0]),
         ("d", None),
     ]
+    one: dict[str, Any] = {"column": 0, "merge": None, "span": 1}
+    pair = [one, {**one, "column": 1}]
+    tables: list[dict[str, Any]] = [
+        {
+            "columns": 2,
+            "parent": None,
+            "rows": [
+                {"after": 0, "before": 0, "cells": pair},
+                {"after": 1, "before": 0, "cells": [one]},
+            ],
+        },
+        {"columns": 2, "parent": [0, 0, 0], "rows": [{"after": 0, "before": 0, "cells": pair}]},
+    ]
     source = DocxSource(docx(body))
-    source.certify(_value(*({"text": t, "table": c} for t, c in cells)))
+    source.certify(_value(*({"text": t, "table": c} for t, c in cells), tables=tables))
     for index in (1, 4, 5):
         moved = [list(c) if c else c for _, c in cells]
         moved[index][2 if index != 5 else 1] += 1  # type: ignore[index]
         with pytest.raises(CertificationError):
             source.certify(
-                _value(*({"text": t, "table": c} for (t, _), c in zip(cells, moved, strict=True)))
+                _value(
+                    *({"text": t, "table": c} for (t, _), c in zip(cells, moved, strict=True)),
+                    tables=tables,
+                )
             )
 
 
@@ -1229,16 +1381,17 @@ def test_each_kind_of_style_and_the_defaults_give_the_font() -> None:
 def test_a_table_style_gives_its_font_inside_its_table_only() -> None:
     table_style = f'<w:style w:type="table" w:default="1" w:styleId="T">{_SYMBOL}</w:style>'
     run = "<w:r><w:t>\u00b3</w:t></w:r>"
-    body = "<w:tbl><w:tr>" + _cell(_p(run)) + "</w:tr></w:tbl>" + _p(run)
+    body = f"<w:tbl>{GRID1}<w:tr>" + _cell(_p(run)) + "</w:tr></w:tbl>" + _p(run)
     source = DocxSource(docx(body, styles=table_style))
-    source.certify(_value({"text": "\u2265", "table": [0, 0, 0]}, "\u00b3"))
+    cell = {"text": "\u2265", "table": [0, 0, 0]}
+    source.certify(_value(cell, "\u00b3", tables=_ONE_CELL))
     named = table_style.replace('w:default="1" ', "")
     body = (
-        '<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr><w:tr>'
+        f'<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr>{GRID1}<w:tr>'
         + _cell(_p(run))
         + "</w:tr></w:tbl>"
     )
-    DocxSource(docx(body, styles=named)).certify(_value({"text": "\u2265", "table": [0, 0, 0]}))
+    DocxSource(docx(body, styles=named)).certify(_value(cell, tables=_ONE_CELL))
 
 
 @pytest.mark.parametrize("name", ["symbol", "SymbolMT", "Symbol MT", "Sym bol"])
@@ -1565,7 +1718,7 @@ def test_the_key_marks_from_every_level_are_worked_out_alike() -> None:
             '<w:r><w:rPr><w:rStyle w:val="S"/></w:rPr><w:t>b</w:t></w:r>'
             '<w:r><w:rPr><w:rStyle w:val="S"/><w:u w:val="none"/></w:rPr><w:t>c</w:t></w:r>'
         )
-        + "<w:tbl><w:tr><w:tc>"
+        + f"<w:tbl>{GRID1}<w:tr><w:tc>"
         + _p("<w:r><w:t>d</w:t></w:r>")
         + "</w:tc></w:tr></w:tbl>"
     )
@@ -1786,7 +1939,7 @@ def test_a_bullet_in_symbol_through_a_paragraph_or_table_style(kind: str, defaul
     item = _item(1, 0, named)
     if kind == "table":
         table = "" if default else '<w:tblPr><w:tblStyle w:val="S"/></w:tblPr>'
-        item = f"<w:tbl>{table}<w:tr><w:tc>{item}</w:tc></w:tr></w:tbl>"
+        item = f"<w:tbl>{table}{GRID1}<w:tr><w:tc>{item}</w:tc></w:tr></w:tbl>"
     data = docx(item, styles=styles, numbering=_list(_level(0, "\uf0b7", "bullet")) + _NUM)
     assert _labels_certified(data) == [(1, "\u2022", "tab")]
 
@@ -2456,8 +2609,8 @@ def test_the_walk_reads_through_every_container(name: str) -> None:
     if name in ("sdt", "sdtContent", "customXml"):
         DocxSource(docx(f"<w:{name}>{_p(run)}</w:{name}>")).certify(_value("a"))
         row = f"<w:tr><w:tc>{_p(run)}</w:tc></w:tr>"
-        table = docx(f"<w:tbl><w:{name}>{row}</w:{name}></w:tbl>")
-        DocxSource(table).certify(_value({"text": "a", "table": [0, 0, 0]}))
+        table = docx(f"<w:tbl>{GRID1}<w:{name}>{row}</w:{name}></w:tbl>")
+        DocxSource(table).certify(_value({"text": "a", "table": [0, 0, 0]}, tables=_ONE_CELL))
     else:
         with pytest.raises(CertificationError, match="among paragraphs"):
             DocxSource(docx(f"<w:{name}>{_p(run)}</w:{name}>"))
@@ -2475,11 +2628,16 @@ def test_the_walk_passes_over_every_inert_element_and_never_text_in_one(name: st
     for at in (
         lambda x: _p(x + "<w:r><w:t>a</w:t></w:r>"),
         lambda x: x + _p("<w:r><w:t>a</w:t></w:r>"),
-        lambda x: f"<w:tbl>{x}<w:tr><w:tc>{_p('<w:r><w:t>a</w:t></w:r>')}</w:tc></w:tr></w:tbl>",
+        lambda x: (
+            f"<w:tbl>{'' if 'tblGrid' in x else GRID1}{x}<w:tr><w:tc>"
+            + _p("<w:r><w:t>a</w:t></w:r>")
+            + "</w:tc></w:tr></w:tbl>"
+        ),
     ):
-        source = DocxSource(docx(at(f"<w:{name}><w:x/></w:{name}>")))
+        column = "<w:gridCol/>" if name == "tblGrid" else ""
+        source = DocxSource(docx(at(f"<w:{name}><w:x/>{column}</w:{name}>")))
         table = [0, 0, 0] if "tbl" in at("") else None
-        source.certify(_value({"text": "a", "table": table}))
+        source.certify(_value({"text": "a", "table": table}, tables=_ONE_CELL if table else []))
         for text in ("<w:t>b</w:t>", "<w:instrText>b</w:instrText>", "<w:delText>b</w:delText>",
                      "<w:r/>", "<w:p/>"):  # fmt: skip
             with pytest.raises(CertificationError, match=r"text in|inside a paragraph"):
@@ -3041,6 +3199,7 @@ def test_emphasis_in_a_part_the_look_turns_off_or_the_cell_is_not_in_is_certifie
     # No first or last row or column, no banding: the middle cell is in no part but corners'.
     body = (
         '<w:tbl><w:tblPr><w:tblStyle w:val="T"/><w:tblLook w:val="0600"/></w:tblPr>'
+        + "<w:tblGrid><w:gridCol/><w:gridCol/><w:gridCol/></w:tblGrid>"
         + row("")
         + row("<w:r><w:t>a</w:t></w:r>")
         + row("")

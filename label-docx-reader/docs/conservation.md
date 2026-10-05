@@ -2,7 +2,7 @@
 
 Every result the reader serves carries a certificate from an independent check
 ([`certify.py`](../src/label_docx/certify.py)). A result the check cannot account for is not
-served; it becomes the refusal `uncertified`. Requirements R-24 to R-28, R-34 to R-36 and R-39
+served; it becomes the refusal `uncertified`. Requirements R-24 to R-28, R-34 to R-36, R-39 and R-43
 in [requirements.md](requirements.md); tests in `tests/test_certify.py`.
 
 ## The statement
@@ -27,7 +27,8 @@ For a document `D` and the reader's result `R`:
 The check verifies the sequence (string equality per paragraph), the structure (paragraphs,
 table cells, paragraph styles, hidden paragraph marks, notes in the order the body refers to
 them, sections and note and page places are `D`'s; every mark is a span of its paragraph's text,
-of a kind the format names) and the ledger:
+of a kind the format names; each body table's grid is the one `D` stores, read by the check's
+own rules) and the ledger:
 `text + instructions + elements = output + field code + page numbers + page breaks + hidden
 whitespace + floating objects`. Equality is all or nothing, so a dropped, added, changed, repeated, swapped or moved
 character, and a dropped, split or merged paragraph, all fail it.
@@ -74,6 +75,11 @@ and every unchanged result is certified. These are samples, not every possible c
 Beyond the text, the check works out on its own, by Word's rules written apart from the reader's,
 the key marks (bold, italic, caps, small caps, strike, double strike, super- and subscript,
 underline), every list label and every note mark. The result's must be the check's (R-35, R-36).
+So must every body table's grid (R-43), which it reads from `D` itself: the `gridCol` count, each
+row's cells laid side by side after its `gridBefore`, each over its `gridSpan`, filling the grid
+exactly with its `gridAfter`, each cell's `vMerge` as stored and, for a nested table, the cell it
+stands in. A row that does not fill its grid, a count that is not digits, a horizontal merge or
+a vertical merge of no known kind is never certified.
 It draws lists in the body only; a list anywhere else, a label in capitals, hidden or drawn as
 a picture, and a custom note mark's echo are never certified.
 
@@ -102,6 +108,10 @@ The proof covers the text. How it is shown is held to the application that shows
 | List labels, note marks, fields, text, bold, italic, caps and strike, headers, footers, comments of a .docx | Word | `test_word_oracle.py` (corpus; comments by unit tests only, none in the corpus yet); `--word on` (every ingest) |
 | Text, marks and list markers of an ePI section    | Chrome  | `test_browser_oracle.py` (corpus); every ingest with Chrome |
 | Tracked views                                     | Word    | `test_tracked.py` (corpus); `--word on` |
+
+Table grids are held to the source alone (the check above): Word has not yet been asked where
+it draws each cell. The grid is what the document stores; a row that does not fill it, which Word
+would have to lay out by rules of its own, is refused.
 
 Word is asked about emphasis per body paragraph: whether all its letters are bold, italic, in
 capitals or struck through, white space's formatting aside, so Word's "no" agrees with a

@@ -87,6 +87,18 @@ REFUSED = {
     "numbering-cases/fields-seq-shown-no-result.docx": "field-without-result",
     # EMA's stray U+F02D in Times New Roman, a code no font draws as the template means it.
     "ema-templates/qrd-product-information-template-version-104_es.docx": "private-use-character",
+    # A table with no grid (tblGrid), as numbering_cases.py writes them: Word builds one by rules
+    # not on record, so where it draws each cell is not known.
+    **{
+        f"numbering-cases/{name}.docx": "unsupported-element"
+        for name in (
+            "emphasis-defaults",
+            "emphasis-defaults-off",
+            "emphasis-toggles",
+            "notes-in-table",
+            "restart-source-cells",
+        )
+    },
 }
 
 

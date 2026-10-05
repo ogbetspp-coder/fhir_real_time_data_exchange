@@ -152,7 +152,7 @@ from typing import Any, Final
 from label_docx.reader import Mark, Numbering, Paragraph
 
 # The version of the rules above; versions.lock.json ties it to this file (tests/test_locks.py).
-READER_VERSION = "epi-reader/1.3.1"
+READER_VERSION = "epi-reader/1.3.2"
 XHTML = "http://www.w3.org/1999/xhtml"
 OBJECT = "\ufffc"
 _COLLAPSIBLE = " \t\n\r\f"

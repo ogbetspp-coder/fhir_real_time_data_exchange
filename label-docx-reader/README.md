@@ -82,17 +82,29 @@ from another web page.
 
 ```json
 {"certificate": {…}, "comments": [], "endnotes": [], "footers": [], "footnotes": [],
- "format": "label-docx-json/1.15.7", "headers": [],
+ "format": "label-docx-json/1.16.0", "headers": [],
  "paragraphs": [{"comments": [], "markHidden": false,
    "marks": [{"end": 5, "kind": "superscript", "start": 4}], "notes": [], "numbering": null,
-   "pages": [], "style": "Heading2", "table": null, "text": "x 109/l"}],
- "reader": "docx-reader/1.26.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"}}
+   "pages": [], "style": "Heading2", "table": [0, 1, 0], "text": "x 109/l"}],
+ "reader": "docx-reader/1.27.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
+ "tables": [{"columns": 2, "parent": null, "rows": [
+   {"after": 0, "before": 0, "cells": [{"column": 0, "merge": null, "span": 2}]},
+   {"after": 1, "before": 0, "cells": [{"column": 0, "merge": null, "span": 1}]}]}]}
 ```
 
 - Offsets (`marks`, `notes`, `pages`, `comments`) count Unicode code points of `text`.
 - `numbering` is the list label Word draws before the paragraph (`text`, `suffix`); it is not
   part of `text`. Its `level` counts from 0 in a .docx (Word's `ilvl`) and from 1 in an ePI (the
-  lists around the item). `table` is `[table, row, cell]`, counted from 0.
+  lists around the item). `table` is `[table, row, cell]`, counted from 0, `cell` among the
+  row's cells.
+- `tables` is each body table's grid, in document order, a nested table as its own entry with
+  its `parent` cell: `columns` (`gridCol`), and each row's `before` and `after` (grid columns
+  left out) and `cells`, each with its first grid `column`, its `span` (`gridSpan`) and its
+  `merge` (`vMerge` as stored: null, `restart` or `continue`). A body paragraph's `table` indexes
+  it (its own table, nested or not). Every row fills its grid exactly: a document with one that
+  does not, or with a legacy horizontal merge (`hMerge`) in the body, is refused, since how Word
+  lays it out is not on record. Tables in notes, headers, footers and comments are not listed;
+  there `table` is the outermost table's cell.
 - A refusal has `"refusal": {"code": …, "detail": …}` in place of the text.
 - A tracked document has `"tracked": {"accepted": {…}, "original": {…}, "changes": […]}` in place
   of the text; each view has the shape above.
