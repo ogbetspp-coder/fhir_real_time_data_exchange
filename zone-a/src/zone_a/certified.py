@@ -120,10 +120,12 @@ def layout(data: bytes) -> tuple[str, ...]:
     any style, header or part, used or not; a part that does not parse is ``unreadable-part``),
     and for a page or column break with a drawn character right before and right after it in its
     paragraph, where Word draws the two on different pages or columns and the text, which leaves
-    the break out, runs them together ("10" and "5 mg" read "105 mg"). Conservative by design,
-    until the reader reports these itself.
+    the break out, runs them together ("10" and "5 mg" read "105 mg"), and for character scaling
+    (``w:w``, anywhere) in a package with a picture, which may stretch the picture. Conservative by
+    design, until the reader reports these itself.
     """
     found: set[str] = set()
+    pictures = scaled = False
     with zipfile.ZipFile(io.BytesIO(data)) as package:
         for name in package.namelist():
             if not (name.startswith("word/") and name.endswith(".xml")):
@@ -137,8 +139,16 @@ def layout(data: bytes) -> tuple[str, ...]:
                 local = element.tag.rsplit("}", 1)[-1]
                 if local in _LAYOUT:
                     found.add(_LAYOUT[local])
+                elif local in ("drawing", "pict"):
+                    pictures = True
+                elif local == "w" and any(
+                    k.endswith("}val") and v != "100" for k, v in element.attrib.items()
+                ):
+                    scaled = True
                 elif local == "p" and _break_between_words(element):
                     found.add("page-break")
+    if pictures and scaled:
+        found.add("character-scale")
     return tuple(sorted(found))
 
 

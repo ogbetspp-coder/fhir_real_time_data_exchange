@@ -48,8 +48,9 @@ else, with the code in parentheses:
   (``list-level``); no paragraph that draws a label and holds no text (``empty-numbered``);
 - tables: one level, with Word's grid on record, no grid columns left out at a row's ends, and
   every vertically merged cell under a cell of the same columns that starts or continues the
-  merge, with no text of its own (``table-grid``, ``table-shape``, ``nested-table``); a table
-  wholly inside one section (``table-across-sections``);
+  merge, with no text of its own (``table-grid``, ``table-shape``, ``nested-table``); no row of
+  exact height, whose text Word clips (``row-height``); a table wholly inside one section
+  (``table-across-sections``);
 - pictures: in line, PNG or JPEG, uncropped and with nothing the reader found against them, at
   most 1 MiB, drawn by Word at no more than their own size and in their own proportions within
   2%; a picture is an ``img`` of the ``data:`` URI of its exact bytes, and on the page U+FFFC, the
@@ -348,6 +349,8 @@ def _grid(table: int, members: Sequence[int], body: Body) -> tuple[int, list[lis
     for r, row in enumerate(grid["rows"]):
         if row["before"] or row["after"]:
             raise RefusedError("table-shape", first, "grid columns left out at a row's end")
+        if row.get("exactHeight"):
+            raise RefusedError("row-height", first, "a row of exact height: Word clips its text")
         here: list[list[Any]] = []
         still: dict[int, list[Any]] = {}
         for c, cell in enumerate(row["cells"]):

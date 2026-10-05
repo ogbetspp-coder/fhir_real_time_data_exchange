@@ -3,7 +3,9 @@
 Each carried section's narrative (``zone_a.word_epi``) is drawn by headless Chrome
 (``label_docx.browser``, the reader's own Chrome oracle) and compared with the section's
 paragraphs as the label reader read them, which is what Word draws (the reader's Word oracle):
-the text of each line, the marks of each character, and the list markers in order. A table's
+the text of each line, the marks of each character, the list markers in order, and each
+picture's size as Chrome decoded it against the size the reader read from its header (a picture
+Chrome cannot decode is drawn broken, and differs). A table's
 cells are lines like any other, in reading order (Chrome's tab between cells is a line's end);
 where a cell stands in the grid is the fidelity check's to prove, from the page.
 
@@ -104,6 +106,15 @@ def read_markers(paragraphs: Sequence[Paragraph]) -> list[str]:
     return [p.numbering.text + " " for p in paragraphs if p.numbering and p.numbering.text]
 
 
+def read_pictures(paragraphs: Sequence[Paragraph]) -> list[list[int]]:
+    """Each picture's size in pixels as the reader read its header, in order."""
+    return [
+        list(picture.pixels or (0, 0))
+        for paragraph in paragraphs
+        for picture in sorted(paragraph.pictures, key=lambda picture: picture.offset)
+    ]
+
+
 def check(body: Body, built: Mapping[str, Any], chrome: Path = browser.CHROME) -> dict[str, Any]:
     """Each carried section with a narrative: whether Chrome draws it as read, or where not.
 
@@ -128,6 +139,8 @@ def check(body: Body, built: Mapping[str, Any], chrome: Path = browser.CHROME) -
                 where = browser.first_difference(theirs, mine)
             elif read_markers(paragraphs) != drawn_markers:
                 where = "list markers differ"
+            elif read_pictures(paragraphs) != [list(size) for size in drawn.get("pictures", [])]:
+                where = "a picture Chrome did not decode to the size the reader read"
         verdicts.append({"key": section["key"], "agrees": where is None, "where": where})
     return {
         "checker": DRAWING_VERSION,

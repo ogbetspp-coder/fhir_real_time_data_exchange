@@ -10,10 +10,11 @@ Word. Pictures and rules (``img``, ``hr``) are left out of the HTML, since Word 
 fields and drawings the reader refuses. Word's version is recorded in the folder's README by
 hand.
 
-``record``: each fixture is built (zone_a.word_epi, with the assignments in ``ASSIGNED``) and its
-narratives drawn by Chrome; what Chrome showed and drew is written to ``chrome.json``, which
-tests/test_word_epi.py replays where Chrome is not installed. A change to the builder's output
-changes the narratives, and the replay then refuses until this is run again.
+``record``: each fixture, and the QRD template (for its picture), is built (zone_a.word_epi, with
+the assignments in ``ASSIGNED``) and its narratives drawn by Chrome; what Chrome showed and drew
+is written to ``chrome.json``, which tests/test_word_epi.py replays where Chrome is not
+installed. A change to the builder's output changes the narratives, and the replay then refuses
+until this is run again.
 """
 
 from __future__ import annotations
@@ -42,8 +43,12 @@ FIXTURES = ROOT / "zone-a" / "tests" / "fixtures" / "word-smpc"
 REGISTRY = ROOT / "qrd" / "registry" / "cap-smpc-en-10.4.json"
 MAPPING = ROOT / "fhir" / "mappings" / "cap-smpc-en.json"
 CONTAINER = Path.home() / "Library/Containers/com.microsoft.Word/Data"
-# Headings a person confirms: Brukinsa words 6.5 and 6.6 otherwise than the template.
-ASSIGNED: dict[str, dict[str, int]] = {"brukinsa-smpc-en": {"smpc.6.5": 1091, "smpc.6.6": 1093}}
+TEMPLATE = ROOT / "qrd" / "sources" / "qrd-product-information-template-version-104_en.docx"
+# Headings a person confirms: Brukinsa and the QRD template word 6.5 and 6.6 otherwise.
+ASSIGNED: dict[str, dict[str, int]] = {
+    "brukinsa-smpc-en": {"smpc.6.5": 1091, "smpc.6.6": 1093},
+    TEMPLATE.stem: {"smpc.6.5": 192, "smpc.6.6": 196},
+}
 
 SAVE_AS = """
 on run argv
@@ -128,7 +133,8 @@ def record() -> None:
     if chrome is None:
         raise SystemExit("Chrome is not installed")
     out: dict[str, Any] = {"application": browser.chrome_version(chrome), "documents": {}}
-    for path in sorted(FIXTURES.glob("*.docx")):
+    # The fixtures, and the QRD template for its picture (the black triangle).
+    for path in [*sorted(FIXTURES.glob("*.docx")), TEMPLATE]:
         divs = narratives(path)
         out["documents"][path.stem] = {
             "narratives": digest(divs),

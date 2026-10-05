@@ -839,3 +839,49 @@ def test_a_word_part_that_does_not_parse_refuses_the_document() -> None:
         target.writestr("word/unused.xml", b"<not closed")
         target.writestr("customXml/item9.xml", b"<also not closed")
     assert certified.layout(out.getvalue()) == ("unreadable-part",)
+
+
+def test_chrome_decodes_each_picture_to_the_size_the_reader_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    name = word_fixtures.TEMPLATE.stem
+    body = read_body(word_fixtures.TEMPLATE.read_bytes())
+    built = sections(
+        body, structure(body.paragraphs, REGISTRY, MAPPING, word_fixtures.ASSIGNED[name]), REGISTRY
+    )
+    _replay(monkeypatch, name, built)
+    assert all(v["agrees"] for v in drawing.check(body, built)["sections"])
+    # Drawn broken (not decoded), or decoded to another size: the section differs.
+    recorded = RECORDED["documents"][name]
+    for size in ([0, 0], [41, 48]):
+        shown = [dict(s, pictures=[size] if s["pictures"] else []) for s in recorded["shown"]]
+        monkeypatch.setattr(browser, "browser_sections", lambda _divs, _chrome, shown=shown: shown)
+        verdicts = {v["key"]: v for v in drawing.check(body, built)["sections"]}
+        assert not verdicts["smpc"]["agrees"]
+        assert "picture" in verdicts["smpc"]["where"]
+
+
+def test_a_row_of_exact_height_is_refused() -> None:
+    table = _grid(1, [(0, 1, None)])
+    table["grid"]["rows"][0]["exactHeight"] = True
+    with pytest.raises(RefusedError) as refused:
+        _build(_p("x", table=(0, 0, 0)), tables=(table,))
+    assert refused.value.code == "row-height"
+
+
+def test_character_scaling_with_a_picture_refuses_the_document() -> None:
+    def package(document: str) -> bytes:
+        out = io.BytesIO()
+        with zipfile.ZipFile(out, "w") as target:
+            target.writestr(
+                "word/document.xml",
+                f'<w:document xmlns:w="{W}"><w:body>{document}</w:body></w:document>',
+            )
+        return out.getvalue()
+
+    picture = "<w:p><w:r><w:drawing/></w:r></w:p>"
+    scaled = '<w:p><w:r><w:rPr><w:w w:val="150"/></w:rPr><w:t>x</w:t></w:r></w:p>'
+    unscaled = '<w:p><w:r><w:rPr><w:w w:val="100"/></w:rPr><w:t>x</w:t></w:r></w:p>'
+    assert certified.layout(package(picture + scaled)) == ("character-scale",)
+    assert certified.layout(package(picture + unscaled)) == ()
+    assert certified.layout(package(scaled)) == ()
