@@ -129,7 +129,7 @@ def test_a_paragraph_mark_joins_past_a_table_and_a_section_end() -> None:
     body = p(t("a"), mark("del")) + nested + p(t("out")) + "</w:tc></w:tr></w:tbl>" + p(t("z"))
     accepted, original, _ = tracked(docx(body))
     assert [(x.text, x.table) for x in read_document(accepted).body] == [
-        ("ain", (0, 0, 0)),
+        ("ain", (1, 0, 0)),
         ("out", (0, 0, 0)),
         ("z", None),
     ]
@@ -283,7 +283,7 @@ def test_the_check_holds_each_view_to_the_source_on_its_own() -> None:
     source = docx(p(t("a"), mark("ins")) + p(t("b") + dele("c") + ins(t("d"))))
     accepted, original, _ = tracked(source)
     assert certify_tracked(source, {"accepted": accepted, "original": original}) == {
-        "checker": "conservation-check/1.14.0",
+        "checker": "conservation-check/1.15.0",
         "accepted": {"characters": 3, "elements": 0, "paragraphsJoined": 0},
         "original": {"characters": 3, "elements": 0, "paragraphsJoined": 1},
     }
@@ -400,7 +400,7 @@ def test_the_check_counts_what_each_view_holds_and_only_the_revised_parts() -> N
     source = _with_part(docx(body, footnotes=note), "word/media/image1.png", b"\x89PNG\r\n")
     accepted, original, _ = tracked(source)
     assert certify_tracked(source, {"accepted": accepted, "original": original}) == {
-        "checker": "conservation-check/1.14.0",
+        "checker": "conservation-check/1.15.0",
         "accepted": {"characters": 5, "elements": 2, "paragraphsJoined": 0},
         "original": {"characters": 4, "elements": 1, "paragraphsJoined": 0},
     }
@@ -555,12 +555,13 @@ def test_a_join_into_a_row_the_view_drops_is_refused() -> None:
 
 
 def test_the_check_holds_nested_tables_to_their_outermost_cell() -> None:
+    # The views' own walk places a paragraph in its outermost cell; the reader, in its own.
     inner = f"<w:tbl>{_row('in1')}{_row('in2', 'del')}</w:tbl>"
     body = f"<w:tbl><w:tr><w:tc>{inner}{p(t('out'))}</w:tc></w:tr>{_row('second')}</w:tbl>"
     source = docx(body + p(t("z")))
     accepted, original, _ = tracked(source)
     assert [(x.text, x.table) for x in read_document(accepted).body] == [
-        ("in1", (0, 0, 0)),
+        ("in1", (1, 0, 0)),
         ("out", (0, 0, 0)),
         ("second", (0, 1, 0)),
         ("z", None),

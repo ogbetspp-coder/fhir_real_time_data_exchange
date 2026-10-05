@@ -149,13 +149,15 @@ function render(paragraph) {
   return node;
 }
 
-// Paragraphs in order, with table cells gathered into tables.
-function body(paragraphs) {
+// Paragraphs in order, with table cells gathered into tables; a nested table's paragraphs shown
+// in the outermost table's cell (a .docx body's ``tables`` names the cell each nested one is in).
+function body(paragraphs, tables = []) {
   const wrap = el("div", { class: "doc" });
   let table = null, key = null;
   for (const paragraph of paragraphs) {
     if (!paragraph.table) { table = null; wrap.append(render(paragraph)); continue; }
-    const [t, row, cell] = paragraph.table;
+    let [t, row, cell] = paragraph.table;
+    while (tables[t] && tables[t].parent) [t, row, cell] = tables[t].parent;
     if (!table || key !== t) { table = el("table"); key = t; wrap.append(table); }
     while (table.rows.length <= row) table.insertRow();
     const tr = table.rows[row];
@@ -217,7 +219,7 @@ function section(item) {
 // A .docx reading: body, headers, footers, comments, footnotes and endnotes.
 function docxParts(result) {
   const doc = el("div", {});
-  doc.append(body(result.paragraphs));
+  doc.append(body(result.paragraphs, result.tables));
   for (const [kind, parts] of [["Headers", result.headers || []], ["Footers", result.footers || []]]) {
     const shown = parts.filter(part => part.refusal || part.paragraphs.some(x => x.text || x.pages.length));
     if (!shown.length) continue;

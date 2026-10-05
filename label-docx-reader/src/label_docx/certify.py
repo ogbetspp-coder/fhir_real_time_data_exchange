@@ -54,13 +54,17 @@ formatting the original view takes from a change is held to Word (``corpus/track
 
 Beyond the text, the check works out on its own, by Word's rules written apart from the
 reader's, the key marks (``CHECKED_MARKS``), every list label and every note mark; the result's
-must be the check's. An ePI's other marks are held to Chrome (``tests/test_browser_oracle.py``);
-a .docx's (highlight, shading, faint, raised text, right-to-left) to nothing but the reader's
-tests. A table style's conditional parts it applies on its own (``_Applied``), as Word's
-answers have them (corpus/numbering-cases, table-style-*). Where Word's key marks are not on
-record the check refuses on its own, as the reader does: a table style's part over text where
-Word was not asked how it applies, or setting a checked mark other than bold, italic, capitals
-and strike, or a font that changes what the text is drawn in;
+must be the check's. So must each body table's grid (``_grid``): its columns, each row's cells
+laid on them by ``gridBefore`` and ``gridSpan``, filling them exactly with ``gridAfter``, and each
+cell's vertical merge as stored; or, where Word's is not on record, no grid and the same reason
+for it. An ePI's other marks are
+held to Chrome (``tests/test_browser_oracle.py``); a .docx's (highlight, shading, faint, raised
+text, right-to-left) to nothing but the reader's tests. A table style's conditional parts it
+applies on its own (``_Applied``), as Word's answers have them (corpus/numbering-cases,
+table-style-*). Where Word's key marks are not on record the check refuses on its own, as the
+reader does: a table style's part over text where Word was not asked how it applies, or setting
+a checked mark other than bold, italic, capitals and strike, or a font that changes what the
+text is drawn in;
 complex script (right-to-left, ``cs``, ``bdo``/``dir``, or Hebrew, Arabic, Indic... text) whose
 ``b`` and ``bCs``, or ``i`` and ``iCs``, differ; text hidden by some level and shown by Word's
 toggle rule; and anything in a cell merged into the one above. It shares no code with the
@@ -85,7 +89,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT, WINGDINGS_BULLETS
 
-CHECKER_VERSION = "conservation-check/1.14.0"
+CHECKER_VERSION = "conservation-check/1.15.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -607,6 +611,9 @@ class _Story:
         self.fields: list[list[Any]] = []
         self.layout = 0
         self.tables = 0
+        # Every table met, in document order: its element, the cell it stands in, its rows and
+        # each row's cells (``_grid`` reads the body's from them).
+        self.met: list[tuple[ET.Element, Any, list[ET.Element], list[list[ET.Element]]]] = []
         self.section = 0
         # How deep in bdo and dir elements the walk is, and whether the current run's two
         # emphasis settings (b and bCs, i and iCs) differ where it is drawn as complex script.
@@ -638,6 +645,7 @@ class _Story:
         own = None if style is None else style.get(_w("val"))
         rows = _owned(element, _w("tr"))
         cells = [_owned(row, _w("tc")) for row in rows]
+        self.met.append((element, outer, rows, cells))
         applied = _Applied(
             self.fonts,
             self.fonts.style_ids(own, "table"),
@@ -651,7 +659,9 @@ class _Story:
                 before = len(self.paragraphs)
                 rprs, problem = applied.at(row_index, cell_index)
                 outside, self.conditional = self.conditional, () if problem else rprs
-                self.blocks(cell, outer or (index, row_index, cell_index), own)
+                here = (index, row_index, cell_index)
+                # A body paragraph is in its own table's cell; any other, in the outermost one's.
+                self.blocks(cell, here if self.story is None else outer or here, own)
                 self.conditional = outside
                 if problem and any(
                     any(s.text for s in p.segments)
@@ -1212,6 +1222,74 @@ def _owned(element: ET.Element, wanted: str) -> list[ET.Element]:
     return out
 
 
+class _NoGridError(Exception):
+    """Why a table's grid is not on record, as the result must name it."""
+
+
+def _grid(
+    table: ET.Element, parent: Any, rows: list[ET.Element], cells: list[list[ET.Element]]
+) -> dict[str, Json]:
+    """A body table as this check reads it from the source, by its own rules.
+
+    Its grid: its ``tblGrid``'s ``gridCol`` elements, and each row's cells laid side by side from
+    the column after the ``gridBefore`` it leaves out, each over its ``gridSpan`` (one when
+    absent), covering the columns exactly with ``gridAfter``. Else no grid, and the first reason,
+    in this order: no ``tblGrid`` or two; then row by row a ``gridBefore`` or ``gridAfter`` that
+    is not digits; cell by cell a horizontal merge, a vertical merge that is neither ``restart``
+    nor ``continue`` (as an empty one is), a ``gridSpan`` that is not digits or is 0; and the row
+    not covering the columns.
+    """
+    try:
+        grid: Json = _grid_laid(table, rows, cells)
+        reason = None
+    except _NoGridError as why:
+        grid, reason = None, str(why)
+    return {"grid": grid, "parent": None if parent is None else list(parent), "reason": reason}
+
+
+def _grid_laid(table: ET.Element, rows: list[ET.Element], cells: list[list[ET.Element]]) -> Json:
+    grids = [child for child in table if child.tag == _w("tblGrid")]
+    if not grids:
+        raise _NoGridError("no-grid")
+    if len(grids) > 1:
+        raise _NoGridError("two-grids")
+    width = sum(1 for child in grids[0] if child.tag == _w("gridCol"))
+    out_rows: list[Json] = []
+    for row, row_cells in zip(rows, cells, strict=True):
+        skipped = _grid_number(row.find(_w("trPr")), "gridBefore", 0)
+        left = _grid_number(row.find(_w("trPr")), "gridAfter", 0)
+        at = skipped
+        laid: list[Json] = []
+        for cell in row_cells:
+            props = cell.find(_w("tcPr"))
+            if props is not None and props.find(_w("hMerge")) is not None:
+                raise _NoGridError("h-merge")
+            down = None if props is None else props.find(_w("vMerge"))
+            merge = None if down is None else down.get(_w("val"), "continue")
+            if merge not in (None, "restart", "continue"):
+                raise _NoGridError("bad-merge")
+            span = _grid_number(props, "gridSpan", 1)
+            if not span:
+                raise _NoGridError("bad-span")
+            laid.append({"column": at, "merge": merge, "span": span})
+            at += span
+        if at + left != width:
+            raise _NoGridError("row-off-grid")
+        out_rows.append({"after": left, "before": skipped, "cells": laid})
+    return {"columns": width, "rows": out_rows}
+
+
+def _grid_number(holder: ET.Element | None, name: str, absent: int) -> int:
+    """``holder``'s ``name`` child's value, digits only, or ``absent`` without one."""
+    element = None if holder is None else holder.find(_w(name))
+    if element is None:
+        return absent
+    raw = element.get(_w("val"), "")
+    if not re.fullmatch(r"[0-9]{1,9}", raw):
+        raise _NoGridError("bad-number")
+    return int(raw)
+
+
 def _inert(element: ET.Element) -> bool:
     """Whether the walk passes over ``element``: one of ``_INERT``, holding no text."""
     if element.tag not in _INERT:
@@ -1427,6 +1505,10 @@ class _Part:
     paragraphs: list[_Paragraph]
     ledger: _Ledger
     error: str | None = None
+    # The tables the walk met, as ``_Story.met`` keeps them.
+    tables: list[tuple[ET.Element, Any, list[ET.Element], list[list[ET.Element]]]] = field(
+        default_factory=list
+    )
 
 
 def _total(ledgers: list[_Ledger]) -> _Ledger:
@@ -2103,7 +2185,7 @@ class DocxSource:
         if story is not None:
             for paragraph in walk.paragraphs:
                 paragraph.numbering = self._label(paragraph, story)
-        return _Part(walk.paragraphs, ledger)
+        return _Part(walk.paragraphs, ledger, tables=walk.met)
 
     def _optional(self, element: ET.Element, story: tuple[str, int]) -> _Part:
         """A part the reader may refuse on its own: what the check cannot read is kept as such.
@@ -2122,6 +2204,14 @@ class DocxSource:
         refused: list[str] = []
         not_read = dict(self.not_read)
         _paragraphs(self.body, value["paragraphs"], "paragraph")
+        grids = [_grid(*met) for met in self.body.tables]
+        if len(value["tables"]) != len(grids):
+            raise CertificationError(
+                f"{len(value['tables'])} tables, where the body has {len(grids)}"
+            )
+        for index, (theirs, mine) in enumerate(zip(value["tables"], grids, strict=True)):
+            if theirs != mine:
+                raise CertificationError(f"table {index + 1}: not the grid the document stores")
         marked = [
             (n["kind"], n["id"], n["mark"]) for p in _every_paragraph(value) for n in p["notes"]
         ]

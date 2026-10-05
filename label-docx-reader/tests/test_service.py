@@ -21,6 +21,7 @@ from label_docx import documents, epi_output, output
 from label_docx.cli import service_main
 from label_docx.output import canonical, read
 from label_docx.service import (
+    ERRORS,
     Service,
     _hosts,
     _QuietHandler,
@@ -244,7 +245,7 @@ def test_any_failure_is_answered_in_json_and_its_detail_logged(
     monkeypatch.setattr(store, "ingest", fails)
     status, headers, body = _call(Service(store), "POST", "/v1/documents", TEMPLATE)
     assert (status, headers["Content-Type"]) == ("500 Internal Server Error", "application/json")
-    assert json.loads(body) == {"error": "internal error"}
+    assert json.loads(body) == {"code": "internal", "error": "internal error"}
     assert "a fault at /private/path" in capsys.readouterr().err
 
 
@@ -544,7 +545,8 @@ def test_a_verdict_of_another_verifier_is_not_reused_nor_served_as_agreement(
     service = Service(store, require=frozenset({"docx"}))
     path = f"/v1/documents/{document.document}"
     # Agreement from the verifier as it was is not agreement from the verifier as it is.
-    assert _call(service, "GET", path)[0] == "409 Conflict"
+    stale = _call(service, "GET", path)
+    assert (stale[0], json.loads(stale[2])["code"]) == ("409 Conflict", "not-yet-verified")
     store.ingest(TEMPLATE)
     assert len(asked) == 2
     assert _call(service, "GET", path)[0] == "200 OK"
@@ -589,5 +591,43 @@ def test_two_answers_at_once_are_both_kept_and_a_difference_is_never_served(
     assert len(store.verifications(document)) == 2
     assert store.disagreement(document) is not None
     service = Service(store, require=frozenset({"docx"}))
-    assert _call(service, "GET", f"/v1/documents/{document}")[0] == "409 Conflict"
+    differs = _call(service, "GET", f"/v1/documents/{document}")
+    assert (differs[0], json.loads(differs[2])["code"]) == ("409 Conflict", "shown-otherwise")
     store.verify(document)
+
+
+def test_every_error_names_a_code_a_program_can_use(tmp_path: Path) -> None:
+    service = Service(Store(tmp_path), hosts=frozenset({"127.0.0.1:8080"}))
+    here = "127.0.0.1:8080"
+    missing = "0" * 64
+    answers = {
+        "wrong-host": _call(service, "GET", "/v1/health", host="evil.test:8080"),
+        "wrong-origin": _call(
+            service, "POST", "/v1/documents", TEMPLATE, origin="http://evil.test", host=here
+        ),
+        "wrong-method": _call(service, "DELETE", "/v1/health", host=here),
+        "no-such-path": _call(service, "GET", "/v2/anything", host=here),
+        "no-such-document": _call(service, "GET", f"/v1/documents/{missing}", host=here),
+        "length-required": _call(service, "POST", "/v1/documents", TEMPLATE, length="x", host=here),
+        "too-large": _call(service, "POST", "/v1/documents", b"x", length=str(2**30), host=here),
+        "empty": _call(service, "POST", "/v1/documents", b"", host=here),
+        "cut-short": _call(service, "POST", "/v1/documents", b"x", length="10", host=here),
+    }
+    for code, (status, headers, body) in answers.items():
+        value = json.loads(body)
+        assert (status[0], headers["Content-Type"], value["code"]) == (
+            "4",
+            "application/json",
+            code,
+        )
+        assert sorted(value) == ["code", "error"]
+    assert set(answers) <= ERRORS
+
+
+def test_a_result_says_its_outcome_as_its_receipt_does(tmp_path: Path) -> None:
+    store = Store(tmp_path)
+    service = Service(store)
+    for data in (TEMPLATE, REFUSED, EPI):
+        receipt = json.loads(store.ingest(data).receipt)
+        status, headers, _ = _call(service, "GET", f"/v1/documents/{receipt['document']}")
+        assert (status, headers["Outcome"]) == ("200 OK", receipt["outcome"])

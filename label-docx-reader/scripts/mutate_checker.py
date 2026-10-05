@@ -169,6 +169,19 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
     ("_Story.token", _SYMBOL_RANGE, "compare:1", 0): _TABLE_EDGE,
     ("_Story.token", _SYMBOL_RANGE, "int:61440", 1): _TABLE_EDGE,
     ("_Story.token", _SYMBOL_RANGE, "int:61695", 0): _TABLE_EDGE,
+    # A table's grid: its cells are collected row for row, so the two lists are as long.
+    (
+        "_grid_laid",
+        "for row, row_cells in zip(rows, cells, strict=True):",
+        "bool",
+        0,
+    ): "cells is made one list per row of rows, so zip(strict=True) never raises",
+    (
+        "DocxSource.certify",
+        'for index, (theirs, mine) in enumerate(zip(value["tables"], grids, strict=True)):',
+        "bool",
+        0,
+    ): _STRICT,
     # The last variation selector, U+E01EF: one past it, U+E01F0, is unassigned (Cn), which the
     # check refuses as such, so a range that ends one later refuses nothing more.
     ("<module>", "(0xE0100, 0xE01EF),", "int:917999", 0): (
