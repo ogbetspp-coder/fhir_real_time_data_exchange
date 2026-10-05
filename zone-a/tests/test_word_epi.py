@@ -7,13 +7,17 @@ whatever is not refused, the fidelity scanner reads the narrative as the page.
 
 from __future__ import annotations
 
+import base64
 import dataclasses
+import hashlib
 import importlib.util
 import io
 import json
 import random
+import struct
 import xml.etree.ElementTree as ET
 import zipfile
+import zlib
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
@@ -21,7 +25,7 @@ from typing import Any
 
 import pytest
 from label_docx import browser
-from label_docx.reader import CommentReference, Mark, Numbering, Paragraph
+from label_docx.reader import CommentReference, Mark, Numbering, Paragraph, Picture
 
 from zone_a import certified, drawing, word_epi
 from zone_a.certified import Body, read_body
@@ -79,10 +83,13 @@ def _grid(
 
 
 def _build(
-    *paragraphs: Paragraph, tables: tuple[dict[str, Any], ...] = (), key: str = "smpc.4.1"
+    *paragraphs: Paragraph,
+    tables: tuple[dict[str, Any], ...] = (),
+    key: str = "smpc.4.1",
+    images: dict[str, bytes] | None = None,
 ) -> tuple[str, str]:
     """The narrative and page of a section holding ``paragraphs``; refusals raise."""
-    body = Body(tuple(paragraphs), tables, 0)
+    body = Body(tuple(paragraphs), tables, 0, images=images or {})
     div, text = _section(key, range(len(paragraphs)), body, GREYS)
     return div or "", text
 
@@ -329,8 +336,9 @@ def test_the_qrd_template_carries_what_its_markup_allows() -> None:
     structured = structure(body.paragraphs, REGISTRY, MAPPING, {"smpc.6.5": 192, "smpc.6.6": 196})
     built = sections(body, structured, REGISTRY)
     codes = Counter((s["refusal"] or {}).get("code", "carried") for s in built["sections"])
-    # The template's guidance in angle brackets, its tabs, its "*" and its triangle picture.
-    assert codes == {"carried": 24, "underline": 3, "tab": 2, "formatting": 2, "picture": 1}
+    # The template's guidance in angle brackets, its tabs and its "*"; its black triangle, drawn
+    # 0.9% out of its own proportions, is carried.
+    assert codes == {"carried": 25, "underline": 3, "tab": 2, "formatting": 2}
 
 
 # ---- the two outputs, held to each other ---------------------------------------------------------
@@ -717,3 +725,102 @@ def test_the_page_reads_the_grid_apart_from_the_builder(monkeypatch: pytest.Monk
     with pytest.raises(RefusedError) as refused:
         _build(*paragraphs, tables=tables)
     assert refused.value.code in ("narrative", "page-differs")
+
+
+# ---- pictures -----------------------------------------------------------------------------------
+
+
+def _png(width: int, height: int) -> bytes:
+    """A real PNG of ``width`` x ``height`` grey pixels."""
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        body = kind + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body))
+
+    rows = b"".join(b"\x00" + b"\x80" * width for _ in range(height))
+    header = struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", header)
+        + chunk(b"IDAT", zlib.compress(rows))
+        + chunk(b"IEND", b"")
+    )
+
+
+def _pictured(
+    image: bytes,
+    extent: tuple[int, int],
+    pixels: tuple[int, int] = (4, 2),
+    reason: str | None = None,
+) -> tuple[Paragraph, dict[str, bytes]]:
+    sha = hashlib.sha256(image).hexdigest()
+    picture = Picture(
+        5, "picture", "word/media/image1.png", sha, "png", pixels, extent, None, reason
+    )
+    return Paragraph("Take \ufffc daily", None, None, None, pictures=(picture,)), {sha: image}
+
+
+def test_a_picture_is_carried_as_its_exact_bytes() -> None:
+    image = _png(4, 2)
+    paragraph, images = _pictured(image, (4 * 9525, 2 * 9525))
+    div, text = _build(paragraph, images=images)
+    source = "data:image/png;base64," + base64.b64encode(image).decode("ascii")
+    assert _inner(div) == f'<p>Take <img src="{source}"/> daily</p>'
+    token = hashlib.sha256(source.encode("utf-8")).hexdigest()
+    assert text == f"\nTake \ufffc{token}\ufffc daily\n"
+    # Smaller than its own size, and 1.9% out of proportion: still carried.
+    _build(_pictured(image, (2 * 9525, 9525))[0], images=images)
+    _build(_pictured(image, (38100, 18700))[0], images=images)
+
+
+@pytest.mark.parametrize(
+    ("extent", "reason", "detail"),
+    [
+        ((5 * 9525, 2 * 9525), None, "larger"),
+        ((4 * 9525, 3 * 9525), None, "larger"),
+        ((38100, 18600), None, "proportion"),
+        ((4 * 9525, 2 * 9525), "cropped", "cropped"),
+        ((4 * 9525, 2 * 9525), "effects", "effects"),
+    ],
+)
+def test_a_picture_drawn_otherwise_is_refused(
+    extent: tuple[int, int], reason: str | None, detail: str
+) -> None:
+    paragraph, images = _pictured(_png(4, 2), extent, reason=reason)
+    with pytest.raises(RefusedError) as refused:
+        _build(paragraph, images=images)
+    assert refused.value.code == "picture"
+    assert detail in refused.value.detail
+
+
+def test_a_picture_without_its_bytes_or_over_a_mebibyte_is_refused() -> None:
+    paragraph, _ = _pictured(_png(4, 2), (4 * 9525, 2 * 9525))
+    with pytest.raises(RefusedError):
+        _build(paragraph, images={})
+    big = _png(4, 2) + b"\x00" * (1 << 20)
+    paragraph, images = _pictured(big, (4 * 9525, 2 * 9525))
+    with pytest.raises(RefusedError) as refused:
+        _build(paragraph, images=images)
+    assert "1 MiB" in refused.value.detail
+    with pytest.raises(RefusedError):
+        _build(_p("Take \ufffc daily"))  # a U+FFFC the reader says nothing of
+
+
+def test_a_heading_with_a_picture_is_refused() -> None:
+    heading, images = _pictured(_png(4, 2), (4 * 9525, 2 * 9525))
+    heading = dataclasses.replace(
+        heading, text="4.1 \ufffcY", pictures=(dataclasses.replace(heading.pictures[0], offset=4),)
+    )
+    body = Body((heading, _p("text"), _p("4.2 Z")), (), 0, images=images)
+    built = sections(body, _structured({"smpc.4.1": 0, "smpc.4.2": 2}), REGISTRY)
+    assert built["sections"][0]["refusal"]["code"] == "picture"
+
+
+def test_the_templates_black_triangle_is_carried() -> None:
+    body = read_body(TEMPLATE.read_bytes())
+    structured = structure(body.paragraphs, REGISTRY, MAPPING, {"smpc.6.5": 192, "smpc.6.6": 196})
+    root = sections(body, structured, REGISTRY)["sections"][0]
+    assert root["key"] == "smpc"
+    assert root["refusal"] is None
+    assert root["narrative"].count("<img ") == 1
+    assert root["page"].count("\ufffc") == 2

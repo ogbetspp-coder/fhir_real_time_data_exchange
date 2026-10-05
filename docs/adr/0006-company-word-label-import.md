@@ -183,8 +183,10 @@ The record does not admit this today, for reasons this ADR has to answer rather 
   section on the first thing they do not list; it checks that the fidelity scanner reads the
   narrative as the page. `zone_a.drawing` (`word-drawing/1.0.0`) is decision 1's drawing check:
   Chrome draws each narrative, compared line by line and mark by mark with the read, which is what
-  Word draws, and a section it draws otherwise, or does not draw, is refused. Until the reader
-  reports pictures (P1), a section with a picture is refused. A document is refused whole where
+  Word draws, and a section it draws otherwise, or does not draw, is refused. A picture the reader
+  vouches for is carried as the `data:` URI of its exact bytes where Word draws it at no more than
+  its own size and in its own proportions within 2% (the EMA templates' black triangle is drawn
+  0.9% to 1.4% out of them); any other picture refuses its section. A document is refused whole where
   Word draws what the read does not yet say: a floating picture or shape (the certificate's
   count), and, by a conservative scan of the package until the reader reports them, a floating
   table, a frame, a right-to-left table or a page break between two words. On five SmPCs Word
@@ -193,5 +195,8 @@ The record does not admit this today, for reasons this ADR has to answer rather 
   fixtures' README says why not; the 13 refused are shading the narrative cannot carry and
   underlines over "+" or "≥". An independent review found ten holes, each fixed and tested
   (`zone-a/tests/test_word_epi.py`, "the independent review's cases").
-- **Still to do:** in the reader (P1), pictures carried and floating tables, frames,
-  right-to-left tables and page breaks reported in place of the scan; P2, P4 and P5.
+- **P1, pictures** (2026-10-05): each U+FFFC the reader writes says what it stands for (part,
+  SHA-256, type by signature, pixels, extent, crop, and a reason from a closed list where it cannot
+  be carried), certified; Word's own saves agree on every DrawingML picture of the corpus.
+- **Still to do:** in the reader (P1), floating tables, frames, right-to-left tables and page
+  breaks reported in place of the scan; P2, P4 and P5.

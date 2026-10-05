@@ -50,8 +50,12 @@ else, with the code in parentheses:
   every vertically merged cell under a cell of the same columns that starts or continues the
   merge, with no text of its own (``table-grid``, ``table-shape``, ``nested-table``); a table
   wholly inside one section (``table-across-sections``);
+- pictures: in line, PNG or JPEG, uncropped and with nothing the reader found against them, at
+  most 1 MiB, drawn by Word at no more than their own size and in their own proportions within
+  2%; a picture is an ``img`` of the ``data:`` URI of its exact bytes, and on the page U+FFFC, the
+  SHA-256 of that URI, and U+FFFC (``picture``);
 - text: no soft hyphen (``soft-hyphen``), tab (``tab``: Word draws it as a jump to a tab stop),
-  picture (``picture``: not yet carried), line or paragraph separator (``line-separator``), or
+  line or paragraph separator (``line-separator``), or
   line that starts with a bullet glyph after a line break (``bullet-after-break``: section 3 step
   4 would read it as a list bullet);
 - no comment (``comment``) and no hidden paragraph mark (``hidden-mark``, the paragraph runs on
@@ -70,15 +74,18 @@ two words).
 
 from __future__ import annotations
 
+import base64
+import binascii
 import dataclasses
 import functools
+import hashlib
 import itertools
 import unicodedata
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
-from label_docx.reader import Mark, Paragraph
+from label_docx.reader import Mark, Paragraph, Picture
 
 from zone_a.certified import Body
 from zone_a.fidelity.normalize import NormalizationError, normalize_text
@@ -151,7 +158,7 @@ _INLINE_WHITESPACE: Final = "".join(sorted(WHITESPACE - {"\n"}))
 _SUFFIXES: Final = frozenset({"tab", "space"})
 
 
-def _check(index: int, paragraph: Paragraph) -> None:
+def _check(index: int, paragraph: Paragraph, images: Mapping[str, bytes] | None = None) -> None:
     """The refusals of the module docstring that do not depend on marks.
 
     A paragraph drawn as nothing may hold a tab; its marks are judged as any others are.
@@ -166,7 +173,7 @@ def _check(index: int, paragraph: Paragraph) -> None:
     if "\t" in text:
         raise RefusedError("tab", index, "a tab")
     if "\ufffc" in text:
-        raise RefusedError("picture", index, "a picture")
+        _pictures(index, paragraph, images)
     if "\u2028" in text or "\u2029" in text:
         # What Word draws for a line or paragraph separator is not on record.
         raise RefusedError("line-separator", index, "U+2028 or U+2029")
@@ -178,6 +185,50 @@ def _check(index: int, paragraph: Paragraph) -> None:
     if _label(paragraph) and paragraph.numbering and paragraph.numbering.suffix not in _SUFFIXES:
         # "1." with nothing after it runs into "5 mg": Word draws "1.5 mg".
         raise RefusedError("list-label", index, f"a label followed by {paragraph.numbering.suffix}")
+
+
+# A picture's largest bytes: section 5's bound on a ``src`` (1 398 104 base64 code points).
+PICTURE_BYTES: Final = 1 << 20
+# EMU in a pixel at 96 dots an inch: what Word's extent is for a picture at its own size.
+EMU_PER_PIXEL: Final = 9525
+
+
+def _pictures(index: int, paragraph: Paragraph, images: Mapping[str, bytes] | None) -> None:
+    """Each picture carried as its exact bytes, or the section refused (``picture``).
+
+    Carried: a picture the reader found nothing against (``reason`` null: in line, PNG or JPEG,
+    uncropped, unrotated, no effects), whose bytes Body holds, at most 1 MiB, that Word draws at no
+    more than its own size (96 dots an inch) and in its own proportions within 2%: its width and
+    its height scaled by factors at most 2% apart (the EMA templates' black triangle is drawn 0.9%
+    to 1.4% out of its own proportions; a browser draws it in them). Not where there is no picture
+    to carry (a heading's).
+    """
+    found = {picture.offset: picture for picture in paragraph.pictures}
+    for at, character in enumerate(paragraph.text):
+        if character != "\ufffc":
+            continue
+        picture = found.get(at)
+        if images is None or picture is None or picture.reason is not None:
+            reason = "here" if picture is None or images is None else picture.reason
+            raise RefusedError("picture", index, f"a picture not carried: {reason}")
+        if (
+            picture.sha256 is None
+            or picture.sha256 not in images
+            or picture.pixels is None
+            or picture.extent is None
+        ):
+            raise RefusedError("picture", index, "a picture without its bytes or its size")
+        if len(images[picture.sha256]) > PICTURE_BYTES:
+            raise RefusedError("picture", index, "a picture over 1 MiB")
+        (width, height), (cx, cy) = picture.pixels, picture.extent
+        # The two scale factors, cx / (width * EMU) and cy / (height * EMU), in whole numbers.
+        across, down = cx * height, cy * width
+        if (
+            cx > width * EMU_PER_PIXEL
+            or cy > height * EMU_PER_PIXEL
+            or 50 * abs(across - down) > max(across, down)
+        ):
+            raise RefusedError("picture", index, "a picture drawn larger or out of proportion")
 
 
 _HYPHENS: Final = frozenset("-\u2010\u2011")
@@ -327,15 +378,30 @@ def _escape(text: str) -> str:
 _NESTING: Final = ("bold", "italic", "superscript", "subscript")  # sup and sub hold no element
 
 
-def _inline(text: str, marks: Sequence[Mark]) -> str:
-    """The text as XHTML: each run of one set of marks in its elements, a line break as br."""
-    cuts = sorted({0, len(text), *(m.start for m in marks), *(m.end for m in marks)})
+def _source(picture: Picture, images: Mapping[str, bytes]) -> str:
+    """A picture's ``src``: the ``data:`` URI of its exact bytes, in padded base64."""
+    image = images[picture.sha256 or ""]
+    media = {"png": "image/png", "jpeg": "image/jpeg"}[picture.type or ""]
+    return f"data:{media};base64,{base64.b64encode(image).decode('ascii')}"
+
+
+def _inline(paragraph: Paragraph, marks: Sequence[Mark], images: Mapping[str, bytes]) -> str:
+    """The text as XHTML: a run of one set of marks in its elements, a break br, a picture img."""
+    text = paragraph.text
+    pictures = {picture.offset: picture for picture in paragraph.pictures}
+    cuts = sorted(
+        {0, len(text), *(m.start for m in marks), *(m.end for m in marks)}
+        | {x for at in pictures for x in (at, at + 1)}
+    )
     out: list[str] = []
     for start, end in itertools.pairwise(cuts):
         kinds = [
             k for k in _NESTING if any(m.kind == k and m.start <= start < m.end for m in marks)
         ]
-        piece = "<br/>".join(_escape(part) for part in text[start:end].split("\n"))
+        if start in pictures:
+            piece = f'<img src="{_source(pictures[start], images)}"/>'
+        else:
+            piece = "<br/>".join(_escape(part) for part in text[start:end].split("\n"))
         for kind in reversed(kinds):
             piece = f"<{CARRIED[kind]}>{piece}</{CARRIED[kind]}>"
         out.append(piece)
@@ -382,7 +448,9 @@ def _flow(indices: Sequence[int], body: Body, marks: Mapping[int, list[Mark]]) -
         if items:
             tag = _list(items[0], [_label(body.paragraphs[i]) for i in items])
             out.append(tag)
-            out.extend(f"<li>{_inline(body.paragraphs[i].text, marks[i])}</li>" for i in items)
+            out.extend(
+                f"<li>{_inline(body.paragraphs[i], marks[i], body.images)}</li>" for i in items
+            )
             out.append("</ul>" if tag == "<ul>" else "</ol>")
             items.clear()
 
@@ -390,7 +458,7 @@ def _flow(indices: Sequence[int], body: Body, marks: Mapping[int, list[Mark]]) -
         paragraph = body.paragraphs[i]
         if not _label(paragraph):
             close()
-            out.append(f"<p>{_inline(paragraph.text, marks[i])}</p>")
+            out.append(f"<p>{_inline(paragraph, marks[i], body.images)}</p>")
             continue
         if items:
             previous = body.paragraphs[items[-1]].numbering
@@ -468,14 +536,31 @@ def _script(index: int, character: str, table: Mapping[str, str]) -> str:
     raise RefusedError("script", index, f"U+{ord(character):04X} raised or lowered")
 
 
-def _line(index: int, paragraph: Paragraph, marks: Sequence[Mark], in_cell: bool) -> str:
-    """The paragraph as page text: its label and a space, then its text, folded."""
+_MEDIA: Final = {"png": "data:image/png;base64,", "jpeg": "data:image/jpeg;base64,"}
+
+
+def _line(
+    index: int,
+    paragraph: Paragraph,
+    marks: Sequence[Mark],
+    in_cell: bool,
+    images: Mapping[str, bytes],
+) -> str:
+    """The paragraph as page text: its label and a space, then its text, folded.
+
+    Each picture is U+FFFC, the SHA-256 of the ``data:`` URI of its bytes, and U+FFFC.
+    """
     text = list(paragraph.text)
     for mark in marks:
         table = _RAISED if mark.kind == "superscript" else _LOWERED
         if mark.kind in ("superscript", "subscript"):
             for at in range(mark.start, mark.end):
                 text[at] = _script(index, paragraph.text[at], table)
+    for picture in paragraph.pictures:
+        uri = _MEDIA[picture.type or ""] + binascii.b2a_base64(
+            images[picture.sha256 or ""], newline=False
+        ).decode("ascii")
+        text[picture.offset] = "\ufffc" + hashlib.sha256(uri.encode("utf-8")).hexdigest() + "\ufffc"
     label = _label(paragraph)
     head = "" if not label or (in_cell and label in BULLETS) else label + " "
     lines = "".join(text).split("\n")
@@ -494,7 +579,7 @@ def page(indices: Sequence[int], body: Body, marks: Mapping[int, list[Mark]]) ->
     for table, run in _segments(indices, body):
         if table is None:
             out += [
-                _line(i, body.paragraphs[i], marks[i], in_cell=False) + "\n"
+                _line(i, body.paragraphs[i], marks[i], False, body.images) + "\n"
                 for i in run
                 if not blank(body.paragraphs[i])
             ]
@@ -515,7 +600,7 @@ def page(indices: Sequence[int], body: Body, marks: Mapping[int, list[Mark]]) ->
                     slots += ["\t\ufdd5\t"] * cell["span"]
                     continue
                 text = " ".join(
-                    _line(i, body.paragraphs[i], marks[i], in_cell=True)
+                    _line(i, body.paragraphs[i], marks[i], True, body.images)
                     for i in by_cell[r, c]
                     if not blank(body.paragraphs[i])
                 )
@@ -546,7 +631,7 @@ def _section(
             raise RefusedError("table-across-sections", edge, "a table in two sections")
     marks: dict[int, list[Mark]] = {}
     for i in indices:
-        _check(i, paragraphs[i])
+        _check(i, paragraphs[i], body.images)
         marks[i] = _marks(i, paragraphs[i], key, greys)
     # One list level in a section: a list inside a list would be drawn as one flat list.
     levels = [(paragraphs[i].numbering.level, i) for i in indices if _label(paragraphs[i])]  # type: ignore[union-attr]

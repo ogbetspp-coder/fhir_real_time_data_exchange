@@ -16,6 +16,7 @@ Zone A reads a footnote's or endnote's text, so a body that refers to one is ref
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import xml.etree.ElementTree as ET
@@ -89,13 +90,16 @@ class Body:
     ``tables`` are the reader's table entries as JSON (each table's grid, or why there is none);
     ``floating`` counts the floating pictures and shapes of every part read, which Word draws and
     the text leaves out (the certificate's ``setAside``); ``layout`` names what else Word draws
-    that the read does not yet report (``layout``, below).
+    that the read does not yet report (``layout``, below); ``images`` are the bytes of each body
+    picture the reader found nothing against (``reason`` null), by their SHA-256, as the package
+    stores them.
     """
 
     paragraphs: tuple[Paragraph, ...]
     tables: tuple[dict[str, Any], ...]
     floating: int
     layout: tuple[str, ...] = field(default=())
+    images: dict[str, bytes] = field(default_factory=dict)
 
 
 # Elements whose drawing the read does not yet report (ADR 0006 P1), by local name, and what each
@@ -176,11 +180,23 @@ def read_body(data: bytes) -> Body:
     if any(paragraph["pages"] for paragraph in value["paragraphs"]):
         # The text keeps only the place of a page number: Word prints one there.
         raise DocxRefusedError("page-number", "a page number, which the text leaves out")
+    paragraphs = tuple(_paragraph(paragraph) for paragraph in value["paragraphs"])
+    images: dict[str, bytes] = {}
+    with zipfile.ZipFile(io.BytesIO(data)) as package:
+        for paragraph in paragraphs:
+            for picture in paragraph.pictures:
+                if picture.reason is None and picture.part is not None:
+                    image = package.read(picture.part)
+                    # The reader certified the part's hash; held to it again here, as read now.
+                    if hashlib.sha256(image).hexdigest() != picture.sha256:
+                        raise DocxRefusedError("uncertified", f"{picture.part} is not as certified")
+                    images[hashlib.sha256(image).hexdigest()] = image
     return Body(
-        paragraphs=tuple(_paragraph(paragraph) for paragraph in value["paragraphs"]),
+        paragraphs=paragraphs,
         tables=tuple(value["tables"]),
         floating=value["certificate"]["setAside"]["floatingObjects"],
         layout=layout(data),
+        images=images,
     )
 
 
