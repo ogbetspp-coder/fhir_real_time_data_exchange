@@ -501,3 +501,27 @@ def test_a_first_header_a_later_section_takes_and_shows_is_read() -> None:
         ],
     )
     assert [h.refusal is None for h in read_document(data).headers] == [True, True, False]
+
+
+def test_a_table_in_a_header_is_held_to_its_outermost_cell() -> None:
+    # A header's tables are not listed; each paragraph names its outermost cell, nested or not,
+    # and the check holds it to that.
+    grid = "<w:tblGrid><w:gridCol/></w:tblGrid>"
+    inner = f"<w:tbl>{grid}<w:tr><w:tc>{p(r('<w:t>Inner</w:t>'))}</w:tc></w:tr></w:tbl>"
+    outer = (
+        f"<w:tbl>{grid}<w:tr><w:tc>{p(r('<w:t>Outer</w:t>'))}{inner}<w:p/></w:tc></w:tr></w:tbl>"
+    )
+    body = p(r("<w:t>Body</w:t>")) + f"<w:sectPr>{reference('header', 'h1')}</w:sectPr>"
+    data = _document(
+        body, {"header1.xml": header(outer + "<w:p/>")}, [("h1", "header", "header1.xml")]
+    )
+    source, value = _source_and_value(data)
+    places = [(x["text"], x["table"]) for x in value["headers"][0]["paragraphs"] if x["text"]]
+    assert places == [("Outer", [0, 0, 0]), ("Inner", [0, 0, 0])]
+    source.certify(value)
+    for index, place in ((0, None), (1, [1, 0, 0])):
+        other: dict[str, Any] = json.loads(json.dumps(value))
+        texts = [x for x in other["headers"][0]["paragraphs"] if x["text"]]
+        texts[index]["table"] = place
+        with pytest.raises(CertificationError):
+            source.certify(other)

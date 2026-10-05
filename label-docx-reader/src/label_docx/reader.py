@@ -42,9 +42,11 @@ What a paragraph carries:
   defaults (Word draws a list set there), and the list label Word draws before it
   (``Numbering.text``, with ``suffix`` naming what separates it from the paragraph). The label is
   computed, not stored, so it is never put into ``text``; see "List labels" below.
-- ``table``: ``(table, row, cell)`` counted from zero in document order, else ``None``. A nested
-  table's paragraphs carry the outermost cell; cells are counted as ``<w:tc>`` elements, not
-  grid columns.
+- ``table``: ``(table, row, cell)`` counted from zero, else ``None``: in the body, the cell of the
+  paragraph's own table (a nested table's paragraphs carry the nested table's), ``table``
+  indexing ``Document.tables``; in a note, header, footer or comment, the outermost table's cell,
+  tables counted in that story in document order, nested ones too. Cells are counted as
+  ``<w:tc>`` elements of their row, not grid columns; see "Tables" below.
 - ``pages``: where in ``text`` Word draws a page number (a table of contents' page, a PAGE
   field). Word sets it from the layout when it prints, so it is never in ``text``.
 - ``notes``: the footnote and endnote marks in the paragraph (``NoteReference``): where each
@@ -78,6 +80,24 @@ last row or column under banding where the style defines it, parts through ``bas
 part over a row off the grid, merged cells, a nested table or a table outside the body. Cell
 shading a style may paint is taken as possibly under every cell, for faint text, and Symbol
 text under a part's fonts is refused.
+
+Tables. ``read_document`` reports each body table (``Document.tables``), one ``Table`` per
+``<w:tbl>`` in document order, a nested table after the table holding it and as its own entry,
+with ``parent`` the (table, row, cell) it stands in, and its ``grid``: ``columns``, the number of
+``gridCol`` in its ``tblGrid``, and its rows, each with the grid columns it leaves out before and
+after its cells (``gridBefore``, ``gridAfter``; 0 when absent) and its ``<w:tc>`` cells in order,
+each with the first grid column it covers (from 0: ``before`` plus the spans before it), its
+``span`` (``gridSpan``, 1 when absent) and its ``merge`` as stored (``vMerge``: None, ``restart``,
+or ``continue``, which is also what a ``vMerge`` with no value means). Nothing is inferred: where
+Word's grid is not on record the grid is None and ``reason`` says why (``REASONS``, the first
+found): no ``tblGrid`` (Word builds one by rules of its own) or more than one, a count that is not
+digits, a legacy horizontal merge (``hMerge``: Word shows the merged-away cell's text as its own
+cell's, but where it draws it is not on record), a ``vMerge`` of another value, a span of 0, or a
+row whose ``before`` + spans + ``after`` is not ``columns``. The text is read all the same: no
+grid refuses a document. A vertical merge is reported as stored, the cells it continues not
+checked: which cells Word joins is a layout question for whoever draws the table. Widths
+(``tcW``, ``wBefore``...) are not reported. Tables in notes, headers, footers and comments are not
+reported (their paragraphs' ``table`` is as above).
 
 Symbol fonts. A run whose effective ``ascii`` and ``hAnsi`` fonts (set directly, by a style, by the
 document defaults or through the theme) are both Symbol, by that exact name, with no complex-script
@@ -323,7 +343,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 # The version of the rules above; versions.lock.json ties it to this file (tests/test_locks.py).
-READER_VERSION = "docx-reader/1.26.0"
+READER_VERSION = "docx-reader/1.27.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -661,8 +681,58 @@ class Note:
 
 
 @dataclass(frozen=True)
+class TableCell:
+    """A cell on its table's grid.
+
+    Its first ``column`` (from 0), the grid columns it ``span``s (``gridSpan``) and its vertical
+    ``merge`` as stored (``vMerge``: None, restart or continue).
+    """
+
+    column: int
+    span: int
+    merge: str | None
+
+
+@dataclass(frozen=True)
+class TableRow:
+    """A row: the grid columns it leaves out ``before`` and ``after`` its cells, and its cells."""
+
+    before: int
+    after: int
+    cells: tuple[TableCell, ...]
+
+
+@dataclass(frozen=True)
+class TableGrid:
+    """A table's grid: its ``columns`` (``gridCol``) and its rows, each laid on them."""
+
+    columns: int
+    rows: tuple[TableRow, ...]
+
+
+# Why a table's grid is not reported, the first found in this order: no ``tblGrid`` or more than
+# one; then row by row, a ``gridBefore`` or ``gridAfter`` that is not a count; cell by cell, a
+# horizontal merge (``hMerge``), a ``vMerge`` other than restart or continue, a ``gridSpan`` that
+# is not a count or is 0; and the row not filling the grid exactly.
+REASONS = ("no-grid", "two-grids", "bad-number", "h-merge", "bad-merge", "bad-span", "row-off-grid")
+
+
+@dataclass(frozen=True)
+class Table:
+    """A body table ("Tables" in the module docstring).
+
+    The ``parent`` cell (table, row, cell) of a nested table, and its ``grid``, or None with the
+    ``reason`` (one of ``REASONS``) where Word draws its cells is not on record.
+    """
+
+    parent: tuple[int, int, int] | None
+    grid: TableGrid | None
+    reason: str | None
+
+
+@dataclass(frozen=True)
 class Document:
-    """A document's text: its body, notes, headers, footers and comments.
+    """A document's text: its body, notes, headers, footers and comments; its body's tables.
 
     The footnotes and endnotes are in the order the body refers to them, the headers and footers
     in the order the sections refer to them, and the comments as stored.
@@ -674,6 +744,7 @@ class Document:
     headers: tuple[Story, ...] = ()
     footers: tuple[Story, ...] = ()
     comments: tuple[Comment, ...] = ()
+    tables: tuple[Table, ...] = ()
 
 
 # --- package -------------------------------------------------------------------------------
@@ -3481,6 +3552,11 @@ def _styleref(
 
 # --- blocks and tables ---------------------------------------------------------------------
 
+# A table as the walk finds it: its element, the cell it stands in, its rows, each row's cells.
+type _Found = tuple[
+    ET.Element, tuple[int, int, int] | None, list[ET.Element], list[list[ET.Element]]
+]
+
 
 class _Body:
     """Reads the blocks of one story: the body, a note, a header, a footer or a comment."""
@@ -3491,6 +3567,9 @@ class _Body:
         self.out: list[Paragraph] = []
         self.contexts: list[_Context] = []
         self.tables = 0
+        # Each table as found, in document order (nested ones too): its element, the cell it
+        # stands in, its rows and each row's cells; the body's grids are read from them (_grid).
+        self.found: list[_Found] = []
         self.rows_ended = 0
         # Every run read, so that the part's every run is known to be accounted for.
         self.runs: set[ET.Element] = set()
@@ -3585,6 +3664,7 @@ class _Body:
         for row in rows:
             cells_of.append([])
             _collect(row, _w("tc"), cells_of[-1], {_w("trPr"), _w("tblPrEx")})
+        self.found.append((element, outer, rows, cells_of))
         layout = (
             _TableLayout(
                 element, rows, cells_of, chain, active, self.story is not None or bool(outer)
@@ -3608,9 +3688,12 @@ class _Body:
                 applied, unknown = (
                     ((), None) if layout is None else layout.cell(row_index, cell_index)
                 )
+                place = (index, row_index, cell_index)
                 self.blocks(
                     cell,
-                    outer or (index, row_index, cell_index),
+                    # The body's paragraphs stand in their own table's cell; elsewhere, in the
+                    # outermost table's.
+                    place if self.story is None else outer or place,
                     table_style,
                     own or table_under,
                     () if unknown else applied,
@@ -3921,6 +4004,64 @@ def _collect(element: ET.Element, wanted: str, out: list[ET.Element], silent: se
             raise DocxRefusedError("unsupported-element", _local(tag))
 
 
+def _grid(found: list[_Found]) -> tuple[Table, ...]:
+    """Each table's grid, or None and why Word's grid for it is not on record ("Tables")."""
+    out: list[Table] = []
+    for element, parent, rows, cells_of in found:
+        grid, reason = _laid(element, rows, cells_of)
+        out.append(Table(parent, grid, reason))
+    return tuple(out)
+
+
+def _laid(
+    element: ET.Element, rows: list[ET.Element], cells_of: list[list[ET.Element]]
+) -> tuple[TableGrid | None, str | None]:
+    """A table's cells laid on its grid, or None and the first reason it cannot be (``REASONS``)."""
+    grids = element.findall(_w("tblGrid"))
+    if len(grids) != 1:
+        return None, "two-grids" if grids else "no-grid"
+    columns = len(grids[0].findall(_w("gridCol")))
+    placed: list[TableRow] = []
+    for row, cells in zip(rows, cells_of, strict=True):
+        before = _grid_count(row.find(_w("trPr")), "gridBefore", 0)
+        after = _grid_count(row.find(_w("trPr")), "gridAfter", 0)
+        if before is None or after is None:
+            return None, "bad-number"
+        column, laid = before, []
+        for cell in cells:
+            properties = cell.find(_w("tcPr"))
+            if properties is None:
+                properties = ET.Element(_w("tcPr"))
+            if properties.find(_w("hMerge")) is not None:
+                # Word shows its text as its own cell's; where it draws it is not on record.
+                return None, "h-merge"
+            merge = properties.find(_w("vMerge"))
+            kind = None if merge is None else merge.get(_w("val"), "continue")
+            if kind not in (None, "restart", "continue"):
+                return None, "bad-merge"
+            span = _grid_count(properties, "gridSpan", 1)
+            if span is None:
+                return None, "bad-number"
+            if span == 0:
+                return None, "bad-span"
+            laid.append(TableCell(column, span, kind))
+            column += span
+        if column + after != columns:
+            # Word lays such a row out by rules not on record.
+            return None, "row-off-grid"
+        placed.append(TableRow(before, after, tuple(laid)))
+    return TableGrid(columns, tuple(placed)), None
+
+
+def _grid_count(properties: ET.Element | None, name: str, default: int) -> int | None:
+    """A ``gridBefore``, ``gridAfter`` or ``gridSpan`` (``default`` if absent); None if no count."""
+    found = None if properties is None else properties.find(_w(name))
+    if found is None:
+        return default
+    value = found.get(_w("val"), "")
+    return int(value) if re.fullmatch(r"[0-9]{1,9}", value) else None
+
+
 def read_docx(data: bytes) -> list[Paragraph]:
     """Every body paragraph of a .docx, in document order, or ``DocxRefusedError``."""
     return list(read_document(data).body)
@@ -4073,6 +4214,7 @@ def read_document(data: bytes) -> Document:
         headers=read_stories["header"],
         footers=read_stories["footer"],
         comments=comments,
+        tables=_grid(reader.found),
     )
 
 
