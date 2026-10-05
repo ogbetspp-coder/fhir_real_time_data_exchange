@@ -1,6 +1,6 @@
 # ADR 0006: Importing a company's Word label into the canonical record
 
-- Status: Proposed (for the owner's decision; nothing here is built)
+- Status: Accepted (owner decisions of 2026-10-05); nothing here is built yet
 - Date: 2026-10-05
 - Related: ADR 0001, ADR 0002 (invariants 7, 8 and 11), ADR 0003, ADR 0005 (decisions 1–4,
   renderer gate), `docs/fidelity-normalization.md` §2, §5, §7, §8,
@@ -46,7 +46,7 @@ The record does not admit this today, for reasons this ADR has to answer rather 
    national reporting system listed in Appendix V" in section 4.8. All five pinned SmPCs carry
    it (`docs/design/qrd-conformance-check.md`).
 
-## Decision (proposed)
+## Decision
 
 1. **A third source kind, `certified-word`, with its own contract in §7.** It is neither the
    structured nor the drawn path. It is trusted by three things together:
@@ -94,22 +94,44 @@ The record does not admit this today, for reasons this ADR has to answer rather 
 4. **Structure.**
    - **Section titles:** a section's title is the Word heading line where it is a form the
      registry allows.
-   - **Assigned headings:** a heading a person assigned (`zone_a.structure`) is carried as the
-     document writes it. The projection's template title is not substituted for it (today's
-     `transform.ts` substitution is changed for this source kind), and the difference is a
-     conformance finding.
+   - **Headings that differ from the template are remediation findings.** A heading a person had
+     to assign (`zone_a.structure`) is never silently changed. The difference is recorded as a
+     finding and sent to the label team responsible for the product, who decide:
+     - fix the source, which makes a new version of the label;
+     - or accept the wording as written, which is recorded with their name.
+
+     The ePI for that label waits for that decision. An accepted wording is carried as the
+     document writes it, and the projection's template title is not substituted for it (today's
+     `transform.ts` substitution changes for this source kind).
+
    - **What the record keeps:** the root section keeps the preamble's text (the black-triangle
      statement, for instance), and named subsections are nested sections.
    - **Refused for now:** note references and page numbers (as `zone_a.certified` does), tracked
      changes and comments. A label submitted for an ePI carries one approved text.
 
-5. **A Type 1 graph with declared, verified metadata.**
-   - **Declaration:** a named reviewer declares the product name, the marketing authorisation
-     holder, the authorisation number, and the identifiers preflight requires (for example, the
-     PMS product id and the SPOR organisation id).
-   - **Verification:** the system confirms that each declared name and number appears verbatim in
-     the section that states it (1, 7 or 8), and refuses otherwise.
-   - **Not supplied:** packs, ingredients and substances are declared not supplied.
+5. **A Type 1 graph whose metadata comes from the label, exactly, and is confirmed once per
+   product.** The QRD template gives the product name, the marketing authorisation holder and
+   the authorisation numbers their own sections (1, 7 and 8).
+   - **Authorisation numbers** are taken by their strict format (`EU/1/YY/NNN/NNN`): every
+     number section 8 states, exactly as written.
+   - **The name and the holder** cannot be taken by rule alone. On the five pinned EMA SmPCs, a
+     rule ("section 1 up to the strength", "section 7's first line") agrees with the EMA's own
+     structured index (its List) for only three of five of each: "BRUKINSA" against
+     "Brukinsa", a name with no strength to cut at, and a holder's name with trailing
+     punctuation. Normalising case or punctuation would be guessing. So the system proposes the
+     exact text from sections 1 and 7, highlighted in the document, and a person confirms it by
+     choosing, never by retyping, once per product.
+   - **Identity:** a confirmed product is a **canonical product**, our own identifier at the top,
+     with regulator-specific identifiers beneath it:
+     - EU: the SPOR organisation id of the holder, the EU authorisation numbers and the
+       procedure number;
+     - other regulators (FDA, MHRA, Swissmedic and others) in the same shape.
+
+     Every later label is matched to a canonical product only by exact equality with confirmed
+     values, which is how labels are sorted after the fact without a person.
+
+   - **Not supplied:** packs, ingredients and substances are declared not supplied, as for an
+     authority import.
    - **Amendments:** ADR 0001 (Type 1 allowed for `certified-word`) and ADR 0002 (invariant 7
      admits `certified-word` with `type1` and an attestation; invariant 11 admits a certified
      Word source).
@@ -142,11 +164,11 @@ The record does not admit this today, for reasons this ADR has to answer rather 
    - the preflight identifiers, and the title rule for assigned headings.
 5. **P5, review screen:** the declared-metadata form and the approval.
 
-## Open questions for the owner
+## Owner decisions (2026-10-05)
 
-1. Approve the trust model of decision 1 (exact read, recompute, Word-against-Chrome drawing
-   check) for admitting Word labels?
-2. Approve decision 5 (metadata declared by a reviewer and verified verbatim against sections 1,
-   7 and 8), and name the identifier systems the client uses?
-3. Approve decision 4's rule that an assigned heading is carried as the document writes it,
-   rather than replaced by the template's title?
+1. **The trust model of decision 1:** accepted for now.
+2. **Product data:** from the label where that is 100% accurate; a canonical identifier at the
+   top, branching into regulator-specific ones. Recorded as decision 5, with the measurement
+   that shows where a person's one-time confirmation is needed.
+3. **Headings that differ from the template:** a remediation finding for the responsible label
+   team to decide (decision 4).
