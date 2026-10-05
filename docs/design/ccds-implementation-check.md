@@ -1,8 +1,8 @@
 # Design note: the CCDS implementation check
 
-- Status: Built (`implementation-check/1.0.0`, `zone-a/src/zone_a/implementation.py`); tested on synthetic documents
+- Status: Built (`implementation-check/1.1.0`, `zone-a/src/zone_a/implementation.py`); tested on synthetic documents
   only. No company CCDS or local label is in the repository.
-- Date: 2026-10-05
+- Date: 2026-10-05; 1.1.0 adds wording in other languages and deadlines
 - Related: the UI proposal (Claude Docs, "Label Intake — UI proposal"), `zone-a/src/zone_a/certified.py`
   (the reads it works on), `docs/design/qrd-conformance-check.md` (the other check on certified reads)
 
@@ -41,15 +41,33 @@ cd zone-a
 .uv-bootstrap/bin/uv run --frozen python scripts/check_implementation.py OLD.docx NEW.docx labels.json --out report.json
 ```
 
-`labels.json` lists the labels, each `{"file": "...", "language": "en"}`, as .docx or ePI Bundles.
-The report names the check's version, the reader and format versions it read with, and the
-SHA-256 of both CCDS files.
+`labels.json` lists the labels, each `{"file": "...", "language": "en"}` and optionally its
+`"market"` and `"due"` date, as .docx or ePI Bundles. The report names the check's version, the
+reader and format versions it read with, and the SHA-256 of both CCDS files, and it ends with a
+summary per edit: labels by status, how many are late, and in which markets.
+
+### Other languages
+
+```
+.uv-bootstrap/bin/uv run --frozen python scripts/check_implementation.py OLD.docx NEW.docx --template de,fr --out wordings.json
+```
+
+writes a file with each edit's CCDS wording and an empty old/new pair per language. Affiliates
+fill in their language's wording; `--wordings wordings.json` then checks their labels against it.
+The file is refused whole when anything in it is wrong: an edit these CCDS versions do not have,
+a reference wording from other versions, a missing or extra side, an empty or unchanged wording.
+
+### Deadlines
+
+`--as-of YYYY-MM-DD` is the day lateness is counted on, and it is required once any label has a
+date: it is never read from a clock, so the same inputs give the same report. A label past its
+date is late unless it is `implemented`; `pending`, `both` and `absent` all lack the evidence. A
+`not-checked` label's lateness is unknown.
 
 ## Limits, on purpose
 
-- **Other languages are not checked.** A local label in German carries a translation of the
-  change, and the check does not know it. The next step is to accept each language's agreed
-  wording (an affiliate's translation, or the EMA's published PRAC wording) as input.
+- **Translations are given, not inferred.** A label in another language is checked only against
+  the wording its affiliate (or the EMA's published PRAC wording) gives for that language.
 - **Within one paragraph.** A wording split over two paragraphs is not found.
 - **Text, not formatting.** A label with the right words in the wrong formatting is
   `implemented`; formatting changes in the CCDS are listed for a person.
@@ -60,6 +78,5 @@ SHA-256 of both CCDS files.
 
 ## Next
 
-- Per-language wording for each edit, so non-English labels are checked too.
-- Deadlines per market, so "late" comes from the check rather than a tracker.
-- An endpoint in the gateway, so the Changes screen reads this report.
+- An endpoint in the gateway, so the Changes screen reads this report (a plan to approve first:
+  the gateway is a new deployed service).
