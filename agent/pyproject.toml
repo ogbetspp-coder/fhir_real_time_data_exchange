@@ -14,20 +14,20 @@ requires-python = ">=3.14,<3.15"
 # The `mcp` extra is not optional for this agent: `google-adk` 2.9.2 keeps the Model Context
 # Protocol SDK behind `google-adk[mcp]` (`mcp>=1.24,<2`), and `McpToolset` is the whole of
 # requirement (1). `uv.lock` pins the resolved `mcp` exactly.
-dependencies = ["google-adk[mcp]==2.9.2", "jsonschema==4.26.0", "pydantic==2.13.5"]
+dependencies = ["google-adk[mcp]==2.11.0", "jsonschema==4.26.0", "pydantic==2.13.5"]
 
 [dependency-groups]
 dev = [
   # A CommonMark renderer (the Python port of markdown-it), for the test that the answer shows
   # each quotation verbatim once rendered as Markdown (tests/test_render.py). Tests only.
   "markdown-it-py==4.2.0",
-  "mypy==2.3.1",
+  "mypy==2.4.0",
   "pytest==9.1.1",
   "pytest-asyncio==1.4.0",
   "pytest-cov==7.1.0",
-  "ruff==0.16.9",
+  "ruff==0.16.10",
   "types-jsonschema==4.26.0.20260518",
-  "uvicorn==0.53.0",
+  "uvicorn==0.54.0",
 ]
 
 [build-system]
