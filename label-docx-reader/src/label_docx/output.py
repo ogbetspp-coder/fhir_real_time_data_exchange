@@ -21,17 +21,19 @@ A read::
      "footnotes": [...], "format": ..., "headers": [...], "paragraphs": [...], "reader": ...,
      "refusedParts": n, "source": {"bytes": n, "sha256": hex}, "tables": [...]}
 
-``tables`` lists each body table's grid (``reader.Table``; "Tables" in the reader's docstring), in
-document order, a nested table as its own entry after the table holding it: ``columns`` (its
-``gridCol`` count), ``parent`` (the ``[table, row, cell]`` a nested table stands in, else null) and
-``rows``, each with ``before`` and ``after`` (grid columns left out, ``gridBefore`` and
-``gridAfter``) and ``cells``, each with ``column`` (the first grid column it covers, from 0),
-``span`` (``gridSpan``) and ``merge`` (``vMerge`` as stored: null, ``restart`` or ``continue``).
-A body paragraph's ``table`` is ``[table, row, cell]`` of its own table (a nested table's, not
-the outermost's), ``cell`` counting the row's ``cells``, not grid columns. Every row fills its
-grid exactly; a document with a row that does not is refused. Tables in notes, headers, footers
-and comments are not listed; their paragraphs' ``table`` is the outermost table's cell, tables
-counted in that story.
+``tables`` lists each body table (``reader.Table``; "Tables" in the reader's docstring), in
+document order, a nested table as its own entry after the table holding it: ``parent`` (the
+``[table, row, cell]`` a nested table stands in, else null), ``grid`` and ``reason``. ``grid`` is
+``columns`` (its ``gridCol`` count) and ``rows``, each with ``before`` and ``after`` (grid columns
+left out, ``gridBefore`` and ``gridAfter``) and ``cells``, each with ``column`` (the first grid
+column it covers, from 0), ``span`` (``gridSpan``) and ``merge`` (``vMerge`` as stored: null,
+``restart`` or ``continue``); ``reason`` is then null. Where Word's grid is not on record, ``grid``
+is null and ``reason`` one of ``reader.REASONS``: ``no-grid``, ``two-grids``, ``bad-number``,
+``h-merge``, ``bad-merge``, ``bad-span``, ``row-off-grid``. The text is read either way. A body
+paragraph's ``table`` is ``[table, row, cell]`` of its own table (a nested table's, not the
+outermost's), ``cell`` counting the row's ``<w:tc>`` cells, not grid columns. Tables in notes,
+headers, footers and comments are not listed; their paragraphs' ``table`` is the outermost
+table's cell, tables counted in that story.
 
 ``headers`` and ``footers`` list each header or footer part the sections refer to, once, in the
 order referred to: its ``part`` name, its ``uses`` (each ``section``, counted from 0, and the
@@ -221,21 +223,26 @@ def read(data: bytes) -> tuple[bytes, bool]:
 
 
 def tables(items: tuple[Table, ...]) -> list[Json]:
-    """The body's tables as JSON: each one's grid, in document order."""
+    """The body's tables as JSON: each one's grid, or why it has none, in document order."""
     return [
         {
-            "columns": t.columns,
+            "grid": None
+            if t.grid is None
+            else {
+                "columns": t.grid.columns,
+                "rows": [
+                    {
+                        "after": r.after,
+                        "before": r.before,
+                        "cells": [
+                            {"column": c.column, "merge": c.merge, "span": c.span} for c in r.cells
+                        ],
+                    }
+                    for r in t.grid.rows
+                ],
+            },
             "parent": None if t.parent is None else list(t.parent),
-            "rows": [
-                {
-                    "after": r.after,
-                    "before": r.before,
-                    "cells": [
-                        {"column": c.column, "merge": c.merge, "span": c.span} for c in r.cells
-                    ],
-                }
-                for r in t.rows
-            ],
+            "reason": t.reason,
         }
         for t in items
     ]

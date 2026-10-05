@@ -21,7 +21,7 @@ from label_docx.reader import DocxRefusedError, read_document, tracked
 from label_docx.store import Store
 from label_docx.word import tracked_verdict
 from test_headers_comments import header, reference, with_parts
-from test_reader import GRID1, W, docx, p, r
+from test_reader import W, docx, p, r
 
 VIEWS = ("accepted", "original")
 WHO = 'w:author="A" w:date="2026-01-01T00:00:00Z"'
@@ -125,8 +125,7 @@ def test_changed_formatting_is_current_when_accepted_and_former_when_rejected() 
 
 def test_a_paragraph_mark_joins_past_a_table_and_a_section_end() -> None:
     # Into the first cell's first paragraph, inside a nested table too (Word's answer).
-    nested = f"<w:tbl>{GRID1}<w:tr><w:tc><w:tbl>{GRID1}<w:tr><w:tc>" + p(t("in"))
-    nested += "</w:tc></w:tr></w:tbl>"
+    nested = "<w:tbl><w:tr><w:tc><w:tbl><w:tr><w:tc>" + p(t("in")) + "</w:tc></w:tr></w:tbl>"
     body = p(t("a"), mark("del")) + nested + p(t("out")) + "</w:tc></w:tr></w:tbl>" + p(t("z"))
     accepted, original, _ = tracked(docx(body))
     assert [(x.text, x.table) for x in read_document(accepted).body] == [
@@ -148,9 +147,7 @@ def test_a_row_inserted_or_deleted_is_in_one_view_only() -> None:
         props = f'<w:trPr><w:{marker} w:id="3" {WHO}/></w:trPr>' if marker else ""
         return f"<w:tr>{props}<w:tc>{p(t(text))}</w:tc></w:tr>"
 
-    data = docx(
-        f"<w:tbl>{GRID1}" + row("kept") + row("new", "ins") + row("gone", "del") + "</w:tbl>"
-    )
+    data = docx("<w:tbl>" + row("kept") + row("new", "ins") + row("gone", "del") + "</w:tbl>")
     accepted, original, changes = tracked(data)
     assert [(x.text, x.table) for x in read_document(accepted).body] == [
         ("kept", (0, 0, 0)),
@@ -453,8 +450,8 @@ def _row(text: str, marker: str = "") -> str:
 
 def test_a_table_whose_every_row_a_view_drops_goes_with_them() -> None:
     body = (
-        f"<w:tbl>{GRID1}{_row('gone', 'del')}</w:tbl>{p(t('mid'))}"
-        f"<w:tbl>{GRID1}{_row('kept')}</w:tbl>{p(t('end'))}"
+        f"<w:tbl>{_row('gone', 'del')}</w:tbl>{p(t('mid'))}"
+        f"<w:tbl>{_row('kept')}</w:tbl>{p(t('end'))}"
     )
     source = docx(body)
     accepted, original, _ = tracked(source)
@@ -476,7 +473,7 @@ def test_a_table_whose_every_row_a_view_drops_goes_with_them() -> None:
 def test_a_join_past_a_table_goes_into_its_first_paragraph_in_document_order() -> None:
     # The first cell wrapped in a content control is still the first cell.
     wrapped = (
-        "<w:tbl><w:tblGrid><w:gridCol/><w:gridCol/></w:tblGrid><w:tr><w:sdt><w:sdtContent><w:tc>"
+        "<w:tbl><w:tr><w:sdt><w:sdtContent><w:tc>"
         + p(t("c1"))
         + "</w:tc></w:sdtContent></w:sdt><w:tc>"
         + p(t("c2"))
@@ -559,8 +556,8 @@ def test_a_join_into_a_row_the_view_drops_is_refused() -> None:
 
 def test_the_check_holds_nested_tables_to_their_outermost_cell() -> None:
     # The views' own walk places a paragraph in its outermost cell; the reader, in its own.
-    inner = f"<w:tbl>{GRID1}{_row('in1')}{_row('in2', 'del')}</w:tbl>"
-    body = f"<w:tbl>{GRID1}<w:tr><w:tc>{inner}{p(t('out'))}</w:tc></w:tr>{_row('second')}</w:tbl>"
+    inner = f"<w:tbl>{_row('in1')}{_row('in2', 'del')}</w:tbl>"
+    body = f"<w:tbl><w:tr><w:tc>{inner}{p(t('out'))}</w:tc></w:tr>{_row('second')}</w:tbl>"
     source = docx(body + p(t("z")))
     accepted, original, _ = tracked(source)
     assert [(x.text, x.table) for x in read_document(accepted).body] == [
@@ -594,7 +591,7 @@ def test_a_malformed_change_or_too_deep_a_part_is_refused_never_an_error() -> No
             "</w:pPrChange>",
         ),
         # A move recorded on a row (no schema has one) is read or refused, never an error.
-        "": f"<w:tbl>{GRID1}<w:tr><w:trPr>"
+        "": "<w:tbl><w:tr><w:trPr>"
         f'<w:moveFrom w:id="3" {WHO}/><w:trPrChange w:id="4" {WHO}><w:trPr/></w:trPrChange>'
         f"</w:trPr><w:tc>{p(t('x'))}</w:tc></w:tr></w:tbl>{p(t('z'))}",
     }

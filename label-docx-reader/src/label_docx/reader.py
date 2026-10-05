@@ -81,24 +81,23 @@ part over a row off the grid, merged cells, a nested table or a table outside th
 shading a style may paint is taken as possibly under every cell, for faint text, and Symbol
 text under a part's fonts is refused.
 
-Tables. ``read_document`` reports each body table's grid (``Document.tables``), one ``Table`` per
+Tables. ``read_document`` reports each body table (``Document.tables``), one ``Table`` per
 ``<w:tbl>`` in document order, a nested table after the table holding it and as its own entry,
-with ``parent`` the (table, row, cell) it stands in. ``columns`` is the number of ``gridCol`` in
-the table's ``tblGrid`` (0 with none). Each row has the grid columns it leaves out before and after
-its cells (``gridBefore``, ``gridAfter``; 0 when absent) and its ``<w:tc>`` cells in order, each
-with the first grid column it covers (from 0: ``before`` plus the spans before it), its ``span``
-(``gridSpan``, 1 when absent) and its ``merge`` as stored (``vMerge``: None, ``restart``, or
-``continue``, which is also what a ``vMerge`` with no value means). Nothing is inferred: every
-row must fill its grid exactly (``before`` + the spans + ``after`` = ``columns``), or the
-document is refused, since Word lays such a row out (or a table with no grid, which Word builds
-itself) by rules not on record. So are a table with two grids, a count that is not a number
-(``invalid-package``), under 0, or a span under 1, a ``vMerge`` of another value, and a legacy
-horizontal merge (``hMerge``): Word shows the merged-away cell's text as its own, but where it
-draws the cell is not on record. A vertical merge is reported as stored, the cells it continues
-not checked: which cells Word joins is a layout question for whoever draws the table. Widths
-(``tcW``, ``wBefore``...) are not reported.
-The grid is checked last, so a document refused for anything else keeps that refusal. Tables in
-notes, headers, footers and comments are not reported (their paragraphs' ``table`` is as above).
+with ``parent`` the (table, row, cell) it stands in, and its ``grid``: ``columns``, the number of
+``gridCol`` in its ``tblGrid``, and its rows, each with the grid columns it leaves out before and
+after its cells (``gridBefore``, ``gridAfter``; 0 when absent) and its ``<w:tc>`` cells in order,
+each with the first grid column it covers (from 0: ``before`` plus the spans before it), its
+``span`` (``gridSpan``, 1 when absent) and its ``merge`` as stored (``vMerge``: None, ``restart``,
+or ``continue``, which is also what a ``vMerge`` with no value means). Nothing is inferred: where
+Word's grid is not on record the grid is None and ``reason`` says why (``REASONS``, the first
+found): no ``tblGrid`` (Word builds one by rules of its own) or more than one, a count that is not
+digits, a legacy horizontal merge (``hMerge``: Word shows the merged-away cell's text as its own
+cell's, but where it draws it is not on record), a ``vMerge`` of another value, a span of 0, or a
+row whose ``before`` + spans + ``after`` is not ``columns``. The text is read all the same: no
+grid refuses a document. A vertical merge is reported as stored, the cells it continues not
+checked: which cells Word joins is a layout question for whoever draws the table. Widths
+(``tcW``, ``wBefore``...) are not reported. Tables in notes, headers, footers and comments are not
+reported (their paragraphs' ``table`` is as above).
 
 Symbol fonts. A run whose effective ``ascii`` and ``hAnsi`` fonts (set directly, by a style, by the
 document defaults or through the theme) are both Symbol, by that exact name, with no complex-script
@@ -247,12 +246,10 @@ What it refuses (``DocxRefusedError.code``):
   of a type other than normal (separators aside), conditional table formatting whose effect on
   the text or a list label is not on record (see "Styles"), text, whitespace, a list
   label, or a note, comment or page mark in a vertically merged-away cell (Word draws none of it
-  and does not count the label; a horizontally merged one outside the body is read as its own
-  cell, as Word shows it), a body table's row off its grid, second grid, horizontal merge,
-  vertical merge of no known kind or cell spanning no column (see "Tables"), a bidirectional
-  override (``bdo``) or an embedding (``dir``) of no direction, a style reference that names a
-  style of another kind, and a ``basedOn`` that does (but a paragraph style's on a character
-  style).
+  and does not count the label; a horizontally merged one is read as its own cell, as Word shows
+  it), a bidirectional override (``bdo``) or an embedding (``dir``) of no direction, a style
+  reference that names a style of another kind, and a ``basedOn`` that does (but a paragraph
+  style's on a character style).
 - ``unsupported-formatting``: formatting or layout whose effect on what is shown is not on
   record: complex script (right-to-left or ``cs`` in force, a ``dir`` embedding, or Hebrew, Arabic,
   Indic, Thai... characters) whose ``b`` and ``bCs``, or ``i`` and ``iCs``, differ (Word draws the
@@ -275,11 +272,11 @@ What it refuses (``DocxRefusedError.code``):
   cannot be read (bad checksum, truncated, encrypted), any part damaged, read or not, parts over
   ``MAX_PACKAGE_BYTES`` or ``MAX_ELEMENTS`` together, a part over ``MAX_PART_BYTES``, an XML part,
   read or not, that is not well-formed, not UTF-8, declares another encoding or a DTD, or nests
-  over ``MAX_DEPTH`` deep, no ``w:body``, a number (an id, a level, a start, a table look, a
-  body table's grid count) that is not a number, a list level outside 0 to 8 in the numbering
-  part, a style, list, list level, note or comment defined twice, a section naming two headers
-  or footers of one type, a note referred to twice, and a mark of a note or comment that is not
-  there, or a comment's mark that stands twice.
+  over ``MAX_DEPTH`` deep, no ``w:body``, a number (an id, a level, a start, a table look) that is
+  not a number, a list level outside 0 to 8 in the numbering part, a style, list, list level, note
+  or comment defined twice, a section naming two headers or footers of one type, a note referred
+  to twice, and a mark of a note or comment that is not there, or a comment's mark that stands
+  twice.
 - ``stray-text``: character data in a WordprocessingML element of a part the reader reads,
   outside ``<w:t>`` and ``<w:instrText>`` (whitespace between elements aside), or an element
   inside either of them.
@@ -706,16 +703,31 @@ class TableRow:
 
 
 @dataclass(frozen=True)
-class Table:
-    """A body table's grid ("Tables" in the module docstring).
-
-    Its ``columns`` (``gridCol``), the ``parent`` cell (table, row, cell) of a nested table, and
-    its rows.
-    """
+class TableGrid:
+    """A table's grid: its ``columns`` (``gridCol``) and its rows, each laid on them."""
 
     columns: int
-    parent: tuple[int, int, int] | None
     rows: tuple[TableRow, ...]
+
+
+# Why a table's grid is not reported, the first found in this order: no ``tblGrid`` or more than
+# one; then row by row, a ``gridBefore`` or ``gridAfter`` that is not a count; cell by cell, a
+# horizontal merge (``hMerge``), a ``vMerge`` other than restart or continue, a ``gridSpan`` that
+# is not a count or is 0; and the row not filling the grid exactly.
+REASONS = ("no-grid", "two-grids", "bad-number", "h-merge", "bad-merge", "bad-span", "row-off-grid")
+
+
+@dataclass(frozen=True)
+class Table:
+    """A body table ("Tables" in the module docstring).
+
+    The ``parent`` cell (table, row, cell) of a nested table, and its ``grid``, or None with the
+    ``reason`` (one of ``REASONS``) where Word draws its cells is not on record.
+    """
+
+    parent: tuple[int, int, int] | None
+    grid: TableGrid | None
+    reason: str | None
 
 
 @dataclass(frozen=True)
@@ -3993,50 +4005,61 @@ def _collect(element: ET.Element, wanted: str, out: list[ET.Element], silent: se
 
 
 def _grid(found: list[_Found]) -> tuple[Table, ...]:
-    """Each table's grid, or DocxRefusedError where Word's grid for it is not on record.
-
-    A row's cells stand on the grid one after the other, after the columns it leaves out before
-    them, and with those it leaves out after them they fill the grid exactly; a table with two
-    grids, a legacy horizontal merge (``hMerge``), a vertical merge of no known kind, a span
-    under 1 or a count under 0 is refused too.
-    """
+    """Each table's grid, or None and why Word's grid for it is not on record ("Tables")."""
     out: list[Table] = []
     for element, parent, rows, cells_of in found:
-        if len(element.findall(_w("tblGrid"))) > 1:
-            raise DocxRefusedError("unsupported-element", "a table with two grids")
-        columns = len(element.findall(f"{_w('tblGrid')}/{_w('gridCol')}"))
-        placed: list[TableRow] = []
-        for row, cells in zip(rows, cells_of, strict=True):
-            before = _grid_count(row, "trPr", "gridBefore", 0)
-            after = _grid_count(row, "trPr", "gridAfter", 0)
-            column, out_cells = before, []
-            for cell in cells:
-                if cell.find(f"{_w('tcPr')}/{_w('hMerge')}") is not None:
-                    # Word shows its text as its own cell's; where it draws it is not on record.
-                    raise DocxRefusedError("unsupported-element", "a horizontal merge (hMerge)")
-                merge = cell.find(f"{_w('tcPr')}/{_w('vMerge')}")
-                kind = None if merge is None else merge.get(_w("val"), "continue")
-                if kind not in (None, "restart", "continue"):
-                    raise DocxRefusedError("unsupported-element", f"a vertical merge {kind!r}")
-                span = _grid_count(cell, "tcPr", "gridSpan", 1)
-                if span < 1:
-                    raise DocxRefusedError("unsupported-element", "a cell spanning no column")
-                out_cells.append(TableCell(column, span, kind))
-                column += span
-            if before < 0 or after < 0 or column + after != columns:
-                # Word lays such a row out by rules not on record.
-                raise DocxRefusedError(
-                    "unsupported-element", f"a row off its table's grid of {columns} columns"
-                )
-            placed.append(TableRow(before, after, tuple(out_cells)))
-        out.append(Table(columns, parent, tuple(placed)))
+        grid, reason = _laid(element, rows, cells_of)
+        out.append(Table(parent, grid, reason))
     return tuple(out)
 
 
-def _grid_count(holder: ET.Element, properties: str, name: str, default: int) -> int:
-    """A row's or cell's ``gridBefore``, ``gridAfter`` or ``gridSpan``, else ``default``."""
-    found = holder.find(f"{_w(properties)}/{_w(name)}")
-    return default if found is None else _int(found.get(_w("val"), ""), name)
+def _laid(
+    element: ET.Element, rows: list[ET.Element], cells_of: list[list[ET.Element]]
+) -> tuple[TableGrid | None, str | None]:
+    """A table's cells laid on its grid, or None and the first reason it cannot be (``REASONS``)."""
+    grids = element.findall(_w("tblGrid"))
+    if len(grids) != 1:
+        return None, "two-grids" if grids else "no-grid"
+    columns = len(grids[0].findall(_w("gridCol")))
+    placed: list[TableRow] = []
+    for row, cells in zip(rows, cells_of, strict=True):
+        before = _grid_count(row.find(_w("trPr")), "gridBefore", 0)
+        after = _grid_count(row.find(_w("trPr")), "gridAfter", 0)
+        if before is None or after is None:
+            return None, "bad-number"
+        column, laid = before, []
+        for cell in cells:
+            properties = cell.find(_w("tcPr"))
+            if properties is None:
+                properties = ET.Element(_w("tcPr"))
+            if properties.find(_w("hMerge")) is not None:
+                # Word shows its text as its own cell's; where it draws it is not on record.
+                return None, "h-merge"
+            merge = properties.find(_w("vMerge"))
+            kind = None if merge is None else merge.get(_w("val"), "continue")
+            if kind not in (None, "restart", "continue"):
+                return None, "bad-merge"
+            span = _grid_count(properties, "gridSpan", 1)
+            if span is None:
+                return None, "bad-number"
+            if span == 0:
+                return None, "bad-span"
+            laid.append(TableCell(column, span, kind))
+            column += span
+        if column + after != columns:
+            # Word lays such a row out by rules not on record.
+            return None, "row-off-grid"
+        placed.append(TableRow(before, after, tuple(laid)))
+    return TableGrid(columns, tuple(placed)), None
+
+
+def _grid_count(properties: ET.Element | None, name: str, default: int) -> int | None:
+    """A ``gridBefore``, ``gridAfter`` or ``gridSpan`` (``default`` if absent); None if no count."""
+    found = None if properties is None else properties.find(_w(name))
+    if found is None:
+        return default
+    value = found.get(_w("val"), "")
+    return int(value) if re.fullmatch(r"[0-9]{1,9}", value) else None
 
 
 def read_docx(data: bytes) -> list[Paragraph]:
@@ -4191,7 +4214,6 @@ def read_document(data: bytes) -> Document:
         headers=read_stories["header"],
         footers=read_stories["footer"],
         comments=comments,
-        # Last, so a document refused for any other reason is refused for it as before.
         tables=_grid(reader.found),
     )
 

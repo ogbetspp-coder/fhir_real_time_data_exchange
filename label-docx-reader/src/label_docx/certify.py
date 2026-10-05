@@ -56,7 +56,8 @@ Beyond the text, the check works out on its own, by Word's rules written apart f
 reader's, the key marks (``CHECKED_MARKS``), every list label and every note mark; the result's
 must be the check's. So must each body table's grid (``_grid``): its columns, each row's cells
 laid on them by ``gridBefore`` and ``gridSpan``, filling them exactly with ``gridAfter``, and each
-cell's vertical merge as stored; a horizontal merge is never certified. An ePI's other marks are
+cell's vertical merge as stored; or, where Word's is not on record, no grid and the same reason
+for it. An ePI's other marks are
 held to Chrome (``tests/test_browser_oracle.py``); a .docx's (highlight, shading, faint, raised
 text, right-to-left) to nothing but the reader's tests. A table style's conditional parts it
 applies on its own (``_Applied``), as Word's answers have them (corpus/numbering-cases,
@@ -1221,22 +1222,38 @@ def _owned(element: ET.Element, wanted: str) -> list[ET.Element]:
     return out
 
 
+class _NoGridError(Exception):
+    """Why a table's grid is not on record, as the result must name it."""
+
+
 def _grid(
     table: ET.Element, parent: Any, rows: list[ET.Element], cells: list[list[ET.Element]]
 ) -> dict[str, Json]:
-    """A body table's grid as this check reads it from the source, by its own rules.
+    """A body table as this check reads it from the source, by its own rules.
 
-    Its columns are its ``tblGrid``'s ``gridCol`` elements. Each row's cells are laid side by
-    side from the column after the ``gridBefore`` it leaves out, each over its ``gridSpan`` (one
-    when absent); with ``gridAfter`` they must cover the columns exactly. A count that is not
-    digits, a span of none, a second grid, a horizontal merge, or a vertical merge that is neither
-    ``restart`` nor ``continue`` (as an empty one is) is never certified: where Word puts such a
-    cell is not on record.
+    Its grid: its ``tblGrid``'s ``gridCol`` elements, and each row's cells laid side by side from
+    the column after the ``gridBefore`` it leaves out, each over its ``gridSpan`` (one when
+    absent), covering the columns exactly with ``gridAfter``. Else no grid, and the first reason,
+    in this order: no ``tblGrid`` or two; then row by row a ``gridBefore`` or ``gridAfter`` that
+    is not digits; cell by cell a horizontal merge, a vertical merge that is neither ``restart``
+    nor ``continue`` (as an empty one is), a ``gridSpan`` that is not digits or is 0; and the row
+    not covering the columns.
     """
+    try:
+        grid: Json = _grid_laid(table, rows, cells)
+        reason = None
+    except _NoGridError as why:
+        grid, reason = None, str(why)
+    return {"grid": grid, "parent": None if parent is None else list(parent), "reason": reason}
+
+
+def _grid_laid(table: ET.Element, rows: list[ET.Element], cells: list[list[ET.Element]]) -> Json:
     grids = [child for child in table if child.tag == _w("tblGrid")]
+    if not grids:
+        raise _NoGridError("no-grid")
     if len(grids) > 1:
-        raise CertificationError("a table with more than one grid")
-    width = sum(1 for grid in grids for child in grid if child.tag == _w("gridCol"))
+        raise _NoGridError("two-grids")
+    width = sum(1 for child in grids[0] if child.tag == _w("gridCol"))
     out_rows: list[Json] = []
     for row, row_cells in zip(rows, cells, strict=True):
         skipped = _grid_number(row.find(_w("trPr")), "gridBefore", 0)
@@ -1246,20 +1263,20 @@ def _grid(
         for cell in row_cells:
             props = cell.find(_w("tcPr"))
             if props is not None and props.find(_w("hMerge")) is not None:
-                raise CertificationError("a horizontal merge, whose place Word has not answered")
+                raise _NoGridError("h-merge")
             down = None if props is None else props.find(_w("vMerge"))
             merge = None if down is None else down.get(_w("val"), "continue")
             if merge not in (None, "restart", "continue"):
-                raise CertificationError(f"a vertical merge {merge!r}")
+                raise _NoGridError("bad-merge")
             span = _grid_number(props, "gridSpan", 1)
             if not span:
-                raise CertificationError("a cell over no column")
+                raise _NoGridError("bad-span")
             laid.append({"column": at, "merge": merge, "span": span})
             at += span
         if at + left != width:
-            raise CertificationError("a row that does not fill its table's grid")
+            raise _NoGridError("row-off-grid")
         out_rows.append({"after": left, "before": skipped, "cells": laid})
-    return {"columns": width, "parent": None if parent is None else list(parent), "rows": out_rows}
+    return {"columns": width, "rows": out_rows}
 
 
 def _grid_number(holder: ET.Element | None, name: str, absent: int) -> int:
@@ -1269,7 +1286,7 @@ def _grid_number(holder: ET.Element | None, name: str, absent: int) -> int:
         return absent
     raw = element.get(_w("val"), "")
     if not re.fullmatch(r"[0-9]{1,9}", raw):
-        raise CertificationError(f"a {name} of {raw!r}")
+        raise _NoGridError("bad-number")
     return int(raw)
 
 

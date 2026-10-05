@@ -354,8 +354,7 @@ class Document:
                     )
                     rows += f"<w:tr>{cells}</w:tr>"
                 table = f'<w:tblPr><w:tblStyle w:val="{self.prefix}T"/></w:tblPr>'
-                grid = "<w:tblGrid>" + '<w:gridCol w:w="2000"/>' * count + "</w:tblGrid>"
-                out += f"<w:tbl>{table}{grid}{rows}</w:tbl>"
+                out += f"<w:tbl>{table}{rows}</w:tbl>"
             else:
                 out += self.paragraph(numbers)
         return out

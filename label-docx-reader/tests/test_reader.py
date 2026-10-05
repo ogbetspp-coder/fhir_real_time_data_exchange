@@ -19,12 +19,14 @@ import pytest
 from label_docx import read as served
 from label_docx.certify import CertificationError, DocxSource
 from label_docx.reader import (
+    REASONS,
     Document,
     DocxRefusedError,
     NoteReference,
     Numbering,
     Table,
     TableCell,
+    TableGrid,
     TableRow,
     read_document,
     read_docx,
@@ -124,10 +126,6 @@ def refusal(body: str, styles: str | None = None, numbering: str | None = None) 
 NUMBERING = (
     abstract(0, lvl(0), lvl(1, text="%2)"), lvl(2, text="%3]")) + num(3, 0) + num(4, 0) + num(7, 0)
 )
-
-
-# The grid of a one-column table (every table the reader reads fills its grid).
-GRID1 = '<w:tblGrid><w:gridCol w:w="1000"/></w:tblGrid>'
 
 
 def r(inner: str, props: str = "") -> str:
@@ -551,10 +549,7 @@ def test_wrapped_paragraphs_rows_and_cells_are_read_not_dropped() -> None:
     body = (
         "<w:customXml w:element='x'>" + p(r("<w:t>block</w:t>")) + "</w:customXml>"
         "<w:tbl>"
-        + GRID1
-        + "<w:sdt><w:sdtContent><w:tr>"
-        + cell.format("row-sdt")
-        + "</w:tr></w:sdtContent></w:sdt>"
+        "<w:sdt><w:sdtContent><w:tr>" + cell.format("row-sdt") + "</w:tr></w:sdtContent></w:sdt>"
         "<w:customXml w:element='y'><w:tr>" + cell.format("row-xml") + "</w:tr></w:customXml>"
         "<w:tr><w:sdt><w:sdtContent>" + cell.format("cell-sdt") + "</w:sdtContent></w:sdt></w:tr>"
         "</w:tbl>"
@@ -712,11 +707,11 @@ def test_tables_carry_their_position_and_numbering_is_metadata() -> None:
     cell = "<w:tc>{}</w:tc>"
     body = (
         p(r("<w:t>before</w:t>"), '<w:numPr><w:ilvl w:val="1"/><w:numId w:val="3"/></w:numPr>')
-        + "<w:tbl><w:tblGrid><w:gridCol/><w:gridCol/></w:tblGrid><w:tr>"
+        + "<w:tbl><w:tr>"
         + cell.format(p(r("<w:t>a</w:t>")))
         + cell.format(p(r("<w:t>b</w:t>")))
         + "</w:tr><w:tr>"
-        + cell.format('<w:tcPr><w:gridSpan w:val="2"/></w:tcPr>' + p(r("<w:t>c</w:t>")))
+        + cell.format(p(r("<w:t>c</w:t>")))
         + "</w:tr></w:tbl>"
     )
     paragraphs = read_docx(docx(body, numbering=NUMBERING))
@@ -727,9 +722,14 @@ def test_tables_carry_their_position_and_numbering_is_metadata() -> None:
         ("c", (0, 1, 0)),
     ]
     assert paragraphs[0].numbering == Numbering(3, 1, "1)", "tab")
+    # It states no grid (tblGrid): it is read, and its grid is not reported.
+    assert read_document(docx(body, numbering=NUMBERING)).tables == (Table(None, None, "no-grid"),)
 
 
 # --- table grids (docx-reader/1.27.0) ---------------------------------------------------------
+
+# The grid of a one-column table.
+GRID1 = '<w:tblGrid><w:gridCol w:w="1000"/></w:tblGrid>'
 
 
 def tbl(columns: int | None, rows: str) -> str:
@@ -750,10 +750,11 @@ def tc(text: str, props: str = "") -> str:
 
 def test_a_body_tables_grid_is_reported_with_spans_merges_and_columns_left_out() -> None:
     restart = '<w:gridSpan w:val="2"/><w:vMerge w:val="restart"/>'
+    continued = '<w:gridSpan w:val="2"/><w:vMerge/>'
     body = tbl(
         3,
         f"<w:tr>{tc('wide', restart)}{tc('b')}</w:tr>"
-        f"<w:tr>{tc('', '<w:gridSpan w:val="2"/><w:vMerge/>')}{tc('c')}</w:tr>"
+        f"<w:tr>{tc('', continued)}{tc('c')}</w:tr>"
         '<w:tr><w:trPr><w:gridBefore w:val="1"/><w:gridAfter w:val="1"/></w:trPr>'
         f"{tc('d')}</w:tr>",
     )
@@ -766,17 +767,12 @@ def test_a_body_tables_grid_is_reported_with_spans_merges_and_columns_left_out()
         ("d", (0, 2, 0)),
         ("after", None),
     ]
-    assert document.tables == (
-        Table(
-            3,
-            None,
-            (
-                TableRow(0, 0, (TableCell(0, 2, "restart"), TableCell(2, 1, None))),
-                TableRow(0, 0, (TableCell(0, 2, "continue"), TableCell(2, 1, None))),
-                TableRow(1, 1, (TableCell(1, 1, None),)),
-            ),
-        ),
+    rows = (
+        TableRow(0, 0, (TableCell(0, 2, "restart"), TableCell(2, 1, None))),
+        TableRow(0, 0, (TableCell(0, 2, "continue"), TableCell(2, 1, None))),
+        TableRow(1, 1, (TableCell(1, 1, None),)),
     )
+    assert document.tables == (Table(None, TableGrid(3, rows), None),)
 
 
 def test_a_nested_table_is_its_own_table_and_its_paragraphs_carry_it() -> None:
@@ -792,44 +788,50 @@ def test_a_nested_table_is_its_own_table_and_its_paragraphs_carry_it() -> None:
         ("back", (0, 0, 0)),
         ("next", (2, 0, 0)),
     ]
-    assert [(t.columns, t.parent) for t in document.tables] == [
-        (1, None),
-        (2, (0, 0, 0)),
-        (1, None),
+    assert [(t.parent, t.grid and t.grid.columns) for t in document.tables] == [
+        (None, 1),
+        ((0, 0, 0), 2),
+        (None, 1),
     ]
 
 
-BEFORE_MINUS_ONE = '<w:trPr><w:gridBefore w:val="-1"/></w:trPr>'
+def _span(value: str) -> str:
+    return f'<w:gridSpan w:val="{value}"/>'
 
 
-@pytest.mark.parametrize(
-    "table",
-    [
-        tbl(2, f"<w:tr>{tc('a')}</w:tr>"),
-        tbl(1, f"<w:tr>{tc('a')}{tc('b')}</w:tr>"),
-        tbl(None, f"<w:tr>{tc('a')}</w:tr>"),
-        tbl(2, f'<w:tr><w:trPr><w:gridAfter w:val="2"/></w:trPr>{tc("a")}</w:tr>'),
-        tbl(2, f"<w:tr>{BEFORE_MINUS_ONE}{tc('a', '<w:gridSpan w:val="3"/>')}</w:tr>"),
-        tbl(1, f"<w:tr>{tc('a', '<w:gridSpan w:val="0"/>')}{tc('b')}</w:tr>"),
-        # Two cells that would fill the grid: where Word draws a legacy merge is not on record.
-        tbl(2, f"<w:tr>{tc('a', '<w:hMerge w:val="restart"/>')}{tc('', '<w:hMerge/>')}</w:tr>"),
-        tbl(1, f"<w:tr>{tc('a', '<w:vMerge w:val="down"/>')}</w:tr>"),
-    ],
-    ids=["short", "long", "no-grid", "after", "negative", "no-span", "hmerge", "vmerge"],
-)
-def test_a_body_table_whose_grid_word_lays_out_by_its_own_rules_is_refused(table: str) -> None:
-    assert refusal(table) == "unsupported-element"
+_BEFORE = '<w:trPr><w:gridBefore w:val="-1"/></w:trPr>'
+_AFTER = '<w:trPr><w:gridAfter w:val="{}"/></w:trPr>'
+_H_MERGE = '<w:hMerge w:val="restart"/>'
+# Each reason a grid is not reported, the first one found, and a table that has it.
+_NO_GRID = {
+    "no-grid": ("no-grid", tbl(None, f"<w:tr>{tc('a')}</w:tr>")),
+    "two-grids": ("two-grids", tbl(1, f"{GRID1}<w:tr>{tc('a')}</w:tr>")),
+    "not-a-number": ("bad-number", tbl(1, f"<w:tr>{tc('a', _span('one'))}</w:tr>")),
+    "negative": ("bad-number", tbl(2, f"<w:tr>{_BEFORE}{tc('a', _span('3'))}</w:tr>")),
+    # Two cells that would fill the grid: where Word draws a legacy merge is not on record.
+    "h-merge": ("h-merge", tbl(2, f"<w:tr>{tc('a', _H_MERGE)}{tc('', '<w:hMerge/>')}</w:tr>")),
+    "bad-merge": ("bad-merge", tbl(1, f"<w:tr>{tc('a', '<w:vMerge w:val="down"/>')}</w:tr>")),
+    "bad-span": ("bad-span", tbl(1, f"<w:tr>{tc('a', _span('0'))}{tc('b')}</w:tr>")),
+    "short": ("row-off-grid", tbl(2, f"<w:tr>{tc('a')}</w:tr>")),
+    "long": ("row-off-grid", tbl(1, f"<w:tr>{tc('a')}{tc('b')}</w:tr>")),
+    "after": ("row-off-grid", tbl(2, f"<w:tr>{_AFTER.format(2)}{tc('a')}</w:tr>")),
+    # The first in order: the row's counts before its cells, a cell's merge before its span.
+    "row-count-first": (
+        "bad-number",
+        tbl(1, f"<w:tr>{_AFTER.format('x')}{tc('a', _H_MERGE)}</w:tr>"),
+    ),
+    "merge-first": ("h-merge", tbl(1, f"<w:tr>{tc('a', _H_MERGE + _span('0'))}</w:tr>")),
+}
 
 
-def test_a_grid_count_that_is_not_a_number_is_refused() -> None:
-    assert refusal(tbl(1, f"<w:tr>{tc('a', '<w:gridSpan w:val="one"/>')}</w:tr>")) == (
-        "invalid-package"
-    )
-
-
-def test_the_grid_is_checked_last_so_other_refusals_stand() -> None:
-    hidden = p(r("<w:t>x</w:t>", "<w:vanish/>"))
-    assert refusal(tbl(None, f"<w:tr>{tc('a')}</w:tr>") + hidden) == "hidden-text"
+@pytest.mark.parametrize(("reason", "table"), _NO_GRID.values(), ids=_NO_GRID.keys())
+def test_a_grid_word_lays_out_by_rules_not_on_record_is_not_reported_and_the_text_is_read(
+    reason: str, table: str
+) -> None:
+    document = read_document(docx(table + p(r("<w:t>after</w:t>"))))
+    assert (document.body[0].text, document.body[-1].text) == ("a", "after")
+    assert document.tables == (Table(None, None, reason),)
+    assert reason in REASONS
 
 
 # --- second review: styles Word falls back to ----------------------------------------------
@@ -865,12 +867,12 @@ def test_conditional_table_formatting_in_force_is_refused_and_unused_is_not() ->
         '<w:rPr><w:vertAlign w:val="superscript"/></w:rPr></w:tblStylePr></w:style>'
     )
     cell = "<w:tr><w:tc>" + p(r("<w:t>10</w:t>")) + "</w:tc></w:tr>"
-    used = '<w:tbl><w:tblPr><w:tblStyle w:val="Banded"/></w:tblPr>' + GRID1 + cell + "</w:tbl>"
+    used = '<w:tbl><w:tblPr><w:tblStyle w:val="Banded"/></w:tblPr>' + cell + "</w:tbl>"
     assert refusal(used, style) == "unsupported-element"
     as_default = style.replace('w:styleId="Banded"', 'w:default="1" w:styleId="Banded"')
-    assert refusal("<w:tbl>" + GRID1 + cell + "</w:tbl>", as_default) == "unsupported-element"
+    assert refusal("<w:tbl>" + cell + "</w:tbl>", as_default) == "unsupported-element"
     # The EMA template defines such a style and never applies it.
-    assert text_of("<w:tbl>" + GRID1 + cell + "</w:tbl>", style) == ["10"]
+    assert text_of("<w:tbl>" + cell + "</w:tbl>", style) == ["10"]
 
 
 # --- second review: Symbol in some font slots only -------------------------------------------
@@ -1114,7 +1116,7 @@ def test_the_default_table_style_applies_only_inside_a_table() -> None:
         '<w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr></w:style>'
     )
     assert text_of(p(r("<w:t>a</w:t>")), styles) == ["\u03b1"]
-    table = "<w:tbl>" + GRID1 + "<w:tr><w:tc>" + p(r("<w:t>a</w:t>")) + "</w:tc></w:tr></w:tbl>"
+    table = "<w:tbl><w:tr><w:tc>" + p(r("<w:t>a</w:t>")) + "</w:tc></w:tr></w:tbl>"
     assert text_of(table, styles) == ["a"]
 
 
@@ -1168,7 +1170,7 @@ def test_paragraph_defaults_and_table_style_paragraph_properties_are_marked() ->
         "</w:pPr></w:style>"
     )
     table = (
-        f'<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr>{GRID1}<w:tr><w:tc>'
+        '<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr><w:tr><w:tc>'
         + p(r("<w:t>ab</w:t>"))
         + "</w:tc></w:tr></w:tbl>"
     )
@@ -1821,7 +1823,7 @@ def _banded(conditional: str) -> str:
 
 def _in_banded(run: str) -> str:
     return (
-        f'<w:tbl><w:tblPr><w:tblStyle w:val="Banded"/></w:tblPr>{GRID1}<w:tr><w:tc>'
+        '<w:tbl><w:tblPr><w:tblStyle w:val="Banded"/></w:tblPr><w:tr><w:tc>'
         + p(run)
         + "</w:tc></w:tr></w:tbl>"
     )
@@ -2058,8 +2060,7 @@ def test_note_numbering_that_depends_on_layout_or_language_is_refused(
 
 
 def test_a_table_in_a_note_is_read() -> None:
-    # Its grid is not reported, nor held: a note's table, nested ones too, keeps its outermost
-    # cell.
+    # Its grid is not reported: a note's table, nested ones too, keeps its outermost cell.
     inner = "<w:tbl><w:tr><w:tc>" + p(r("<w:t>inner</w:t>")) + "</w:tc></w:tr></w:tbl>"
     table = "<w:tbl><w:tr><w:tc>" + p(r("<w:t>cell</w:t>")) + inner + "</w:tc></w:tr></w:tbl>"
     document = read(p(ref(1)), fnote(1, p(r("<w:footnoteRef/>")) + table))
@@ -2755,7 +2756,7 @@ def test_properties_in_an_unknown_namespace_are_refused(where: str) -> None:
 def _merged_away(inner: str) -> str:
     """A table whose second row's cell is merged into the first's (vMerge continue)."""
     return (
-        f"<w:tbl>{GRID1}<w:tr><w:tc><w:tcPr><w:vMerge w:val='restart'/></w:tcPr>"
+        "<w:tbl><w:tr><w:tc><w:tcPr><w:vMerge w:val='restart'/></w:tcPr>"
         + p(r("<w:t>top</w:t>"))
         + "</w:tc></w:tr><w:tr><w:tc><w:tcPr><w:vMerge/></w:tcPr>"
         + inner
@@ -2787,24 +2788,21 @@ def test_anything_but_an_empty_unnumbered_paragraph_in_a_merged_away_cell_is_ref
     assert text_of(_merged_away(p(""))) == ["top", ""]
 
 
-def test_a_horizontally_merged_away_cell_is_read_as_its_own_cell_outside_the_body() -> None:
-    # Word shows and prints the text of a legacy hMerge continue cell as its own paragraph. In
-    # the body, where the grid is reported, it is refused: where Word draws it is not on record.
-    table = (
+def test_a_horizontally_merged_away_cell_is_read_as_its_own_cell() -> None:
+    # Word shows and prints the text of a legacy hMerge continue cell as its own paragraph.
+    body = (
         "<w:tbl><w:tr><w:tc><w:tcPr><w:hMerge w:val='restart'/></w:tcPr>"
         + p(r("<w:t>left</w:t>"))
         + "</w:tc><w:tc><w:tcPr><w:hMerge/></w:tcPr>"
         + p(r("<w:t>merged away</w:t>"))
         + "</w:tc></w:tr></w:tbl>"
+        + p(r("<w:t>after</w:t>"))
     )
-    document = read(p(ref(1)), fnote(1, p(r("<w:footnoteRef/>")) + table))
-    assert [(x.text, x.table) for x in document.footnotes[0].paragraphs] == [
-        ("", None),
+    assert [(x.text, x.table) for x in read_docx(docx(body))] == [
         ("left", (0, 0, 0)),
         ("merged away", (0, 0, 1)),
+        ("after", None),
     ]
-    two = "<w:tbl><w:tblGrid><w:gridCol/><w:gridCol/></w:tblGrid>"
-    assert refusal(table.replace("<w:tbl>", two)) == "unsupported-element"
 
 
 _PLACEHOLDER = (
@@ -2961,8 +2959,7 @@ def _styled_table(look: str, rows: list[list[str]], props: str = "<w:b/><w:i/>")
         + "</w:tr>"
         for row in rows
     )
-    grid = f"<w:tblGrid>{'<w:gridCol/>' * len(rows[0])}</w:tblGrid>"
-    return f'<w:tbl><w:tblPr><w:tblStyle w:val="T"/>{look}</w:tblPr>{grid}{cells}</w:tbl>', style
+    return f'<w:tbl><w:tblPr><w:tblStyle w:val="T"/>{look}</w:tblPr>{cells}</w:tbl>', style
 
 
 @pytest.mark.parametrize(
@@ -2997,7 +2994,7 @@ def test_conditional_emphasis_is_read_where_the_table_turns_it_off_or_holds_no_t
 
 def _cell(inner: str, shading: str = "") -> str:
     shd = f'<w:tcPr><w:shd w:val="clear" w:fill="{shading}"/></w:tcPr>' if shading else ""
-    return f"<w:tbl>{GRID1}<w:tr><w:tc>{shd}{inner}</w:tc></w:tr></w:tbl>"
+    return f"<w:tbl><w:tr><w:tc>{shd}{inner}</w:tc></w:tr></w:tbl>"
 
 
 @pytest.mark.parametrize(
@@ -3060,7 +3057,7 @@ def test_faint_under_conditional_or_unknown_colours_is_refused() -> None:
 
 
 def _row(height: str, inner: str) -> str:
-    return f"<w:tbl>{GRID1}<w:tr><w:trPr>{height}</w:trPr><w:tc>{inner}</w:tc></w:tr></w:tbl>"
+    return f"<w:tbl><w:tr><w:trPr>{height}</w:trPr><w:tc>{inner}</w:tc></w:tr></w:tbl>"
 
 
 TEN_POINTS = '<w:sz w:val="20"/>'
@@ -3161,7 +3158,6 @@ def t_table(look: str = ALL_LOOKS, size: int = 3, props: str = "", rows: str = "
     """A size-by-size table in style T, one run in each cell; ``rows`` opens every row."""
     return (
         f'<w:tbl><w:tblPr><w:tblStyle w:val="T"/>{look}</w:tblPr>'
-        + f"<w:tblGrid>{'<w:gridCol w:w="1000"/>' * size}</w:tblGrid>"
         + "".join(
             f"<w:tr>{rows}"
             + "".join(f"<w:tc>{p(r(f'<w:t>r{i}c{j}</w:t>', props))}</w:tc>" for j in range(size))
@@ -3482,15 +3478,11 @@ NOT_ASKED = {
     # Where a part applies: a row off the grid, merged cells, a nested table, or the table
     # nested in another.
     "row-off-the-grid": (
-        t_table(rows='<w:trPr><w:gridBefore w:val="1"/></w:trPr>').replace(
-            "<w:gridCol", '<w:gridCol w:w="1000"/><w:gridCol', 1
-        ),
+        t_table(rows='<w:trPr><w:gridBefore w:val="1"/></w:trPr>'),
         t_style(("firstRow", "<w:b/>")),
     ),
     "merged-cells": (
-        t_table()
-        .replace("<w:tc>", '<w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr>', 1)
-        .replace(f"<w:tc>{p(r('<w:t>r0c1</w:t>'))}</w:tc>", "", 1),
+        t_table().replace("<w:tc>", '<w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr>', 1),
         t_style(("firstRow", "<w:b/>")),
     ),
     "nested-under-part": (

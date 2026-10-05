@@ -78,8 +78,8 @@ underline), every list label and every note mark. The result's must be the check
 So must every body table's grid (R-43), which it reads from `D` itself: the `gridCol` count, each
 row's cells laid side by side after its `gridBefore`, each over its `gridSpan`, filling the grid
 exactly with its `gridAfter`, each cell's `vMerge` as stored and, for a nested table, the cell it
-stands in. A row that does not fill its grid, a count that is not digits, a horizontal merge or
-a vertical merge of no known kind is never certified.
+stands in; or, where a row does not fill its grid, a count is not digits, or a merge is one Word's
+drawing of is not on record, no grid and the same first reason the result names.
 It draws lists in the body only; a list anywhere else, a label in capitals, hidden or drawn as
 a picture, and a custom note mark's echo are never certified.
 
@@ -110,8 +110,9 @@ The proof covers the text. How it is shown is held to the application that shows
 | Tracked views                                     | Word    | `test_tracked.py` (corpus); `--word on` |
 
 Table grids are held to the source alone (the check above): Word has not yet been asked where
-it draws each cell. The grid is what the document stores; a row that does not fill it, which Word
-would have to lay out by rules of its own, is refused.
+it draws each cell. The grid is what the document stores; where Word would have to lay it out by
+rules of its own (a row that does not fill it, say), no grid is reported, and the text is read
+all the same.
 
 Word is asked about emphasis per body paragraph: whether all its letters are bold, italic, in
 capitals or struck through, white space's formatting aside, so Word's "no" agrees with a

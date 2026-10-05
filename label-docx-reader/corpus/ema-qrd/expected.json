@@ -8,19 +8,19 @@
   "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx": {
     "certificateSha256": "d5dced3cd666b0906028f76fb445f4d2888dac08044f2617d72d0f75d308a79b",
     "paragraphsSha256": "2dc7ebacbcd5ee986c511b6a9c4ed2c9266e12e433a7d356e10ef02da6bb09c9",
-    "resultSha256": "8bb86c03b4919c0a786daa104d2dddee565df35002a14699f4d6f1dc6c367978",
+    "resultSha256": "c97c4df2a6003246673db20d82732e2cf6f5bf80edb9e6bf88de69930e24e3eb",
     "sha256": "68a8026e6d99f22f9a380edf04df34bb5f29f35574f9e507fb4b5d5f16e996ae"
   },
   "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx": {
     "certificateSha256": "56911d54ce93a8fae1a37bfcce33dc665b11d82b5c084dbbbc0717cc81ccf96b",
     "paragraphsSha256": "cfa69ad12d071020f4121217d9490416eb691a20f4cea062b218031f8ac80295",
-    "resultSha256": "951c72de2b755c880a7a5f52e3627ab84e1f253408270f07060933fc40f5a244",
+    "resultSha256": "6e5aed6ff1755af1edace65a13266bb90166e0297065549e3daeebcdc3ef50d0",
     "sha256": "10aed02c52b69740041841d09a3fca2239bc9839eb3317bc1c1dd732532a9215"
   },
   "qrd-product-information-template-version-104_en.docx": {
     "certificateSha256": "5b5dcc43a69c01f0299c393c37433d9840fde25eaa9c8f4112b8787868458b54",
     "paragraphsSha256": "c2aceda77663feebd44dac1c7f0e2d06b94518c5f67d561c0dea0aaf3ecba1c1",
-    "resultSha256": "2a9d7cf862fb129e77d1fcb47b21b94964e45c50acda0abde1020dd834667371",
+    "resultSha256": "7f8a4410bccee73b111b8603231691b43b61ea68be9e547edb7469b60b6db12d",
     "sha256": "6c9da03b2c72f055c81dc14f12c82da61a1609e7beffcc71f95e8046d7104fd1"
   }
 }
