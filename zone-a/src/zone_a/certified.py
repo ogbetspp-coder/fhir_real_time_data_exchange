@@ -9,7 +9,9 @@ character, or a refusal. A result the check cannot account for is refused there
 is checked is what was certified.
 
 A .docx with tracked changes reads to two texts, every change accepted and every change rejected,
-with no default between them; Zone A takes neither and refuses it (``tracked-change``).
+with no default between them; Zone A takes neither and refuses it (``tracked-change``). Nothing in
+Zone A reads a footnote's or endnote's text, so a body that refers to one is refused
+(``note-reference``); nor a page number's, which the text leaves out (``page-number``).
 """
 
 from __future__ import annotations
@@ -55,9 +57,14 @@ def _paragraph(value: dict[str, Any]) -> Paragraph:
 def read_docx(data: bytes) -> list[Paragraph]:
     """The body paragraphs of a .docx, as the reader certified them.
 
+    A footnote or endnote's text is in the reader's result but not in these paragraphs, and
+    nothing here reads it, so a body that refers to one is refused rather than read without it;
+    so is a body with a page number (PAGE, PAGEREF...), whose digits the text leaves out.
+
     Raises:
-        DocxRefusedError: The reader refused the document (``uncertified`` among the codes), or
-            it has tracked changes.
+        DocxRefusedError: The reader refused the document (``uncertified`` among the codes), it
+            has tracked changes, or its body refers to a footnote or endnote or holds a page
+            number.
     """
     result, was_read = read_docx_json(data)
     value = json.loads(result)
@@ -65,6 +72,11 @@ def read_docx(data: bytes) -> list[Paragraph]:
         raise DocxRefusedError(value["refusal"]["code"], value["refusal"]["detail"])
     if "tracked" in value:
         raise DocxRefusedError("tracked-change", "two texts (changes accepted, rejected)")
+    if any(paragraph["notes"] for paragraph in value["paragraphs"]):
+        raise DocxRefusedError("note-reference", "a footnote or endnote, whose text is not read")
+    if any(paragraph["pages"] for paragraph in value["paragraphs"]):
+        # The text keeps only the place of a page number: Word prints one there.
+        raise DocxRefusedError("page-number", "a page number, which the text leaves out")
     return [_paragraph(paragraph) for paragraph in value["paragraphs"]]
 
 

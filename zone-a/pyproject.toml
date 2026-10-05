@@ -117,13 +117,6 @@ warn_unreachable = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 
 [[tool.mypy.overrides]]
-# The label reader (label-docx-reader/) is typed and passes mypy --strict on its own, but ships no
-# py.typed marker: adding one changes its source tree, which its mutation record hashes whole
-# (scripts/mutate_checker.py). Follow its imports as typed instead.
-module = ["label_docx", "label_docx.*"]
-follow_untyped_imports = true
-
-[[tool.mypy.overrides]]
 # Generated code: checked, but datamodel-code-generator emits no docstrings for fields and
 # pydantic's plugin covers the model semantics.
 module = "zone_a.contracts.*"

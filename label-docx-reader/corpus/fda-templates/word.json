@@ -2436,7 +2436,7 @@
     "fda-patient-package-insert-template.docx": true,
     "fda-prescribing-information-template.docx": true
   },
-  "recorded": "2026-10-03",
+  "recorded": "2026-10-04",
   "sha256": {
     "fda-medication-guide-template.docx": "435c5e9d5c10722e78db6bb90c7489a5b4ede8e08fb08334b7bb9e5ec2c5511c",
     "fda-patient-package-insert-template.docx": "3442be0483c834bb3d178a56857c9d93f4d17e817629a18c5204e2c0eeaf12c2",
@@ -2445,6 +2445,28 @@
   "stories": {
     "fda-prescribing-information-template.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          true,
+          false
+        ],
+        [
+          1,
+          true,
+          false
+        ],
+        [
+          2,
+          false,
+          false
+        ],
+        [
+          3,
+          false,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -2867,5 +2889,5 @@
       "If the distributor is included must include one of the following phrases: \u201cManufactured for Firm-D\u201d, \u201cDistributed by Firm-D\u201d, \u201cManufactured by Firm-M for Firm-D\u201d, \u201cManufactured for Firm-D by Firm-M\u201d, \u201cDistributor: Firm-D\u201d, or \u201cMarketed by Firm-D\u201d.]]"
     ]
   },
-  "verifier": "word-verifier/1.0.4"
+  "verifier": "word-verifier/1.0.5"
 }

@@ -4,15 +4,16 @@
     uv run --frozen python scripts/lock_versions.py --check   # fail on unlocked code
     uv run --frozen python scripts/lock_versions.py --amend   # re-lock an unreleased version
 
-Each component's results carry its version (a check result names ``reader`` and ``checker``, the
-registry ``readerVersion`` and ``registryVersion``), so a change to what the code does must change
-the version. ``versions.lock.json`` records, for every version of every component, the SHA-256 of
-the source files that decide its output, as ``src/authority/importer.lock.json`` does for the
-authority importer. A change to one of those files leaves the current version locked to other
-code, which tests/test_versions_lock.py refuses until the version is bumped and this script run.
-``--amend`` re-locks a version to changed code, and refuses one any lock in main's first-parent
-history holds (``released``); the test holds every released entry unchanged too, as the
-importer's lock test does. Versions released before the lock existed are not in it.
+Each component's results carry its version (a check result names ``reader``, ``format`` and
+``checker``, the registry ``readerVersion``, ``readerFormat`` and ``registryVersion``), so a change
+to what the code does must change the version. ``versions.lock.json`` records, for every version of
+every component, the SHA-256 of the source files that decide its output, as
+``src/authority/importer.lock.json`` does for the authority importer. A change to one of those files
+leaves the current version locked to other code, which tests/test_versions_lock.py refuses until the
+version is bumped and this script run. ``--amend`` re-locks a version to changed code, and refuses
+one any lock in main's first-parent history holds (``released``); the test holds every released
+entry unchanged too, as the importer's lock test does. Versions released before the lock existed are
+not in it.
 """
 
 from __future__ import annotations
@@ -41,15 +42,28 @@ class Component(NamedTuple):
 
 # The files each version covers: the component's own module and every module of this package it
 # reads with (zone_a.underline and zone_a.fidelity.normalize decide which characters count).
-# The readers are the label reader's (label-docx-reader/), each tied to the file its own lock
-# ties its version to (label-docx-reader/scripts/lock.py), so a change it versions there is
-# versioned here. Its certified JSON (output.py, epi_output.py, certify.py) is versioned there as
-# label-docx-json and label-epi-json; zone_a.certified, which rebuilds the values the registry and
-# the check read from it, is theirs.
+# The readers and their formats are the label reader's (label-docx-reader/), each tied to the
+# files its own lock ties its version to (label-docx-reader/scripts/lock.py, current_versions),
+# so a change it versions there is versioned here; the results name both. zone_a.certified, which
+# rebuilds the values the registry and the check read from the certified JSON, is theirs.
 _LABEL_DOCX = "../label-docx-reader/src/label_docx"
 COMPONENTS: dict[str, Component] = {
     "docx-reader": Component("label_docx.reader", "READER_VERSION", (f"{_LABEL_DOCX}/reader.py",)),
-    "epi-reader": Component("label_docx.epi", "READER_VERSION", (f"{_LABEL_DOCX}/epi.py",)),
+    "docx-format": Component(
+        "label_docx.output",
+        "FORMAT_VERSION",
+        tuple(f"{_LABEL_DOCX}/{name}.py" for name in ("output", "certify", "documents")),
+    ),
+    "epi-reader": Component(
+        "label_docx.epi", "READER_VERSION", (f"{_LABEL_DOCX}/epi.py", f"{_LABEL_DOCX}/reader.py")
+    ),
+    "epi-format": Component(
+        "label_docx.epi_output",
+        "FORMAT_VERSION",
+        tuple(
+            f"{_LABEL_DOCX}/{name}.py" for name in ("epi_output", "output", "documents", "certify")
+        ),
+    ),
     "qrd-registry": Component(
         "zone_a.qrd.registry",
         "REGISTRY_VERSION",

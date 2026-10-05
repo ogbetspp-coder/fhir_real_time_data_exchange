@@ -1,13 +1,11 @@
 name: Label reader
 
 # The label reader (label-docx-reader/), brought in with its history from its own repository,
-# keeps its own gate: the five checks of its README's "Development", run only when it or this
-# workflow changes. Its own label-docx-reader/.github/ is inert here; this file replaces it.
+# keeps its own gate: the five checks of its README's "Development". It is a required check, so
+# it runs on every pull request (a path-filtered workflow never reports, and a required check that
+# never reports blocks the merge); on main, only when it or this workflow changes.
 on:
   pull_request:
-    paths:
-      - "label-docx-reader/**"
-      - ".github/workflows/label-docx-reader.yml"
   push:
     branches:
       - main
@@ -33,6 +31,8 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
+          # The version lock's check reads main's history as released (LOCK_BASE below).
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -48,7 +48,7 @@ jobs:
           cache-dependency-glob: label-docx-reader/uv.lock
 
       - name: Install
-        run: uv sync --frozen
+        run: uv sync --locked
 
       - name: Lint
         run: uv run --frozen ruff check .
@@ -59,8 +59,15 @@ jobs:
       - name: Type-check
         run: uv run --frozen mypy --strict
 
+      # The commit whose history is released: the commit before a push, main otherwise.
+      - name: Name the lock's base
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: bash ../scripts/ci/lock-base.sh
+
       - name: Locks
         run: uv run --frozen python scripts/lock.py --check
 
       - name: Test
-        run: uv run --frozen pytest --cov
+        # On every core (pytest-xdist): the tests share no state, and coverage is combined.
+        run: uv run --frozen pytest --cov -n auto

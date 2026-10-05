@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
 
-from lock import CORPUS, VERSIONS, current_versions, expected
+import pytest
+
+import lock
+from lock import CORPUS, VERSIONS, base, current_versions, expected, released, released_problems
 
 
 def test_the_current_versions_are_locked_to_the_current_code() -> None:
@@ -21,3 +25,40 @@ def test_every_corpus_document_reads_as_locked() -> None:
     for folder in folders:
         locked = json.loads((folder / "expected.json").read_text("utf-8"))
         assert locked == expected(folder), f"{folder.name}: review, then run scripts/lock.py"
+
+
+def test_every_released_entry_is_kept() -> None:
+    # Every lock in the first-parent history of LOCK_BASE (CI: scripts/ci/lock-base.sh) or
+    # origin/main: a released version's hash never changes or goes.
+    history = released(base())
+    if os.environ.get("CI") == "true":
+        assert history, "CI must name the lock's base (LOCK_BASE, full history)"
+    if history is None:
+        return
+    assert released_problems(json.loads(VERSIONS.read_text("utf-8")), history) == []
+
+
+def test_a_changed_or_dropped_released_entry_is_refused() -> None:
+    lock = json.loads(VERSIONS.read_text("utf-8"))
+    version, _ = current_versions()["reader"]
+    changed = [("0" * 40, {"reader": {version: "f" * 64}})]
+    (problem,) = released_problems(lock, changed)
+    assert problem.startswith(f"reader {version} was released")
+    dropped = {name: dict(entries) for name, entries in lock.items()}
+    del dropped["reader"][version]
+    (problem,) = released_problems(dropped, [("0" * 40, lock)])
+    assert problem.startswith(f"reader {version} was released")
+    assert released_problems(lock, [("0" * 40, lock)]) == []
+
+
+def test_each_version_is_tied_to_every_file_that_decides_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The ePI reader builds the reader's marks, numbering and paragraphs; the format is decided
+    # by documents too, which says which reader reads the bytes.
+    monkeypatch.setattr(lock, "_sha256", lambda *paths: ",".join(sorted(p.name for p in paths)))
+    files = {name: digest for name, (_, digest) in lock.current_versions().items()}
+    assert files["reader"] == "reader.py"
+    assert files["epi-reader"] == "epi.py,reader.py"
+    assert files["format"] == "certify.py,documents.py,output.py"
+    assert files["epi-format"] == "certify.py,documents.py,epi_output.py,output.py"

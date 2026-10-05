@@ -222,10 +222,10 @@ defaults are wrong:
   `1e+21` or `1e-7`. `canonical_json` does the same (`ecmascript_number`), where it refused every
   non-integral float until 2026-09-28 (audit C-10): a 2.5 mg strength could not be hashed in Zone A.
   `tests/test_canonical_json_parity.py` reproduces JavaScript's text for the doubles in
-  `test/fixtures/contracts/canonical-json-numbers.json`, each carried by its IEEE 754 bits, and the
-  decimal submission's hashes. An integral float is the integer it equals (`1.0` is `1`). An
-  _integer_ beyond 2^53-1 is still refused here: JSON gives Python the exact integer and
-  JavaScript the nearest double, which may be two values. Zone B is not as strict: it accepts such
+  `test/fixtures/contracts/canonical-json-numbers.json`, each carried by its IEEE 754 bits, and
+  `tests/test_contracts_parity.py` the decimal submission's hashes. An integral float is the
+  integer it equals (`1.0` is `1`). An _integer_ beyond 2^53-1 is still refused here: JSON gives
+  Python the exact integer and JavaScript the nearest double, which may be two values. Zone B is not as strict: it accepts such
   an integer when it is written as JavaScript writes the double (item 17 below).
 - **Write every submission part with `canonical_json`.** Zone B's submission reader refuses a part
   whose numbers are not written as JavaScript writes them (`non-canonical-number`; ADR 0002,
@@ -367,7 +367,9 @@ npx tsx scripts/fidelity/differential.ts --seed 20260920 --count 2000 --out /tmp
 cd zone-a && DIFFERENTIAL_CORPUS=/tmp/differential.jsonl .uv-bootstrap/bin/uv run --frozen pytest -q tests/test_differential.py
 ```
 
-Three families, a third of the corpus each:
+Three families, a third of the generated cases each. A corpus of 500 cases or more also gets 5,796
+`xhtml` cases appended, the same at every seed: every lowered ½ between every neighbour of the
+`fidelity-norm/3.1.0` rule, in a clean paragraph (`--count 2000` writes 7,796 lines).
 
 - **normalize** — strings assembled from a weighted alphabet that covers every code point in the
   specification's closed lists (the four invisibles, the six ligatures, the nine bullet glyphs,
@@ -410,11 +412,12 @@ a future edit to the generator cannot quietly shrink the alphabet while the run 
 
 **In CI** (`.github/workflows/ci.yml`, and `scripts/check-all.sh` locally) the corpus is 2000
 cases at the fixed seed 20260920 and 2000 more at a seed of the run's own, its run id (locally, the
-time, or `DIFFERENTIAL_RUN_SEED`). The generator prints the seed and every case records it, so a
-failure at a new seed is reproduced with `--seed <that seed> --count 2000`. Each night,
-`.github/workflows/parity-sweep.yml` runs the exhaustive sweep as well: every code point as a
-character reference inside `sup`, inside `sub` and after an inline tag, and raw in three
-normalisation contexts, digested by `scripts/fidelity/parity-sweep.ts` and compared by
+time, or `DIFFERENTIAL_RUN_SEED`), each with the 5,796 lowered-½ cases: 15,592 cases in all. The
+generator prints the seed and every case records it, so a failure at a new seed is reproduced
+with `--seed <that seed> --count 2000`. Each night, `.github/workflows/parity-sweep.yml` runs the
+exhaustive sweep as well: every code point but the surrogates (U+D800–U+DFFF) as a character
+reference inside `sup`, inside `sub` and after an inline tag, and raw in three normalisation
+contexts, digested by `scripts/fidelity/parity-sweep.ts` and compared by
 `tests/test_parity_sweep.py` (skipped unless `PARITY_SWEEP` names the TypeScript's digests).
 
 **Results.** 2000 cases at each of three seeds, 6000 in total, **zero divergences**:
@@ -491,11 +494,12 @@ guard, so it cannot drift away from the generator.
 ## Continuous integration
 
 `.github/workflows/ci.yml` has a `zone-a` job alongside the Node `check` job: pinned Python 3.14,
-pinned `uv`, `uv sync --frozen`, then lint, format check, `mypy --strict`, the model-regeneration
+pinned `uv`, `uv sync --locked`, then lint, format check, `mypy --strict`, the model-regeneration
 check, and the tests. It now also sets up Node at the same pinned version as the `check` job and
 runs `npm ci`, because the differential corpus is produced by the TypeScript implementation: the
-job generates 2000 cases at seed 20260920 and points `DIFFERENTIAL_CORPUS` at them before
-`pytest`. The seed and count are pinned so a CI failure is reproducible locally from the two
+job generates 2000 cases at seed 20260920, and 2000 more at the run's own seed (each with the
+lowered-½ cases, above), and points `DIFFERENTIAL_CORPUS` at them before `pytest`. The count is
+pinned and the generator prints each seed, so a CI failure is reproducible locally from the two
 numbers in the log.
 
 Each step was verified to fail closed by breaking it locally and confirming a non-zero exit: one
@@ -515,10 +519,11 @@ it calls `print` or `pprint`, names `sys.stdout` or `sys.stderr` (`.write`, an a
 or imports `logging`, `pprint`, `warnings` or `traceback`, with a negative case for each. It is a
 lint over names, not a sandbox: a route built at run time (`getattr(sys, "std" + "out")`, a path
 assembled from parts, a subprocess that echoes, `ctypes`) passes it, a limit its own tests pin,
-and review is what catches those. It also fails if any Python or Markdown file in this directory contains
-a run of 24 or more characters taken from a vector's normalisation input, XHTML input, page
-text, or section markup. Vector comparisons are made on the values themselves, as the TypeScript
-tests do, but a failing comparison reports only the vector name, the canonical lengths, and two
+and review is what catches those. It also fails if any Python file (outside `contracts/`) or
+Markdown file in this directory contains, whole, a vector string of 24 or more characters: a
+normalisation or XHTML input or expected output, a page's text or a section's markup. A part of
+such a string, or a shorter string, is not caught. Vector comparisons are made on the values
+themselves, as the TypeScript tests do, but a failing comparison reports only the vector name, the canonical lengths, and two
 digests; a committed check result is compared by digest, and a failure names only the JSON
 pointers that differ.
 
@@ -527,7 +532,10 @@ pointers that differ.
 The port did find gaps. Every item below is a place where `docs/fidelity-normalization.md`, the
 ADRs, or the generated schemas did not determine the answer and `src/fidelity/*.ts` or
 `src/contracts/*.ts` had to be read, or where the TypeScript does something the specification
-does not say. None of them was resolved by changing Zone B.
+does not say. None of them was resolved by changing Zone B. Items 2 to 12 describe the
+specification as it stood when the port was written: `fidelity-norm/1.1.1` wrote each of them
+into `docs/fidelity-normalization.md` (sections 1, 5 and 6), and the vectors' outcomes did not
+change.
 
 **1. The contracts pin `uuid` and `date-time` with both a `format` and a `pattern`, which no
 pydantic model can express.** `contracts/generated/` emits
@@ -572,9 +580,10 @@ the SHA-256 of its canonical JSON, but not that the report's own hash is taken o
 with the `reportHash` field removed. Read from `verifyReportHash` in `verify.ts`.
 
 **7. The report's `issues` strings are free text and are inside the hash.** `Page 2:
-body-boundary`, `Orphan provenance <key>`, `No narrative sections to verify`, `Duplicate page
-number <n>`, `Invalid body range on page <n>`, `Ambiguous source section <key>` — their exact
-wording is load-bearing for `reportHash` and appears nowhere in the specification. A
+body-boundary`, `Orphan provenance <key>`, `No narrative sections to verify` — their exact
+wording is load-bearing for `reportHash` and appears nowhere in the specification. (`Duplicate
+page number <n>`, `Invalid body range on page <n>` and `Ambiguous source section <key>` are the
+details of a thrown structural error, which produces no report and so no hash.) A
 re-implementation must copy them character for character; these were taken from `verify.ts`.
 
 **8. Most span-resolution reason codes are not in the specification.** Section 6 names

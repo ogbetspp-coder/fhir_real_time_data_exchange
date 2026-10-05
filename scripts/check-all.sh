@@ -54,8 +54,8 @@ step "Node: npm run build"
 npm run build
 
 # --- Zone A (job: zone-a) ------------------------------------------------------------------
-step "Zone A: uv sync --frozen"
-(cd zone-a && "$UV" sync --frozen)
+step "Zone A: uv sync --locked"
+(cd zone-a && "$UV" sync --locked)
 step "Zone A: uv run --frozen ruff check ."
 (cd zone-a && "$UV" run --frozen ruff check .)
 step "Zone A: uv run --frozen ruff format --check ."
@@ -75,8 +75,8 @@ step "Zone A: uv run --frozen pytest --cov"
 (cd zone-a && DIFFERENTIAL_CORPUS="$ROOT/differential.jsonl" "$UV" run --frozen pytest --cov)
 
 # --- Agent (job: agent) --------------------------------------------------------------------
-step "Agent: uv sync --frozen"
-(cd agent && "$UV" sync --frozen)
+step "Agent: uv sync --locked"
+(cd agent && "$UV" sync --locked)
 step "Agent: uv run --frozen ruff check ."
 (cd agent && "$UV" run --frozen ruff check .)
 step "Agent: uv run --frozen ruff format --check ."

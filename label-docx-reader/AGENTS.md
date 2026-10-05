@@ -28,11 +28,11 @@ an EMA ePI) or refuse. Every rule below serves that.
   it; a new test goes there, and `tests/test_traceability.py` fails on a test that proves nothing
   or a requirement that names a test that is gone.
 - **Version every change.** `versions.lock.json` ties each version to the files that decide it
-  (`scripts/lock.py`, `current_versions`): `reader.py` to `READER_VERSION`; `output.py` and
-  `certify.py` to `label-docx-json`; `epi.py` to the ePI reader; `epi_output.py`, `output.py`,
-  `documents.py` and `certify.py` to `label-epi-json`. Bump every version whose files changed,
+  (`scripts/lock.py`, `current_versions`): `reader.py` to `READER_VERSION`; `output.py`,
+  `certify.py` and `documents.py` to `label-docx-json`; `epi.py` and `reader.py` to the ePI
+  reader; `epi_output.py`, `output.py`, `documents.py` and `certify.py` to `label-epi-json`. Bump every version whose files changed,
   run `scripts/lock.py` and review the diff of `corpus/*/expected.json`. Never re-lock a version
-  to other code.
+  to other code; a version in any lock on main (released) is never changed or dropped.
 - **Public or synthetic documents only** in `corpus/` and in tests, each set with a
   `sources.json`. No client or confidential labels in the repository.
 - **Tests never print label text.** A failure names a file, a code or a digest.

@@ -13,6 +13,7 @@ import pytest
 
 from label_docx.output import canonical, paragraphs, read
 from label_docx.reader import DocxRefusedError, read_docx
+from test_no_label_leak import sha256_hex
 
 CORPUS = sorted((Path(__file__).resolve().parents[1] / "corpus").glob("*/*.docx"))
 ENVIRONMENTS = [
@@ -39,19 +40,22 @@ def test_fresh_processes_under_other_hash_seeds_and_locales_write_the_same_bytes
     ]
     outputs = set()
     for process in running:
-        stdout, stderr = process.communicate()
-        # Read or refused (corpus/numbering-cases holds one refusal), never an error.
-        assert process.returncode in (0, 2), stderr.decode()
-        outputs.add(stdout)
-    assert outputs == {read(path.read_bytes())[0]}
+        stdout, _ = process.communicate()
+        # Read, refused (corpus/numbering-cases holds one refusal) or read in part (a template
+        # whose headers are refused), never an error; what the process wrote to stderr is not
+        # shown, as it could quote the document.
+        assert process.returncode in (0, 2, 3), f"{path.name}: exit {process.returncode}"
+        outputs.add(sha256_hex(stdout))
+    assert outputs == {sha256_hex(read(path.read_bytes())[0])}
 
 
 type Date = tuple[int, int, int, int, int, int]
 
 
-def _result(data: bytes) -> bytes | str:
+def _result(data: bytes) -> str:
+    """The digest of the result, or the refusal's code."""
     try:
-        return canonical(paragraphs(read_docx(data)))
+        return sha256_hex(canonical(paragraphs(read_docx(data))))
     except DocxRefusedError as refused:
         return refused.code
 
@@ -81,5 +85,7 @@ def test_the_result_depends_on_the_parts_not_on_how_they_are_zipped(path: Path) 
     ]
     for reverse, compression, date in cases:
         repacked = _repack(data, reverse, compression, date)
-        assert repacked != data
+        # Worked out first: the assertion would print both packages.
+        rezipped = repacked != data
+        assert rezipped
         assert _result(repacked) == expected

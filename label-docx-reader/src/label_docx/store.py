@@ -42,7 +42,7 @@ import re
 import sys
 import tempfile
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -62,7 +62,8 @@ class Ingested:
 
     document: str
     receipt: bytes
-    result: bytes
+    # The label's text: never in a repr, which a failing test or a traceback would print.
+    result: bytes = field(repr=False)
     read: bool
     created: bool
     # The application's verdict on the read (canonical JSON), or None where none was asked.
@@ -353,23 +354,34 @@ class Store:
         return data
 
 
-def _receipt(document: str, result: bytes, value: dict[str, Json], reading: Kind) -> bytes:
-    """What ingesting a document answers: the same bytes every time for the same document.
+def outcome(value: dict[str, Json]) -> str:
+    """A result's outcome: ``read``, ``refused``, or ``read-in-part``.
 
-    The outcome is ``read``, ``refused``, or ``read-in-part``: an ePI with sections, or a .docx
+    Read in part: an ePI with sections, or a .docx (either view of one with tracked changes)
     with headers, footers or comments, the reader refused on their own. Those hold no text, and
-    their refusals say why. A .docx with tracked changes says how many (``trackedChanges``).
+    their refusals say why.
     """
-    outcome = "refused" if "refusal" in value else "read"
+    if "refusal" in value:
+        return "refused"
     found = value.get("tracked")
     tracked: dict[str, Any] = found if isinstance(found, dict) else {}
     views = [tracked[v] for v in ("accepted", "original") if v in tracked]
     if value.get("refusedSections") or any(v.get("refusedParts") for v in (value, *views)):
-        outcome = "read-in-part"
+        return "read-in-part"
+    return "read"
+
+
+def _receipt(document: str, result: bytes, value: dict[str, Json], reading: Kind) -> bytes:
+    """What ingesting a document answers: the same bytes every time for the same document.
+
+    Its outcome is ``outcome``'s. A .docx with tracked changes says how many (``trackedChanges``).
+    """
+    found = value.get("tracked")
+    tracked: dict[str, Any] = found if isinstance(found, dict) else {}
     receipt: dict[str, Json] = {
         "document": document,
         "format": reading.format,
-        "outcome": outcome,
+        "outcome": outcome(value),
         "reader": reading.reader,
         "result": {"bytes": len(result), "sha256": hashlib.sha256(result).hexdigest()},
     }

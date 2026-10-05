@@ -94,6 +94,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from label_docx.epi import READER_VERSION, Document, Section, walk
+from label_docx.epi_output import FORMAT_VERSION
 from label_docx.reader import Mark, Paragraph
 
 from zone_a.certified import read_epi
@@ -104,7 +105,7 @@ from zone_a.underline import underline_changes
 # The version of the rules in this module and in headings.py, pattern.py and zone_a.underline.
 # A change to any of them changes its hash in versions.lock.json, and
 # tests/test_versions_lock.py then requires a new version here.
-CHECKER_VERSION = "qrd-check/1.3.0"
+CHECKER_VERSION = "qrd-check/1.4.0"
 SIMILARITY = 0.85
 MIN_LITERAL = 12
 FILL_LIMIT = 300
@@ -1544,9 +1545,9 @@ def report(file: str, data: bytes, registry: bytes, mapping: bytes) -> str:
     """The committed check result for one pinned source file, as JSON text.
 
     Besides ``check``'s result it names the source file and the SHA-256 of the exact bytes of
-    the three inputs, and the reader's version: the registry's version does not change with
-    every byte of it (its ``readerVersion`` has), and the mapping's version names the heading
-    findings' source only as far as it is bumped.
+    the three inputs, and the reader's version and its format's: the registry's version does not
+    change with every byte of it (its ``readerVersion`` has), and the mapping's version names the
+    heading findings' source only as far as it is bumped.
 
     Args:
         file: The pinned source file's name.
@@ -1557,6 +1558,7 @@ def report(file: str, data: bytes, registry: bytes, mapping: bytes) -> str:
     result = {
         "source": {"file": file, "sha256": hashlib.sha256(data).hexdigest()},
         "reader": READER_VERSION,
+        "format": FORMAT_VERSION,
         "inputs": {
             "registrySha256": hashlib.sha256(registry).hexdigest(),
             "mappingSha256": hashlib.sha256(mapping).hexdigest(),

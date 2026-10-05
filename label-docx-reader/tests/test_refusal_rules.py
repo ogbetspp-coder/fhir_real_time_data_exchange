@@ -204,6 +204,187 @@ def test_seq_styleref_ref_and_noteref_forms_word_computes_otherwise_are_refused(
     assert fragment in detail
 
 
+def _read_text(data: bytes) -> list[str]:
+    return [paragraph.text for paragraph in read_document(data).body]
+
+
+def test_a_styleref_with_a_format_switch_is_refused() -> None:
+    # As REF: Word's print of "Intro" under \* Upper is not on record; MERGEFORMAT changes no text.
+    intro = p(r("<w:t>Intro</w:t>"), HEADING)
+    for switch in ("Upper", "Lower", "Caps", "roman"):
+        body = intro + p(_field(f"STYLEREF 1 \\* {switch}", "Intro"))
+        assert _refusal(docx(body, H1)) == (
+            "computed-field",
+            "a STYLEREF field with a format switch",
+        )
+    assert _read_text(docx(intro + p(_field("STYLEREF 1 \\* MERGEFORMAT", "Intro")), H1)) == [
+        "Intro",
+        "Intro",
+    ]
+
+
+def test_a_cross_reference_to_text_holding_a_page_number_is_refused() -> None:
+    # The stored result matches the text, which leaves the page number Word prints out.
+    page = _field("PAGE", "3")
+    marked = p(_marked("bm", r('<w:t xml:space="preserve">Page </w:t>') + page))
+    assert _refusal(docx(marked + p(_field("REF bm \\h", "Page ")))) == (
+        "computed-field",
+        "a REF to a bookmark holding a page number",
+    )
+    heading = p(r('<w:t xml:space="preserve">Chapter </w:t>') + page, HEADING)
+    assert _refusal(docx(heading + p(_field("STYLEREF 1", "Chapter ")), H1)) == (
+        "computed-field",
+        "a STYLEREF to a paragraph with a page number",
+    )
+
+
+@pytest.mark.parametrize(
+    ("properties", "paragraph", "element"),
+    [
+        ("<w:color/>", "", "color"),
+        ('<w:color w:themeColor="background1"/>', "", "color"),
+        ("<w:vertAlign/>", "", "vertAlign"),
+        ("<w:u/>", "", "u"),
+        ("<w:highlight/>", "", "highlight"),
+        ("<w:position/>", "", "position"),
+        ('<w:shd w:fill="000000"/>', "", "shd"),
+        ("<w:sz/>", "", "sz"),
+        ("", '<w:shd w:fill="000000"/>', "shd"),
+    ],
+    ids=["color", "theme-color", "vert-align", "u", "highlight", "position", "shd", "sz", "p-shd"],
+)
+def test_a_property_without_its_value_is_refused(
+    properties: str, paragraph: str, element: str
+) -> None:
+    # Skipped, a style's value would show through it; read, it would be a guess at Word's.
+    styles = (
+        '<w:style w:type="character" w:styleId="C"><w:rPr><w:vertAlign w:val="superscript"/>'
+        '<w:u w:val="single"/><w:color w:val="FFFFFF"/><w:position w:val="6"/></w:rPr></w:style>'
+    )
+    body = p(r("<w:t>9</w:t>", '<w:rStyle w:val="C"/>' + properties), paragraph)
+    assert _refusal(docx(body, styles)) == ("unsupported-formatting", f"w:{element} without w:val")
+
+
+@pytest.mark.parametrize(
+    ("body", "footnotes"),
+    [
+        (
+            p(_marked("store", r("<w:t>below 25 C</w:t>")))
+            + p(_marked("STORE", r("<w:t>below 30 C</w:t>")).replace('"1"', '"2"'))
+            + p(_field("REF STORE \\h", "below 30 C")),
+            None,
+        ),
+        (
+            p(_marked("STORE", r("<w:t>below 30 C</w:t>")) + ref(1))
+            + p(_field("REF STORE \\h", "below 30 C")),
+            fnote(
+                1,
+                p(
+                    r("<w:footnoteRef/>")
+                    + _marked("store", r("<w:t>x</w:t>")).replace('"1"', '"9"')
+                ),
+            ),
+        ),
+        (
+            p(
+                _marked("bm", r("<w:t>below</w:t>"))
+                + r("<w:t>25 C</w:t>")
+                + '<w:bookmarkEnd w:id="1"/>'
+            )
+            + p(_field("REF bm", "below")),
+            None,
+        ),
+        (
+            p('<w:bookmarkStart w:id="1" w:name="bm"/>' + _marked("other", r("<w:t>below</w:t>")))
+            + p(_field("REF other", "below")),
+            None,
+        ),
+        (
+            p(
+                '<w:bookmarkEnd w:id="1"/>'
+                + r("<w:t>below</w:t>")
+                + '<w:bookmarkStart w:id="1" w:name="bm"/>'
+            )
+            + p(_field("REF bm \\h", "")),
+            None,
+        ),
+        (
+            p(_marked("bm", r("<w:t>below</w:t>")))
+            + p(_marked("BM", r("<w:t>x</w:t>")).replace('"1"', '"2"'))
+            + p(_field("PAGEREF bm \\h", "1")),
+            None,
+        ),
+    ],
+    ids=[
+        "names-differ-in-case",
+        "case-twin-in-a-note",
+        "two-ends",
+        "two-starts",
+        "end-first",
+        "pageref",
+    ],
+)
+def test_a_bookmark_word_may_find_otherwise_is_refused(body: str, footnotes: str | None) -> None:
+    assert _refusal(docx(body, footnotes=footnotes)) == (
+        "computed-field",
+        f"a {'PAGEREF' if 'PAGEREF' in body else 'REF'} to a bookmark it cannot read",
+    )
+
+
+def test_seq_identifiers_that_differ_only_in_case_are_refused() -> None:
+    body = p(_field("SEQ Table", "1")) + p(_field("SEQ table", "1"))
+    assert _refusal(docx(body)) == ("computed-field", "SEQ identifiers that differ only in case")
+
+
+@pytest.mark.parametrize(
+    "space", ["\u00a0", "&#10;", "\u2003", "\u3000"], ids=["nbsp", "lf", "em", "ideographic"]
+)
+def test_a_field_code_with_whitespace_other_than_spaces_is_refused(space: str) -> None:
+    marked = p(_marked("bm", r("<w:t>below</w:t>")))
+    for code in (f"REF{space}bm", f'HYPERLINK{space}"https://example.org"'):
+        assert _refusal(docx(marked + p(_field(code, "below")))) == (
+            "computed-field",
+            "a field code with whitespace other than spaces",
+        )
+    assert _read_text(docx(marked + p(_field("REF\tbm", "below")))) == ["below", "below"]
+    # Inside quotes it parts no words: a hyperlink's tooltip.
+    tooltip = f'HYPERLINK "https://example.org" \\o "see{space}here"'
+    assert _read_text(docx(p(_field(tooltip, "link")))) == ["link"]
+
+
+@pytest.mark.parametrize(
+    ("styles", "props", "paragraph"),
+    [
+        (
+            '<w:style w:type="character" w:styleId="HB"><w:rPr><w:highlight w:val="black"/>'
+            "</w:rPr></w:style>",
+            '<w:rStyle w:val="HB"/><w:color w:val="FFFFFF"/>',
+            "",
+        ),
+        (
+            '<w:style w:type="paragraph" w:styleId="HB"><w:rPr><w:highlight w:val="yellow"/>'
+            "</w:rPr></w:style>",
+            "",
+            '<w:pStyle w:val="HB"/>',
+        ),
+        (
+            '<w:docDefaults><w:rPrDefault><w:rPr><w:highlight w:val="none"/></w:rPr>'
+            "</w:rPrDefault></w:docDefaults>",
+            "",
+            "",
+        ),
+    ],
+    ids=["character-style", "paragraph-style", "defaults"],
+)
+def test_a_highlight_set_by_a_style_is_refused(styles: str, props: str, paragraph: str) -> None:
+    body = p(r("<w:t>not for IV use</w:t>", props), paragraph)
+    assert _refusal(docx(body, styles)) == ("unsupported-formatting", "a highlight set by a style")
+    # Set on the run itself, over the style's, it is read and marked.
+    direct = p(r("<w:t>x</w:t>", props + '<w:highlight w:val="green"/>'), paragraph)
+    (read,) = read_document(docx(direct, styles)).body
+    assert [m.kind for m in read.marks if m.kind.startswith("highlight")] == ["highlight-green"]
+
+
 # --- numbering --------------------------------------------------------------------------
 
 
@@ -373,3 +554,68 @@ def test_a_part_over_the_part_cap_is_refused(monkeypatch: pytest.MonkeyPatch) ->
     code, detail = _refusal(docx(p(r("<w:t>a</w:t>"))))
     assert code == "invalid-package"
     assert detail.endswith("is over 64 bytes")
+
+
+_OPEN_FIELD = (
+    r('<w:fldChar w:fldCharType="begin"/>')
+    + r('<w:instrText xml:space="preserve"> DOCPROPERTY Title </w:instrText>')
+    + r('<w:fldChar w:fldCharType="separate"/>')
+    + r("<w:t>a</w:t>")
+)
+_STORY_END = ("unbalanced-field", "a field still open where its story ends")
+
+
+def test_a_field_still_open_where_its_story_ends_is_refused() -> None:
+    # Its result has no end: what of the story is the field's, and what Word shows, is unknown.
+    assert _refusal(docx(p(_OPEN_FIELD))) == _STORY_END
+    in_cell = f"<w:tbl><w:tr><w:tc>{p(_OPEN_FIELD)}</w:tc></w:tr></w:tbl>"
+    assert _refusal(docx(in_cell)) == _STORY_END
+    note = fnote(1, p(r("<w:footnoteRef/>") + _OPEN_FIELD))
+    assert _refusal(docx(p(r("<w:t>x</w:t>") + ref(1)), footnotes=note)) == _STORY_END
+    (story,) = read_document(_with_header(p(_OPEN_FIELD))).headers
+    assert story.refusal is not None
+    assert (story.refusal[0], story.refusal[1]) == _STORY_END
+    # A stored result may run on past its paragraph, closed in a later one.
+    closed = p(_OPEN_FIELD) + p(r("<w:t>b</w:t>") + r('<w:fldChar w:fldCharType="end"/>'))
+    assert _read_text(docx(closed)) == ["a", "b"]
+
+
+@pytest.mark.parametrize("showing", ["<w:showingPlcHdr/>", '<w:showingPlcHdr w:val="true"/>'])
+def test_an_empty_content_control_showing_its_placeholder_is_refused(showing: str) -> None:
+    # Word shows a placeholder, which is not in the content, whether or not it names one.
+    body = p(r("<w:t>a</w:t>") + f"<w:sdt><w:sdtPr>{showing}</w:sdtPr><w:sdtContent/></w:sdt>")
+    assert _refusal(docx(body)) == ("unsupported-element", "an empty content control's placeholder")
+    off = body.replace(showing, '<w:showingPlcHdr w:val="0"/>')
+    assert _read_text(docx(off)) == ["a"]
+    # A placeholder kept in the content is the content's text.
+    kept = body.replace("<w:sdtContent/>", f"<w:sdtContent>{r('<w:t>b</w:t>')}</w:sdtContent>")
+    assert _read_text(docx(kept)) == ["ab"]
+
+
+@pytest.mark.parametrize(
+    "character", ["\u200b", "\u2060", "\ufeff"], ids=["zero-width-space", "word-joiner", "bom"]
+)
+def test_a_field_code_with_an_invisible_format_character_is_refused(character: str) -> None:
+    for code in (f'HYPERLINK "https://example.org"{character}', f"DOCPROPERTY Title{character}"):
+        assert _refusal(docx(p(_field(code, "link")))) == (
+            "computed-field",
+            "a field code with an invisible format character",
+        )
+    # Inside quotes it parts no words: a hyperlink's tooltip.
+    tooltip = f'HYPERLINK "https://example.org" \\o "see{character}here"'
+    assert _read_text(docx(p(_field(tooltip, "link")))) == ["link"]
+
+
+def test_a_reference_must_name_its_bookmark_in_the_case_written() -> None:
+    # Word's bookmark names are case-insensitive, but what it prints for another case is not on
+    # record: the name must be the bookmark's as written.
+    marked = p(_marked("_Ref1", r("<w:t>below</w:t>")))
+    assert _read_text(docx(marked + p(_field("REF _Ref1 \\h", "below")))) == ["below", "below"]
+    assert _refusal(docx(marked + p(_field("REF _ref1 \\h", "below")))) == (
+        "computed-field",
+        "a REF to a bookmark that is not there",
+    )
+    assert _refusal(docx(marked + p(_field("PAGEREF _ref1 \\h", "4")))) == (
+        "computed-field",
+        "a PAGEREF to a bookmark it cannot read",
+    )

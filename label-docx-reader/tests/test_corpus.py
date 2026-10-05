@@ -34,8 +34,11 @@ def test_every_corpus_file_is_the_recorded_byte_copy() -> None:
         assert present == set(recorded), sources.parent.name
         for name, source in recorded.items():
             data = (sources.parent / name).read_bytes()
-            assert len(data) == source["bytes"], name
-            assert hashlib.sha256(data).hexdigest() == source["sha256"], name
+            # One comparison of a pair: len(data) == ... alone would print the bytes.
+            assert (len(data), hashlib.sha256(data).hexdigest()) == (
+                source["bytes"],
+                source["sha256"],
+            ), name
 
 
 def test_words_views_of_tracked_cases_are_of_the_cases_as_they_are() -> None:

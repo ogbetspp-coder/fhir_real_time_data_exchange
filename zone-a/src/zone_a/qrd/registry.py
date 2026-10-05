@@ -19,13 +19,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from label_docx.output import FORMAT_VERSION
 from label_docx.reader import READER_VERSION, Paragraph
 
 from zone_a.certified import read_docx
 from zone_a.qrd.pattern import Token, UnbalancedTemplateError, children, is_balanced, parse
 from zone_a.underline import underline_changes
 
-REGISTRY_VERSION = "1.1.0"
+REGISTRY_VERSION = "1.2.0"
 
 TEMPLATE_FILE = "qrd-product-information-template-version-104_en.docx"
 APPENDIX_I_FILE = (
@@ -514,6 +515,7 @@ def build(directory: Path, lock: dict[str, Any]) -> dict[str, Any]:
     return {
         "registryVersion": REGISTRY_VERSION,
         "readerVersion": READER_VERSION,
+        "readerFormat": FORMAT_VERSION,
         "template": {
             "family": "EMA QRD product-information template, centralised procedure",
             "version": "10.4",

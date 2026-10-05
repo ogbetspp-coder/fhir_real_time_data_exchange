@@ -56,7 +56,8 @@ def test_a_docx_is_held_to_word_and_an_epi_is_not(tmp_path: Path) -> None:
     assert ingested.verification is not None
     assert json.loads(ingested.verification)["verdict"] == "agrees"
     assert store.verifications(ingested.document) == [json.loads(ingested.verification)]
-    assert store.ingest(EPI).verification is None
+    # Compared as a list: `is None` would print the ingestion, with its result.
+    assert [store.ingest(EPI).verification] == [None]
 
 
 def test_a_docx_word_shows_otherwise_is_never_served(tmp_path: Path) -> None:
@@ -79,8 +80,7 @@ def test_an_application_that_cannot_be_asked_verifies_nothing_and_keeps_nothing(
     )
     for data in (DOCX, EPI):
         ingested = store.ingest(data)
-        assert ingested.verification is None
-        assert store.verifications(ingested.document) == []
+        assert (ingested.verification, store.verifications(ingested.document)) == (None, [])
 
 
 @pytest.mark.skipif(

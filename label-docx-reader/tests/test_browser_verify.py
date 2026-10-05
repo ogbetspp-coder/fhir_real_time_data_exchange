@@ -53,17 +53,19 @@ def test_an_epi_is_verified_and_the_verdict_kept_once_per_browser(tmp_path: Path
     store = Store(tmp_path, browser=_checker(_agreeing))
     first = store.ingest(EPI)
     again = Store(tmp_path, browser=_checker(_agreeing)).ingest(EPI)
-    assert first.verification is not None
-    assert first.verification == again.verification
-    assert json.loads(first.verification)["application"] == "Stand-in 1.0"
-    assert store.verifications(first.document) == [json.loads(first.verification)]
+    # Taken out of the ingestion first: an assertion on it would print the result it holds.
+    verification = first.verification
+    assert verification is not None
+    assert verification == again.verification
+    assert json.loads(verification)["application"] == "Stand-in 1.0"
+    assert store.verifications(first.document) == [json.loads(verification)]
     assert store.disagreement(first.document) is None
 
 
 def test_a_word_document_and_a_refused_epi_are_not_sent_to_the_browser(tmp_path: Path) -> None:
     store = Store(tmp_path, browser=_checker(_differing))
-    assert store.ingest(DOCX).verification is None
-    assert store.ingest(b'{"resourceType": "Bundle"}').verification is None
+    refused = b'{"resourceType": "Bundle"}'
+    assert [store.ingest(data).verification for data in (DOCX, refused)] == [None, None]
 
 
 def test_a_kept_verdict_is_not_asked_again_and_a_new_version_is(tmp_path: Path) -> None:
@@ -146,7 +148,9 @@ def test_chrome_draws_the_list_markers_the_reader_reads_and_sees_a_changed_one()
             if p["numbering"] is not None and p["numbering"]["text"] is not None
         ]
 
-    assert len(items(result["sections"])) > 10
+    # Counted first: the assertion would print the paragraphs counted.
+    listed = len(items(result["sections"]))
+    assert listed > 10
     assert browser.verify_epi(EPI, result, CHROME)["differs"] == []
     changed = copy.deepcopy(result)
     first = items(changed["sections"])[0]

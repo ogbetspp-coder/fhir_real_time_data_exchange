@@ -19,6 +19,7 @@ import json
 import pickle
 import random
 import re
+import unicodedata
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -32,11 +33,13 @@ from label_docx.certify import (
     CertificationError,
     DocxSource,
     EpiSource,
+    _drawn_complex,
     _formatted,
     _unescape,
     certify_docx,
     certify_epi,
 )
+from label_docx.epi import is_default_ignorable
 from label_docx.output import canonical
 from label_docx.word import SUFFIXES, label_as_drawn
 from lock import MANIFESTS
@@ -2880,8 +2883,13 @@ def test_a_merged_cell_holds_what_its_lists_and_restart_say() -> None:
     ],
 )
 def test_complex_script_is_known_by_its_ranges_alone(code: int, complex_script: bool) -> None:
+    assert _drawn_complex(chr(code)) is complex_script
     body = _p(f"<w:r><w:rPr><w:b/></w:rPr><w:t>{chr(code)}</w:t></w:r>")
-    if complex_script:
+    # A boundary that is unassigned, a format character or ignorable is refused first as such.
+    if unicodedata.category(chr(code)) in ("Cf", "Cn") or code == 0xFE00:
+        with pytest.raises(CertificationError, match="does not show as itself"):
+            DocxSource(docx(body))
+    elif complex_script:
         with pytest.raises(CertificationError, match="complex script"):
             DocxSource(docx(body))
     else:
@@ -3532,3 +3540,307 @@ def test_column_banding_over_a_last_column_whose_look_is_unsaid_is_never_certifi
     # Over no text in the last column, the columns before it are banded.
     first_two = _only_text(body, *(f"r{i}c{j}" for i in range(3) for j in (0, 1)))
     assert _checked_grid(first_two, styles) == "B . .|B . .|B . ."
+
+
+# --- what the check refuses on its own, where the reader refuses (sweep of the check) -----------
+
+_BEGIN = '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+_SEPARATE = '<w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+_END = '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
+
+
+def _code(code: str) -> str:
+    return f'<w:r><w:instrText xml:space="preserve"> {code} </w:instrText></w:r>'
+
+
+@pytest.mark.parametrize(
+    ("body", "reason"),
+    [
+        (
+            _p(_BEGIN + _code("QUOTE")) + _p("<w:r><w:t>b</w:t></w:r>" + _SEPARATE + _END),
+            "a paragraph ends inside a field's code or page number",
+        ),
+        (
+            _p(_BEGIN + _code("PAGE") + _SEPARATE + "<w:r><w:t>3</w:t></w:r>")
+            + _p("<w:r><w:t>b</w:t></w:r>" + _END),
+            "a paragraph ends inside a field's code or page number",
+        ),
+        (
+            _p(_BEGIN + _code("DOCPROPERTY Title") + _SEPARATE + "<w:r><w:t>a</w:t></w:r>"),
+            "a field still open where its story ends",
+        ),
+    ],
+    ids=["code-past-its-paragraph", "page-number-past-its-paragraph", "open-at-the-story-end"],
+)
+def test_a_field_left_open_at_a_paragraph_or_story_end_is_never_certified(
+    body: str, reason: str
+) -> None:
+    with pytest.raises(CertificationError, match=f"^{re.escape(reason)}$"):
+        DocxSource(docx(body))
+    # A stored result may run on past its paragraph, closed in a later one.
+    shown = _BEGIN + _code("DOCPROPERTY Title") + _SEPARATE + "<w:r><w:t>a</w:t></w:r>"
+    data = docx(_p(shown) + _p("<w:r><w:t>b</w:t></w:r>" + _END))
+    DocxSource(data).certify(_value("a", "b"))
+
+
+@pytest.mark.parametrize("hidden", ["<w:vanish/>", '<w:vanish w:val="1"/>'])
+def test_a_hidden_page_number_is_never_certified(hidden: str) -> None:
+    result = f"<w:r><w:rPr>{hidden}</w:rPr><w:t>3</w:t></w:r>"
+    for page in (
+        _BEGIN + _code("PAGE") + _SEPARATE + result + _END,
+        f'<w:fldSimple w:instr=" PAGE ">{result}</w:fldSimple>',
+    ):
+        with pytest.raises(CertificationError, match=r"^a hidden page number$"):
+            DocxSource(docx(_p("<w:r><w:t>p</w:t></w:r>" + page)))
+        shown = page.replace(f"<w:rPr>{hidden}</w:rPr>", "")
+        DocxSource(docx(_p("<w:r><w:t>p</w:t></w:r>" + shown))).certify(
+            _value({"text": "p", "pages": [1]})
+        )
+
+
+_EDGES = "spaces at the edge of a text element not preserved"
+_UNSHOWN = "a character Word does not show as itself"
+
+
+@pytest.mark.parametrize(
+    ("text", "reason"),
+    [
+        ("<w:t> x</w:t>", _EDGES),
+        ("<w:t>x </w:t>", _EDGES),
+        ('<w:t xml:space="default"> x </w:t>', _EDGES),
+        ("<w:t>a&#13;b</w:t>", _UNSHOWN),
+        *(
+            (f"<w:t>a{chr(code)}b</w:t>", _UNSHOWN)
+            for code in (
+                0x0009,  # a tab, which Word writes as w:tab
+                0x000A,  # a line feed, which Word writes as w:br
+                0x0085,  # a C1 control
+                0x202E,  # a right-to-left override
+                0x200B,  # a zero-width space
+                0x2066,  # a left-to-right isolate
+                0xFEFF,  # a byte order mark
+                0x034F,  # the grapheme joiner, ignorable though a mark
+                0x180F,  # a Mongolian variation selector
+                0xFE0F,  # a variation selector
+                0xE0100,  # a supplementary variation selector
+                0x3164,  # the Hangul filler, ignorable though a letter
+                0x0378,  # unassigned
+            )
+        ),
+    ],
+    ids=lambda value: (
+        {_EDGES: "edges", _UNSHOWN: "unshown"}.get(value)
+        or re.sub(r"[^0-9A-Za-z]+", "-", ascii(value)).strip("-")
+    ),
+)
+def test_text_word_shows_otherwise_than_stored_is_never_certified(text: str, reason: str) -> None:
+    with pytest.raises(CertificationError, match=f"^{re.escape(reason)}$"):
+        DocxSource(docx(_p(f"<w:r>{text}</w:r>")))
+    # In a field's code as anywhere: the check reads every text element alike.
+    with pytest.raises(CertificationError, match=f"^{re.escape(reason)}$"):
+        DocxSource(docx(_p(_BEGIN + f"<w:r>{text}</w:r>" + _SEPARATE + _END)))
+
+
+# Each end of the check's ranges of characters drawn as nothing, and one past it.
+_IGNORED_EDGES = sorted(
+    {
+        code + step
+        for low, high in (
+            (0x034F, 0x034F),
+            (0x115F, 0x1160),
+            (0x17B4, 0x17B5),
+            (0x180B, 0x180F),
+            (0x3164, 0x3164),
+            (0xFE00, 0xFE0F),
+            (0xFFA0, 0xFFA0),
+            (0xE0100, 0xE01EF),
+        )
+        for code, step in ((low, -1), (low, 0), (high, 0), (high, 1))
+    }
+)
+
+
+@pytest.mark.parametrize("code", _IGNORED_EDGES, ids=lambda code: f"U+{code:04X}")
+def test_a_character_is_refused_exactly_where_unicode_draws_it_as_nothing(code: int) -> None:
+    # Held to the ePI reader's own copy of Unicode's Default_Ignorable_Code_Point, so a range
+    # of the check's that ends one character early or late is caught at that character.
+    unshown = unicodedata.category(chr(code)) in ("Cf", "Cc", "Cn") or is_default_ignorable(code)
+    try:
+        DocxSource(docx(_p(f"<w:r><w:t>a{chr(code)}b</w:t></w:r>"))).certify(
+            _value(f"a{chr(code)}b")
+        )
+        refused = False
+    except CertificationError:
+        refused = True
+    assert refused == unshown
+
+
+def test_text_shown_as_stored_is_certified() -> None:
+    stored = f"a{chr(0xA0)}{chr(0xE9)}b"  # a no-break space and an accented letter
+    body = _p(f'<w:r><w:t xml:space="preserve"> x </w:t><w:t>{stored}</w:t></w:r>')
+    DocxSource(docx(body)).certify(_value(" x " + stored))
+
+
+_W15 = 'xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml"'
+_BOUND = '<w:dataBinding w:xpath="/r/x" w:storeItemID="{00000000-0000-0000-0000-000000000000}"/>'
+_PLACEHOLDER = '<w:placeholder><w:docPart w:val="DefaultPlaceholder"/></w:placeholder>'
+
+
+@pytest.mark.parametrize(
+    ("body", "reason"),
+    [
+        (
+            f"<w:sdt><w:sdtPr>{_BOUND}</w:sdtPr><w:sdtContent>"
+            + _p("<w:r><w:t>Stored</w:t></w:r>")
+            + "</w:sdtContent></w:sdt>",
+            "a content control bound to data",
+        ),
+        (
+            _p(
+                f'<w:sdt><w:sdtPr><w15:dataBinding {_W15} w15:xpath="/r/x"/></w:sdtPr>'
+                "<w:sdtContent><w:r><w:t>Stored</w:t></w:r></w:sdtContent></w:sdt>"
+            ),
+            "a content control bound to data",
+        ),
+        (
+            _p(f"<w:sdt><w:sdtPr>{_PLACEHOLDER}</w:sdtPr><w:sdtContent/></w:sdt>"),
+            "an empty content control showing a placeholder",
+        ),
+        (
+            _p(
+                "<w:sdt><w:sdtPr><w:showingPlcHdr/></w:sdtPr><w:sdtContent>"
+                "<w:r><w:t></w:t></w:r></w:sdtContent></w:sdt>"
+            ),
+            "an empty content control showing a placeholder",
+        ),
+        (
+            f"<w:tbl><w:tr><w:sdt><w:sdtPr>{_BOUND}</w:sdtPr><w:sdtContent><w:tc>"
+            + _p("<w:r><w:t>Stored</w:t></w:r>")
+            + "</w:tc></w:sdtContent></w:sdt></w:tr></w:tbl>",
+            "a content control bound to data",
+        ),
+    ],
+    ids=["bound", "bound-word-2013", "empty-placeholder", "showing-placeholder-empty", "in-a-row"],
+)
+def test_a_content_control_word_fills_from_elsewhere_is_never_certified(
+    body: str, reason: str
+) -> None:
+    with pytest.raises(CertificationError, match=f"^{re.escape(reason)}$"):
+        DocxSource(docx(body))
+
+
+@pytest.mark.parametrize(
+    "properties", [_PLACEHOLDER, "<w:showingPlcHdr/>", _PLACEHOLDER + "<w:showingPlcHdr/>"]
+)
+def test_a_placeholder_stored_in_the_content_is_its_text(properties: str) -> None:
+    # Word writes the placeholder it shows into the content (corpus/tracked-cases, Word's own
+    # file for content-control-emptied); a tab alone shows a character too.
+    for content, text in (("<w:t>Enter a name</w:t>", "Enter a name"), ("<w:tab/>", "\t")):
+        body = _p(
+            f"<w:sdt><w:sdtPr>{properties}</w:sdtPr>"
+            f"<w:sdtContent><w:r>{content}</w:r></w:sdtContent></w:sdt>"
+        )
+        DocxSource(docx(body)).certify(_value(text))
+    off = _p('<w:sdt><w:sdtPr><w:showingPlcHdr w:val="0"/></w:sdtPr><w:sdtContent/></w:sdt>')
+    DocxSource(docx(off)).certify(_value(""))
+
+
+_ONE_LEVEL = '<w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/></w:lvl>'
+_ANOTHER = '<w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/><w:lvlText w:val="%1)"/></w:lvl>'
+_NUM_OF_0 = '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>'
+_OVERRIDE = '<w:lvlOverride w:ilvl="0"><w:startOverride w:val="3"/></w:lvlOverride>'
+
+
+@pytest.mark.parametrize(
+    ("styles", "numbering", "reason"),
+    [
+        (
+            '<w:style w:type="character" w:styleId="C"><w:rPr><w:b/></w:rPr></w:style>'
+            '<w:style w:type="paragraph" w:styleId="C"/>',
+            None,
+            "style C is defined twice",
+        ),
+        (
+            None,
+            f'<w:abstractNum w:abstractNumId="0">{_ONE_LEVEL}</w:abstractNum>'
+            f'<w:abstractNum w:abstractNumId="0">{_ANOTHER}</w:abstractNum>{_NUM_OF_0}',
+            "abstractNum 0 is defined twice",
+        ),
+        (
+            None,
+            f'<w:abstractNum w:abstractNumId="0">{_ONE_LEVEL}{_ANOTHER}</w:abstractNum>{_NUM_OF_0}',
+            "list level 0 is defined twice",
+        ),
+        (
+            None,
+            f'<w:abstractNum w:abstractNumId="0">{_ONE_LEVEL}</w:abstractNum>{_NUM_OF_0}'
+            '<w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>',
+            "numId 1 is defined twice",
+        ),
+        (
+            None,
+            f'<w:abstractNum w:abstractNumId="0">{_ONE_LEVEL}</w:abstractNum>{_NUM_OF_0}'
+            '<w:num w:numId="1"/>',
+            "numId 1 is defined twice",
+        ),
+        (
+            None,
+            f'<w:abstractNum w:abstractNumId="0">{_ONE_LEVEL}</w:abstractNum>'
+            f'<w:num w:numId="1"><w:abstractNumId w:val="0"/>{_OVERRIDE}{_OVERRIDE}</w:num>',
+            "list level 0 is defined twice",
+        ),
+    ],
+    ids=["style", "abstract-num", "level", "num", "num-naming-no-list", "level-override"],
+)
+def test_anything_defined_twice_is_never_certified(
+    styles: str | None, numbering: str | None, reason: str
+) -> None:
+    body = _p("<w:r><w:t>x</w:t></w:r>")
+    with pytest.raises(CertificationError, match=f"^{re.escape(reason)}$"):
+        DocxSource(docx(body, styles=styles, numbering=numbering))
+    once = (
+        f'<w:abstractNum w:abstractNumId="0">{_ONE_LEVEL}</w:abstractNum>'
+        f'<w:num w:numId="1"><w:abstractNumId w:val="0"/>{_OVERRIDE}</w:num>'
+    )
+    styled = '<w:style w:type="character" w:styleId="C"/><w:style w:styleId="P"/>'
+    DocxSource(docx(body, styles=styled, numbering=once)).certify(_value("x"))
+
+
+def _entries(data: bytes, *extra: tuple[str, str]) -> bytes:
+    """``data`` with more zip entries, under names it may already hold."""
+    import io
+    import zipfile
+
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(out, "w") as target:
+        for info in source.infolist():
+            target.writestr(info, source.read(info))
+        for name, content in extra:
+            target.writestr(name, content)
+    return out.getvalue()
+
+
+# zipfile warns of a duplicate name, as it should.
+@pytest.mark.filterwarnings("ignore:Duplicate name")
+def test_a_part_name_twice_in_any_case_or_a_part_named_twice_is_never_certified() -> None:
+    from test_reader import document_xml
+
+    data = docx(_p("<w:r><w:t>x</w:t></w:r>"))
+    other = document_xml(_p("<w:r><w:t>y</w:t></w:r>"))
+    for name in ("word/document.xml", "word/Document.xml", "WORD/DOCUMENT.XML"):
+        with pytest.raises(CertificationError, match=r"^a part name occurs twice$"):
+            DocxSource(_entries(data, (name, other)))
+    DocxSource(_entries(data, ("word/other.xml", other))).certify(_value("x"))
+    styled = docx(_p("<w:r><w:t>x</w:t></w:r>"), styles="")
+    second = (
+        '<Relationship Id="s2" Type="http://schemas.openxmlformats.org/officeDocument/2006/'
+        'relationships/styles" Target="styles2.xml"/>'
+    )
+    twice = _relationships(
+        _with_part(styled, "word/styles2.xml", f'<w:styles xmlns:w="{W}"/>'),
+        "word/_rels/document.xml.rels",
+        second,
+    )
+    with pytest.raises(CertificationError, match=r"^two styles parts$"):
+        DocxSource(twice)
+    DocxSource(styled).certify(_value("x"))

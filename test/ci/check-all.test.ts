@@ -120,7 +120,7 @@ describe("scripts/check-all.sh", () => {
       ["zone-a", 8],
       ["agent", 6],
     ]);
-    expect(sections.get("zone-a")?.[0]).toBe("zone-a uv sync --frozen");
+    expect(sections.get("zone-a")?.[0]).toBe("zone-a uv sync --locked");
     for (const command of NOT_RUN_LOCALLY) {
       expect([...jobs.values()].flat()).toContain(command);
     }

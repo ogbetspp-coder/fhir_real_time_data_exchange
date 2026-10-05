@@ -279,7 +279,7 @@ jobs:
           cache-dependency-glob: zone-a/uv.lock
 
       - name: Install Python dependencies
-        run: uv sync --frozen
+        run: uv sync --locked
 
       - name: Lint
         run: uv run --frozen ruff check .
@@ -352,7 +352,7 @@ jobs:
           cache-dependency-glob: agent/uv.lock
 
       - name: Install Python dependencies
-        run: uv sync --frozen
+        run: uv sync --locked
 
       - name: Lint
         run: uv run --frozen ruff check .

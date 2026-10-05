@@ -54,7 +54,7 @@ jobs:
           cache-dependency-glob: zone-a/uv.lock
 
       - name: Install Python dependencies
-        run: uv sync --frozen
+        run: uv sync --locked
 
       - name: Sweep every code point with the TypeScript implementation
         working-directory: .

@@ -4173,7 +4173,7 @@
     "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx": true,
     "qrd-product-information-template-version-104_en.docx": true
   },
-  "recorded": "2026-10-03",
+  "recorded": "2026-10-04",
   "sha256": {
     "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": "13031dfae722bfe2479cb9323be96adfe18941da1c489731ea805082e5f886b3",
     "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx": "68a8026e6d99f22f9a380edf04df34bb5f29f35574f9e507fb4b5d5f16e996ae",
@@ -4183,6 +4183,13 @@
   "stories": {
     "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          true,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -4230,6 +4237,13 @@
     },
     "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          true,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -4277,6 +4291,13 @@
     },
     "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          true,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -4324,6 +4345,13 @@
     },
     "qrd-product-information-template-version-104_en.docx": {
       "comments": [],
+      "setups": [
+        [
+          0,
+          true,
+          false
+        ]
+      ],
       "stories": [
         [
           "header",
@@ -5064,5 +5092,5 @@
       "<The following information is intended for healthcare professionals only:>"
     ]
   },
-  "verifier": "word-verifier/1.0.4"
+  "verifier": "word-verifier/1.0.5"
 }

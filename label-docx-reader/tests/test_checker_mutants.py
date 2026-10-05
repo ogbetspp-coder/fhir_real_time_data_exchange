@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 
 from mutate_checker import EQUIVALENT, RECORD, TARGET, count, held_sha256, keys
 
@@ -52,3 +53,13 @@ def test_each_reason_names_one_fault_of_the_check_as_it_is() -> None:
 def test_most_faults_are_caught_outright() -> None:
     record = json.loads(RECORD.read_text("utf-8"))
     assert record["killed"] / record["mutants"] > 0.9
+
+
+def test_the_record_is_held_to_every_helper_the_tests_run_on(tmp_path: Path) -> None:
+    # The cases test_reader builds lists from, and the pinned tools: a change to either is a
+    # change to what the check's tests run.
+    for name in ("scripts/numbering_cases.py", "pyproject.toml"):
+        before = held_sha256(tmp_path)
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / name).write_text("changed", "utf-8")
+        assert held_sha256(tmp_path) != before, name

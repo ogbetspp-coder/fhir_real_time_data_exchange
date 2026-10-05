@@ -141,6 +141,7 @@ served as written, a raw FHIR string: its whitespace is not collapsed.
 from __future__ import annotations
 
 import bisect
+import functools
 import json
 import re
 import unicodedata
@@ -151,7 +152,7 @@ from typing import Any, Final
 from label_docx.reader import Mark, Numbering, Paragraph
 
 # The version of the rules above; versions.lock.json ties it to this file (tests/test_locks.py).
-READER_VERSION = "epi-reader/1.3.0"
+READER_VERSION = "epi-reader/1.3.1"
 XHTML = "http://www.w3.org/1999/xhtml"
 OBJECT = "\ufffc"
 _COLLAPSIBLE = " \t\n\r\f"
@@ -308,7 +309,10 @@ _STYLE_CHARS = re.compile(r"[A-Za-z0-9 \t\n\r\f#%!.,:;'\"()-]*")
 _QUOTED_FAMILY = re.compile(r"'[^'\";]*'|\"[^'\";]*\"|[^'\";]*")
 
 
-def _declarations(style: str) -> list[tuple[str, str]]:
+# A style is read many times over (each element's checks, each character's marks); the reading is
+# a function of the string alone, and a refusal is raised again each time (no exception is kept).
+@functools.lru_cache(maxsize=4096)
+def _declarations(style: str) -> tuple[tuple[str, str], ...]:
     if not _STYLE_CHARS.fullmatch(style):
         raise _RefusedError("unsupported-style", "a character CSS tokenizes other than the reader")
     # A bracket in a quoted font family name is part of the name ('CG Times (WN)').
@@ -328,7 +332,7 @@ def _declarations(style: str) -> list[tuple[str, str]]:
         ):
             raise _RefusedError("unsupported-style", f"a quote in {name.strip()!r}")
         out.append((name.strip().lower(), value.strip().lower().removesuffix("!important").strip()))
-    return out
+    return tuple(out)
 
 
 # Colour names the reader accepts: CSS's basic colours, the ones Word writes, and keywords.
@@ -533,7 +537,8 @@ def _valid_border(part: str, token: str) -> bool:
     return _WIDTH.fullmatch(token) is not None
 
 
-def _importance_ordered(style: str) -> list[tuple[str, str]]:
+@functools.lru_cache(maxsize=4096)
+def _importance_ordered(style: str) -> tuple[tuple[str, str], ...]:
     """The declarations in the order a browser applies them: normal ones, then ``!important``."""
     normal: list[tuple[str, str]] = []
     important: list[tuple[str, str]] = []
@@ -544,7 +549,7 @@ def _importance_ordered(style: str) -> list[tuple[str, str]]:
         value = value.strip().lower()
         target = important if value.endswith("!important") else normal
         target.append((name.strip().lower(), value.removesuffix("!important").strip()))
-    return normal + important
+    return (*normal, *important)
 
 
 def _inline_borders(style: str, builder: _Builder) -> set[str]:
@@ -957,6 +962,8 @@ _TINY_POINTS: Final = 2.0
 # --- paragraphs -----------------------------------------------------------------------------
 
 
+# A function of the character and the interpreter's Unicode data alone, asked once per character.
+@functools.cache
 def _check_character(character: str) -> None:
     """Refuse a character a browser does not show as itself (or the reader's U+FFFC)."""
     if character == OBJECT:
@@ -1121,7 +1128,11 @@ def _marks(kinds: list[frozenset[str]]) -> tuple[Mark, ...]:
     kinds = [frozenset("faint" if k == _FAINT_COLOUR else k for k in each) for each in kinds]
     out: list[Mark] = []
     started: dict[str, int] = {}  # each kind open at this character, from where
+    previous: frozenset[str] | None = None
     for index, each in enumerate([*kinds, frozenset()]):
+        if each == previous:
+            continue  # what is open is already ``each``
+        previous = each
         for kind in [kind for kind in started if kind not in each]:
             out.append(Mark(started.pop(kind), index, kind))
         for kind in each:
@@ -1686,7 +1697,29 @@ _HTML_OTHERWISE = re.compile(
 )
 # A run a tag name cannot leave, and what may follow a name up to "/>" (quoted attributes).
 _NAME_RUN = re.compile(r"[^\s/>]+")
-_SELF_CLOSING_TAIL = re.compile(r"(?:\s+[^\s=/>]+\s*=\s*(?:\"[^\"]*\"|'[^']*'))*\s*/>")
+_ATTRIBUTE = re.compile(r"\s+[^\s=/>]+\s*=\s*(?:\"[^\"]*\"|'[^']*')")
+_CLOSING = re.compile(r"\s*/>")
+
+
+def _self_closing_tail(div: str, at: int, known: dict[int, bool]) -> bool:
+    """Whether quoted attributes from ``at`` run on to "/>", each place's answer kept in ``known``.
+
+    An attribute matches one way only, and "/>" never follows where one does (a name cannot
+    begin with "/"), so the attributes from any place lead to one end, which answers for every
+    place on the way. Keeping the answers scans each attribute once, where scanning the tail
+    afresh from each "<" in the attribute values ahead of it took quadratic time.
+    """
+    passed: list[int] = []
+    while at not in known:
+        attribute = _ATTRIBUTE.match(div, at)
+        if attribute is None:
+            known[at] = _CLOSING.match(div, at) is not None
+            break
+        passed.append(at)
+        at = attribute.end()
+    for place in passed:
+        known[place] = known[at]
+    return known[at]
 
 
 def _html_otherwise(div: str) -> bool:
@@ -1699,15 +1732,18 @@ def _html_otherwise(div: str) -> bool:
     """
     if _HTML_OTHERWISE.search(div):
         return True
+    known: dict[int, bool] = {}
     for run in _NAME_RUN.finditer(div):
         text = run.group()
+        if "<" not in text:
+            continue
         names = (
             text[at + 1 :] if len(text) - at <= 4 else None
             for at in range(len(text) - 1)
             if text[at] == "<" and text[at + 1].isascii() and text[at + 1].isalpha()
         )
         if any(name not in ("br", "hr", "img") for name in names) and (
-            _SELF_CLOSING_TAIL.match(div, run.end())
+            _self_closing_tail(div, run.end(), known)
         ):
             return True
     return False
@@ -1816,7 +1852,9 @@ def read_epi(data: bytes) -> Document:
 # How deep a Bundle's arrays and objects may nest (the pinned ePIs reach 17): the JSON parser
 # recurses, and how deep it can go depends on the thread's stack.
 _JSON_DEPTH: Final = 100
-_JSON_STRING = re.compile(r'"[^"\\]*(?:\\.[^"\\]*)*"', re.S)
+# A string, or one never closed, which runs to the end: tried from each quote in turn, a string
+# never closed was scanned to the end from every one, in quadratic time. Not JSON either way.
+_JSON_STRING = re.compile(r'"[^"\\]*+(?:\\.[^"\\]*+)*+(?:"|\\?\Z)', re.S)
 
 
 def _one_reading(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
