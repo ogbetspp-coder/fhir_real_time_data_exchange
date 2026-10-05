@@ -776,6 +776,8 @@ def test_a_picture_is_carried_as_its_exact_bytes() -> None:
 @pytest.mark.parametrize(
     ("extent", "reason", "detail"),
     [
+        ((0, 0), None, "no size"),
+        ((4 * 9525, 0), None, "no size"),
         ((5 * 9525, 2 * 9525), None, "larger"),
         ((4 * 9525, 3 * 9525), None, "larger"),
         ((38100, 18600), None, "proportion"),

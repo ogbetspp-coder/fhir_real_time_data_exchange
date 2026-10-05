@@ -223,6 +223,8 @@ def _pictures(index: int, paragraph: Paragraph, images: Mapping[str, bytes] | No
         (width, height), (cx, cy) = picture.pixels, picture.extent
         # The two scale factors, cx / (width * EMU) and cy / (height * EMU), in whole numbers.
         across, down = cx * height, cy * width
+        if cx <= 0 or cy <= 0 or width <= 0 or height <= 0:
+            raise RefusedError("picture", index, "a picture Word draws at no size")
         if (
             cx > width * EMU_PER_PIXEL
             or cy > height * EMU_PER_PIXEL
