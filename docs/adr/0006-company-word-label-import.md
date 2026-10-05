@@ -1,6 +1,6 @@
 # ADR 0006: Importing a company's Word label into the canonical record
 
-- Status: Accepted (owner decisions of 2026-10-05); nothing here is built yet
+- Status: Accepted (owner decisions of 2026-10-05); P1 tables and P3 built (Progress, below)
 - Date: 2026-10-05
 - Related: ADR 0001, ADR 0002 (invariants 7, 8 and 11), ADR 0003, ADR 0005 (decisions 1–4,
   renderer gate), `docs/fidelity-normalization.md` §2, §5, §7, §8,
@@ -172,3 +172,20 @@ The record does not admit this today, for reasons this ADR has to answer rather 
    that shows where a person's one-time confirmation is needed.
 3. **Headings that differ from the template:** a remediation finding for the responsible label
    team to decide (decision 4).
+
+## Progress
+
+- **P1, tables** (2026-10-05): the reader reports each body table's grid (`docx-reader/1.27.0`,
+  `label-docx-json/1.16.0`), certified by the conservation check and held to Word's own saves.
+- **P3** (2026-10-05): `zone_a.word_epi` (`word-epi/1.0.0`) builds each section's narrative and
+  page text from the certified read by separate code, under decision 3's closed lists, and refuses
+  a section on the first thing they do not list; it checks that the fidelity scanner reads the
+  narrative as the page. `zone_a.drawing` (`word-drawing/1.0.0`) is decision 1's drawing check:
+  Chrome draws each narrative, compared line by line, mark by mark and list marker by list marker
+  with the read, which is what Word draws. Until the reader reports pictures (P1), a section with a
+  picture is refused; a document with a floating object is refused whole, since the certificate
+  counts floating objects but does not say where. On five SmPCs Word wrote from the pinned EMA
+  ePIs (`zone-a/tests/fixtures/word-smpc/`), 145 of 160 sections are carried, Chrome draws every
+  one as read, and each reads as the EMA's own text but where the fixtures' README says why not;
+  the 15 refused are shading the narrative cannot carry and underlines over "+" or "≥".
+- **Still to do:** P1's pictures and floating objects in the reader, P2, P4 and P5.

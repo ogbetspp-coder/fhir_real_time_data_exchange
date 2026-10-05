@@ -17,6 +17,7 @@ Zone A reads a footnote's or endnote's text, so a body that refers to one is ref
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from typing import Any
 
 from label_docx.epi import Document, EpiRefusedError, Section, SectionRefusal
@@ -78,8 +79,22 @@ def _paragraph(value: dict[str, Any]) -> Paragraph:
     )
 
 
-def read_docx(data: bytes) -> list[Paragraph]:
-    """The body paragraphs of a .docx, as the reader certified them.
+@dataclass(frozen=True)
+class Body:
+    """A .docx body as the reader certified it.
+
+    ``tables`` are the reader's table entries as JSON (each table's grid, or why there is none);
+    ``floating`` counts the floating objects (anchored pictures, shapes, frames) of every part
+    read, which Word draws and the text leaves out (the certificate's ``setAside``).
+    """
+
+    paragraphs: tuple[Paragraph, ...]
+    tables: tuple[dict[str, Any], ...]
+    floating: int
+
+
+def read_body(data: bytes) -> Body:
+    """The body of a .docx, as the reader certified it.
 
     A footnote or endnote's text is in the reader's result but not in these paragraphs, and
     nothing here reads it, so a body that refers to one is refused rather than read without it;
@@ -101,7 +116,16 @@ def read_docx(data: bytes) -> list[Paragraph]:
     if any(paragraph["pages"] for paragraph in value["paragraphs"]):
         # The text keeps only the place of a page number: Word prints one there.
         raise DocxRefusedError("page-number", "a page number, which the text leaves out")
-    return [_paragraph(paragraph) for paragraph in value["paragraphs"]]
+    return Body(
+        paragraphs=tuple(_paragraph(paragraph) for paragraph in value["paragraphs"]),
+        tables=tuple(value["tables"]),
+        floating=value["certificate"]["setAside"]["floatingObjects"],
+    )
+
+
+def read_docx(data: bytes) -> list[Paragraph]:
+    """The body paragraphs of a .docx, as the reader certified them (``read_body``)."""
+    return list(read_body(data).paragraphs)
 
 
 def _section(value: dict[str, Any]) -> Section:
