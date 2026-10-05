@@ -80,6 +80,11 @@ COMPONENTS: dict[str, Component] = {
         "IMPLEMENTATION_VERSION",
         ("src/zone_a/implementation.py", "src/zone_a/certified.py"),
     ),
+    "smpc-structure": Component(
+        "zone_a.structure",
+        "STRUCTURE_VERSION",
+        ("src/zone_a/structure.py", "src/zone_a/qrd/headings.py", "src/zone_a/qrd/registry.py"),
+    ),
     "qrd-check": Component(
         "zone_a.qrd.check",
         "CHECKER_VERSION",
