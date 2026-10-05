@@ -95,10 +95,13 @@ found): no ``tblGrid`` (Word builds one by rules of its own) or more than one, a
 digits, a legacy horizontal merge (``hMerge``: Word shows the merged-away cell's text as its own
 cell's, but where it draws it is not on record), a ``vMerge`` of another value, a span of 0, or a
 row whose ``before`` + spans + ``after`` is not ``columns``. The text is read all the same: no
-grid refuses a document. A vertical merge is reported as stored, the cells it continues not
-checked: which cells Word joins is a layout question for whoever draws the table. Widths
-(``tcW``, ``wBefore``...) are not reported. Tables in notes, headers, footers and comments are not
-reported (their paragraphs' ``table`` is as above).
+grid refuses a document. Each row says whether its height may be ``exact`` (Word clips what does
+not fit): its own ``trHeight`` of rule ``exact``, or one its table's style sets in its own or a
+conditional part's row properties, which is taken as possibly any row's (how Word applies a
+style's row height is not on record). A vertical merge is reported as stored, the cells it
+continues not checked: which cells Word joins is a layout question for whoever draws the table.
+Widths (``tcW``, ``wBefore``...) are not reported. Tables in notes, headers, footers and
+comments are not reported (their paragraphs' ``table`` is as above).
 
 Pictures. Each U+FFFC in a paragraph's ``text``, in the body, a note, a header, a footer or a
 comment, has a ``Picture`` in its ``pictures``, in order, with its ``offset``: its ``kind``,
@@ -109,31 +112,45 @@ stored under that very name; the part's ``sha256``; its ``type`` by its signatur
 or ``jpeg`` (never by its name or content type); its ``pixels`` (width, height) from its header
 (a PNG's IHDR, a JPEG's frame header, as stored); its ``extent`` in EMU (``wp:extent``; None for
 VML); and its ``crop`` (``a:srcRect``'s left, top, right and bottom in thousandths of a percent, an
-absent side 0; None without one). What can be read is reported whatever the reason. ``reason`` is
-None where the image's bytes, stretched over the extent, are the picture as Word draws it; else
-the first of ``PICTURE_REASONS``: ``shape``; ``vml`` (its drawing in VML is not read); ``linked``
-(``r:link``); ``no-part`` (no ``wp:inline`` holding one ``a:graphicData`` of one ``pic:pic``
-with a ``blipFill`` and a ``blip``, no ``r:embed``, or no part as above); ``not-png-or-jpeg``;
-``bad-image-header`` (a PNG whose chunks, each with its CRC, do not run whole from an IHDR of a
-size, bit depth and colour type PNG allows to IEND, with image data; a JPEG with a marker out of
-place or a segment past its end before its scan, or not one baseline, extended or progressive
-frame header there, of a size other than 0; Exif data, a JPEG's APP1 or a PNG's ``eXIf``, that
-cannot be read or stands twice); ``animated`` (a PNG with ``acTL``); ``orientation`` (Exif data
-whose orientation is not 1: an application may turn or mirror it, or not); ``bad-number`` (an
-extent, effect extent, crop, offset, rotation or flip that is not a number); ``cropped`` (any
-side not 0); ``rotated`` (``a:xfrm`` ``rot`` not 0); ``flipped`` (``flipH`` or ``flipV``); and
-``effects``, anything else that may make Word draw other than the pixels so stretched, by a
-closed list: an effect extent not 0; a ``pic:pic`` of other than its non-visual properties, one
-``blipFill`` and its shape properties, or hidden (``cNvPr``); a ``blipFill`` with attributes, or
-of other than its ``blip``, a ``srcRect`` and a stretch of a bare ``fillRect``; a ``blip`` with
-attributes but ``r:embed``, ``r:link`` and ``cstate``, or children but extensions of Word's
-compression setting (``a14:useLocalDpi``) alone (so any recolouring, transparency, duotone,
-grayscale, artistic effect or SVG); shape properties with attributes but ``bwMode``, or children
-but each of a transform (``a:xfrm``, with ``rot``, ``flipH`` and ``flipV`` alone, at offset 0 and
-of the extent), a rectangle (``prstGeom`` ``rect``, no adjustments), no fill, and a line of no
-fill, once. Whether Word draws it larger than its pixels is for the caller: ``extent`` and
-``pixels`` are both given (9525 EMU are a pixel at 96 dpi). Only the image's headers are read,
-never its pixels, and the reader never refuses for a picture.
+absent side 0; None without one). What can be read is reported whatever the reason. ``reason``
+is the first of ``PICTURE_REASONS`` found against the picture, or None where none is. None does
+not say Word draws these bytes so: it says nothing on the closed list below was found, and the
+list rests on what the reader knows Word to do, not on Word's drawing (the builder and the
+browser hold the rest). The reasons: ``shape``; ``vml`` (its drawing in VML is not read);
+``field`` (in any field's result, a complex field's between ``separate`` and ``end`` or a
+``fldSimple``'s: Word may print the field again with another picture, as a REF to a bookmark
+round one does); ``linked`` (``r:link``); ``no-part`` (no ``wp:inline`` holding one
+``a:graphicData`` of one ``pic:pic`` with a ``blipFill`` and a ``blip``, no ``r:embed``, or no
+part as above); ``not-png-or-jpeg``; ``bad-image-header`` (a PNG whose chunks, each of four
+ASCII letters and with its CRC, do not run whole from one IHDR, first, of a size up to 10,000
+pixels a side, a bit depth and colour type PNG allows, to IEND and the end of the bytes, with
+image data, a palette image's PLTE before it, and no critical chunk but those four; a JPEG with
+a marker out of place or a segment past its end before its scan, or not one baseline, extended or
+progressive frame header there of precision 8, 1, 3 or 4 components and a size of 1 to 10,000
+a side; Exif data, a JPEG's APP1 or a PNG's ``eXIf``, that cannot be read or stands twice; and an
+image of more than 100,000 chunks or segments, read no further); ``colour`` (a PNG with
+``iCCP`` or ``cHRM``, or ``gAMA`` without ``sRGB``; a JPEG with an ICC profile or four
+components: a browser manages colour, and what Word does is not on record); ``animated`` (a PNG
+with ``acTL``); ``orientation`` (Exif data whose orientation is not 1: an application may turn or
+mirror it, or not); ``bad-number`` (an extent, effect extent, crop, offset, rotation or flip that
+is not a number); ``cropped`` (any side not 0); ``rotated`` (``a:xfrm`` ``rot`` not 0);
+``flipped`` (``flipH`` or ``flipV``); ``line-height`` (an exact line height, the paragraph's
+nearest ``spacing`` with a ``lineRule`` through its styles and the defaults: Word clips the
+picture to it); ``row-height`` (in a row whose height may be exact, at any depth of tables; see
+"Tables"); ``border`` (a ``w:bdr`` other than none on its run, by the run's nearest level that
+sets one); and ``effects``, anything else that may make Word draw other than the pixels
+stretched over the extent, by a closed list: an effect extent not 0; a ``pic:pic`` of other
+than its non-visual properties, one ``blipFill`` and its shape properties, or hidden
+(``cNvPr``); a ``blipFill`` with attributes, or of other than its ``blip``, a ``srcRect`` and a
+stretch of a bare ``fillRect``; a ``blip`` with attributes but ``r:embed``, ``r:link`` and
+``cstate``, or children but extensions of Word's compression setting (``a14:useLocalDpi``)
+alone (so any recolouring, transparency, duotone, grayscale, artistic effect or SVG); shape
+properties with attributes but ``bwMode``, or children but each of a transform (``a:xfrm``, with
+``rot``, ``flipH`` and ``flipV`` alone, at offset 0 and of the extent), a rectangle
+(``prstGeom`` ``rect``, no adjustments), no fill, and a line of no fill, once. Whether Word draws
+it larger than its pixels is for the caller: ``extent`` and ``pixels`` are both given (9525 EMU
+are a pixel at 96 dpi). Only the image's headers are read, chunk by chunk with none kept, never
+its pixels; and the reader never refuses for a picture.
 
 Symbol fonts. A run whose effective ``ascii`` and ``hAnsi`` fonts (set directly, by a style, by the
 document defaults or through the theme) are both Symbol, by that exact name, with no complex-script
@@ -654,16 +671,21 @@ class NoteReference:
 PICTURE_REASONS = (
     "shape",
     "vml",
+    "field",
     "linked",
     "no-part",
     "not-png-or-jpeg",
     "bad-image-header",
+    "colour",
     "animated",
     "orientation",
     "bad-number",
     "cropped",
     "rotated",
     "flipped",
+    "line-height",
+    "row-height",
+    "border",
     "effects",
 )
 
@@ -770,11 +792,16 @@ class TableCell:
 
 @dataclass(frozen=True)
 class TableRow:
-    """A row: the grid columns it leaves out ``before`` and ``after`` its cells, and its cells."""
+    """A row: the grid columns it leaves out ``before`` and ``after`` its cells, and its cells.
+
+    ``exact``: its height may be exact (``trHeight`` ``hRule="exact"``, its own or one its
+    table's style may set), so that Word clips what does not fit.
+    """
 
     before: int
     after: int
     cells: tuple[TableCell, ...]
+    exact: bool = False
 
 
 @dataclass(frozen=True)
@@ -1096,6 +1123,8 @@ class _Style:
     shadings: tuple[ET.Element, ...] = ()
     # The style's name (w:name), which Word's heading levels and STYLEREF go by.
     name: str | None = None
+    # Whether its row properties, its own or a conditional part's, set an exact row height.
+    exact_rows: bool = False
 
 
 @dataclass
@@ -1315,6 +1344,13 @@ def _styles(
             ),
             parts={part.get(_w("type"), ""): part for part in style.findall(_w("tblStylePr"))},
             bands=(_band_size(style, "Row"), _band_size(style, "Col")),
+            exact_rows=any(
+                _exact(row)
+                for row in (
+                    *style.findall(_w("trPr")),
+                    *style.findall(f"{_w('tblStylePr')}/{_w('trPr')}"),
+                )
+            ),
         )
         if style.get(_w("default")) in ("1", "true", "on"):
             # With more than one default of a kind, the last one is used (ECMA-376 17.7.4.17).
@@ -1820,6 +1856,10 @@ _PNG = b"\x89PNG\r\n\x1a\n"
 _PNG_DEPTHS = {0: (1, 2, 4, 8, 16), 2: (8, 16), 3: (1, 2, 4, 8), 4: (8, 16), 6: (8, 16)}
 # JPEG's frame headers (SOF0 to SOF15 but DHT, JPG and DAC); only the first three are read.
 _FRAMES = set(range(0xC0, 0xD0)) - {0xC4, 0xC8, 0xCC}
+# Past this many chunks or segments, or this many pixels on a side, an image is not read on.
+_MAX_PIECES = 100_000
+_MAX_SIDE = 10_000
+_NOT_FILL = re.compile(rb"[^\xff]")
 
 
 def _a(tag: str) -> str:
@@ -1850,9 +1890,13 @@ class _Pictures:
         digest, kind, pixels, reasons = self.package.images[name]
         return name, digest, kind, pixels, set(reasons)
 
-    def read(self, element: ET.Element, offset: int) -> Picture:
-        """What a ``w:drawing``, ``w:pict`` or alternate content read as U+FFFC stands for."""
-        found: set[str] = set()
+    def read(self, element: ET.Element, offset: int, around: frozenset[str]) -> Picture:
+        """What a ``w:drawing``, ``w:pict`` or alternate content read as U+FFFC stands for.
+
+        ``around`` holds the reasons its place gives (``field``, ``line-height``, ``row-height``,
+        ``border``).
+        """
+        found: set[str] = set(around)
         if element.tag == _w("pict"):
             image = next(n for n in element.iter() if _local(n.tag) == "imagedata")
             part, digest, kind, pixels, _ = self.image(image.get(f"{{{R}}}id"))
@@ -2016,55 +2060,88 @@ def _image(data: bytes) -> tuple[str | None, tuple[int, int] | None, set[str]]:
 
 
 def _png(data: bytes) -> tuple[tuple[int, int] | None, set[str]]:
-    """A PNG's width and height from its IHDR, every chunk whole with its CRC up to IEND."""
+    """A PNG's width and height from its IHDR, every chunk whole with its CRC up to IEND.
+
+    Read as it goes, keeping no chunk but the header and Exif data, and given up past
+    ``_MAX_PIECES`` chunks.
+    """
     bad: tuple[None, set[str]] = (None, {"bad-image-header"})
-    chunks: list[tuple[bytes, bytes]] = []
-    at = len(_PNG)
-    while not chunks or chunks[-1][0] != b"IEND":
-        if at + 12 > len(data):
+    view = memoryview(data)
+    kinds: set[bytes] = set()
+    exif: list[bytes] = []
+    colour = width = height = 0
+    at, count = len(_PNG), 0
+    while True:
+        count += 1
+        if count > _MAX_PIECES or at + 12 > len(data):
             return bad
         size = int.from_bytes(data[at : at + 4])
+        kind = data[at + 4 : at + 8]
         end = at + 12 + size
-        if size > 0x7FFFFFFF or end > len(data):
+        if size > 0x7FFFFFFF or end > len(data) or not kind.isalpha():
             return bad
-        if zlib.crc32(data[at + 4 : end - 4]) != int.from_bytes(data[end - 4 : end]):
+        if zlib.crc32(view[at + 4 : end - 4]) != int.from_bytes(data[end - 4 : end]):
             return bad
-        chunks.append((data[at + 4 : at + 8], data[at + 8 : end - 4]))
+        # IHDR once and first; no critical chunk PNG does not define; a palette before the
+        # image data of an image that needs one.
+        if (kind == b"IHDR") != (count == 1) or (
+            kind[:1].isupper() and kind not in (b"IHDR", b"PLTE", b"IDAT", b"IEND")
+        ):
+            return bad
+        if kind == b"IHDR":
+            if size != 13:
+                return bad
+            width, height = (
+                int.from_bytes(data[at + 8 : at + 12]),
+                int.from_bytes(data[at + 12 : at + 16]),
+            )
+            depth, colour, compression, filtering, interlace = data[at + 16 : at + 21]
+            if (
+                not 0 < width <= _MAX_SIDE
+                or not 0 < height <= _MAX_SIDE
+                or depth not in _PNG_DEPTHS.get(colour, ())
+                or compression
+                or filtering
+                or interlace > 1
+            ):
+                return bad
+        if kind == b"IDAT" and b"IDAT" not in kinds and colour == 3 and b"PLTE" not in kinds:
+            return bad
+        if kind == b"eXIf" and len(exif) < 2:
+            exif.append(data[at + 8 : end - 4])
+        kinds.add(kind)
         at = end
-    kinds = [kind for kind, _ in chunks]
-    header = chunks[0][1]
-    if kinds[0] != b"IHDR" or len(header) != 13 or b"IDAT" not in kinds:
+        if kind == b"IEND":
+            break
+    if at != len(data) or b"IDAT" not in kinds:
         return bad
-    width, height = int.from_bytes(header[0:4]), int.from_bytes(header[4:8])
-    depth, colour, compression, filtering, interlace = header[8:13]
-    if (
-        not 0 < width <= 0x7FFFFFFF
-        or not 0 < height <= 0x7FFFFFFF
-        or depth not in _PNG_DEPTHS.get(colour, ())
-        or compression
-        or filtering
-        or interlace > 1
-    ):
-        return bad
-    reasons = _turned([body for kind, body in chunks if kind == b"eXIf"])
+    reasons = _turned(exif)
+    if kinds & {b"iCCP", b"cHRM"} or (b"gAMA" in kinds and b"sRGB" not in kinds):
+        reasons.add("colour")
     if b"acTL" in kinds:
         reasons.add("animated")
     return (width, height), reasons
 
 
 def _jpeg(data: bytes) -> tuple[tuple[int, int] | None, set[str]]:
-    """A JPEG's width and height from its one frame header, its segments whole up to its scan."""
+    """A JPEG's width and height from its one frame header, its segments whole up to its scan.
+
+    Given up past ``_MAX_PIECES`` segments.
+    """
     bad: tuple[None, set[str]] = (None, {"bad-image-header"})
     frames: list[tuple[int, bytes]] = []
     exif: list[bytes] = []
-    at = 2
+    profiled = False
+    at, count = 2, 0
     while True:
-        if at >= len(data) or data[at] != 0xFF:
+        count += 1
+        if count > _MAX_PIECES or at >= len(data) or data[at] != 0xFF:
             return bad
-        while at < len(data) and data[at] == 0xFF:
-            at += 1
-        if at >= len(data):
+        # Fill bytes (0xFF) before the marker's code.
+        filled = _NOT_FILL.search(data, at)
+        if filled is None:
             return bad
+        at = filled.start()
         marker = data[at]
         at += 1
         if marker == 0x01 or 0xD0 <= marker <= 0xD7:
@@ -2074,21 +2151,34 @@ def _jpeg(data: bytes) -> tuple[tuple[int, int] | None, set[str]]:
         size = int.from_bytes(data[at : at + 2])
         if size < 2 or at + size > len(data):
             return bad
-        body = data[at + 2 : at + size]
+        start = at + 2
         at += size
         if marker == 0xDA:
             break
-        if marker in _FRAMES:
-            frames.append((marker, body))
-        elif marker == 0xE1 and body.startswith(b"Exif\x00\x00"):
-            exif.append(body[6:])
+        if marker in _FRAMES and len(frames) < 2:
+            frames.append((marker, data[start:at]))
+        elif marker in _FRAMES:
+            return bad
+        elif marker == 0xE1 and data.startswith(b"Exif\x00\x00", start, at) and len(exif) < 2:
+            exif.append(data[start + 6 : at])
+        elif marker == 0xE2 and data.startswith(b"ICC_PROFILE\x00", start, at):
+            profiled = True
     if len(frames) != 1 or frames[0][0] not in (0xC0, 0xC1, 0xC2) or len(frames[0][1]) < 6:
         return bad
     header = frames[0][1]
-    height, width = int.from_bytes(header[1:3]), int.from_bytes(header[3:5])
-    if not width or not height:
+    height, width, parts = int.from_bytes(header[1:3]), int.from_bytes(header[3:5]), header[5]
+    if (
+        header[0] != 8
+        or parts not in (1, 3, 4)
+        or len(header) < 6 + 3 * parts
+        or not 0 < width <= _MAX_SIDE
+        or not 0 < height <= _MAX_SIDE
+    ):
         return bad
-    return (width, height), _turned(exif)
+    reasons = _turned(exif)
+    if profiled or parts == 4:
+        reasons.add("colour")
+    return (width, height), reasons
 
 
 def _turned(exif: list[bytes]) -> set[str]:
@@ -2167,8 +2257,11 @@ class _ParagraphReader:
         self.bookmark_ends: list[tuple[str, int, int]] = []
         self.parts: list[str] = []
         self.length = 0
-        # Each U+FFFC read into the text: where it stands, and the element it stands for.
-        self.objects: list[tuple[int, ET.Element]] = []
+        # Each U+FFFC read into the text: where it stands, the element it stands for, and the
+        # reasons its run gives (in a field's result, a border on the run).
+        self.objects: list[tuple[int, ET.Element, frozenset[str]]] = []
+        # How many simple fields (fldSimple) hold what is being read.
+        self.simple = 0
         self.marks: list[Mark] = []
         # Where in ``marks`` the last mark of each kind is.
         self.last_mark: dict[str, int] = {}
@@ -2202,7 +2295,9 @@ class _ParagraphReader:
                     self.container(child)
                     self.layout -= 1
                     continue
+                self.simple += 1
                 self.container(child)
+                self.simple -= 1
                 if self.length == before:
                     raise DocxRefusedError("field-without-result", "a simple field shows nothing")
                 if code in _COMPUTED_FIELDS:
@@ -2275,8 +2370,12 @@ class _ParagraphReader:
         placed: list[str] = []
         references: list[NoteReference] = []
         comments: list[CommentReference] = []
-        # Each picture read into the text: the index of its character in ``emitted``, its element.
-        objects: list[tuple[int, ET.Element]] = []
+        # Each picture read into the text: the index of its character in ``emitted``, its element
+        # and its run's reasons: in a field's result (Word prints the field again, maybe with
+        # another picture), or bordered (``w:bdr`` other than none, through the run's levels).
+        objects: list[tuple[int, ET.Element, frozenset[str]]] = []
+        border = properties.element("bdr")
+        bordered = border is not None and border.get(_w("val")) not in ("nil", "none")
         for child in run:
             tag = child.tag
             if tag == _w("commentReference"):
@@ -2318,7 +2417,12 @@ class _ParagraphReader:
             else:
                 produced = self._special(child)
             if produced == OBJECT and not self.in_instruction() and not self.layout:
-                objects.append((len(emitted), child))
+                # Not in an instruction, so every field open is in its result.
+                in_field = bool(self.fields) or self.carried > 0 or self.simple > 0
+                why = {"field"} if in_field else set()
+                objects.append(
+                    (len(emitted), child, frozenset(why | ({"border"} if bordered else set())))
+                )
             if not self.in_instruction():
                 (placed if self.layout else emitted).append(produced)
             elif self.fields[-1]:
@@ -2370,7 +2474,7 @@ class _ParagraphReader:
             )
         start = self.length
         ends = [0, *itertools.accumulate(len(part) for part in emitted)] if objects else []
-        self.objects += [(start + ends[index], element) for index, element in objects]
+        self.objects += [(start + ends[i], element, why) for i, element, why in objects]
         self.parts.append(text)
         self.length += len(text)
         self._mark(properties, start, self.length)
@@ -2946,6 +3050,7 @@ def _paragraph(
     under: tuple[_Rgb, ...] = (),
     conditional: tuple[ET.Element, ...] = (),
     pictures: _Pictures | None = None,
+    exact_row: bool = False,
 ) -> tuple[Paragraph, _Context]:
     ppr = element.find(_w("pPr"))
     style = None
@@ -3017,8 +3122,31 @@ def _paragraph(
         comments=tuple(reader.comments),
         pictures=()
         if pictures is None
-        else tuple(pictures.read(element, offset) for offset, element in reader.objects),
+        else tuple(
+            pictures.read(element, offset, why | _clipped(levels, exact_row))
+            for offset, element, why in reader.objects
+        ),
     ), context
+
+
+def _clipped(levels: list[ET.Element | None], exact_row: bool) -> frozenset[str]:
+    """Where Word may clip a paragraph's pictures: an exact line height, a row of exact height.
+
+    The line rule is the nearest level's that sets one (as ``_layout`` reads it).
+    """
+    rule = next(
+        (
+            spacing.get(_w("lineRule"))
+            for level in levels
+            if level is not None
+            and (spacing := level.find(_w("spacing"))) is not None
+            and spacing.get(_w("lineRule")) is not None
+        ),
+        None,
+    )
+    return frozenset({"line-height"} if rule == "exact" else set()) | frozenset(
+        {"row-height"} if exact_row else set()
+    )
 
 
 def _paragraph_marks(reader: _ParagraphReader, levels: list[ET.Element | None]) -> tuple[Mark, ...]:
@@ -3970,9 +4098,10 @@ def _styleref(
 
 # --- blocks and tables ---------------------------------------------------------------------
 
-# A table as the walk finds it: its element, the cell it stands in, its rows, each row's cells.
+# A table as the walk finds it: its element, the cell it stands in, its rows, each row's cells,
+# and whether each row may be of exact height.
 type _Found = tuple[
-    ET.Element, tuple[int, int, int] | None, list[ET.Element], list[list[ET.Element]]
+    ET.Element, tuple[int, int, int] | None, list[ET.Element], list[list[ET.Element]], list[bool]
 ]
 
 
@@ -3992,6 +4121,8 @@ class _Body:
         # Each table as found, in document order (nested ones too): its element, the cell it
         # stands in, its rows and each row's cells; the body's grids are read from them (_grid).
         self.found: list[_Found] = []
+        # How many rows of exact height hold what is being read.
+        self.exact_rows = 0
         self.rows_ended = 0
         # Every run read, so that the part's every run is known to be accounted for.
         self.runs: set[ET.Element] = set()
@@ -4029,6 +4160,7 @@ class _Body:
                     under,
                     conditional,
                     self.pictures,
+                    self.exact_rows > 0,
                 )
                 self.out.append(paragraph)
                 self.contexts.append(replace(context, rows_ended=self.rows_ended))
@@ -4087,7 +4219,11 @@ class _Body:
         for row in rows:
             cells_of.append([])
             _collect(row, _w("tc"), cells_of[-1], {_w("trPr"), _w("tblPrEx")})
-        self.found.append((element, outer, rows, cells_of))
+        # A row's own exact height, or one its table's style may set (in its own or a
+        # conditional part's row properties): how Word applies a style's is not on record.
+        styled = any(style.exact_rows for style in chain)
+        exact = [styled or _exact(row.find(_w("trPr"))) for row in rows]
+        self.found.append((element, outer, rows, cells_of, exact))
         layout = (
             _TableLayout(
                 element, rows, cells_of, chain, active, self.story is not None or bool(outer)
@@ -4105,6 +4241,7 @@ class _Body:
         painted = [c for shd in shadings for c in self.styles.painted(shd)]
         table_under = tuple(dict.fromkeys([*painted, *(under or self.styles.page)]))
         for row_index, (row, cells) in enumerate(zip(rows, cells_of, strict=True)):
+            self.exact_rows += exact[row_index]
             for cell_index, cell in enumerate(cells):
                 start, first = len(self.out), len(self.contexts)
                 own = tuple(self.styles.painted(cell.find(f"{_w('tcPr')}/{_w('shd')}")))
@@ -4154,6 +4291,7 @@ class _Body:
                     raise DocxRefusedError(
                         "unsupported-element", "text, a label or a mark in a merged-away cell"
                     )
+            self.exact_rows -= exact[row_index]
             self.rows_ended += 1
 
 
@@ -4430,14 +4568,20 @@ def _collect(element: ET.Element, wanted: str, out: list[ET.Element], silent: se
 def _grid(found: list[_Found]) -> tuple[Table, ...]:
     """Each table's grid, or None and why Word's grid for it is not on record ("Tables")."""
     out: list[Table] = []
-    for element, parent, rows, cells_of in found:
-        grid, reason = _laid(element, rows, cells_of)
+    for element, parent, rows, cells_of, exact in found:
+        grid, reason = _laid(element, rows, cells_of, exact)
         out.append(Table(parent, grid, reason))
     return tuple(out)
 
 
+def _exact(properties: ET.Element | None) -> bool:
+    """Whether row properties (a row's ``trPr``) set a height of rule ``exact``."""
+    height = None if properties is None else properties.find(_w("trHeight"))
+    return height is not None and height.get(_w("hRule")) == "exact"
+
+
 def _laid(
-    element: ET.Element, rows: list[ET.Element], cells_of: list[list[ET.Element]]
+    element: ET.Element, rows: list[ET.Element], cells_of: list[list[ET.Element]], exact: list[bool]
 ) -> tuple[TableGrid | None, str | None]:
     """A table's cells laid on its grid, or None and the first reason it cannot be (``REASONS``)."""
     grids = element.findall(_w("tblGrid"))
@@ -4445,7 +4589,7 @@ def _laid(
         return None, "two-grids" if grids else "no-grid"
     columns = len(grids[0].findall(_w("gridCol")))
     placed: list[TableRow] = []
-    for row, cells in zip(rows, cells_of, strict=True):
+    for row, cells, fixed in zip(rows, cells_of, exact, strict=True):
         before = _grid_count(row.find(_w("trPr")), "gridBefore", 0)
         after = _grid_count(row.find(_w("trPr")), "gridAfter", 0)
         if before is None or after is None:
@@ -4472,7 +4616,7 @@ def _laid(
         if column + after != columns:
             # Word lays such a row out by rules not on record.
             return None, "row-off-grid"
-        placed.append(TableRow(before, after, tuple(laid)))
+        placed.append(TableRow(before, after, tuple(laid), fixed))
     return TableGrid(columns, tuple(placed)), None
 
 

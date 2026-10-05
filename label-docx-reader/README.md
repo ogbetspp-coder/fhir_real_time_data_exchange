@@ -11,7 +11,8 @@ normalises or repairs.
   tables. A picture in line with the text is U+FFFC, as is a shape in alternate content that
   holds no text (any other shape is refused); a floating one is not in the text, as in Word, and
   the certificate counts it. Each U+FFFC says what it stands for: the image part, its SHA-256,
-  type, pixels, extent and crop, or why its bytes are not the picture Word draws. Formatting that changes meaning (bold, italic, super/subscript,
+  type, pixels, extent and crop, and the first reason found that its bytes may not be the
+  picture Word draws. Formatting that changes meaning (bold, italic, super/subscript,
   underline, strike, caps, highlight, shading, faint text) is reported as marks over the text,
   never folded in.
 - **What Word shows.** List labels ("4.8", "b)", "•"), footnote marks and computed fields (SEQ,
@@ -92,8 +93,10 @@ from another web page.
    "style": "Heading2", "table": [0, 1, 0], "text": "x 109/l \ufffc"}],
  "reader": "docx-reader/1.28.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
  "tables": [{"grid": {"columns": 2, "rows": [
-   {"after": 0, "before": 0, "cells": [{"column": 0, "merge": null, "span": 2}]},
-   {"after": 1, "before": 0, "cells": [{"column": 0, "merge": null, "span": 1}]}]},
+   {"after": 0, "before": 0, "cells": [{"column": 0, "merge": null, "span": 2}],
+    "exactHeight": false},
+   {"after": 1, "before": 0, "cells": [{"column": 0, "merge": null, "span": 1}],
+    "exactHeight": false}]},
    "parent": null, "reason": null}]}
 ```
 
@@ -105,8 +108,9 @@ from another web page.
 - `tables` lists each body table, in document order, a nested table as its own entry with its
   `parent` cell, and its `grid`: `columns` (`gridCol`), and each row's `before` and `after`
   (grid columns left out) and `cells`, each with its first grid `column`, its `span`
-  (`gridSpan`) and its `merge` (`vMerge` as stored: null, `restart` or `continue`). Where Word's
-  grid is not on record, `grid` is null and `reason` says why: `no-grid`, `two-grids`,
+  (`gridSpan`) and its `merge` (`vMerge` as stored: null, `restart` or `continue`), and whether
+  the row's height may be exact (`exactHeight`: its own `trHeight` of rule `exact`, or one its
+  table's style sets), where Word clips what does not fit. Where Word's grid is not on record, `grid` is null and `reason` says why: `no-grid`, `two-grids`,
   `bad-number`, `h-merge` (a legacy horizontal merge), `bad-merge`, `bad-span` or `row-off-grid`
   (a row that does not fill the grid exactly). The text is read either way. A body paragraph's
   `table` indexes `tables` (its own table, nested or not). Tables in notes, headers, footers and
@@ -116,13 +120,16 @@ from another web page.
   `part` its relationship names and the `sha256` of its bytes, its `type` by signature alone
   (`png` or `jpeg`), its `pixels` from the image's header, its `extent` in EMU (`wp:extent`) and
   its `crop` (`a:srcRect`, thousandths of a percent). The bytes are not in the result: read the
-  part from the source and hold it to `sha256`. `reason` is null where those bytes stretched over
-  the extent are the picture Word draws, else the first of `shape`, `vml`, `linked`, `no-part`,
-  `not-png-or-jpeg`, `bad-image-header`, `animated`, `orientation` (Exif turns it),
-  `bad-number`, `cropped`, `rotated`, `flipped` and `effects` (anything else that may change the
-  drawing, by a closed list: recolouring, transparency, SVG, a border, a shape, a shadow...).
-  Whether Word draws it larger than its pixels is the caller's to judge (9525 EMU a pixel at 96
-  dpi). No picture refuses a read; the closed lists: "Pictures" in
+  part from the source and hold it to `sha256`. `reason` is the first found of `shape`, `vml`,
+  `field` (in a field's result, which Word prints again), `linked`, `no-part`,
+  `not-png-or-jpeg`, `bad-image-header`, `colour` (colour a browser manages), `animated`,
+  `orientation` (Exif turns it), `bad-number`, `cropped`, `rotated`, `flipped`, `line-height`
+  and `row-height` (Word clips it to an exact line or row), `border` (on its run) and `effects`
+  (anything else on a closed list: recolouring, transparency, SVG, an outline, a shape other than
+  a rectangle, a shadow...). Null means only that nothing on those closed lists was found: the
+  lists rest on what is known of Word, not on Word's drawing, and the ePI builder and the browser
+  hold the rest. Whether Word draws it larger than its pixels is the caller's to judge (9525 EMU
+  a pixel at 96 dpi). No picture refuses a read; the lists: "Pictures" in
   [`reader.py`](src/label_docx/reader.py).
 - A refusal has `"refusal": {"code": …, "detail": …}` in place of the text.
 - A tracked document has `"tracked": {"accepted": {…}, "original": {…}, "changes": […]}` in place
@@ -141,7 +148,7 @@ Every key: the docstrings of [`output.py`](src/label_docx/output.py) and
 | Tracked views are Word's Accept All / Reject All (33 of 39 cases; 6 refused) | Word's own files (`test_tracked.py`) |
 | ePI sections are what Chrome shows                            | Chrome's recorded answers (`test_browser_oracle.py`) |
 | Every result read is certified; seeded changes to each corpus result read are caught | `test_certify.py` |
-| Each fault put into the checker is caught by its tests, or recorded as unable to change a result | the mutation record (`test_checker_mutants.py`) |
+| Each fault put into the checker is caught by its tests, or recorded as unable to change a result | the mutation record (`test_checker_mutants.py`); not yet re-run for the check's picture and row rules, so it does not hold at this commit until it is |
 | Up to two seeded edits of each kind in `scripts/mutate.py` to the `document.xml` of each corpus .docx not refused: one to what the reader reports changes the result or is refused; others (font size, bookkeeping) change nothing | `test_mutations.py` |
 | Same bytes across processes, hash seeds, locales and zip layouts; seeded damage to four corpus files never crashes it | `test_determinism.py`, `test_robustness.py` |
 

@@ -49,9 +49,11 @@ and every unchanged result is certified. These are samples, not every possible c
   Wingdings bullet table, reviewed mappings from Adobe's `symbol.txt` (as the Unicode Consortium
   maps it) and ISO/IEC N4384. Word does not check them: the Word oracle reads Word's stored codes
   through the same tables (`word.as_drawn`, `word.label_as_drawn`).
-- It shares rules by design: Word's precedence for fonts and hiding, the toggles, list labels and
-  note marks are the reader's rules written again, apart. A rule wrong in both is caught only by
-  Word's recorded answers (`test_word_oracle.py`).
+- It shares rules by design: Word's precedence for fonts and hiding, the toggles, list labels,
+  note marks, table grids and what a picture stands for are the reader's rules written again,
+  apart. That transcription, in code of its own, catches a slip in the reader's code, not a
+  wrong rule: a rule wrong in both is caught only by Word's recorded answers
+  (`test_word_oracle.py`), where Word has been asked, and by nothing where it has not.
 - It treats the result as untrusted: a wrong result can only fail.
 - Each token has one reading. Whether a run is in the Symbol font, or hidden, the check decides
   itself by Word's precedence (run, character style, paragraph style, table style, defaults).
@@ -90,14 +92,19 @@ for each drawing it reads as U+FFFC, in order, the check finds on its own the im
 picture's `blip`, or a VML picture's first `imagedata`, through the story part's own
 relationships: one internal relationship of the image type, to a part stored under that very
 name), hashes its bytes, tells PNG from JPEG by the signature alone, reads the size from the
-PNG's chunks (each with its CRC, IHDR to IEND) or the JPEG's segments (to its scan, one baseline,
-extended or progressive frame), and any Exif orientation; and reads the drawing's extent, crop,
-rotation, flips and every other element and attribute against its own closed list. The reason
-it names is the first of a fixed list (`shape`, `vml`, `linked`, `no-part`, `not-png-or-jpeg`,
-`bad-image-header`, `animated`, `orientation`, `bad-number`, `cropped`, `rotated`, `flipped`,
-`effects`); an entry in any other way, one too many or one missing is never certified. A
-picture never refuses a read: what the reader cannot vouch for it reports with its reason, and
-the check holds that reason as it holds every other value.
+PNG's chunks (each whole with its CRC, one IHDR first to IEND at the end, no unknown critical
+chunk) or the JPEG's segments (to its scan, one frame of precision 8), at most 100,000 of
+either and none kept, and any Exif orientation or colour management; finds where the picture
+stands (in a field's result, in a paragraph of exact line height, in a row whose height may be
+exact, on a bordered run); and reads the drawing's extent, crop, rotation, flips and every other
+element and attribute against its own closed list. The reason it names is the first of a fixed
+list (`shape`, `vml`, `field`, `linked`, `no-part`, `not-png-or-jpeg`, `bad-image-header`,
+`colour`, `animated`, `orientation`, `bad-number`, `cropped`, `rotated`, `flipped`,
+`line-height`, `row-height`, `border`, `effects`); an entry in any other way, one too many or
+one missing is never certified. A null reason says only that nothing on those lists was found:
+the lists rest on what is known of Word, not on Word's drawing. A picture never refuses a read:
+what the reader cannot vouch for it reports with its reason, and the check holds that reason as
+it holds every other value. Each grid row's `exactHeight` is the check's own reading too.
 
 ## Tracked changes
 
@@ -126,11 +133,13 @@ The proof covers the text. How it is shown is held to the application that shows
 | Tracked views                                     | Word    | `test_tracked.py` (corpus); `--word on` |
 
 Table grids are held to the source alone (the check above): Word has not yet been asked where
-it draws each cell. So are pictures: which part a picture's bytes are in, and its extent and
-crop, are what the document stores; that Word draws nothing else (no recolouring, border,
-turn...) rests on the closed list, not on Word's drawing. The grid is what the document stores; where Word would have to lay it out by
+it draws each cell. The grid is what the document stores; where Word would have to lay it out by
 rules of its own (a row that does not fill it, say), no grid is reported, and the text is read
-all the same.
+all the same. So are pictures: which part a picture's bytes are in, and its extent and crop, are
+what the document stores; that Word draws nothing else (no recolouring, outline, turn...) rests
+on the closed list, not on Word's drawing. Chrome's decoded size of each ePI picture is
+recorded by the browser oracle (`browser_sections`, `pictures`), for the builder to hold to the
+reader's `pixels`.
 
 Word is asked about emphasis per body paragraph: whether all its letters are bold, italic, in
 capitals or struck through, white space's formatting aside, so Word's "no" agrees with a
@@ -165,7 +174,8 @@ its tests and the corpus, at least 90% of faults killed, and every survivor reco
 reason it cannot change a result; each reason names one fault. The run works on a copy of the
 files taken when it starts, so an edit made meanwhile cannot reach it. Counts are in
 `docs/checker-mutants.json`. The last run took 31 minutes on eight cores; a run resumes in parts
-(`--budget`).
+(`--budget`). At this commit the record predates the check's picture and row rules: it holds
+again once the run is made for them.
 
 ## Every time
 

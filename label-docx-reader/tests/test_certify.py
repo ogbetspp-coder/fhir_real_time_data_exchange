@@ -35,12 +35,15 @@ from label_docx.certify import (
     EpiSource,
     _drawn_complex,
     _formatted,
+    _jpeg_facts,
+    _png_facts,
     _unescape,
     certify_docx,
     certify_epi,
 )
 from label_docx.epi import is_default_ignorable
 from label_docx.output import canonical
+from label_docx.reader import _image as reader_image
 from label_docx.word import SUFFIXES, label_as_drawn
 from lock import MANIFESTS
 from test_reader import (
@@ -50,16 +53,23 @@ from test_reader import (
     HEADERS,
     LAST_LEFT_OUT,
     LINE,
+    MEDIA,
     NO_LOOKS,
     NOT_ASKED,
     PICTURE_CASES,
+    PLACED_CASES,
     SHAPE,
     SIZE_ONE,
     WP,
     W,
     _alternate,
+    chunk,
     docx,
+    exif,
+    jpeg,
     p,
+    png,
+    segment,
     t_style,
     t_table,
     tbl,
@@ -354,7 +364,7 @@ def _change_the_grid(value: dict[str, Any], rng: random.Random) -> bool:
     table = rng.choice(tables)
     grid = table["grid"]
     cells = [c for row in grid["rows"] for c in row["cells"]] if grid else []
-    roll = rng.randrange(8) if cells else rng.choice((0, 1, 7))
+    roll = rng.randrange(9) if cells else rng.choice((0, 1, 7))
     if roll == 0:
         table["parent"] = [0, 0, 0] if table["parent"] is None else None
     elif roll == 1 and grid is None:
@@ -370,6 +380,9 @@ def _change_the_grid(value: dict[str, Any], rng: random.Random) -> bool:
     elif roll == 6:
         cell = rng.choice(cells)
         cell["merge"] = {None: "restart", "restart": "continue", "continue": None}[cell["merge"]]
+    elif roll == 8:
+        row = rng.choice(grid["rows"])
+        row["exactHeight"] = not row["exactHeight"]
     else:
         tables.remove(table)
     return True
@@ -628,6 +641,7 @@ _GRID_BODY = tbl(
         lambda t: t.pop(),
         lambda t: t.append(t[1]),
         lambda t: t.reverse(),
+        lambda t: t[0]["grid"]["rows"][0].update(exactHeight=True),
     ],
     ids=[
         "columns",
@@ -646,6 +660,7 @@ _GRID_BODY = tbl(
         "table-dropped",
         "table-added",
         "order",
+        "exact-height",
     ],
 )
 def test_a_tables_grid_is_the_one_the_document_stores_and_only_that(
@@ -1234,6 +1249,61 @@ def test_every_picture_is_held_to_the_source_by_the_checks_own_rules(
         changed["paragraphs"][0]["pictures"] = wrong
         with pytest.raises(CertificationError, match="pictures"):
             source.certify(changed)
+
+
+@pytest.mark.parametrize(
+    ("body", "styles", "reason"),
+    [case[1:] for case in PLACED_CASES],
+    ids=[case[0] for case in PLACED_CASES],
+)
+def test_the_check_finds_the_reason_a_pictures_place_gives_on_its_own(
+    body: str, styles: str | None, reason: str | None
+) -> None:
+    data = with_media(docx(body, styles), MEDIA)
+    value, source = _docx_value(data), DocxSource(data)
+    source.certify(value)
+    for other in (None, "field", "line-height", "row-height", "border"):
+        if other == reason:
+            continue
+        changed = copy.deepcopy(value)
+        [x for q in changed["paragraphs"] for x in q["pictures"]][-1]["reason"] = other
+        with pytest.raises(CertificationError, match="pictures"):
+            source.certify(changed)
+
+
+def test_the_checks_image_reading_agrees_with_the_readers_on_damaged_images() -> None:
+    # The two read an image's bytes apart: each seeded change of a byte, a cut or an insertion
+    # into PNGs and JPEGs of every kind tested must give both the same type, pixels and reasons.
+    seeds = [
+        png(),
+        png(colour=3, extra=chunk(b"PLTE", bytes(3))),
+        png(extra=chunk(b"eXIf", exif(3)[6:]) + chunk(b"gAMA", bytes(4))),
+        png(extra=chunk(b"sRGB", b"\x00") + chunk(b"acTL", bytes(8))),
+        jpeg(),
+        jpeg(parts=3, extra=segment(0xE1, exif(6)) + segment(0xE2, b"ICC_PROFILE\x00\x01")),
+        jpeg(frame=0xC2, parts=4),
+    ]
+    rng = random.Random(1)
+    for _ in range(20_000):
+        data = bytearray(rng.choice(seeds))
+        for _ in range(rng.randint(1, 4)):
+            roll = rng.random()
+            if roll < 0.5 and len(data) > 3:
+                data[rng.randrange(3, len(data))] = rng.randrange(256)
+            elif roll < 0.75:
+                data = data[: rng.randrange(3, len(data) + 1)]
+            else:
+                at = rng.randrange(3, len(data) + 1)
+                data[at:at] = bytes(rng.randrange(256) for _ in range(rng.randint(1, 6)))
+        kind, pixels, why = reader_image(bytes(data))
+        mine: tuple[str | None, list[int] | None, set[str]]
+        if bytes(data[:8]) == b"\x89PNG\r\n\x1a\n":
+            mine = ("png", *_png_facts(bytes(data)))
+        elif bytes(data[:3]) == b"\xff\xd8\xff":
+            mine = ("jpeg", *_jpeg_facts(bytes(data)))
+        else:
+            mine = (None, None, {"not-png-or-jpeg"})
+        assert (kind, None if pixels is None else list(pixels), why) == mine, data.hex()[:80]
 
 
 def _standing(reason: str, offset: int = 0, kind: str = "picture") -> dict[str, Any]:

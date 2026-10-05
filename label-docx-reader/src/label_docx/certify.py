@@ -188,6 +188,11 @@ def _local(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
 
+# A table as the walk meets it: its element, the cell it stands in, its rows, each row's cells,
+# and whether each row's height may be exact.
+type _Met = tuple[ET.Element, Any, list[ET.Element], list[list[ET.Element]], list[bool]]
+
+
 # --- the ledger ---------------------------------------------------------------------------
 
 
@@ -241,8 +246,11 @@ class _Paragraph:
     # and its list label.
     mark_hidden: bool = False
     numbering: dict[str, Any] | None = None
-    # Each drawing read as U+FFFC, in order, and what each stands for (``DocxSource._picture``).
-    drawings: list[ET.Element] = field(default_factory=list)
+    # Each drawing read as U+FFFC, in order, with the reasons its run gives (a field's result, a
+    # border), and what each stands for (``DocxSource._picture``).
+    drawings: list[tuple[ET.Element, set[str]]] = field(default_factory=list)
+    # Whether a row of exact height holds it.
+    in_exact_row: bool = False
     pictures: list[dict[str, Json]] = field(default_factory=list)
 
 
@@ -309,6 +317,8 @@ class _Fonts:
         # Per table style, its conditional parts (tblStylePr), and its band sizes (rows, columns).
         self.parts: dict[str, list[ET.Element]] = {}
         self.bands: dict[str, tuple[str | None, str | None]] = {}
+        # Table styles whose row properties (their own, or a part's) make a row's height exact.
+        self.fixed_rows: set[str] = set()
         if styles is not None:
             for style in styles.findall(_w("style")):
                 style_id = style.get(_w("styleId"))
@@ -325,6 +335,10 @@ class _Fonts:
                 self.ppr[style_id] = style.find(_w("pPr"))
                 self.parts[style_id] = style.findall(_w("tblStylePr"))
                 self.bands[style_id] = (_size_of(style, "Row"), _size_of(style, "Col"))
+                if any(
+                    _row_fixed(holder.find(_w("trPr"))) for holder in (style, *self.parts[style_id])
+                ):
+                    self.fixed_rows.add(style_id)
                 if style.get(_w("default")) in ("1", "true", "on"):
                     self.defaults[kind] = style_id
             self.doc_rpr = styles.find(f"{_w('docDefaults')}/{_w('rPrDefault')}/{_w('rPr')}")
@@ -623,7 +637,7 @@ class _Story:
         self.tables = 0
         # Every table met, in document order: its element, the cell it stands in, its rows and
         # each row's cells (``_grid`` reads the body's from them).
-        self.met: list[tuple[ET.Element, Any, list[ET.Element], list[list[ET.Element]]]] = []
+        self.met: list[_Met] = []
         self.section = 0
         # How deep in bdo and dir elements the walk is, and whether the current run's two
         # emphasis settings (b and bCs, i and iCs) differ where it is drawn as complex script.
@@ -631,6 +645,9 @@ class _Story:
         self.unsure: tuple[bool, bool] = (False, False)
         # The table style's parts Word applies to the cell being read (``_Applied``).
         self.conditional: tuple[ET.Element, ...] = ()
+        # How many simple fields, and rows of exact height, hold what is being read.
+        self.simple = 0
+        self.fixed = 0
 
     # The block structure: paragraphs in document order, and the cell each stands in.
 
@@ -655,7 +672,9 @@ class _Story:
         own = None if style is None else style.get(_w("val"))
         rows = _owned(element, _w("tr"))
         cells = [_owned(row, _w("tc")) for row in rows]
-        self.met.append((element, outer, rows, cells))
+        styled = not self.fonts.fixed_rows.isdisjoint(self.fonts.style_ids(own, "table"))
+        fixed = [styled or _row_fixed(row.find(_w("trPr"))) for row in rows]
+        self.met.append((element, outer, rows, cells, fixed))
         applied = _Applied(
             self.fonts,
             self.fonts.style_ids(own, "table"),
@@ -665,6 +684,7 @@ class _Story:
             self.story is not None or outer is not None,
         )
         for row_index, row_cells in enumerate(cells):
+            self.fixed += fixed[row_index]
             for cell_index, cell in enumerate(row_cells):
                 before = len(self.paragraphs)
                 rprs, problem = applied.at(row_index, cell_index)
@@ -689,6 +709,7 @@ class _Story:
                     numbered = _numbering_of(self.fonts, paragraph)
                     if paragraph.segments or (numbered is not None and numbered[0] != 0):
                         raise CertificationError("content in a merged-away cell")
+            self.fixed -= fixed[row_index]
 
     def paragraph(
         self, element: ET.Element, table: tuple[int, int, int] | None, table_style: str | None
@@ -698,6 +719,7 @@ class _Story:
         properties = element.find(_w("pPr"))
         style = None if properties is None else properties.find(_w("pStyle"))
         here = _Paragraph(
+            in_exact_row=self.fixed > 0,
             table=table,
             properties=properties,
             style=None if style is None else style.get(_w("val")),
@@ -731,6 +753,7 @@ class _Story:
             if child.tag == _w("r"):
                 self.run(child)
             elif child.tag == _w("fldSimple"):
+                self.simple += 1
                 if (
                     not self.in_instruction()
                     and _page_field(child.get(_w("instr"), ""))
@@ -742,6 +765,7 @@ class _Story:
                     self.layout -= 1
                 else:
                     self.inline(child)
+                self.simple -= 1
             elif child.tag in (_w("bdo"), _w("dir")):
                 # Text in a bidirectional embedding or override is drawn as complex script.
                 self.bidi += 1
@@ -856,7 +880,14 @@ class _Story:
             else:
                 shown.append(token)
                 if local in ("drawing", "pict", "AlternateContent"):
-                    here.drawings.append(child)
+                    # A field's result Word prints again (it may hold another picture then),
+                    # and a border on the run, nearest level first.
+                    around = {"field"} if self.fields or self.simple else set()
+                    edges = [e for level in levels if (e := level.find(_w("bdr"))) is not None]
+                    edge = edges[0] if edges else None
+                    if edge is not None and edge.get(_w("val")) not in ("none", "nil"):
+                        around.add("border")
+                    here.drawings.append((child, around))
         self.flush_run(shown, hidden, kinds)
 
     def token(self, child: ET.Element, local: str, symbol: bool) -> str:
@@ -1239,7 +1270,11 @@ class _NoGridError(Exception):
 
 
 def _grid(
-    table: ET.Element, parent: Any, rows: list[ET.Element], cells: list[list[ET.Element]]
+    table: ET.Element,
+    parent: Any,
+    rows: list[ET.Element],
+    cells: list[list[ET.Element]],
+    fixed: list[bool],
 ) -> dict[str, Json]:
     """A body table as this check reads it from the source, by its own rules.
 
@@ -1252,14 +1287,16 @@ def _grid(
     not covering the columns.
     """
     try:
-        grid: Json = _grid_laid(table, rows, cells)
+        grid: Json = _grid_laid(table, rows, cells, fixed)
         reason = None
     except _NoGridError as why:
         grid, reason = None, str(why)
     return {"grid": grid, "parent": None if parent is None else list(parent), "reason": reason}
 
 
-def _grid_laid(table: ET.Element, rows: list[ET.Element], cells: list[list[ET.Element]]) -> Json:
+def _grid_laid(
+    table: ET.Element, rows: list[ET.Element], cells: list[list[ET.Element]], fixed: list[bool]
+) -> Json:
     grids = [child for child in table if child.tag == _w("tblGrid")]
     if not grids:
         raise _NoGridError("no-grid")
@@ -1287,8 +1324,41 @@ def _grid_laid(table: ET.Element, rows: list[ET.Element], cells: list[list[ET.El
             at += span
         if at + left != width:
             raise _NoGridError("row-off-grid")
-        out_rows.append({"after": left, "before": skipped, "cells": laid})
+        exact = fixed[len(out_rows)]
+        out_rows.append({"after": left, "before": skipped, "cells": laid, "exactHeight": exact})
     return {"columns": width, "rows": out_rows}
+
+
+def _row_fixed(row_properties: ET.Element | None) -> bool:
+    """Whether a ``trPr`` makes its row's height exact: its first ``trHeight``'s ``hRule``."""
+    heights = [] if row_properties is None else row_properties.findall(_w("trHeight"))
+    return bool(heights) and heights[0].get(_w("hRule")) == "exact"
+
+
+def _line_rule(fonts: _Fonts, paragraph: _Paragraph) -> str | None:
+    """A paragraph's line rule, from the first ``spacing`` that sets one.
+
+    Looked for in the paragraph's own properties, then its style's, its table style's (in a
+    table) and the defaults'.
+    """
+    sources = [
+        paragraph.properties,
+        *(fonts.ppr.get(i) for i in fonts.style_ids(paragraph.style, "paragraph")),
+        *(
+            fonts.ppr.get(i)
+            for i in (
+                fonts.style_ids(paragraph.table_style, "table")
+                if paragraph.table is not None
+                else []
+            )
+        ),
+        fonts.doc_ppr,
+    ]
+    for source in sources:
+        for spacing in [] if source is None else source.findall(_w("spacing"))[:1]:
+            if spacing.get(_w("lineRule")) is not None:
+                return spacing.get(_w("lineRule"))
+    return None
 
 
 def _grid_number(holder: ET.Element | None, name: str, absent: int) -> int:
@@ -1309,18 +1379,27 @@ def _grid_number(holder: ET.Element | None, name: str, absent: int) -> int:
 _NOT_AS_IS = (
     "shape",
     "vml",
+    "field",
     "linked",
     "no-part",
     "not-png-or-jpeg",
     "bad-image-header",
+    "colour",
     "animated",
     "orientation",
     "bad-number",
     "cropped",
     "rotated",
     "flipped",
+    "line-height",
+    "row-height",
+    "border",
     "effects",
 )
+# An image read past this many chunks or segments, or larger on a side, is a bad one.
+_PIECES = 100_000
+_SIDE = 10_000
+_CODE = re.compile(rb"[^\xff]")
 _IMAGE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
 # Short names for the namespaces a picture's drawing is written in.
 _PREFIXES = {
@@ -1473,56 +1552,87 @@ def _shape_properties(shape: ET.Element | None, extent: list[int] | None, why: s
 
 
 def _png_facts(data: bytes) -> tuple[list[int] | None, set[str]]:
-    """A PNG's pixels, by chunks read whole with their CRCs from IHDR to IEND, and its reasons."""
+    """A PNG's pixels and reasons, its chunks read one by one (none kept but IHDR and eXIf).
+
+    Each chunk whole, with its CRC; IHDR first and only first, of a size up to ``_SIDE``, a bit
+    depth its colour type allows; no critical chunk but IHDR, PLTE, IDAT and IEND; a palette
+    image's PLTE before its first IDAT; image data; nothing after IEND; at most ``_PIECES``.
+    """
     broken: tuple[None, set[str]] = (None, {"bad-image-header"})
-    kinds: list[bytes] = []
-    bodies: list[bytes] = []
+    seen: list[bytes] = []
+    exif: list[bytes] = []
+    pixels: list[int] = []
+    colour = -1
     at = 8
-    while b"IEND" not in kinds[-1:]:
+    for number in range(_PIECES):
         if len(data) - at < 12:
             return broken
         length, kind = struct.unpack_from(">I4s", data, at)
         stop = at + length + 12
-        if length >= 1 << 31 or stop > len(data):
+        if length >= 1 << 31 or stop > len(data) or not re.fullmatch(rb"[A-Za-z]{4}", kind):
             return broken
-        if struct.unpack_from(">I", data, stop - 4)[0] != zlib.crc32(data[at + 4 : stop - 4]):
+        (crc,) = struct.unpack_from(">I", data, stop - 4)
+        if crc != zlib.crc32(memoryview(data)[at + 4 : stop - 4]):
             return broken
-        kinds.append(kind)
-        bodies.append(data[at + 8 : stop - 4])
+        critical = 65 <= kind[0] <= 90
+        if (number == 0) != (kind == b"IHDR"):
+            return broken
+        if critical and kind not in (b"IHDR", b"PLTE", b"IDAT", b"IEND"):
+            return broken
+        if kind == b"IHDR":
+            if length != 13:
+                return broken
+            width, height, depth, colour, method, filtering, interlace = struct.unpack_from(
+                ">IIBBBBB", data, at + 8
+            )
+            if (
+                not (1 <= width <= _SIDE and 1 <= height <= _SIDE)
+                or (colour, depth) not in _PNG_KINDS
+                or (method, filtering) != (0, 0)
+                or interlace not in (0, 1)
+            ):
+                return broken
+            pixels = [width, height]
+        elif kind == b"IDAT" and colour == 3 and b"IDAT" not in seen and b"PLTE" not in seen:
+            return broken
+        elif kind == b"eXIf" and len(exif) < 2:
+            exif.append(data[at + 8 : stop - 4])
+        if kind not in seen:
+            seen.append(kind)
         at = stop
-    if kinds[0] != b"IHDR" or len(bodies[0]) != 13 or b"IDAT" not in kinds:
+        if kind == b"IEND":
+            break
+    else:
         return broken
-    width, height, depth, colour, method, filtering, interlace = struct.unpack(
-        ">IIBBBBB", bodies[0]
-    )
-    if (
-        not (1 <= width < 1 << 31 and 1 <= height < 1 << 31)
-        or (colour, depth) not in _PNG_KINDS
-        or (method, filtering) != (0, 0)
-        or interlace not in (0, 1)
-    ):
+    if at != len(data) or b"IDAT" not in seen:
         return broken
-    why = _exif_turn([b for k, b in zip(kinds, bodies, strict=True) if k == b"eXIf"])
-    if b"acTL" in kinds:
+    why = _exif_turn(exif)
+    if b"iCCP" in seen or b"cHRM" in seen or (b"gAMA" in seen and b"sRGB" not in seen):
+        why.add("colour")
+    if b"acTL" in seen:
         why.add("animated")
-    return [width, height], why
+    return pixels, why
 
 
 def _jpeg_facts(data: bytes) -> tuple[list[int] | None, set[str]]:
-    """A JPEG's pixels, by its one frame header among whole segments before its scan."""
+    """A JPEG's pixels and reasons, by its one frame header among whole segments before its scan.
+
+    The frame baseline, extended or progressive, of precision 8, 1, 3 or 4 components (4 is
+    ``colour``, as an ICC profile is) and a size up to ``_SIDE``; at most ``_PIECES`` segments.
+    """
     broken: tuple[None, set[str]] = (None, {"bad-image-header"})
-    frames: list[tuple[int, bytes]] = []
+    frame: tuple[int, bytes] | None = None
     exif: list[bytes] = []
+    icc = False
     at = 2
-    while True:
+    for _ in range(_PIECES):
         if data[at : at + 1] != b"\xff":
             return broken
-        while data[at : at + 1] == b"\xff":
-            at += 1
-        if at >= len(data):
+        code_at = _past_fill(data, at)
+        if code_at >= len(data):
             return broken
-        code = data[at]
-        at += 1
+        code = data[code_at]
+        at = code_at + 1
         if code == 0x01 or code & 0xF8 == 0xD0:
             continue  # TEM and RST0 to RST7 stand alone
         if code in (0x00, 0xD8, 0xD9) or len(data) - at < 2:
@@ -1535,15 +1645,35 @@ def _jpeg_facts(data: bytes) -> tuple[list[int] | None, set[str]]:
         if code == 0xDA:
             break
         if code & 0xF0 == 0xC0 and code not in (0xC4, 0xC8, 0xCC):
-            frames.append((code, segment))
+            if frame is not None:
+                return broken
+            frame = (code, segment)
         elif code == 0xE1 and segment[:6] == b"Exif\x00\x00":
-            exif.append(segment[6:])
-    if len(frames) != 1 or frames[0][0] > 0xC2 or len(frames[0][1]) < 6:
+            exif = [*exif, segment[6:]][:2]
+        elif code == 0xE2 and segment[:12] == b"ICC_PROFILE\x00":
+            icc = True
+    else:
         return broken
-    _, height, width = struct.unpack_from(">BHH", frames[0][1])
-    if not (width and height):
+    if frame is None or frame[0] > 0xC2 or len(frame[1]) < 6:
         return broken
-    return [width, height], _exif_turn(exif)
+    precision, height, width, parts = struct.unpack_from(">BHHB", frame[1])
+    if (
+        precision != 8
+        or parts not in (1, 3, 4)
+        or len(frame[1]) < 6 + 3 * parts
+        or not (1 <= width <= _SIDE and 1 <= height <= _SIDE)
+    ):
+        return broken
+    why = _exif_turn(exif)
+    if icc or parts == 4:
+        why.add("colour")
+    return [width, height], why
+
+
+def _past_fill(data: bytes, at: int) -> int:
+    """Where the first byte that is not 0xFF stands, from ``at`` (``len(data)`` if none)."""
+    found = _CODE.search(data, at)
+    return len(data) if found is None else found.start()
 
 
 def _exif_turn(blocks: list[bytes]) -> set[str]:
@@ -1795,9 +1925,7 @@ class _Part:
     ledger: _Ledger
     error: str | None = None
     # The tables the walk met, as ``_Story.met`` keeps them.
-    tables: list[tuple[ET.Element, Any, list[ET.Element], list[list[ET.Element]]]] = field(
-        default_factory=list
-    )
+    tables: list[_Met] = field(default_factory=list)
 
 
 def _total(ledgers: list[_Ledger]) -> _Ledger:
@@ -2484,17 +2612,24 @@ class DocxSource:
             for paragraph in walk.paragraphs:
                 paragraph.numbering = self._label(paragraph, story)
         for paragraph in walk.paragraphs:
-            paragraph.pictures = [self._picture(d, source) for d in paragraph.drawings]
+            # Where Word may clip the paragraph's pictures: an exact line, an exact row.
+            clipped = {"line-height"} if _line_rule(self.fonts, paragraph) == "exact" else set()
+            if paragraph.in_exact_row:
+                clipped.add("row-height")
+            paragraph.pictures = [
+                self._picture(d, source, around | clipped) for d, around in paragraph.drawings
+            ]
         return _Part(walk.paragraphs, ledger, tables=walk.met)
 
-    def _picture(self, drawing: ET.Element, source: str) -> dict[str, Json]:
+    def _picture(self, drawing: ET.Element, source: str, around: set[str]) -> dict[str, Json]:
         """What one U+FFFC stands for, read from the source by this check's own rules.
 
         A VML picture's image is its first ``imagedata``'s; a DrawingML one's the ``blip`` of
         the one ``pic:pic`` of the one ``graphicData`` its ``wp:inline`` holds; a ``wps`` shape
-        has none. Each reason found is kept; the first of ``_NOT_AS_IS`` is the result's.
+        has none. ``around`` are the reasons its place gives. Each reason found is kept; the first
+        of ``_NOT_AS_IS`` is the result's.
         """
-        why: set[str] = set()
+        why: set[str] = set(around)
         found: dict[str, Json] = dict.fromkeys(
             ("crop", "extent", "part", "pixels", "reason", "sha256", "type")
         )

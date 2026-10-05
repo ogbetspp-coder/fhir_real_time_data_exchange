@@ -1921,12 +1921,15 @@ def chunk(kind: bytes, body: bytes) -> bytes:
     return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
 
 
-def png(width: int = 2, height: int = 1, extra: bytes = b"", depth: int = 8) -> bytes:
-    """A real PNG of ``width`` by ``height`` black pixels (RGB), ``extra`` chunks after IHDR."""
-    rows = b"".join(b"\x00" + b"\x00" * 3 * width for _ in range(height))
+def png(
+    width: int = 2, height: int = 1, extra: bytes = b"", depth: int = 8, colour: int = 2
+) -> bytes:
+    """A real PNG of ``width`` by ``height`` black pixels (RGB, or palette index 0 for colour
+    type 3), ``extra`` chunks after IHDR."""
+    rows = b"".join(b"\x00" + b"\x00" * (3 if colour == 2 else 1) * width for _ in range(height))
     return (
         b"\x89PNG\r\n\x1a\n"
-        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, depth, 2, 0, 0, 0))
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, depth, colour, 0, 0, 0))
         + extra
         + chunk(b"IDAT", zlib.compress(rows))
         + chunk(b"IEND", b"")
@@ -1937,14 +1940,22 @@ def segment(marker: int, body: bytes) -> bytes:
     return bytes((0xFF, marker)) + struct.pack(">H", len(body) + 2) + body
 
 
-def jpeg(width: int = 1, height: int = 1, frame: int = 0xC0, extra: bytes = b"") -> bytes:
+def jpeg(
+    width: int = 1,
+    height: int = 1,
+    frame: int = 0xC0,
+    extra: bytes = b"",
+    precision: int = 8,
+    parts: int = 1,
+) -> bytes:
     """A real baseline JPEG of one grey 8x8 block, ``width`` by ``height`` (``extra`` first)."""
     huffman = bytes([1] + [0] * 15) + b"\x00"  # one code of one bit, for symbol 0
+    components = b"".join(bytes((i + 1, 0x11, 0)) for i in range(parts))
     return (
         b"\xff\xd8"
         + extra
         + segment(0xDB, b"\x00" + b"\x01" * 64)
-        + segment(frame, struct.pack(">BHHB", 8, height, width, 1) + b"\x01\x11\x00")
+        + segment(frame, struct.pack(">BHHB", precision, height, width, parts) + components)
         + segment(0xC4, b"\x00" + huffman)
         + segment(0xC4, b"\x10" + huffman)
         + segment(0xDA, b"\x01\x01\x00\x00\x3f\x00")
@@ -2023,7 +2034,10 @@ def read_pictures(run: str, media: dict[str, bytes], rels: dict[str, str] | None
 
 
 PNG = png()
-MEDIA = {"word/media/image1.png": PNG}
+IMAGE = "word/media/image1.png"
+MEDIA = {IMAGE: PNG}
+IHDR = struct.pack(">IIBBBBB", 2, 1, 8, 2, 0, 0, 0)
+PALETTE = png(colour=3)
 VML = VML_PICTURE.replace('xmlns:r="urn:r" r:id="rId8"', f'xmlns:r="{REL}" r:id="rIdImg"')
 TURNED = jpeg(extra=segment(0xE1, exif(6)))
 # Each picture the reader cannot vouch for, its media and relationships, and the reason it gives.
@@ -2154,6 +2168,49 @@ PICTURE_CASES: list[tuple[str, str, dict[str, bytes], dict[str, str] | None, str
     ("resized", picture(shape='<a:xfrm><a:ext cx="1" cy="1"/></a:xfrm>'), MEDIA, None, "effects"),
     ("effect-extent", picture(effect='l="0" t="0" r="9525" b="0"'), MEDIA, None, "effects"),
     ("hidden", picture().replace("name='p'/>", "name='p' hidden='1'/>"), MEDIA, None, "effects"),
+    # Headers browsers and Word may read otherwise, or not at all.
+    ("palette-without-plte", picture(), {IMAGE: PALETTE}, None, "bad-image-header"),
+    ("palette", picture(), {IMAGE: png(extra=chunk(b"PLTE", bytes(3)), colour=3)}, None, None),
+    (
+        "unknown-critical",
+        picture(),
+        {IMAGE: png(extra=chunk(b"ABCD", b"x"))},
+        None,
+        "bad-image-header",
+    ),
+    ("second-ihdr", picture(), {IMAGE: png(extra=chunk(b"IHDR", IHDR))}, None, "bad-image-header"),
+    ("not-letters", picture(), {IMAGE: png(extra=chunk(b"ab1d", b""))}, None, "bad-image-header"),
+    ("after-iend", picture(), {IMAGE: PNG + b"x"}, None, "bad-image-header"),
+    ("too-wide", picture(), {IMAGE: png(width=10_001)}, None, "bad-image-header"),
+    ("jpeg-12-bit", picture(), {IMAGE: jpeg(precision=12)}, None, "bad-image-header"),
+    ("jpeg-2-components", picture(), {IMAGE: jpeg(parts=2)}, None, "bad-image-header"),
+    ("jpeg-too-high", picture(), {IMAGE: jpeg(height=10_001)}, None, "bad-image-header"),
+    (
+        "jpeg-two-frames",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xC0, bytes(9)))},
+        None,
+        "bad-image-header",
+    ),
+    # Colour Chrome manages and Word's handling of is not on record.
+    ("iccp", picture(), {IMAGE: png(extra=chunk(b"iCCP", b"p\x00\x00x"))}, None, "colour"),
+    ("chrm", picture(), {IMAGE: png(extra=chunk(b"cHRM", bytes(32)))}, None, "colour"),
+    ("gama-alone", picture(), {IMAGE: png(extra=chunk(b"gAMA", bytes(4)))}, None, "colour"),
+    (
+        "gama-srgb",
+        picture(),
+        {IMAGE: png(extra=chunk(b"sRGB", b"\x00") + chunk(b"gAMA", bytes(4)))},
+        None,
+        None,
+    ),
+    (
+        "jpeg-icc",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xE2, b"ICC_PROFILE\x00\x01\x01"))},
+        None,
+        "colour",
+    ),
+    ("jpeg-cmyk", picture(), {IMAGE: jpeg(parts=4)}, None, "colour"),
 ]
 
 
@@ -2217,6 +2274,140 @@ def test_a_picture_its_bytes_cannot_stand_for_has_the_first_reason_and_is_read(
     assert found["kind"] == ("shape" if reason == "shape" else "picture")
     if found["part"] is not None:
         assert found["sha256"] == hashlib.sha256(media[found["part"]]).hexdigest()
+
+
+def field(instruction: str, result: str) -> str:
+    """A complex field with ``instruction`` showing ``result`` (runs)."""
+    return (
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r(f'<w:instrText xml:space="preserve"> {instruction} </w:instrText>')
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + result
+        + r('<w:fldChar w:fldCharType="end"/>')
+    )
+
+
+EXACT = '<w:spacing w:line="240" w:lineRule="exact"/>'
+BORDER = '<w:bdr w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
+ROW = '<w:trPr><w:trHeight w:val="2000" w:hRule="exact"/></w:trPr>'
+INNER = f"<w:tr><w:tc>{p(r(picture()))}</w:tc></w:tr>"
+# Where a picture stands, and the reason its place gives: Word prints a field's result again
+# (a REF to a bookmark round another picture prints that one), and clips a picture to an exact
+# line or row; a border on the run is drawn round it.
+PLACED_CASES: list[tuple[str, str, str | None, str | None]] = [
+    ("plain", p(r(picture())), None, None),
+    ("complex-field", p(field("DOCPROPERTY Title", r(picture()))), None, "field"),
+    (
+        "simple-field",
+        p(f'<w:fldSimple w:instr=" DOCPROPERTY Title ">{r(picture())}</w:fldSimple>'),
+        None,
+        "field",
+    ),
+    (
+        "ref-to-another",
+        p('<w:bookmarkStart w:id="0" w:name="logo"/>' + r(picture()) + '<w:bookmarkEnd w:id="0"/>')
+        + p(field("REF logo \\h", r(picture()))),
+        None,
+        "field",
+    ),
+    (
+        "carried-field",
+        p(
+            r('<w:fldChar w:fldCharType="begin"/>')
+            + r('<w:instrText xml:space="preserve"> DOCPROPERTY T </w:instrText>')
+            + r('<w:fldChar w:fldCharType="separate"/>')
+            + r("<w:t>x</w:t>")
+        )
+        + p(r(picture()) + r('<w:fldChar w:fldCharType="end"/>')),
+        None,
+        "field",
+    ),
+    ("exact-line", p(r(picture()), EXACT), None, "line-height"),
+    ("at-least-line", p(r(picture()), EXACT.replace("exact", "atLeast")), None, None),
+    (
+        "exact-line-by-style",
+        p(r(picture())),
+        '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:pPr>'
+        + EXACT
+        + "</w:pPr></w:style>",
+        "line-height",
+    ),
+    (
+        "exact-line-by-default",
+        p(r(picture())),
+        f"<w:docDefaults><w:pPrDefault><w:pPr>{EXACT}</w:pPr></w:pPrDefault></w:docDefaults>",
+        "line-height",
+    ),
+    (
+        "nearest-rule-wins",
+        p(r(picture()), EXACT.replace("exact", "auto")),
+        f"<w:docDefaults><w:pPrDefault><w:pPr>{EXACT}</w:pPr></w:pPrDefault></w:docDefaults>",
+        None,
+    ),
+    ("exact-row", tbl(1, f"<w:tr>{ROW}<w:tc>{p(r(picture()))}</w:tc></w:tr>"), None, "row-height"),
+    (
+        "at-least-row",
+        tbl(1, f"<w:tr>{ROW.replace('exact', 'atLeast')}<w:tc>{p(r(picture()))}</w:tc></w:tr>"),
+        None,
+        None,
+    ),
+    (
+        "nested-in-exact-row",
+        tbl(1, f"<w:tr>{ROW}<w:tc>{tbl(1, INNER)}{p('')}</w:tc></w:tr>"),
+        None,
+        "row-height",
+    ),
+    (
+        "exact-row-by-style",
+        tbl(1, f"<w:tr><w:tc>{p(r(picture()))}</w:tc></w:tr>").replace(
+            "<w:tbl>", '<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr>'
+        ),
+        f'<w:style w:type="table" w:styleId="T">{ROW}</w:style>',
+        "row-height",
+    ),
+    ("border", p(r(picture(), BORDER)), None, "border"),
+    ("no-border", p(r(picture(), '<w:bdr w:val="none"/>')), None, None),
+    (
+        "border-by-style",
+        p(r(picture(), '<w:rStyle w:val="B"/>')),
+        f'<w:style w:type="character" w:styleId="B"><w:rPr>{BORDER}</w:rPr></w:style>',
+        "border",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("body", "styles", "reason"),
+    [case[1:] for case in PLACED_CASES],
+    ids=[case[0] for case in PLACED_CASES],
+)
+def test_a_picture_word_may_print_otherwise_or_clip_says_so_and_is_read(
+    body: str, styles: str | None, reason: str | None
+) -> None:
+    value = json.loads(served(with_media(docx(body, styles), MEDIA))[0])
+    assert "refusal" not in value, value.get("refusal")
+    found = [x for q in value["paragraphs"] for x in q["pictures"]]
+    assert found[-1]["reason"] == reason
+    assert found[-1]["sha256"] == hashlib.sha256(PNG).hexdigest()
+
+
+def test_a_tables_rows_say_whether_their_height_is_exact() -> None:
+    rows = f"<w:tr>{ROW}<w:tc>{p('')}</w:tc></w:tr><w:tr><w:tc>{p('')}</w:tc></w:tr>"
+    styled = '<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr>'
+    part = f'<w:tblStylePr w:type="firstRow">{ROW}</w:tblStylePr>'
+    for table, styles, exact in (
+        (tbl(1, rows), None, [True, False]),
+        (tbl(1, rows.replace("exact", "atLeast")), None, [False, False]),
+        # A style's row height, its own or a part's, may apply to any row: how is not on record.
+        (
+            tbl(1, rows).replace("<w:tbl>", styled),
+            f'<w:style w:type="table" w:styleId="T">{part}</w:style>',
+            [True, True],
+        ),
+    ):
+        (found,) = read_document(docx(table, styles)).tables
+        assert found.grid is not None
+        assert [row.exact for row in found.grid.rows] == exact
 
 
 def test_smart_tag_and_custom_xml_properties_are_not_text() -> None:

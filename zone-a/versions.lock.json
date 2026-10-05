@@ -4,18 +4,18 @@
     "label-docx-json/1.15.6": "27d75cd2956c34304fb7a811931cb18ce9199b6071a9beea58a4eecd03e60c27",
     "label-docx-json/1.15.7": "0cc9f57af0651a7eff6141f89f75d4358a1f91247df2495cc1c0f603bf00d7e7",
     "label-docx-json/1.16.0": "8ea8365876133a160b1e1da828b824ad26b4eb219f5f3b7b15a43e8cfc634f13",
-    "label-docx-json/1.17.0": "cf3b5333e0714ebec87c626160dd0f8fe01cd5e70f074bec80f8a6877536717e"
+    "label-docx-json/1.17.0": "231bae00cf6c521338bfda6b0c8e7d337faf858ef6c912b2d72d8a7ca0ac50ff"
   },
   "docx-reader": {
     "docx-reader/1.1.0": "fe8d2711b071d26ad210f9541ffa1d11ea13b49401f38d7ce77040f30d7cc572",
     "docx-reader/1.25.0": "f1bd44ec1759c6ee39e6c807258df528e7ed68e5b5d0a3a89c6976faa37edce8",
     "docx-reader/1.26.0": "49d437a531e36c81a48c61dd7ec58af97edac2246331b2030c31e4043059b066",
     "docx-reader/1.27.0": "89648044df0d2eb04a871c210175cf4611babff6f4c3f952451427bf2d139b89",
-    "docx-reader/1.28.0": "fc290c4de2f75faf87af0ceb67caaa387602cd82ccfaebca7c3b236c7795ff57"
+    "docx-reader/1.28.0": "da764385ec6b8b0ff262d776038bc375362003f522fea539ba1900170a975def"
   },
   "epi-format": {
     "label-epi-json/1.11.10": "66d14a7c4db479bd132579b71160fde2d13d104eac6cfdd05226ca7f0a0a5182",
-    "label-epi-json/1.11.11": "d8188f29742867f16d58f24bd6dcacafdc156eb8d8cfa26963dfb9126fad8710",
+    "label-epi-json/1.11.11": "0e56040f889864693c505a49a8c129d6ef668d3e31d33bc316d62d6abb43da15",
     "label-epi-json/1.11.7": "6a8bcf96814f1cba3b8e02e0bd02bb40b13cc2f46d3aaf7a2c9e0a5d834fb007",
     "label-epi-json/1.11.8": "f4088ce541f0b97afacd7f480c1c1fce4a51bd5b55f484d2c7b5ea40e3254c26",
     "label-epi-json/1.11.9": "1a651a6c6ad5c98fea503bd91339eee8e94aceb5999f7948b9c9f429f63e409e"
@@ -25,7 +25,7 @@
     "epi-reader/1.3.0": "8472b97178b5c8315f87f090828b158cf294a73025d3e6ef351e18b6f5c6a3e6",
     "epi-reader/1.3.1": "d8ab4b095fc1c77fe71e7c16de12226d363532f63df20fe8bdc4341302ce351c",
     "epi-reader/1.3.2": "424e99bd4e31a08f11bbc0400a6fab82816335394a85cb67c5ad1992a81d8746",
-    "epi-reader/1.3.3": "086db36a14c1c80f4c87bda319311f69cac68a7bd42052b44644dcfa23a52317"
+    "epi-reader/1.3.3": "706e64abe226f5bb0d012a77be11fb0f2d845f4ae2af5740d86e11a1add3fecb"
   },
   "implementation-check": {
     "implementation-check/1.0.0": "8d0188c8c37aecdfce10776597c2645f99c7083d0326da4080a46d9512a7c031",

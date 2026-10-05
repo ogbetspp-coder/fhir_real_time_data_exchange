@@ -39,7 +39,7 @@ from label_docx.reader import Paragraph
 TIMEOUT_SECONDS = 300
 # What Chrome is asked and how its answers are judged: a change to this file changes it
 # (``scripts/lock.py``). A kept verdict of another version does not count as Chrome's now.
-VERIFIER = "browser-verifier/1.0.1"
+VERIFIER = "browser-verifier/1.1.0"
 
 
 class BrowserError(Exception):
@@ -128,11 +128,21 @@ function facts(element, host) {{
   }}
   return out;
 }}
-for (const div of divs) {{
+// Each div parsed at once, so its pictures load (and decode) before the page's load event;
+// each is then laid out and read in turn.
+const parsed = divs.map(div => {{
   const host = document.createElement("div");
-  document.body.appendChild(host);
   host.innerHTML = div;
+  return host;
+}});
+window.addEventListener("load", () => {{
+for (const host of parsed) {{
+  document.body.appendChild(host);
+  // Each picture's decoded size, in order: [0, 0] for one the browser did not decode.
+  const pictures = [];
   for (const picture of host.querySelectorAll("img")) {{
+    const shown = picture.complete && picture.naturalWidth > 0;
+    pictures.push(shown ? [picture.naturalWidth, picture.naturalHeight] : [0, 0]);
     picture.replaceWith(document.createTextNode("\\ufffc"));
   }}
   const whole = document.createRange();
@@ -157,7 +167,7 @@ for (const div of divs) {{
   if (error === null && /[^\\n\\t]/.test(text.slice(at))) {{
     error = "text after the last text node's piece";
   }}
-  results.push({{ text, runs, error }});
+  results.push({{ text, runs, error, pictures }});
   host.remove();
 }}
 selection.removeAllRanges();
@@ -166,6 +176,7 @@ out.type = "application/json";
 out.id = "out";
 out.textContent = JSON.stringify(results).replace(/</g, "\\\\u003c");
 document.body.appendChild(out);
+}});
 </script>
 </body></html>
 """
@@ -181,7 +192,11 @@ def chrome_version(chrome: Path = CHROME) -> str:
 
 
 def browser_sections(divs: list[str], chrome: Path = CHROME) -> list[dict[str, Any]]:
-    """What Chrome shows for each div: its text, and the facts of each text node's piece."""
+    """What Chrome shows for each div: its text, the facts of each text node's piece, pictures.
+
+    ``pictures`` is each picture's size as Chrome decoded it, in document order: ``[width,
+    height]``, or ``[0, 0]`` for one it did not decode.
+    """
     payload = json.dumps(divs).replace("<", "\\u003c")
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
         page = Path(folder) / "page.html"
