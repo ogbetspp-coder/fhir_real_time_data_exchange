@@ -6,12 +6,14 @@ statuses, and no assertion shows its text.
 
 from __future__ import annotations
 
+import datetime
 import importlib.util
 import io
 import itertools
 import json
 import random
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -275,3 +277,148 @@ def test_an_epi_is_read_section_by_section() -> None:
 @pytest.mark.parametrize("bad", ["", "   "])
 def test_a_blank_paragraph_is_layout(bad: str) -> None:
     assert impl.changes([_p("A.")], [_p("A."), _p(bad)]) == []
+
+
+DE_OLD = "Schwerwiegende Infektionen, einschließlich Tuberkulose, wurden berichtet."
+DE_NEW = (
+    "Schwerwiegende Infektionen, einschließlich Tuberkulose und Hepatitis-B-Reaktivierung, "
+    "wurden berichtet."
+)
+
+
+def test_a_label_in_another_language_is_checked_against_its_given_wording() -> None:
+    edit = _hbv()
+    given: impl.Wordings = {edit.id: {"de": (DE_OLD, DE_NEW)}}
+    implemented = impl.check(edit, _label(DE_NEW, language="de"), "en", given)
+    assert (implemented.status, implemented.wording) == ("implemented", "translation")
+    assert impl.check(edit, _label(DE_OLD, language="de"), "en", given).status == "pending"
+    assert impl.check(edit, _label(DE_NEW, language="fr"), "en", given).reason == "language"
+    assert impl.check(edit, _label(NEW_TB), "en", given).wording == "ccds"
+
+
+def _file(edit: impl.Edit, **languages: object) -> dict[str, object]:
+    return {edit.id: {"ccds": {"language": "en", "old": edit.old, "new": edit.new}, **languages}}
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (lambda _e: {"0" * 12: {}}, "no edit"),
+        (lambda e: {e.id: {"ccds": {"old": "other", "new": e.new}}}, "other CCDS wording"),
+        (lambda e: _file(e, en={"old": "a", "new": "b"}), "own language"),
+        (lambda e: _file(e, de={"new": DE_NEW}), "old and new"),
+        (lambda e: _file(e, de={"old": DE_OLD, "new": None}), "new must be given"),
+        (lambda e: _file(e, de={"old": " ", "new": DE_NEW}), "old is empty"),
+        (lambda e: _file(e, de={"old": DE_NEW, "new": DE_NEW}), "the same"),
+        (lambda e: [e.id], "JSON object"),
+    ],
+)
+def test_a_wording_file_is_refused_whole_when_anything_is_wrong(
+    change: Callable[[impl.Edit], object], message: str
+) -> None:
+    edit = _hbv()
+    with pytest.raises(ValueError, match=message):
+        impl.load_wordings(change(edit), [edit], "en")
+
+
+def test_an_inserted_paragraph_takes_no_old_wording_in_any_language() -> None:
+    old, new = [_p("Keep.")], [_p("Keep."), _p("Added whole.")]
+    (edit,) = impl.edits(old, new, impl.changes(old, new))
+    with pytest.raises(ValueError, match="old must be null"):
+        impl.load_wordings(_file(edit, de={"old": "Alt.", "new": "Neu."}), [edit], "en")
+    assert impl.load_wordings(_file(edit, de={"old": None, "new": "Neu."}), [edit], "en") == {
+        edit.id: {"de": (None, "Neu.")}
+    }
+
+
+def test_a_template_lists_each_checkable_edit_to_fill_in() -> None:
+    edit = _hbv()
+    ambiguous = impl.Edit("x" * 12, 0, "a", "b", "ambiguous-wording")
+    made = impl.template([edit, ambiguous], "en", ["de", "fr"])
+    assert list(made) == [edit.id]
+    assert made[edit.id]["de"] == {"old": None, "new": None}
+    # Left empty, a language is not given; filled in, it is.
+    assert impl.load_wordings(made, [edit], "en") == {}
+    made[edit.id]["de"] = {"old": DE_OLD, "new": DE_NEW}
+    assert impl.load_wordings(made, [edit], "en") == {edit.id: {"de": (DE_OLD, DE_NEW)}}
+
+
+def test_lateness_counts_from_the_date_given_never_a_clock() -> None:
+    edit = _hbv()
+    due = datetime.date(2026, 9, 1)
+    on = datetime.date(2026, 10, 5)
+    pending = impl.Label("ie", "en", (_p(OLD_TB),), market="IE", due=due)
+    done = impl.Label("uk", "en", (_p(NEW_TB),), market="UK", due=due)
+    other = impl.Label("de", "de", (_p(DE_NEW),), market="DE", due=due)
+    undated = impl.Label("mt", "en", (_p(OLD_TB),), market="MT")
+    assert impl.days_late(impl.check(edit, pending, "en"), pending, on) == 34
+    assert impl.days_late(impl.check(edit, pending, "en"), pending, due) == 0
+    # Before its date a label is not late, never early by a negative count.
+    early = due - datetime.timedelta(days=10)
+    assert impl.days_late(impl.check(edit, pending, "en"), pending, early) == 0
+    assert impl.days_late(impl.check(edit, done, "en"), done, on) == 0
+    assert impl.days_late(impl.check(edit, other, "en"), other, on) is None
+    assert impl.days_late(impl.check(edit, undated, "en"), undated, on) is None
+
+
+def test_the_report_counts_each_edit_and_names_the_late_markets() -> None:
+    old, new = [_p("Warnings", "Heading2"), _p(OLD_TB)], [_p("Warnings", "Heading2"), _p(NEW_TB)]
+    due = datetime.date(2026, 9, 1)
+    labels = [
+        impl.Label("uk", "en", (_p(NEW_TB),), market="UK", due=due),
+        impl.Label("ie", "en", (_p(OLD_TB),), market="IE", due=due),
+        impl.Label("ie", "en", (_p(OLD_TB),), market="IE", due=due),
+        impl.Label("de", "de", (_p(DE_NEW),), market="DE", due=due),
+    ]
+    sources = {"old": "a", "new": "b"}
+    with pytest.raises(ValueError, match="as of"):
+        impl.report(old, new, "en", labels, sources)
+    result = impl.report(old, new, "en", labels, sources, as_of=datetime.date(2026, 10, 5))
+    ((edit_id, summary),) = result["summary"].items()
+    assert summary == {
+        "implemented": 1,
+        "pending": 2,
+        "both": 0,
+        "absent": 0,
+        "not-checked": 1,
+        "late": 2,
+        "lateMarkets": ["IE"],
+    }
+    # Two labels may share a name: each keeps its own result.
+    assert [entry["results"][0]["daysLate"] for entry in result["labels"]] == [0, 34, 34, None]
+    assert result["asOf"] == "2026-10-05"
+    assert edit_id == result["edits"][0]["id"]
+
+
+def test_the_script_writes_a_template_and_a_dated_translated_report(tmp_path: Path) -> None:
+    spec = importlib.util.spec_from_file_location(
+        "check_implementation", ROOT / "zone-a" / "scripts" / "check_implementation.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    script = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(script)
+    (tmp_path / "old.docx").write_bytes(_docx(OLD_TB))
+    (tmp_path / "new.docx").write_bytes(_docx(NEW_TB))
+    (tmp_path / "de.docx").write_bytes(_docx(DE_NEW))
+    ccds = [str(tmp_path / "old.docx"), str(tmp_path / "new.docx")]
+    made = tmp_path / "wordings.json"
+    assert script.main([*ccds, "--template", "de", "--out", str(made)]) == 0
+    filled = json.loads(made.read_text(encoding="utf-8"))
+    (edit_id,) = filled
+    filled[edit_id]["de"] = {"old": DE_OLD, "new": DE_NEW}
+    made.write_text(json.dumps(filled), encoding="utf-8")
+    entries = [{"file": "de.docx", "language": "de", "market": "DE", "due": "2026-09-01"}]
+    (tmp_path / "labels.json").write_text(json.dumps(entries), encoding="utf-8")
+    labels = str(tmp_path / "labels.json")
+    with pytest.raises(SystemExit):  # a date, and no day to count lateness on
+        script.main([*ccds, labels, "--wordings", str(made)])
+    out = tmp_path / "report.json"
+    dated = [*ccds, labels, "--wordings", str(made), "--as-of", "2026-10-05", "--out", str(out)]
+    assert script.main(dated) == 0
+    (result,) = json.loads(out.read_text(encoding="utf-8"))["labels"][0]["results"]
+    assert (result["status"], result["wording"], result["daysLate"]) == (
+        "implemented",
+        "translation",
+        0,
+    )

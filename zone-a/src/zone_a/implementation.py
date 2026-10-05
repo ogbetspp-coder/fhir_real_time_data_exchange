@@ -40,9 +40,26 @@ paragraph, and gives the label one status for the edit:
   paragraph is ``pending`` while its text is there and ``absent`` when it is not, never
   ``implemented``: the text alone cannot tell a removal from a label that never had it;
 - ``not-checked``, with the reason: the edit cannot be checked (``ambiguous-wording``), the label
-  is in another language than the CCDS (``language``: its wording would be a translation, which
-  is not given here), the reader refused the label (``refused``, with the reader's code), or it
-  refused a part of it (``refused-part``), where either wording may stand.
+  is in another language than the CCDS and no wording in its language is given (``language``),
+  the reader refused the label (``refused``, with the reader's code), or it refused a part of it
+  (``refused-part``), where either wording may stand.
+
+Translations. A label in another language carries a translation of the change, which the CCDS
+does not hold, so its wording is given: ``load_wordings`` reads a file of each edit's old and new
+wording by language (``template`` writes one to fill in, with each edit's CCDS wording beside it
+for reference). Such a label is checked against its language's wording exactly as above, and its
+result says which wording it was checked against (``ccds`` or ``translation``). The file is
+refused whole, never in part, when it names an edit these CCDS versions do not have, carries a
+reference wording other than the CCDS's (it was made for other versions), gives a side the CCDS
+change does not have or leaves out one it has, gives an empty wording or the same old and new
+wording, or gives wording in the CCDS's own language. A language whose old and new wording are
+both left empty is not given.
+
+Deadlines. A label may carry its market and the date it must carry the change by (``due``). On
+the day the report is made as of (``as_of``, given, never read from a clock, so the same inputs
+give the same report), a label past its date is late by the days since, unless its status is
+``implemented``: ``pending``, ``both`` and ``absent`` all lack the evidence that the change is
+there. A ``not-checked`` label's lateness is unknown (``None``), and so is a label with no date.
 
 A place where one wording lies inside the other (the old "reported." in the new "Rarely reported.")
 is the longer one's. Each place a wording is found is the paragraph's index and the character offset
@@ -54,6 +71,7 @@ normalised for a status.
 
 from __future__ import annotations
 
+import datetime
 import difflib
 import hashlib
 import itertools
@@ -68,7 +86,7 @@ from label_docx.reader import DocxRefusedError, Paragraph
 
 from zone_a import certified
 
-IMPLEMENTATION_VERSION = "implementation-check/1.0.0"
+IMPLEMENTATION_VERSION = "implementation-check/1.1.0"
 # Words of unchanged text kept on each side of an edit.
 CONTEXT = 4
 
@@ -117,6 +135,8 @@ class Label:
     paragraphs: tuple[Paragraph, ...] = ()
     refusal: str | None = None
     refused_part: bool = False
+    market: str | None = None
+    due: datetime.date | None = None
 
 
 @dataclass(frozen=True)
@@ -128,6 +148,12 @@ class Result:
     new: tuple[tuple[int, int], ...]
     old: tuple[tuple[int, int], ...]
     spacing: bool
+    # The wording the label was checked against: "ccds" or "translation" (None: not checked).
+    wording: str | None = None
+
+
+# Each edit's old and new wording in a label's language, by edit id and language.
+type Wordings = dict[str, dict[str, tuple[str | None, str | None]]]
 
 
 def tokens(text: str) -> list[str]:
@@ -334,50 +360,122 @@ def _spaced(paragraphs: Sequence[Paragraph], wordings: Iterable[str | None]) -> 
     return any(_WHITE.sub(" ", w) in text for w in wordings if w is not None for text in texts)
 
 
-def check(edit: Edit, label: Label, language: str) -> Result:
-    """Where a label stands on an edit (the module docstring, "Labels")."""
+def check(edit: Edit, label: Label, language: str, wordings: Wordings | None = None) -> Result:
+    """Where a label stands on an edit (the module docstring, "Labels" and "Translations")."""
     if edit.reason is not None:
         return Result("not-checked", edit.reason, (), (), False)
     if label.refusal is not None:
         return Result("not-checked", "refused", (), (), False)
-    if label.language != language:
-        return Result("not-checked", "language", (), (), False)
-    new = _places(label.paragraphs, edit.new)
-    old = _places(label.paragraphs, edit.old)
-    if edit.old is not None and edit.new is not None:
+    if label.language == language:
+        was, now, wording = edit.old, edit.new, "ccds"
+    else:
+        given = (wordings or {}).get(edit.id, {}).get(label.language)
+        if given is None:
+            return Result("not-checked", "language", (), (), False)
+        (was, now), wording = given, "translation"
+    new = _places(label.paragraphs, now)
+    old = _places(label.paragraphs, was)
+    if was is not None and now is not None:
         # "reported." in "Rarely reported." is the new wording, not the old.
-        new, old = (
-            _outside(new, len(edit.new), old, len(edit.old)),
-            _outside(old, len(edit.old), new, len(edit.new)),
-        )
+        new, old = _outside(new, len(now), old, len(was)), _outside(old, len(was), new, len(now))
     if label.refused_part:
         return Result("not-checked", "refused-part", new, old, False)
-    if edit.new is None:
+    if now is None:
         status = "pending" if old else "absent"
-    elif edit.old is None:
+    elif was is None:
         status = "implemented" if new else "absent"
     else:
         status = {(True, False): "implemented", (False, True): "pending", (True, True): "both"}.get(
             (bool(new), bool(old)), "absent"
         )
-    spacing = status == "absent" and _spaced(label.paragraphs, (edit.old, edit.new))
-    return Result(status, None, new, old, spacing)
+    spacing = status == "absent" and _spaced(label.paragraphs, (was, now))
+    return Result(status, None, new, old, spacing, wording)
 
 
-def read_label(name: str, language: str, data: bytes) -> Label:
+def days_late(result: Result, label: Label, as_of: datetime.date | None) -> int | None:
+    """How many days past its date a label is on an edit (the module docstring, "Deadlines")."""
+    if label.due is None or as_of is None or result.status == "not-checked":
+        return None
+    if result.status == "implemented":
+        return 0
+    return max(0, (as_of - label.due).days)
+
+
+def template(checked: Sequence[Edit], language: str, languages: Sequence[str]) -> dict[str, Any]:
+    """A wording file to fill in: each checkable edit's CCDS wording, an empty pair a language."""
+    return {
+        e.id: {
+            "ccds": {"language": language, "old": e.old, "new": e.new},
+            **{code: {"old": None, "new": None} for code in languages},
+        }
+        for e in checked
+        if e.reason is None
+    }
+
+
+def load_wordings(value: object, checked: Sequence[Edit], language: str) -> Wordings:
+    """A wording file's wordings, or ValueError naming what is wrong with it (whole or nothing)."""
+    if not isinstance(value, dict):
+        raise ValueError("a wording file is a JSON object of edits")
+    by_id = {e.id: e for e in checked}
+    out: Wordings = {}
+    for edit_id, entry in value.items():
+        edit = by_id.get(edit_id)
+        if edit is None:
+            raise ValueError(f"no edit {edit_id} in these CCDS versions")
+        if not isinstance(entry, dict):
+            raise ValueError(f"edit {edit_id}: not an object of languages")
+        reference = entry.get("ccds")
+        if reference is not None and (
+            not isinstance(reference, dict)
+            or reference.get("old") != edit.old
+            or reference.get("new") != edit.new
+        ):
+            raise ValueError(f"edit {edit_id}: the file was made for other CCDS wording")
+        for code, pair in entry.items():
+            if code == "ccds":
+                continue
+            where = f"edit {edit_id}, {code}"
+            if code == language:
+                raise ValueError(f"{where}: the CCDS's own language takes the CCDS's wording")
+            if not isinstance(pair, dict) or set(pair) != {"old", "new"}:
+                raise ValueError(f"{where}: not an object of old and new")
+            was, now = pair["old"], pair["new"]
+            if was is None and now is None:
+                continue  # not filled in: that language is not given
+            for side, text, ccds in (("old", was, edit.old), ("new", now, edit.new)):
+                if (text is None) != (ccds is None):
+                    expected = "null, as in the CCDS" if ccds is None else "given, as in the CCDS"
+                    raise ValueError(f"{where}: {side} must be {expected}")
+                if text is not None and (not isinstance(text, str) or not text.strip()):
+                    raise ValueError(f"{where}: {side} is empty")
+            if was == now:
+                raise ValueError(f"{where}: old and new are the same")
+            out.setdefault(edit_id, {})[code] = (was, now)
+    return out
+
+
+def read_label(
+    name: str,
+    language: str,
+    data: bytes,
+    market: str | None = None,
+    due: datetime.date | None = None,
+) -> Label:
     """A label read through the certified reads: an ePI Bundle (JSON) or a .docx."""
     if data[:1] == b"{":
         try:
             document = certified.read_epi(data)
         except EpiRefusedError as refused:
-            return Label(name, language, refusal=refused.code)
+            return Label(name, language, refusal=refused.code, market=market, due=due)
         sections = list(walk(document.sections))
         paragraphs = tuple(p for s in sections for p in s.paragraphs)
-        return Label(name, language, paragraphs, refused_part=any(s.refusal for s in sections))
+        refused_part = any(s.refusal for s in sections)
+        return Label(name, language, paragraphs, refused_part=refused_part, market=market, due=due)
     try:
-        return Label(name, language, tuple(certified.read_docx(data)))
+        return Label(name, language, tuple(certified.read_docx(data)), market=market, due=due)
     except DocxRefusedError as refused:
-        return Label(name, language, refusal=refused.code)
+        return Label(name, language, refusal=refused.code, market=market, due=due)
 
 
 def report(
@@ -386,15 +484,29 @@ def report(
     language: str,
     labels: Sequence[Label],
     sources: dict[str, str],
+    wordings: object = None,
+    as_of: datetime.date | None = None,
 ) -> dict[str, Any]:
     """The changes, their edits and every label's status on each, as JSON values.
 
     It names the implementation check's version and the readers' and their formats' (a status is
     only as good as the reading under it); ``sources`` names the two CCDS files' SHA-256
-    (``old``, ``new``); a label that the reader refused carries its code.
+    (``old``, ``new``); a label that the reader refused carries its code. ``wordings`` is a
+    wording file's JSON value (``load_wordings``); ``as_of`` is the day lateness is counted on,
+    required when a label has a date. ``summary`` counts, for each edit, the labels by status,
+    those late, and the markets they are in.
     """
     found = changes(old, new)
     checked = edits(old, new, found)
+    given = load_wordings(wordings, checked, language) if wordings is not None else {}
+    if as_of is None and any(label.due is not None for label in labels):
+        raise ValueError("a label has a date: give the day the report is made as of")
+    # By the label's position, then the edit's: two labels may share a name.
+    results = [[check(e, label, language, given) for e in checked] for label in labels]
+    late = [
+        [days_late(r, label, as_of) for r in row]
+        for label, row in zip(labels, results, strict=True)
+    ]
 
     def place(found_at: tuple[tuple[int, int], ...]) -> list[dict[str, int]]:
         return [{"paragraph": p, "offset": o} for p, o in found_at]
@@ -423,24 +535,45 @@ def report(
             {"id": e.id, "change": e.change, "old": e.old, "new": e.new, "reason": e.reason}
             for e in checked
         ],
+        "asOf": None if as_of is None else as_of.isoformat(),
         "labels": [
             {
                 "name": label.name,
                 "language": label.language,
+                "market": label.market,
+                "due": None if label.due is None else label.due.isoformat(),
                 "refusal": label.refusal,
                 "results": [
                     {
                         "edit": e.id,
                         "status": r.status,
                         "reason": r.reason,
+                        "wording": r.wording,
                         "new": place(r.new),
                         "old": place(r.old),
                         "spacing": r.spacing,
+                        "daysLate": days,
                     }
-                    for e in checked
-                    for r in (check(e, label, language),)
+                    for e, r, days in zip(checked, results[i], late[i], strict=True)
                 ],
             }
-            for label in labels
+            for i, label in enumerate(labels)
         ],
+        "summary": {
+            e.id: {
+                **{
+                    status: sum(1 for row in results if row[k].status == status)
+                    for status in ("implemented", "pending", "both", "absent", "not-checked")
+                },
+                "late": sum(1 for row in late if (row[k] or 0) > 0),
+                "lateMarkets": sorted(
+                    {
+                        label.market
+                        for label, row in zip(labels, late, strict=True)
+                        if label.market is not None and (row[k] or 0) > 0
+                    }
+                ),
+            }
+            for k, e in enumerate(checked)
+        },
     }
