@@ -826,3 +826,16 @@ def test_the_templates_black_triangle_is_carried() -> None:
     assert root["refusal"] is None
     assert root["narrative"].count("<img ") == 1
     assert root["page"].count("\ufffc") == 2
+
+
+def test_a_word_part_that_does_not_parse_refuses_the_document() -> None:
+    out = io.BytesIO()
+    with (
+        zipfile.ZipFile(FIXTURES / "jentadueto-smpc-en.docx") as source,
+        zipfile.ZipFile(out, "w") as target,
+    ):
+        for item in source.infolist():
+            target.writestr(item, source.read(item))
+        target.writestr("word/unused.xml", b"<not closed")
+        target.writestr("customXml/item9.xml", b"<also not closed")
+    assert certified.layout(out.getvalue()) == ("unreadable-part",)

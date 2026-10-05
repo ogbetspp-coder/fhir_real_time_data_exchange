@@ -69,7 +69,7 @@ text they draw the same (``heading-formatting``), since its line is the section'
 A document is refused whole where Word draws something the read does not say: a floating picture
 or shape (``floating-object``, counted by the certificate but not placed), or one of
 ``Body.layout`` (``floating-table``, ``frame``, ``right-to-left-table``, a ``page-break`` between
-two words).
+two words, an ``unreadable-part``).
 """
 
 from __future__ import annotations

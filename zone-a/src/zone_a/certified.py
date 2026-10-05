@@ -116,18 +116,23 @@ _DRAWN_AS_TEXT: Final = frozenset({"t", "sym", "noBreakHyphen", "drawing", "pict
 def layout(data: bytes) -> tuple[str, ...]:
     """What Word draws in the package that the reader's text does not yet say, by name.
 
-    Not a reading: a scan of every XML part for the elements of ``_LAYOUT`` (in any style, header
-    or part, used or not), and for a page or column break with a drawn character right before and
-    right after it in its paragraph, where Word draws the two on different pages or columns and
-    the text, which leaves the break out, runs them together ("10" and "5 mg" read "105 mg").
-    Conservative by design, until the reader reports these itself.
+    Not a reading: a scan of every XML part under ``word/`` for the elements of ``_LAYOUT`` (in
+    any style, header or part, used or not; a part that does not parse is ``unreadable-part``),
+    and for a page or column break with a drawn character right before and right after it in its
+    paragraph, where Word draws the two on different pages or columns and the text, which leaves
+    the break out, runs them together ("10" and "5 mg" read "105 mg"). Conservative by design,
+    until the reader reports these itself.
     """
     found: set[str] = set()
     with zipfile.ZipFile(io.BytesIO(data)) as package:
         for name in package.namelist():
-            if not name.endswith(".xml") or name.endswith(".rels"):
+            if not (name.startswith("word/") and name.endswith(".xml")):
                 continue
-            root = ET.fromstring(package.read(name))  # the reader parsed it first
+            try:
+                root = ET.fromstring(package.read(name))
+            except ET.ParseError:
+                found.add("unreadable-part")  # Word's own parts: none the reader read is so
+                continue
             for element in root.iter():
                 local = element.tag.rsplit("}", 1)[-1]
                 if local in _LAYOUT:
