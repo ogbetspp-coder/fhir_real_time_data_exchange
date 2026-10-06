@@ -450,15 +450,6 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
     ("_unread_kind", 'if node.tag == _w("sdt"):', "compare:0", 0): _HELD_CONTROLS,
     ("_unread_kind", 'if node.tag == _w("sdt"):', "str:'sdt'", 0): _HELD_CONTROLS,
     ("_unread_kind", "_control(node)", "call", 0): _HELD_CONTROLS,
-    (
-        "_Story.paragraph",
-        'if _local(drawing.tag) in ("drawing", "pict", "AlternateContent")',
-        "boolop",
-        0,
-    ): (
-        "a drawing the walk does not set aside is refused as a token when met (token: text "
-        "inside it), so leaving its paragraphs out of this test changes only the refusal's words"
-    ),
 }
 
 _COMPARE = {
