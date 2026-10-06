@@ -277,11 +277,11 @@ What it refuses (``DocxRefusedError.code``):
   or a list. Such a document has more than one text: ``tracked`` makes its two views, each read
   by these rules, and refuses what it cannot undo (see ``tracked``).
 - ``hidden-text``: hidden text other than whitespace (hidden whitespace is left out), or a hidden
-  note mark, comment mark or page number, hidden directly or at any level of the style hierarchy
-  (hiding is treated as a fact as soon as any level asserts it, unless the run itself says it is
-  visible); and a run with text or a paragraph mark hidden by some level where Word's toggle rule
-  (``_Properties.shown``: a nearer style turns it off, or two kinds of style cancel) shows it,
-  since what Word then shows is not on record.
+  note mark, comment mark, page number or anchored object, hidden directly or at any level of the
+  style hierarchy (hiding is treated as a fact as soon as any level asserts it, unless the run
+  itself says it is visible); and a run with text or a paragraph mark hidden by some level where
+  Word's toggle rule (``_Properties.shown``: a nearer style turns it off, or two kinds of style
+  cancel) shows it, since what Word then shows is not on record.
 - ``unmapped-symbol``: a Symbol-font code the table does not hold (or, in a Symbol run, a
   character above U+00FF outside U+F000 to U+F0FF), a ``w:sym`` without a hex code or in a font
   other than Symbol, or a Wingdings list bullet the table does not hold.
@@ -437,7 +437,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 # The version of the rules above; versions.lock.json ties it to this file (tests/test_locks.py).
-READER_VERSION = "docx-reader/1.30.0"
+READER_VERSION = "docx-reader/1.30.1"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -2631,6 +2631,9 @@ class _ParagraphReader:
                 kind = _unread(child, self.styles) if outside else None
                 produced = "" if kind else self._special(child)
                 if not produced and not self.in_instruction() and not self.layout:
+                    if hidden:
+                        # Whether Word draws an object anchored in a hidden run is not on record.
+                        raise DocxRefusedError("hidden-text", "a hidden anchored object")
                     anchored.append(Anchored(here(), kind or _floating(child)))
             else:
                 produced = self._special(child)

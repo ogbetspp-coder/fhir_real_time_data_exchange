@@ -75,7 +75,7 @@ from label_docx.reader import (
 WORD = Path("/Applications/Microsoft Word.app")
 # What Word is asked and how its answers are judged: a change to this file changes it
 # (``scripts/lock.py``). A kept verdict or recorded answer of another version is not reused.
-VERIFIER = "word-verifier/1.0.5"
+VERIFIER = "word-verifier/1.0.6"
 
 
 class WordError(Exception):
@@ -1004,21 +1004,36 @@ TOGGLES = ("bold", "italic", "caps", "strike")
 
 
 def _mark_paragraphs(xml: str) -> str:
-    """``xml`` with ``@@Q<n>@@`` at the start of every paragraph, after its properties.
+    """``xml`` with ``@@Q<n>@@`` at the start of every body paragraph, after its properties.
 
-    Every paragraph the XML parser finds must be marked, or the answers would be another's.
+    ``n`` is the reader's index: paragraphs in text boxes and shapes (``_ASIDE``) are not the
+    body's and are left unmarked. Every paragraph the XML parser finds must be found by the scan,
+    or the answers would be another's.
     """
-    count = itertools.count()
+    aside: list[bool] = []
+
+    def walk(element: ET.Element, inside: bool) -> None:
+        for child in element:
+            if child.tag == f"{{{W}}}p":
+                aside.append(inside)
+            walk(child, inside or child.tag.rsplit("}", 1)[-1] in _ASIDE)
+
+    walk(ET.fromstring(xml), False)
+    found = itertools.count()
+    body = itertools.count()
 
     def mark(start: re.Match[str]) -> str:
-        marker = f"<w:r><w:t>@@Q{next(count)}@@</w:t></w:r>"
         tag = start.group(0)
+        at = next(found)
+        if at >= len(aside) or aside[at]:
+            return tag
+        marker = f"<w:r><w:t>@@Q{next(body)}@@</w:t></w:r>"
         if tag.endswith("/>") and "<w:pPr" not in tag:  # an empty paragraph
             return tag[:-2] + ">" + marker + "</w:p>"
         return tag + marker
 
     marked = _PARAGRAPH_START.sub(mark, xml)
-    if next(count) != sum(1 for _ in ET.fromstring(xml).iter(f"{{{W}}}p")):
+    if next(found) != len(aside):
         raise SystemExit("paragraphs the scan does not find as the XML parser does")
     return marked
 

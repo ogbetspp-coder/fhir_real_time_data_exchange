@@ -53,6 +53,12 @@
     "resultSha256": "2eafa1082507e00a10a31c6611aa43b8bb2cfe41aab028f5b8618c3950115496",
     "sha256": "750b0013e7fce81a82b98c78a73661362e97b615de68d825705ed0780b025c04"
   },
+  "drawing-anchored-text-box.docx": {
+    "certificateSha256": "ae8db40b44a0997bb4df8e660fb5b48bbe618b9367d7b66fe885fa1b718afe57",
+    "paragraphsSha256": "8d7cd7866b0e2bb1a76898c36b82ff5594eb602fc81cf10c1f76c03b1a868d0d",
+    "resultSha256": "47993c0d5c5a39604ac07954c7b75a703e4693e2bcb706cc7d1df57c53f64337",
+    "sha256": "e1abd86463e0b31f3b4f47fc7b30d23d4dcb072188dd72c29b671c959230a563"
+  },
   "drawing-inline-picture.docx": {
     "certificateSha256": "fef74623b474d5e842d7aebe958ad53d7b02f9651ea2545c083cc58ced540012",
     "paragraphsSha256": "677ad11d1a68f5a397234ba8db4b6b48b16906398fc69877fa3f3faa53153599",

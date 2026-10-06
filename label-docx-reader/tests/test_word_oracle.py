@@ -655,7 +655,7 @@ def test_a_document_named_like_one_open_in_word_is_not_asked_about(
     assert word_module._run_alone(command, "script").stdout == "done\n"
 
 
-def test_every_paragraph_is_marked_after_its_properties_or_none_is() -> None:
+def test_every_body_paragraph_is_marked_after_its_properties_or_none_is() -> None:
     xml = document_xml(
         '<w:p>\n  <w:pPr><w:pStyle w:val="x"/></w:pPr><w:r><w:t>a</w:t></w:r></w:p>'
         "<w:p><w:pPr/></w:p><w:p/>"
@@ -667,6 +667,12 @@ def test_every_paragraph_is_marked_after_its_properties_or_none_is() -> None:
     other = xml.replace("<w:p/>", "<v:p/>").replace("<w:document ", f'<w:document xmlns:v="{W}" ')
     with pytest.raises(SystemExit):
         _mark_paragraphs(other)
+    # A text box's paragraphs are not the body's: the reader's index goes on past them.
+    box = "<w:pict><w:txbxContent><w:p><w:r><w:t>b</w:t></w:r></w:p></w:txbxContent></w:pict>"
+    box = f"<w:r>{box}</w:r>"
+    marked = _mark_paragraphs(document_xml(f"<w:p>{box}</w:p><w:p/>"))
+    assert marked.count("@@Q") == 2
+    assert marked.index("@@Q1@@") > marked.index("</w:txbxContent>")
 
 
 def test_words_note_marks_and_fields_are_on_record_for_every_document_with_them() -> None:

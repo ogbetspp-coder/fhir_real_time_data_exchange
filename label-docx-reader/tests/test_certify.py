@@ -174,7 +174,9 @@ def test_every_result_the_readers_make_is_certified(path: Path) -> None:
     certificate = source.certify(value)
     if path.suffix == ".docx":
         source_count = sum(certificate["source"].values())
-        kept = certificate["output"]["characters"] + sum(certificate["setAside"].values())
+        aside = certificate["setAside"]
+        # unreadObjects counts again, of floatingObjects, the ones holding text (output.py).
+        kept = certificate["output"]["characters"] + sum(aside.values()) - aside["unreadObjects"]
         assert source_count == kept
     else:
         assert certificate["output"]["characters"] == (

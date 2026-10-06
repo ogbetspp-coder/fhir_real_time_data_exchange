@@ -3040,6 +3040,14 @@ def test_a_floating_object_holding_text_is_set_aside_unread_where_it_is_anchored
     assert value["paragraphs"][0]["anchored"] == [{"kind": kind, "offset": 1, "read": False}]
 
 
+@pytest.mark.parametrize("name", ["text-box", "vml-text-box", "picture"])
+def test_a_floating_object_in_a_hidden_run_is_refused(name: str) -> None:
+    # Whether Word draws it is not on record.
+    drawing = PICTURE.replace("wp:inline", "wp:anchor") if name == "picture" else None
+    hidden = r(drawing or FLOATING_TEXT[name][0], "<w:vanish/>")
+    assert refusal(p(r("<w:t>a</w:t>") + hidden)) == "hidden-text"
+
+
 def test_every_floating_object_is_placed_where_it_is_anchored() -> None:
     line = _alternate(SHAPE, LINE)
     picture = PICTURE.replace("wp:inline", "wp:anchor")
