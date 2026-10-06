@@ -1,6 +1,6 @@
 # Narrative fidelity normalisation specification
 
-Version: `fidelity-norm/3.2.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
+Version: `fidelity-norm/3.3.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
 in section 9)
 
 This document is the language-neutral specification of the text normalisation and XHTML
@@ -420,15 +420,20 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   and ellipses in a Japanese font) but not the text; it is not compared.
 - Allowed attributes: `xmlns` (root), `xml:lang` and `lang` (root `div` only), `scope` (`th`
   only), `type` and `start` (`ol` only), `colspan`
-  and `rowspan` (`td` and `th` only), `src` (`img` only, required there). Values must be double-
-  or single-quoted. Any other attribute — in particular `style`, `hidden`, `title`, `class`,
+  and `rowspan` (`td` and `th` only), `src` (`img` only, required there), and `style` (`span`
+  only, from 3.3.0). Values must be double-
+  or single-quoted. Any other attribute — in particular `hidden`, `title`, `class`,
   `id`, `alt`, `reversed` and `value` — rejects, and so does an allowed attribute on any other
   element and a repeated attribute name on one element. A viewer's stylesheet or script can key
   on a class, an id or a language tag to hide content, and a narrative needs none of them below
-  the root.
+  the root. The one `style` is the EMA ePI style guide's grey for the QRD template's "not printed"
+  text, exactly `background-color: silver;`: a background under text drawn in its own colour hides
+  nothing, while any other declaration could (`color: silver`, `display: none`), so no other
+  value, spelling or second declaration is allowed.
 - Attribute values are never compared against the source, so they must not be able to carry
   text. Each value must match its token form or the element rejects: `xml:lang`, `lang`,
   `scope` — `[A-Za-z0-9_.:-]{1,32}`; `type` — exactly `1`, `a`, `A`, `i` or `I`; `start` — `0|-?[1-9][0-9]{0,3}`; `colspan`, `rowspan` — `[1-9][0-9]{0,2}|1000`;
+  `style` — exactly `background-color: silver;`;
   `src` — `data:image/png;base64,` or `data:image/jpeg;base64,` followed by a body that is
   non-empty, at most 1 398 104 code points (the base64 length of 1 MiB), a multiple of 4 long,
   all `[A-Za-z0-9+/=]`, with `=` only as its last one or two code points (tested directly, not
@@ -848,9 +853,14 @@ An extractor must:
   order:
   - outside a table, each paragraph that is not blank is a line: the list label the reader reports
     and U+0020, where the label is not empty, then the paragraph's text, then U+000A. Where the
-    paragraph draws no label and its text begins, past section 3 step 5 whitespace, with a
-    section 3 step 4 bullet glyph followed by U+0009, that U+0009 is written as U+0020 (a bullet
-    typed in the text, as ADR 0006 decision 3's narrative writes it). In the text
+    paragraph draws no label and its text begins, past section 3 step 5 whitespace, with a typed
+    label followed by U+0009, that U+0009 is written as U+0020 (a label typed in the text, as ADR
+    0006's narrative writes it). A typed label is, from 3.3.0: a section 3 step 4 bullet glyph,
+    U+002D, U+2013 or U+2014; one to three of the same footnote mark (U+002A, U+2217, U+2020,
+    U+2021, U+00A7, U+00B6 or U+0023); or an enumerator (one to three ASCII digits, one ASCII
+    letter, or one to four of `i`, `v`, `x`, or of `I`, `V`, `X`) followed by U+002E or U+0029,
+    or enclosed in U+0028 and U+0029; then any number of U+0020. (In 3.2.0, a step 4 bullet glyph
+    only.) A bare letter or number is not a label: before a tab it reads as a column. In the text
     a code point inside a superscript or subscript mark is written by the raised or lowered rule
     below (inside a subscript mark, U+221E and U+00BD are kept as they are, as section 5 keeps
     them inside `sub`); each picture (U+FFFC) is U+FFFC, the SHA-256 of the `data:` URI of the
@@ -866,13 +876,20 @@ An extractor must:
     written as outside a table but with no label that is a step 4 bullet glyph, its line breaks as
     U+0020 and no U+000A of its own.
 
+  The narrative carries the QRD template's grey (a light grey highlight or D9D9D9 shading) as a
+  `span` styled `background-color: silver;` (section 5, from 3.3.0), which the page does not
+  mark. A list whose labels an HTML list without `start` or `type` cannot draw as Word does
+  (other than all "•", or "1.", "2.", ... from one) is written in the narrative as Word draws it,
+  from 3.3.0: each item a `p` of its label, U+0020 and its text, which is the line the page already
+  writes for it; in a table cell, where the page leaves a step 4 bullet glyph's label out, such
+  a label that is one refuses the section.
+
   The extractor refuses the section where the read holds anything ADR 0006 decision 3's closed
   lists do not carry (`zone_a.word_epi` names each refusal): a mark other than bold, italic,
-  superscript and subscript, except an underline that cannot change the text, the template's own
-  grey where the registry names it and capitals over text they draw the same; a list label other
-  than "•" or "1.", "2.", ... from one (FHIR's narrative rule txt-1 allows no `start` or `type` on
-  `ol`), or one not followed by a tab or a space, or two list levels in the section; a picture the reader does not vouch for, over 1 MiB, or drawn by Word larger than its
-  own size or out of its own proportions by more than 2%; a tab (but the one after a typed bullet
+  superscript, subscript and the template's grey, except an underline that cannot change the text
+  and capitals over text they draw the same; a list label not followed by a tab or a space, or two
+  list levels in the section; a picture the reader does not vouch for, over 1 MiB, or drawn by Word larger than its
+  own size or out of its own proportions by more than 2%; a tab (but the one after a typed label
   above), a soft hyphen, U+2028 or U+2029,
   a bullet glyph starting a line after a line break, a comment or a hidden paragraph mark; a
   heading drawn otherwise than its title; where the reader's grid is not on record, a row leaves
@@ -932,6 +949,19 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
 
 ## 9. Version history
 
+- `fidelity-norm/3.3.0` (minor) — section 5 allows one attribute value, `style` exactly
+  `background-color: silver;` on `span`: the EMA ePI style guide's grey for the QRD template's
+  "not printed" text. Any other value, element or spelling, a second declaration or a repeated
+  attribute still rejects; eleven XHTML vectors pin it and its near misses. Section 7's certified
+  Word rule carries the template's grey as that span; writes a list an HTML list cannot draw
+  (labels other than all "•", or "1.", "2.", ... from one) as its labels' text, the line the page
+  already writes; and writes as U+0020 the tab after a typed label, where 3.2.0 did so only after
+  a step 4 bullet glyph (ADR 0006, owner decisions of 2026-10-06). Two verify vectors are added,
+  reviewed by hand: a page with grey text and labels written as text against its narrative
+  (passed), and the same dashes drawn as an HTML list (failed). Sections 1 to 4 and 6 and the code
+  point table do not change. The withheld section of an authority import
+  (`docs/design/authority-import-withheld.md`, not built) moves to 3.4.0. The change record is
+  `docs/validation/changes/2026-10-06-fidelity-norm-3-3-0.md`.
 - `fidelity-norm/3.2.0` (minor) — section 7 qualifies a third kind of source, a certified Word
   source (ADR 0006): a Word SmPC the pinned label reader read exactly, whose conservation check
   accounted for every character, structured by the QRD template's own headings, with one page
@@ -944,7 +974,8 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   same read (passed), and the same page against that narrative with its merged cell unmerged or its
   list numbered from one later, and a page that writes a bullet after a line break as content
   against a narrative that draws it after a `br` (each failed). 3.2.0 was first reserved for the withheld section of
-  an authority import (`docs/design/authority-import-withheld.md`, not built), which takes 3.3.0.
+  an authority import (`docs/design/authority-import-withheld.md`, not built), which then took
+  3.3.0 and now takes 3.4.0.
   The change record is `docs/validation/changes/2026-10-05-fidelity-norm-3-2-0.md`.
 - `fidelity-norm/3.1.0` (minor) — inside `sub`, U+221E INFINITY is kept unchanged instead of
   rejecting (`unmappable-script`), and U+00BD VULGAR FRACTION ONE HALF is kept under the

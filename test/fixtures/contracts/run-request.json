@@ -2,6 +2,6 @@
   "source": "document",
   "submissionRef": {
     "uri": "gs://synthetic-bucket/synthetic-smpc.submission.json",
-    "sha256": "09bf878d0e3559ff6eb7001a84cc43a2d015f631ab10c0ba3d9752b940f7fe35"
+    "sha256": "afe0f09e3ea32d2e9fd4db7f7fcc2776ef4eb56c9c08c5b9b31c6b720750af21"
   }
 }

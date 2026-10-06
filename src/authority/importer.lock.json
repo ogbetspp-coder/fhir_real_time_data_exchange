@@ -34,5 +34,9 @@
   "2.3.1": {
     "sourceSha256": "1674ca99f05260aecd7ee2259b21e2c55c3de4aa42bbbd248024751cd986eed3",
     "vectorsSha256": "d394f3642af857d0f3fec74cb56ad75fbd232110ee4b3f288ca2f0b9c1a3a052"
+  },
+  "2.3.2": {
+    "sourceSha256": "58522320e8a662eac1b1a37303c32629b6593af2dde23dca63fec0f55f02a30d",
+    "vectorsSha256": "8898a6232cfcfc401a17a7c24187b2de95014013ccc238efaca80b623e314c04"
   }
 }

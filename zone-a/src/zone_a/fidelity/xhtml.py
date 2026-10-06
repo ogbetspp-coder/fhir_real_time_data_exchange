@@ -493,6 +493,9 @@ TOKEN_VALUE: Final = re.compile(r"[A-Za-z0-9_.:-]{1,32}")
 LIST_TYPE_VALUE: Final = re.compile(r"[1aAiI]")
 LIST_START_VALUE: Final = re.compile(r"0|-?[1-9][0-9]{0,3}")
 SPAN_VALUE: Final = re.compile(r"[1-9][0-9]{0,2}|1000")
+# The one style allowed (from 3.3.0): the EMA ePI style guide's grey for QRD "not printed" text,
+# on a `span` and in exactly this spelling. A background under black text hides nothing.
+GREY_STYLE: Final = "background-color: silver;"
 # A picture's source is a PNG or JPEG `data:` URI: the picture's own bytes, compared with the
 # source through the hash `img` emits. A reference (a path or a URL) is refused: what it draws is
 # whatever the viewer's origin serves, or nothing, and neither is bound by the check.
@@ -603,6 +606,8 @@ def _attribute_allowed(name: str, value: str, element: str, is_root: bool) -> bo
         return element in ("td", "th") and SPAN_VALUE.fullmatch(value) is not None
     if name == "src":
         return element == "img" and _is_picture_data(value)
+    if name == "style":
+        return element == "span" and value == GREY_STYLE
     return False
 
 

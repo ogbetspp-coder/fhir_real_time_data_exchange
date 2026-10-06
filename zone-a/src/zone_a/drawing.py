@@ -12,9 +12,13 @@ where a cell stands in the grid is the fidelity check's to prove, from the page.
 Both sides are compared as a reader of the page sees them. Spaces, tabs and line feeds collapse
 to one space and lines are trimmed, as a browser lays out text and as Word's extra spaces read;
 empty lines are none. Marks are compared on the characters that are not whitespace. On the
-read's side, the marks the narrative leaves out by its closed list (an underline, the template's
-grey, capitals over what they draw the same) are left out here too, so this check is no second
-guard of those rules; any other mark the narrative did not carry differs.
+read's side, the marks the narrative leaves out by its closed list (an underline, capitals over
+what they draw the same) are left out here too, so this check is no second guard of those rules;
+any other mark the narrative did not carry differs. The template's grey is read as the silver
+background the narrative draws it with (``DRAWN_GREY``), so a grey character Chrome draws on any
+other background, or a character drawn grey that Word does not shade, differs. A list label the
+narrative writes as text (``zone_a.word_epi.text_labels``) is read as the start of its line, not
+as a marker.
 
 Not compared: a list's indentation and nesting (the builder refuses two levels in a section), and
 which line a bullet stands before (bullets are compared in order, and section 3 step 4 removes
@@ -36,10 +40,12 @@ from label_docx import browser
 from label_docx.reader import Paragraph
 
 from zone_a.certified import Body
-from zone_a.word_epi import CAPITALS, GREY, WHITESPACE, blank, unchanged_by_capitals
+from zone_a.word_epi import CAPITALS, GREY, WHITESPACE, blank, text_labels, unchanged_by_capitals
 
-DRAWING_VERSION: Final = "word-drawing/1.0.6"
-LEFT_OUT: Final = frozenset({"underline"}) | GREY
+DRAWING_VERSION: Final = "word-drawing/1.1.0"
+LEFT_OUT: Final = frozenset({"underline"})
+# The template's grey as Chrome reports the narrative's silver span (``label_docx.browser``).
+DRAWN_GREY: Final = "shading-#c0c0c0"
 _SPACE: Final = re.compile(r"[ \t\r\f]+|[^ \t\r\f]")
 
 Line = tuple[str, tuple[frozenset[str], ...]]
@@ -76,17 +82,22 @@ def _without_whitespace_marks(lines: Sequence[Line]) -> list[Line]:
     ]
 
 
-def read_lines(paragraphs: Sequence[Paragraph]) -> list[Line]:
-    """The paragraphs' lines and marks, as the narrative must draw them."""
+def read_lines(paragraphs: Sequence[Paragraph], heads: Sequence[str] = ()) -> list[Line]:
+    """The paragraphs' lines and marks, as the narrative must draw them.
+
+    ``heads`` gives each paragraph the text the narrative writes before it, unmarked: its list
+    label and a space where the label is written as text, else nothing (all nothing by default).
+    """
     characters: list[tuple[str, frozenset[str]]] = []
-    for paragraph in paragraphs:
+    for paragraph, head in zip(paragraphs, heads or [""] * len(paragraphs), strict=True):
         kinds: list[set[str]] = [set() for _ in paragraph.text]
         for mark in paragraph.marks:
             if mark.kind not in LEFT_OUT:
                 for at in range(mark.start, mark.end):
                     # Capitals over a character they draw the same are no mark on it.
                     if not (mark.kind in CAPITALS and unchanged_by_capitals(paragraph.text[at])):
-                        kinds[at].add(mark.kind)
+                        kinds[at].add(DRAWN_GREY if mark.kind in GREY else mark.kind)
+        characters += [(c, frozenset[str]()) for c in head]
         characters += [(c, frozenset(k)) for c, k in zip(paragraph.text, kinds, strict=True)]
         characters.append(("\n", frozenset()))
     return _without_whitespace_marks(_shown(characters))
@@ -104,6 +115,12 @@ def drawn_lines(section: dict[str, Any]) -> list[Line]:
 def read_markers(paragraphs: Sequence[Paragraph]) -> list[str]:
     """The list label each paragraph draws, with the space after it, in order."""
     return [p.numbering.text + " " for p in paragraphs if p.numbering and p.numbering.text]
+
+
+def _label_text(paragraph: Paragraph) -> str:
+    """A list label the narrative writes as text, and the space after it."""
+    assert paragraph.numbering is not None  # noqa: S101 - text_labels names labelled paragraphs
+    return f"{paragraph.numbering.text} "
 
 
 def read_pictures(paragraphs: Sequence[Paragraph]) -> list[list[int]]:
@@ -129,15 +146,20 @@ def check(body: Body, built: Mapping[str, Any], chrome: Path = browser.CHROME) -
     verdicts: list[dict[str, Any]] = []
     for section, drawn, drawn_markers in zip(carried, shown, markers, strict=True):
         start, stop = section["paragraphs"]
-        paragraphs = [p for p in body.paragraphs[start:stop] if not blank(p)]
+        indices = [i for i in range(start, stop) if not blank(body.paragraphs[i])]
+        paragraphs = [body.paragraphs[i] for i in indices]
+        as_text = text_labels(range(start, stop), body)
+        heads = [_label_text(body.paragraphs[i]) if i in as_text else "" for i in indices]
         where: str | None = None
         if drawn["error"] is not None:
             where = drawn["error"]
         else:
-            mine, theirs = read_lines(paragraphs), drawn_lines(drawn)
+            mine, theirs = read_lines(paragraphs, heads), drawn_lines(drawn)
             if mine != theirs:
                 where = browser.first_difference(theirs, mine)
-            elif read_markers(paragraphs) != drawn_markers:
+            elif read_markers([body.paragraphs[i] for i in indices if i not in as_text]) != (
+                drawn_markers
+            ):
                 where = "list markers differ"
             elif read_pictures(paragraphs) != [list(size) for size in drawn.get("pictures", [])]:
                 where = "a picture Chrome did not decode to the size the reader read"
