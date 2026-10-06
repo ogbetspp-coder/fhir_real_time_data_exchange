@@ -1,0 +1,20 @@
+{
+  "resourceType": "NamingSystem",
+  "id": "source-document-sha256",
+  "url": "https://khs.dev/fhir/NamingSystem/source-document-sha256",
+  "version": "0.3.0",
+  "name": "SourceDocumentSha256",
+  "title": "Source document SHA-256",
+  "status": "active",
+  "kind": "identifier",
+  "experimental": true,
+  "date": "2026-10-06",
+  "description": "A source document, by the SHA-256 of its bytes, 64 lowercase hexadecimal digits.",
+  "uniqueId": [
+    {
+      "type": "uri",
+      "value": "https://khs.dev/fhir/identifier/source-document-sha256",
+      "preferred": true
+    }
+  ]
+}

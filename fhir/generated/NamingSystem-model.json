@@ -1,0 +1,20 @@
+{
+  "resourceType": "NamingSystem",
+  "id": "model",
+  "url": "https://khs.dev/fhir/NamingSystem/model",
+  "version": "0.3.0",
+  "name": "Model",
+  "title": "Extraction model",
+  "status": "active",
+  "kind": "identifier",
+  "experimental": true,
+  "date": "2026-10-06",
+  "description": "The model a structuring run used, by the id its submission records.",
+  "uniqueId": [
+    {
+      "type": "uri",
+      "value": "https://khs.dev/fhir/identifier/model",
+      "preferred": true
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "resourceType": "NamingSystem",
+  "id": "type2-document",
+  "url": "https://khs.dev/fhir/NamingSystem/type2-document",
+  "version": "0.3.0",
+  "name": "Type2Document",
+  "title": "Synthetic Type 2 document",
+  "status": "active",
+  "kind": "identifier",
+  "experimental": true,
+  "date": "2026-10-06",
+  "description": "A synthetic Type 2 source Bundle's identifier in the fixtures (src/fixtures/synthetic.ts). Synthetic content only: never a real product's. The same for every version of a document (Bundle-uv-epi).",
+  "uniqueId": [
+    {
+      "type": "uri",
+      "value": "https://khs.dev/fhir/identifier/type2-document",
+      "preferred": true
+    }
+  ]
+}

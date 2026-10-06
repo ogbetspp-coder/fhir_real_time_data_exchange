@@ -1,5 +1,11 @@
 import { permittedTitles, type EmaMapping, type SectionRule } from "./mapping.js";
 import {
+  EU_AUTHORISATION_NUMBER_PATTERN,
+  EU_AUTHORISATION_NUMBER_SYSTEM,
+  EU_PRODUCT_NUMBER_PATTERN,
+  EU_PRODUCT_NUMBER_SYSTEM,
+} from "./standards.js";
+import {
   isComposition,
   type CompositionSection,
   type FhirBundle,
@@ -35,15 +41,17 @@ function issue(
 }
 
 // A Type 1 record, an authority import's (docs/design/authority-import-contract.md, D9): the
-// Composition, the product scope, its holder and its authorisation, exactly one of each and
-// nothing else. Packs, items, ingredients and substances are declared not supplied by their
-// absence; none may be inferred.
+// Composition, the product scope, its holder and its authorisations, and nothing else: exactly one
+// of each but the RegulatedAuthorization, of which there is one per authorisation
+// (docs/design/version-identity.md: one per EU authorisation number). Packs, items, ingredients
+// and substances are declared not supplied by their absence; none may be inferred.
 const TYPE1_RESOURCES = [
   "Composition",
   "MedicinalProductDefinition",
   "Organization",
   "RegulatedAuthorization",
 ] as const;
+const TYPE1_MANY: readonly string[] = ["RegulatedAuthorization"];
 
 type GraphType = "type1" | "type2";
 
@@ -82,25 +90,28 @@ function type1GraphIssues(bundle: FhirBundle): OperationOutcomeIssue[] {
       issues.push(
         issue("error", "structure", `A Type 1 record carries no ${resourceType}`, "Bundle.entry"),
       );
-    } else if (entries.length !== 1) {
+    } else if (entries.length !== 1 && !TYPE1_MANY.includes(resourceType)) {
       issues.push(
         issue("error", "structure", `A Type 1 record has one ${resourceType}`, "Bundle.entry"),
       );
     }
   }
-  const one = (type: (typeof TYPE1_RESOURCES)[number]) => {
+  const all = (type: (typeof TYPE1_RESOURCES)[number]) => {
     const entries = byType.get(type);
     if (entries === undefined) {
       issues.push(issue("error", "required", `Type 1 record is missing ${type}`, "Bundle.entry"));
     }
-    return entries?.length === 1 ? entries[0] : undefined;
+    return entries ?? [];
+  };
+  const one = (type: (typeof TYPE1_RESOURCES)[number]) => {
+    const entries = all(type);
+    return entries.length === 1 ? entries[0] : undefined;
   };
   const composition = one("Composition");
   const product = one("MedicinalProductDefinition");
   const holder = one("Organization");
-  const authorisation = one("RegulatedAuthorization");
+  const authorisations = all("RegulatedAuthorization");
   if (composition === undefined || product === undefined || holder === undefined) return issues;
-  if (authorisation === undefined) return issues;
 
   const expectLink = (actual: string | undefined, expected: string, where: string): void => {
     if (actual !== expected) {
@@ -109,16 +120,18 @@ function type1GraphIssues(bundle: FhirBundle): OperationOutcomeIssue[] {
   };
   expectLink(onlyReference(composition.resource.subject), product.fullUrl, "Composition.subject");
   expectLink(onlyReference(composition.resource.author), holder.fullUrl, "Composition.author");
-  expectLink(
-    onlyReference(authorisation.resource.subject),
-    product.fullUrl,
-    "RegulatedAuthorization.subject",
-  );
-  expectLink(
-    referenceOf(authorisation.resource.holder),
-    holder.fullUrl,
-    "RegulatedAuthorization.holder",
-  );
+  for (const authorisation of authorisations) {
+    expectLink(
+      onlyReference(authorisation.resource.subject),
+      product.fullUrl,
+      "RegulatedAuthorization.subject",
+    );
+    expectLink(
+      referenceOf(authorisation.resource.holder),
+      holder.fullUrl,
+      "RegulatedAuthorization.holder",
+    );
+  }
   const names: unknown = product.resource.name;
   if (
     !Array.isArray(names) ||
@@ -132,11 +145,89 @@ function type1GraphIssues(bundle: FhirBundle): OperationOutcomeIssue[] {
   for (const [resource, where] of [
     [product.resource, "MedicinalProductDefinition.identifier"],
     [holder.resource, "Organization.identifier"],
-    [authorisation.resource, "RegulatedAuthorization.identifier"],
+    ...authorisations.map(
+      ({ resource }) => [resource, "RegulatedAuthorization.identifier"] as const,
+    ),
   ] as const) {
     if (!hasIdentifier(resource)) {
       issues.push(issue("error", "required", `${where} is required`, where));
     }
+  }
+  return issues;
+}
+
+// EU authorisation numbers in either graph (docs/design/version-identity.md): every value in the
+// two systems has its strict form; only a RegulatedAuthorization carries an authorisation number,
+// one at most, and no two the same one; only a MedicinalProductDefinition carries a product number;
+// and the product numbers are exactly the authorisation numbers' products. The package's
+// invariants khs-eu-1 to khs-eu-4 (scripts/fhir/generate-artifacts.ts) state the same rules for
+// the official validator.
+function euNumberIssues(bundle: FhirBundle): OperationOutcomeIssue[] {
+  const issues: OperationOutcomeIssue[] = [];
+  const numbers = (resource: FhirResource, system: string): unknown[] =>
+    (Array.isArray(resource.identifier) ? (resource.identifier as unknown[]) : [])
+      .filter((entry) => (entry as { system?: unknown } | null)?.system === system)
+      .map((entry) => (entry as { value?: unknown }).value);
+  const authorisationNumbers: string[] = [];
+  const productNumbers = new Set<string>();
+  const rules = [
+    [EU_AUTHORISATION_NUMBER_SYSTEM, EU_AUTHORISATION_NUMBER_PATTERN, "RegulatedAuthorization"],
+    [EU_PRODUCT_NUMBER_SYSTEM, EU_PRODUCT_NUMBER_PATTERN, "MedicinalProductDefinition"],
+  ] as const;
+  for (const { resource } of bundle.entry) {
+    for (const [system, pattern, carrier] of rules) {
+      const values = numbers(resource, system);
+      if (values.length === 0) continue;
+      const where = `${resource.resourceType}.identifier`;
+      if (resource.resourceType !== carrier) {
+        issues.push(issue("error", "structure", `Only a ${carrier} carries ${system}`, where));
+      }
+      for (const value of values) {
+        if (typeof value !== "string" || !new RegExp(pattern).test(value)) {
+          issues.push(
+            issue("error", "value", `An identifier in ${system} is not ${pattern}`, where),
+          );
+        } else if (system === EU_PRODUCT_NUMBER_SYSTEM) {
+          productNumbers.add(value);
+        } else {
+          authorisationNumbers.push(value);
+        }
+      }
+      if (system === EU_AUTHORISATION_NUMBER_SYSTEM && values.length > 1) {
+        issues.push(
+          issue(
+            "error",
+            "structure",
+            "A RegulatedAuthorization has one EU authorisation number",
+            where,
+          ),
+        );
+      }
+    }
+  }
+  if (new Set(authorisationNumbers).size !== authorisationNumbers.length) {
+    issues.push(
+      issue(
+        "error",
+        "duplicate",
+        "Two RegulatedAuthorizations carry one EU authorisation number",
+        "RegulatedAuthorization.identifier",
+      ),
+    );
+  }
+  const products = new Set(authorisationNumbers.map((value) => value.replace(/\/[0-9]{3}$/, "")));
+  if (
+    products.size !== productNumbers.size ||
+    [...products].some((product) => !productNumbers.has(product))
+  ) {
+    issues.push(
+      issue(
+        "error",
+        "value",
+        "The EU product numbers are not exactly those of the EU authorisation numbers",
+        "MedicinalProductDefinition.identifier",
+      ),
+    );
   }
   return issues;
 }
@@ -163,7 +254,7 @@ export function validateCanonicalPreflight(
       ),
     );
   }
-  issues.push(...type1GraphIssues(bundle));
+  issues.push(...type1GraphIssues(bundle), ...euNumberIssues(bundle));
   if (issues.length === 0) {
     issues.push(issue("success", "informational", "Canonical Type 1 preflight passed"));
   }
@@ -205,6 +296,7 @@ export function validateType2Preflight(bundle: FhirBundle): OperationOutcome {
       issue("error", "duplicate", `Duplicate Bundle.entry.fullUrl ${fullUrl}`, "Bundle.entry"),
     );
   }
+  issues.push(...euNumberIssues(bundle));
 
   if (issues.length === 0) {
     issues.push(issue("success", "informational", "Canonical Type 2 preflight passed"));

@@ -1,0 +1,20 @@
+{
+  "resourceType": "NamingSystem",
+  "id": "example-sid-product",
+  "url": "https://khs.dev/fhir/NamingSystem/example-sid-product",
+  "version": "0.3.0",
+  "name": "ExampleSidProduct",
+  "title": "Example product",
+  "status": "active",
+  "kind": "identifier",
+  "experimental": true,
+  "date": "2026-10-06",
+  "description": "The HL7 Global ePI DrugX example's http://example.org/sid/product, moved into this namespace by the seeded synthetic source (createSyntheticSmpcFromPublishedType2, src/fixtures/synthetic.ts). Example content only.",
+  "uniqueId": [
+    {
+      "type": "uri",
+      "value": "https://khs.dev/fhir/example/sid/product",
+      "preferred": true
+    }
+  ]
+}

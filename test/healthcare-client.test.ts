@@ -177,9 +177,55 @@ describe("validating a resource", () => {
   });
 });
 
+// The transaction's precondition (docs/design/version-identity.md): the version of the document
+// Bundle the validated store holds, read before the run signs.
+describe("reading the stored version of a resource", () => {
+  it("GETs it from the validated store and answers its version id", async () => {
+    answer = respond(200, { resourceType: "Bundle", id: "b1", meta: { versionId: "MTc5" } });
+    const client = new HealthcareApiClient(OPTIONS);
+
+    expect(await client.readStoredVersion("Bundle", "b1", RUN_ID)).toEqual({ versionId: "MTc5" });
+
+    const request = only();
+    expect(request.url).toBe(`${BASE}/validated/fhir/Bundle/b1`);
+    expect(request.init.method).toBe("GET");
+    expectStandardHeaders(request.headers);
+  });
+
+  it("answers absent for a 404, and refuses a 410 and a resource without a version", async () => {
+    answer = respond(404, { resourceType: "OperationOutcome", issue: [] });
+    expect(await new HealthcareApiClient(OPTIONS).readStoredVersion("Bundle", "b", RUN_ID)).toBe(
+      "absent",
+    );
+
+    answer = respond(410, { resourceType: "OperationOutcome", issue: [] });
+    const gone = await new HealthcareApiClient(OPTIONS)
+      .readStoredVersion("Bundle", "b", RUN_ID)
+      .catch((e: unknown) => e);
+    expect(gone).toBeInstanceOf(HealthcareApiError);
+    expect([(gone as HealthcareApiError).operation, (gone as HealthcareApiError).status]).toEqual([
+      "read-target",
+      410,
+    ]);
+
+    answer = respond(200, { resourceType: "Bundle", id: "b" });
+    await expect(
+      new HealthcareApiClient(OPTIONS).readStoredVersion("Bundle", "b", RUN_ID),
+    ).rejects.toThrow("The target store answered a resource without a version id");
+  });
+
+  it("refuses without a validated store, before any request", async () => {
+    const client = new HealthcareApiClient({ ...OPTIONS, TARGET_FHIR_STORE_ID: undefined });
+    await expect(client.readStoredVersion("Bundle", "b", RUN_ID)).rejects.toThrow(
+      "TARGET_FHIR_STORE_ID is required",
+    );
+    expect(sent).toEqual([]);
+  });
+});
+
 function transaction(extras: FhirResource[] = []) {
   const target = transformType2ToEma(createSyntheticType2Bundle(mapping), mapping);
-  return buildPersistTransaction(target.list, target.documentBundle, RUN_ID, extras);
+  return buildPersistTransaction(target.list, target.documentBundle, RUN_ID, "absent", extras);
 }
 
 describe("executing the transaction", () => {

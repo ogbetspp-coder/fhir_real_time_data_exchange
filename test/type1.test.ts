@@ -136,7 +136,7 @@ describe("the EMA List's product identity", () => {
     expect(list.title).toBe("Synthetic Paracetamol 500 mg tablets");
   });
 
-  it("refuses a product with two names, and a graph with two authorisations", () => {
+  it("refuses a product with two names, and two authorisations that state different identities", () => {
     const named = type1();
     resource(named, "MedicinalProductDefinition").name = [
       { productName: "Synthetic A" },
@@ -149,7 +149,16 @@ describe("the EMA List's product identity", () => {
       ({ resource: candidate }) => candidate.resourceType === "RegulatedAuthorization",
     );
     if (authorisation === undefined) throw new Error("fixture has an authorisation");
+    // One RegulatedAuthorization per authorisation (docs/design/version-identity.md): two that
+    // state the same holder, regulator and procedure are one identity for the List.
     twice.entry.push({ ...structuredClone(authorisation), fullUrl: `${authorisation.fullUrl}-2` });
+    expect(refused(twice)).toBe(false);
+    expect(transformType2ToEma(twice, mapping).list.extension).toEqual(
+      transformType2ToEma(type1(), mapping).list.extension,
+    );
+    const second = twice.entry.at(-1)?.resource;
+    if (second === undefined) throw new Error("fixture has a second authorisation");
+    second.case = { identifier: { system: PROCEDURE_NUMBER_SYSTEM, value: "SYNTHETIC-PROC-2" } };
     expect(() => transformType2ToEma(twice, mapping)).toThrow(/ambiguous/);
   });
 

@@ -38,6 +38,7 @@ vi.mock("../src/gcp/healthcare.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/gcp/healthcare.js")>()),
   HealthcareApiClient: class {
     public validate = (): Promise<typeof passed> => Promise.resolve(passed);
+    public readStoredVersion = (): Promise<"absent"> => Promise.resolve("absent");
     public executeTransaction = (): Promise<object> => Promise.resolve({ resourceType: "Bundle" });
   },
 }));

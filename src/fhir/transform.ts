@@ -1,4 +1,4 @@
-import { sha256, stableUuid } from "../lib/hash.js";
+import { canonicalJson, sha256, stableUuid } from "../lib/hash.js";
 import { isGap } from "../fidelity/normalize.js";
 import { isGridMarker, xhtmlToText } from "../fidelity/xhtml.js";
 import {
@@ -7,7 +7,12 @@ import {
   type EmaMapping,
   type SectionRule,
 } from "./mapping.js";
-import { QRD_TEMPLATE_VERSION, SPOR_ORGANISATIONS } from "./standards.js";
+import {
+  EMA_EU_NUMBER_SYSTEM,
+  EU_PRODUCT_NUMBER_SYSTEM,
+  QRD_TEMPLATE_VERSION,
+  SPOR_ORGANISATIONS,
+} from "./standards.js";
 import {
   isComposition,
   type BundleEntry,
@@ -33,6 +38,14 @@ const QRD_TEMPLATE_EXTENSION =
 // (fhir/maps/type2-to-ema-cap-smpc-en.map), which it cannot carry out.
 export const EMA_DOCUMENT_IDENTIFIER_SYSTEM = "https://khs.dev/fhir/identifier/ema-document";
 export const EMA_DOCUMENT_ID_NAMESPACE = "ema-bundle";
+// The system of the EMA Composition's identifier, which names one version of the Composition
+// (docs/design/version-identity.md): its value is derived from the source identifier and the
+// Composition's own content, so a new version gets a new value and the same content the same one.
+// Until 2026-10-06 the identifier was https://khs.dev/fhir/identifier/ema-composition, the same
+// for every version; versions written before then keep it in the store's history.
+export const EMA_COMPOSITION_VERSION_SYSTEM =
+  "https://khs.dev/fhir/identifier/ema-composition-version";
+export const EMA_COMPOSITION_VERSION_NAMESPACE = "ema-composition-version";
 
 export type MappingDecision = {
   sourceKey: string;
@@ -411,37 +424,13 @@ function identifierInSystem(value: unknown, system: string, where: string): stri
 type ListExtension = { url: string } & Record<string, unknown>;
 type ListIdentity = { productName: string | undefined; extensions: ListExtension[] };
 
-// What the EMA List states about the product (EUEpiList extensions and title), selected from
-// the graph by path and identifier system, and nothing it does not state
-// (docs/design/authority-import-contract.md, D11). The synthetic Type 2 graph has no value in
-// these systems, so it gets no extension.
-function listIdentity(sourceBundle: FhirBundle): ListIdentity {
-  const resources = sourceBundle.entry;
-  const byUrl = new Map(resources.map((entry) => [entry.fullUrl, entry.resource]));
-  const authorisations = resources.filter(
-    ({ resource }) => resource.resourceType === "RegulatedAuthorization",
-  );
-  if (authorisations.length > 1) {
-    throw new TransformationError("Product identity is ambiguous", [
-      "The graph has more than one RegulatedAuthorization",
-    ]);
-  }
-  const products = resources.filter(
-    ({ resource }) => resource.resourceType === "MedicinalProductDefinition",
-  );
-  const names: unknown = products.length === 1 ? products[0]?.resource.name : undefined;
-  if (Array.isArray(names) && names.length > 1) {
-    throw new TransformationError("Product identity is ambiguous", [
-      "The product has more than one name",
-    ]);
-  }
-  const productName = Array.isArray(names)
-    ? ((names[0] as { productName?: unknown } | undefined)?.productName as string | undefined)
-    : undefined;
-
+// What one RegulatedAuthorization states about the List's holder, regulator and procedure, in
+// their identifier systems, and nothing it does not state.
+function authorisationExtensions(
+  authorisation: FhirResource,
+  byUrl: Map<string, FhirResource>,
+): ListExtension[] {
   const extensions: ListExtension[] = [];
-  const authorisation = authorisations[0]?.resource;
-  if (authorisation === undefined) return { productName, extensions };
   const add = (name: string, value: Record<string, unknown>): void => {
     extensions.push({ url: `${EXTENSION_BASE}${name}`, ...value });
   };
@@ -476,6 +465,61 @@ function listIdentity(sourceBundle: FhirBundle): ListIdentity {
   if (procedure !== undefined) {
     add("ext-epi-procedure-number", {
       valueIdentifier: { system: PROCEDURE_NUMBER_SYSTEM, value: procedure },
+    });
+  }
+  return extensions;
+}
+
+// What the EMA List states about the product (EUEpiList extensions and title), selected from
+// the graph by path and identifier system, and nothing it does not state
+// (docs/design/authority-import-contract.md, D11). The synthetic Type 2 graph has no value in
+// these systems, so it gets no extension. A graph has one RegulatedAuthorization per EU
+// authorisation number (docs/design/version-identity.md), so it may have several: they must state
+// the same holder, regulator and procedure, or the List's identity is ambiguous and refused. The
+// EU number is the product's EU product number, which the List carries once (0..1): two refuse.
+function listIdentity(sourceBundle: FhirBundle): ListIdentity {
+  const resources = sourceBundle.entry;
+  const byUrl = new Map(resources.map((entry) => [entry.fullUrl, entry.resource]));
+  const products = resources.filter(
+    ({ resource }) => resource.resourceType === "MedicinalProductDefinition",
+  );
+  const names: unknown = products.length === 1 ? products[0]?.resource.name : undefined;
+  if (Array.isArray(names) && names.length > 1) {
+    throw new TransformationError("Product identity is ambiguous", [
+      "The product has more than one name",
+    ]);
+  }
+  const productName = Array.isArray(names)
+    ? ((names[0] as { productName?: unknown } | undefined)?.productName as string | undefined)
+    : undefined;
+
+  const [first, ...others] = resources
+    .filter(({ resource }) => resource.resourceType === "RegulatedAuthorization")
+    .map(({ resource }) => authorisationExtensions(resource, byUrl));
+  if (others.some((other) => canonicalJson(other) !== canonicalJson(first))) {
+    throw new TransformationError("Product identity is ambiguous", [
+      "The graph's RegulatedAuthorizations state different holders, regulators or procedures",
+    ]);
+  }
+  const extensions = [...(first ?? [])];
+
+  const euNumbers = new Set(
+    products.flatMap(({ resource }) =>
+      identifiersIn(resource.identifier)
+        .filter(({ system }) => system === EU_PRODUCT_NUMBER_SYSTEM)
+        .map(({ value }) => value),
+    ),
+  );
+  if (euNumbers.size > 1) {
+    throw new TransformationError("Product identity is ambiguous", [
+      "The graph states more than one EU product number; the EMA List carries one",
+    ]);
+  }
+  const [euNumber] = euNumbers;
+  if (typeof euNumber === "string") {
+    extensions.push({
+      url: `${EXTENSION_BASE}ext-epi-eu-number`,
+      valueIdentifier: { system: EMA_EU_NUMBER_SYSTEM, value: euNumber },
     });
   }
   return { productName, extensions };
@@ -672,12 +716,8 @@ export function transformType2ToEma(
         valueString: qrdTemplateVersion,
       },
     ],
-    identifier: [
-      {
-        system: "https://khs.dev/fhir/identifier/ema-composition",
-        value: compositionId,
-      },
-    ],
+    // Set below, once the rest of the Composition is assembled.
+    identifier: [],
     type: {
       coding: [
         {
@@ -689,6 +729,20 @@ export function transformType2ToEma(
     },
     section: [root],
   };
+  // One version of the Composition, one identifier (Composition-uv-epi and EUEpiComposition: "Each
+  // new version ... receives a new identifier"; docs/design/version-identity.md). The value is
+  // derived from the source identifier and the Composition's content without its identifier, so
+  // it changes exactly when the Composition does. The resource id stays the same across versions:
+  // the store versions one Composition.
+  targetComposition.identifier = [
+    {
+      system: EMA_COMPOSITION_VERSION_SYSTEM,
+      value: stableUuid(
+        EMA_COMPOSITION_VERSION_NAMESPACE,
+        `${sourceIdentifier}:${sha256({ ...targetComposition, identifier: undefined })}`,
+      ),
+    },
+  ];
 
   // Each mapped section's narrative as it stands in the assembled Composition, the one the run
   // persists, compared with the source section's, found by the id its rule fixes. (It used to be

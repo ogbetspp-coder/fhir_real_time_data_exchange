@@ -1,0 +1,55 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "eu-product-identity",
+  "url": "https://khs.dev/fhir/StructureDefinition/eu-product-identity",
+  "version": "0.3.0",
+  "name": "EuProductIdentity",
+  "title": "EU product identity of an ePI document",
+  "status": "active",
+  "experimental": true,
+  "description": "The EU number rules of an ePI document Bundle's product graph: EU authorisation numbers (EU/1/YY/NNN/PPP), one per RegulatedAuthorization, and the MedicinalProductDefinition's EU product numbers (EU/1/YY/NNN), exactly the authorisations' products. A graph with no EU number meets every rule.",
+  "fhirVersion": "5.0.0",
+  "kind": "resource",
+  "abstract": false,
+  "type": "Bundle",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Bundle",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Bundle",
+        "path": "Bundle",
+        "constraint": [
+          {
+            "key": "khs-eu-1",
+            "severity": "error",
+            "human": "Every EU authorisation number is ^EU/1/[0-9]{2}/[0-9]{3,4}/[0-9]{3}$, and only a RegulatedAuthorization carries one",
+            "expression": "entry.resource.ofType(RegulatedAuthorization).identifier.where(system = 'https://khs.dev/fhir/identifier/eu-authorisation-number').all(value.matches('^EU/1/[0-9]{2}/[0-9]{3,4}/[0-9]{3}$')) and entry.resource.where(($this is RegulatedAuthorization).not()).descendants().ofType(Identifier).where(system = 'https://khs.dev/fhir/identifier/eu-authorisation-number').empty()",
+            "source": "https://khs.dev/fhir/StructureDefinition/eu-product-identity"
+          },
+          {
+            "key": "khs-eu-2",
+            "severity": "error",
+            "human": "Every EU product number is ^EU/1/[0-9]{2}/[0-9]{3,4}$, and only a MedicinalProductDefinition carries one",
+            "expression": "entry.resource.ofType(MedicinalProductDefinition).identifier.where(system = 'https://khs.dev/fhir/identifier/eu-product-number').all(value.matches('^EU/1/[0-9]{2}/[0-9]{3,4}$')) and entry.resource.where(($this is MedicinalProductDefinition).not()).descendants().ofType(Identifier).where(system = 'https://khs.dev/fhir/identifier/eu-product-number').empty()",
+            "source": "https://khs.dev/fhir/StructureDefinition/eu-product-identity"
+          },
+          {
+            "key": "khs-eu-3",
+            "severity": "error",
+            "human": "One RegulatedAuthorization per EU authorisation number: none carries two, no two carry one",
+            "expression": "entry.resource.ofType(RegulatedAuthorization).all(identifier.where(system = 'https://khs.dev/fhir/identifier/eu-authorisation-number').count() <= 1) and entry.resource.ofType(RegulatedAuthorization).identifier.where(system = 'https://khs.dev/fhir/identifier/eu-authorisation-number').value.isDistinct()",
+            "source": "https://khs.dev/fhir/StructureDefinition/eu-product-identity"
+          },
+          {
+            "key": "khs-eu-4",
+            "severity": "error",
+            "human": "The EU product numbers are exactly the products of the EU authorisation numbers",
+            "expression": "entry.resource.ofType(RegulatedAuthorization).identifier.where(system = 'https://khs.dev/fhir/identifier/eu-authorisation-number').select(value.replaceMatches('/[0-9]{3}$', '')).subsetOf(entry.resource.ofType(MedicinalProductDefinition).identifier.where(system = 'https://khs.dev/fhir/identifier/eu-product-number').value) and entry.resource.ofType(MedicinalProductDefinition).identifier.where(system = 'https://khs.dev/fhir/identifier/eu-product-number').value.subsetOf(entry.resource.ofType(RegulatedAuthorization).identifier.where(system = 'https://khs.dev/fhir/identifier/eu-authorisation-number').select(value.replaceMatches('/[0-9]{3}$', '')))",
+            "source": "https://khs.dev/fhir/StructureDefinition/eu-product-identity"
+          }
+        ]
+      }
+    ]
+  }
+}

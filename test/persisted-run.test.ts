@@ -4,6 +4,7 @@ import { createApp } from "../src/app.js";
 import { loadConfig, type AppConfig } from "../src/config.js";
 import { loadEmaMapping, type EmaMapping } from "../src/fhir/mapping.js";
 import { PROVENANCE_PROFILE } from "../src/fhir/provenance.js";
+import { EU_PRODUCT_IDENTITY_PROFILE } from "../src/fhir/standards.js";
 import { transformType2ToEma } from "../src/fhir/transform.js";
 import type { FhirBundle, FhirResource, OperationOutcome } from "../src/fhir/types.js";
 import { createSyntheticType2Bundle } from "../src/fixtures/synthetic.js";
@@ -32,6 +33,9 @@ const state = vi.hoisted(() => ({
   failExecute: false,
   failLedger: false,
   failLineage: false,
+  // The version of the document Bundle the target store holds before the run writes it; none
+  // when undefined.
+  stored: undefined as { versionId: string } | undefined,
   objects: new Map<string, unknown>(),
   executed: [] as unknown[],
   // What each validator was asked: the resource and its profiles, in order.
@@ -82,6 +86,10 @@ vi.mock("../src/gcp/healthcare.js", async (importOriginal) => ({
           ? { resourceType: "OperationOutcome", issue: [{ severity: "fatal", code: "invalid" }] }
           : { resourceType: "OperationOutcome", issue: [] },
       );
+    }
+    public readStoredVersion(): Promise<{ versionId: string } | "absent"> {
+      state.events.push({ kind: "read-stored" });
+      return Promise.resolve(state.stored ?? "absent");
     }
     public executeTransaction(transaction: PersistTransaction): Promise<unknown> {
       state.events.push({ kind: "execute" });
@@ -189,6 +197,7 @@ beforeEach(() => {
   state.failExecute = false;
   state.failLedger = false;
   state.failLineage = false;
+  state.stored = undefined;
   state.objects.clear();
   state.executed.length = 0;
   state.official.length = 0;
@@ -256,10 +265,19 @@ describe("a persisted run's validation gates", () => {
     expect(state.official).toEqual(
       targets.map(({ resource, profiles }) => ({ resource, profiles })),
     );
+    // The package's own profiles go to the official validator only: the store does not know them.
     expect(state.cloud).toEqual(
       targets.flatMap(({ resource, profiles }) =>
-        profiles.map((profile) => ({ resource, profiles: [profile] })),
+        profiles
+          .filter((profile) => profile !== EU_PRODUCT_IDENTITY_PROFILE)
+          .map((profile) => ({ resource, profiles: [profile] })),
       ),
+    );
+    expect(targets.find(({ name }) => name === "source")?.profiles).toContain(
+      EU_PRODUCT_IDENTITY_PROFILE,
+    );
+    expect(targets.find(({ name }) => name === "ema-bundle")?.profiles).toContain(
+      EU_PRODUCT_IDENTITY_PROFILE,
     );
     const signed = state.objects.get("signed-manifest") as SignedManifest | undefined;
     expect(signed?.manifest.validation.profiles).toEqual(
@@ -286,6 +304,7 @@ describe("a persisted run's commit order", () => {
     expect(response.status).toBe(200);
 
     expect(sideEffects()).toEqual([
+      "read-stored",
       "write:source-type2",
       "write:ema-list",
       "write:ema-document-bundle",
@@ -353,6 +372,33 @@ describe("a persisted run's commit order", () => {
       versionId: VERSION,
       lastUpdated: "2026-09-27T16:47:11.921985+00:00",
     });
+  });
+
+  // The transaction's precondition (docs/design/version-identity.md): the store's version of
+  // the document Bundle, read before the manifest is signed, on the Bundle's entry and no other.
+  it("conditions the document Bundle's write on the version the store held", async () => {
+    for (const [stored, request] of [
+      ["absent", { ifNoneMatch: "*" }],
+      [{ versionId: "MTc5MDUyNzYzMTkyMTk4NTAwMQ" }, { ifMatch: 'W/"MTc5MDUyNzYzMTkyMTk4NTAwMQ"' }],
+    ] as const) {
+      state.stored = stored === "absent" ? undefined : stored;
+      state.executed.length = 0;
+      state.objects.clear();
+      const response = await post({ source: "fixture", runId: crypto.randomUUID() });
+      expect(response.status).toBe(200);
+      const sent = state.executed[0] as PersistTransaction;
+      const conditional = sent.entry.filter(
+        ({ request: entry }) => "ifMatch" in entry || "ifNoneMatch" in entry,
+      );
+      expect(conditional.map(({ request: entry }) => entry)).toEqual([
+        { method: "PUT", url: `Bundle/${conditional[0]?.resource.id ?? ""}`, ...request },
+      ]);
+      expect(conditional[0]?.resource.resourceType).toBe("Bundle");
+      // The signed hash covers the precondition.
+      expect(state.objects.get("signed-manifest")).toMatchObject({
+        manifest: { persistence: { transactionSha256: sha256(sent) } },
+      });
+    }
   });
 
   it("answers with the version the transaction wrote, for the workflow's stream check", async () => {

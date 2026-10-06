@@ -9,7 +9,7 @@ import { sha256Utf8 } from "../lib/hash.js";
 // Healthcare API refused a write rather than, say, KMS refusing a signature — a distinction the
 // first failed run could not make, because every upstream refusal arrived as a bare `Error` and
 // the pipeline could only call it `unclassified`.
-export type HealthcareOperation = "read-source" | "validate" | "execute-bundle";
+export type HealthcareOperation = "read-source" | "read-target" | "validate" | "execute-bundle";
 
 // An OperationOutcome's `diagnostics` quotes the content that was rejected, so it is never
 // carried. `issue[].code` is a closed FHIR value set, and `details.text` is a machine code such
@@ -68,8 +68,17 @@ export class HealthcareApiError extends Error {
 // both rely on that.
 export type PersistTransactionEntry = {
   resource: FhirResource;
-  request: { method: "PUT"; url: string };
+  request: { method: "PUT"; url: string; ifMatch?: string; ifNoneMatch?: "*" };
 };
+
+// What the target store held of the document Bundle when the run read it, before it signed: the
+// version it read, or nothing. It is the transaction's precondition (docs/design/version-identity.md):
+// the document Bundle's entry carries `ifMatch` with that version, so the transaction is refused if
+// anything wrote the document since, or `ifNoneMatch: "*"`, so it is refused if anything created
+// it since. Every resource the transaction writes has an id derived from the same source identifier
+// as the Bundle's (src/fhir/transform.ts, D7), every run that writes them writes the Bundle in the
+// same transaction, and a transaction is atomic, so the one precondition guards them all.
+export type StoredDocument = { versionId: string } | "absent";
 
 export type PersistTransaction = {
   resourceType: "Bundle";
@@ -157,6 +166,7 @@ export function buildPersistTransaction(
   list: FhirResource,
   documentBundle: FhirBundle,
   runId: string,
+  stored: StoredDocument,
   extras: FhirResource[] = [],
   timestamp: string = new Date().toISOString(),
 ): PersistTransaction {
@@ -188,7 +198,15 @@ export function buildPersistTransaction(
     timestamp,
     entry: resources.map((resource) => ({
       resource,
-      request: { method: "PUT", url: address(resource) },
+      request: {
+        method: "PUT",
+        url: address(resource),
+        ...(resource !== documentBundle
+          ? {}
+          : stored === "absent"
+            ? { ifNoneMatch: "*" as const }
+            : { ifMatch: `W/"${stored.versionId}"` }),
+      },
     })),
   };
 }
@@ -348,6 +366,31 @@ export class HealthcareApiClient {
       throw new Error("A source resource id must be a single path segment");
     }
     return this.#request<T>("read-source", url, runId);
+  }
+
+  // The version of a resource the target store holds now, read before a run signs its
+  // transaction, or "absent" when the store answers 404. A deleted resource (410) or any other
+  // refusal fails the run: what to write over it is for a person to decide.
+  public async readStoredVersion(
+    resourceType: string,
+    id: string,
+    runId: string,
+  ): Promise<StoredDocument> {
+    const store = this.options.TARGET_FHIR_STORE_ID;
+    if (store === undefined) throw new Error("TARGET_FHIR_STORE_ID is required");
+    const url = `${this.#storeBase(store)}/${encodeURIComponent(resourceType)}/${encodeURIComponent(id)}`;
+    let resource: FhirResource;
+    try {
+      resource = await this.#request<FhirResource>("read-target", url, runId, { method: "GET" });
+    } catch (error) {
+      if (error instanceof HealthcareApiError && error.status === 404) return "absent";
+      throw error;
+    }
+    const versionId = resource.meta?.versionId;
+    if (typeof versionId !== "string" || versionId.length === 0) {
+      throw new Error("The target store answered a resource without a version id");
+    }
+    return { versionId };
   }
 
   public async validate(

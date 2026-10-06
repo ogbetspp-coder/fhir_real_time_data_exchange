@@ -370,3 +370,21 @@ holds the double. Every integer field of every contract is capped at the bound, 
 FHIR resources of a Bundle can carry one; a Zone A producer cannot hash, and so must not write, such
 a Bundle. A product-graph value whose precision must survive would need a contract that carries it
 as text; none does today.
+
+## Amendment (2026-10-06, an ePI's versions and its EU numbers)
+
+`docs/design/version-identity.md` settles the version model from the pinned Global ePI and EUePI
+profiles, and the product's identity by EU number (ADR 0006 decision 5). It changes three things
+the 2026-09-24 amendment above states; the contract does not change.
+
+- **The Type 1 set.** One Composition, MedicinalProductDefinition and Organization, and one
+  RegulatedAuthorization per authorisation (one per EU authorisation number), each linked to the
+  product and the holder, named and identified. The importer still makes one.
+- **EU numbers.** Both graph types' preflights refuse an EU authorisation number that is not
+  `EU/1/YY/NNN/PPP`, carried by anything but a RegulatedAuthorization, two on one or one on two,
+  and product numbers that are not exactly the authorisation numbers' products; the package's
+  profile `eu-product-identity` states the same rules for the official validator.
+- **The EMA List and Composition.** The List takes the holder, regulator and procedure only when
+  every RegulatedAuthorization states the same ones, and the product's one EU product number as
+  `ext-epi-eu-number`. The EMA Composition's identifier is one per version, derived from the source
+  identifier and its content; every id stays as before.

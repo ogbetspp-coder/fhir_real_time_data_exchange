@@ -1,0 +1,20 @@
+{
+  "resourceType": "NamingSystem",
+  "id": "eu-product-number",
+  "url": "https://khs.dev/fhir/NamingSystem/eu-product-number",
+  "version": "0.3.0",
+  "name": "EuProductNumber",
+  "title": "EU product number",
+  "status": "active",
+  "kind": "identifier",
+  "experimental": true,
+  "date": "2026-10-06",
+  "description": "An EU product number, EU/1/YY/NNN (an authorisation number without its presentation), as a MedicinalProductDefinition's identifier. https://khs.dev/fhir/StructureDefinition/eu-product-identity holds every value to ^EU/1/[0-9]{2}/[0-9]{3,4}$, and to the products of the RegulatedAuthorizations' numbers (khs-eu-2, khs-eu-4).",
+  "uniqueId": [
+    {
+      "type": "uri",
+      "value": "https://khs.dev/fhir/identifier/eu-product-number",
+      "preferred": true
+    }
+  ]
+}

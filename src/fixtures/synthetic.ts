@@ -10,6 +10,8 @@ import { isComposition } from "../fhir/types.js";
 import {
   DEFAULT_SYNTHETIC_PRODUCT_ID,
   SYNTHETIC_DOCUMENT_DATE,
+  syntheticCompositionDate,
+  syntheticCompositionIdentifier,
   syntheticProduct,
   syntheticSectionDiv,
   type SyntheticFixtureOptions,
@@ -82,7 +84,7 @@ export function createSyntheticType2Bundle(
     identifier: [
       {
         system: "https://khs.dev/fhir/identifier/composition",
-        value: product.compositionIdentifier,
+        value: syntheticCompositionIdentifier(product, version),
       },
     ],
     status: "final",
@@ -100,7 +102,7 @@ export function createSyntheticType2Bundle(
         reference: productUrl,
       },
     ],
-    date: SYNTHETIC_DOCUMENT_DATE,
+    date: syntheticCompositionDate(version),
     author: [
       {
         reference: organizationUrl,
@@ -256,9 +258,9 @@ export function createSyntheticType2Bundle(
     meta: globalEpiProfile("Bundle"),
     // Bundle-uv-epi makes language mandatory (1..1); the Composition already says "en".
     language: "en",
-    // Version-independent on purpose: transform.ts derives the EMA document Bundle id from this
-    // value, so version 2 must carry the identifier version 1 carried or the store would hold
-    // two documents instead of two versions of one.
+    // Version-independent on purpose, as Bundle-uv-epi defines it: transform.ts derives the EMA
+    // document Bundle id from this value, so version 2 must carry the identifier version 1
+    // carried or the store would hold two documents instead of two versions of one.
     identifier: {
       system: "https://khs.dev/fhir/identifier/type2-document",
       value: product.bundleIdentifier,

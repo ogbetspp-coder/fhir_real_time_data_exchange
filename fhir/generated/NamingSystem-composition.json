@@ -1,0 +1,20 @@
+{
+  "resourceType": "NamingSystem",
+  "id": "composition",
+  "url": "https://khs.dev/fhir/NamingSystem/composition",
+  "version": "0.3.0",
+  "name": "Composition",
+  "title": "Synthetic Composition",
+  "status": "active",
+  "kind": "identifier",
+  "experimental": true,
+  "date": "2026-10-06",
+  "description": "A synthetic Type 2 source Composition's identifier in the fixtures (src/fixtures/synthetic.ts). Synthetic content only: never a real product's. One per version (Composition-uv-epi).",
+  "uniqueId": [
+    {
+      "type": "uri",
+      "value": "https://khs.dev/fhir/identifier/composition",
+      "preferred": true
+    }
+  ]
+}

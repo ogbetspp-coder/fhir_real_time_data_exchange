@@ -7,15 +7,35 @@ import { loadEmaMapping, type SectionRule } from "../../src/fhir/mapping.js";
 import {
   ACTIVITY_SYSTEM,
   APPROVAL_CONTENT_EXTENSION_URL,
+  APPROVER_IDENTIFIER_SYSTEM,
   APPROVER_ROLE_SYSTEM,
+  AUTHORITY_FILE_IDENTIFIER_SYSTEM,
+  FIDELITY_REPORT_IDENTIFIER_SYSTEM,
+  IMPORT_REQUESTER_IDENTIFIER_SYSTEM,
+  MODEL_IDENTIFIER_SYSTEM,
+  SOURCE_DOCUMENT_IDENTIFIER_SYSTEM,
 } from "../../src/fhir/provenance.js";
+import {
+  EU_AUTHORISATION_NUMBER_PATTERN,
+  EU_AUTHORISATION_NUMBER_SYSTEM,
+  EU_PRODUCT_IDENTITY_PROFILE,
+  EU_PRODUCT_NUMBER_PATTERN,
+  EU_PRODUCT_NUMBER_SYSTEM,
+  KHS_CANONICAL,
+} from "../../src/fhir/standards.js";
+import {
+  EMA_COMPOSITION_VERSION_SYSTEM,
+  EMA_DOCUMENT_IDENTIFIER_SYSTEM,
+} from "../../src/fhir/transform.js";
 
 // The repository's own FHIR definitions, and the package that carries them to the official
 // validator. src/fhir/transform.ts is the crosswalk; the StructureMap is its executed twin
 // (fhir/maps/), which runs through the ConceptMap, and test/official/structuremap-twin.test.ts
-// holds the two to the same output. The code systems, value sets and extension define every
-// https://khs.dev/fhir/ system and extension the pipeline writes (identifier systems need no
-// definition). Every resource is checked by the official HL7 validator in CI
+// holds the two to the same output. The code systems, value sets, extension and naming systems
+// define every https://khs.dev/fhir/ system and extension the pipeline and its fixtures write
+// (test/version-identity.test.ts finds every identifier system they write and requires its
+// NamingSystem), and one profile states the EU number rules. Every resource is checked by the
+// official HL7 validator in CI
 // (scripts/ci/emit-validation-set.ts), and the package is loaded by it there and in the sidecar
 // (Dockerfile.validator, a fifth -ig), so what the pipeline writes is validated against them.
 //
@@ -32,9 +52,9 @@ await mkdir(output, { recursive: true });
 const mapping = await loadEmaMapping();
 
 const PACKAGE_NAME = "dev.khs.fhir.epi";
-const PACKAGE_VERSION = "0.2.0";
+const PACKAGE_VERSION = "0.3.0";
 const PACKAGE_FILE = `${PACKAGE_NAME}.tgz`;
-const CANONICAL = "https://khs.dev/fhir";
+const CANONICAL = KHS_CANONICAL;
 
 function flatten(rule: SectionRule): SectionRule[] {
   return [rule, ...(rule.children ?? []).flatMap(flatten)];
@@ -183,6 +203,238 @@ const approvalContentExtension = {
   },
 };
 
+// Every identifier system the pipeline and its fixtures write, each a NamingSystem
+// (docs/design/version-identity.md). Whether a value persists across an ePI's versions is said
+// where it matters. A retired system is no longer written, but versions written before stay in
+// the store's history.
+const NAMING_SYSTEMS_DATE = "2026-10-06";
+const synthetic = (what: string): string =>
+  `A synthetic ${what}'s identifier in the fixtures (src/fixtures/synthetic.ts). Synthetic content only: never a real product's.`;
+const identifierSystems: { system: string; title: string; description: string; retired?: true }[] =
+  [
+    {
+      system: EMA_DOCUMENT_IDENTIFIER_SYSTEM,
+      title: "EMA document Bundle",
+      description:
+        "The EMA document Bundle's identifier. Its value is the Bundle's id, derived from the source Bundle.identifier.value (src/fhir/transform.ts), and is the same for every version of the ePI document (Bundle-uv-epi).",
+    },
+    {
+      system: EMA_COMPOSITION_VERSION_SYSTEM,
+      title: "EMA Composition version",
+      description:
+        "One version of the EMA Composition: a UUID derived from the source Bundle.identifier.value and the Composition's content without its identifier (src/fhir/transform.ts). Each new version has a new value (Composition-uv-epi, EUEpiComposition); the same content has the same value.",
+    },
+    {
+      system: `${CANONICAL}/identifier/ema-composition`,
+      title: "EMA Composition (retired)",
+      description:
+        "The EMA Composition's identifier until 2026-10-06: the Composition's id, the same for every version, which the Global ePI and EMA profiles define as one per version. No longer written; versions written before then keep it in the store's history.",
+      retired: true,
+    },
+    {
+      system: `${CANONICAL}/identifier/epi-package`,
+      title: "EMA ePI List",
+      description:
+        "The EMA List's identifier: 'ema-' and the source Bundle.identifier.value, the same for every version of the ePI (EUEpiList).",
+    },
+    {
+      system: `${CANONICAL}/identifier/transaction`,
+      title: "Persist transaction",
+      description: "The identifier of a run's persist transaction Bundle: the run's id, a UUID.",
+    },
+    {
+      system: EU_AUTHORISATION_NUMBER_SYSTEM,
+      title: "EU authorisation number",
+      description: `An EU marketing authorisation number, EU/1/YY/NNN/PPP (YY the year, NNN the product in three or four digits, PPP the presentation), as a RegulatedAuthorization's identifier: one RegulatedAuthorization per number, one number per RegulatedAuthorization. ${EU_PRODUCT_IDENTITY_PROFILE} holds every value to ${EU_AUTHORISATION_NUMBER_PATTERN} (khs-eu-1, khs-eu-3).`,
+    },
+    {
+      system: EU_PRODUCT_NUMBER_SYSTEM,
+      title: "EU product number",
+      description: `An EU product number, EU/1/YY/NNN (an authorisation number without its presentation), as a MedicinalProductDefinition's identifier. ${EU_PRODUCT_IDENTITY_PROFILE} holds every value to ${EU_PRODUCT_NUMBER_PATTERN}, and to the products of the RegulatedAuthorizations' numbers (khs-eu-2, khs-eu-4).`,
+    },
+    {
+      system: MODEL_IDENTIFIER_SYSTEM,
+      title: "Extraction model",
+      description: "The model a structuring run used, by the id its submission records.",
+    },
+    {
+      system: APPROVER_IDENTIFIER_SYSTEM,
+      title: "Approver",
+      description:
+        "The approver of a submission, by the opaque id its approval records, never an e-mail address.",
+    },
+    {
+      system: SOURCE_DOCUMENT_IDENTIFIER_SYSTEM,
+      title: "Source document SHA-256",
+      description:
+        "A source document, by the SHA-256 of its bytes, 64 lowercase hexadecimal digits.",
+    },
+    {
+      system: FIDELITY_REPORT_IDENTIFIER_SYSTEM,
+      title: "Fidelity report SHA-256",
+      description: "A fidelity report, by its reportHash, 64 lowercase hexadecimal digits.",
+    },
+    {
+      system: IMPORT_REQUESTER_IDENTIFIER_SYSTEM,
+      title: "Import requester",
+      description: "Who requested an authority import, by the id the import request records.",
+    },
+    {
+      system: AUTHORITY_FILE_IDENTIFIER_SYSTEM,
+      title: "Authority file",
+      description:
+        "An authority's published file an import read: the authority's segment, then Bundle/ or List/ and the authority's id for the file.",
+    },
+    {
+      system: `${CANONICAL}/identifier/authority-import`,
+      title: "Authority import record",
+      description:
+        "An authority import's canonical record: the Bundle's identifier, authority-import:, the authority's segment, a colon and the authority's id for the document; and the Composition's, the same followed by :composition.",
+    },
+    {
+      system: `${CANONICAL}/identifier/type2-document`,
+      title: "Synthetic Type 2 document",
+      description: `${synthetic("Type 2 source Bundle")} The same for every version of a document (Bundle-uv-epi).`,
+    },
+    {
+      system: `${CANONICAL}/identifier/composition`,
+      title: "Synthetic Composition",
+      description: `${synthetic("Type 2 source Composition")} One per version (Composition-uv-epi).`,
+    },
+    {
+      system: `${CANONICAL}/identifier/organization`,
+      title: "Synthetic organisation",
+      description: synthetic("organisation"),
+    },
+    {
+      system: `${CANONICAL}/identifier/product`,
+      title: "Synthetic product",
+      description: synthetic("medicinal product"),
+    },
+    {
+      system: `${CANONICAL}/identifier/authorization`,
+      title: "Synthetic authorisation",
+      description: `${synthetic("authorisation")} Never an EU authorisation number.`,
+    },
+    {
+      system: `${CANONICAL}/identifier/package`,
+      title: "Synthetic package",
+      description: synthetic("packaged product"),
+    },
+    {
+      system: `${CANONICAL}/identifier/packaging`,
+      title: "Synthetic packaging",
+      description: synthetic("packaging"),
+    },
+    {
+      system: `${CANONICAL}/identifier/manufactured-item`,
+      title: "Synthetic manufactured item",
+      description: synthetic("manufactured item"),
+    },
+    {
+      system: `${CANONICAL}/identifier/administrable-product`,
+      title: "Synthetic administrable product",
+      description: synthetic("administrable product"),
+    },
+    {
+      system: `${CANONICAL}/identifier/substance`,
+      title: "Synthetic substance",
+      description: synthetic("substance"),
+    },
+    ...(["org", "product"] as const).map((kind) => ({
+      system: `${CANONICAL}/example/sid/${kind}`,
+      title: `Example ${kind}`,
+      description: `The HL7 Global ePI DrugX example's http://example.org/sid/${kind}, moved into this namespace by the seeded synthetic source (createSyntheticSmpcFromPublishedType2, src/fixtures/synthetic.ts). Example content only.`,
+    })),
+  ];
+
+const namingSystems = identifierSystems.map(({ system, title, description, retired }) => {
+  const id = system
+    .slice(`${CANONICAL}/`.length)
+    .replace(/^identifier\//, "")
+    .replaceAll("/", "-");
+  return {
+    resourceType: "NamingSystem",
+    id,
+    url: `${CANONICAL}/NamingSystem/${id}`,
+    version: PACKAGE_VERSION,
+    name: id
+      .split("-")
+      .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
+      .join(""),
+    title,
+    status: retired === true ? "retired" : "active",
+    kind: "identifier",
+    experimental: true,
+    date: NAMING_SYSTEMS_DATE,
+    description,
+    uniqueId: [{ type: "uri", value: system, preferred: true }],
+  };
+});
+
+// The EU number rules (docs/design/version-identity.md) for the official validator, as invariants
+// on a document Bundle. src/fhir/preflight.ts states the same rules (euNumberIssues); every rule
+// holds for a graph with no EU number.
+const authorisationNumbers = `entry.resource.ofType(RegulatedAuthorization).identifier.where(system = '${EU_AUTHORISATION_NUMBER_SYSTEM}')`;
+const productNumbers = `entry.resource.ofType(MedicinalProductDefinition).identifier.where(system = '${EU_PRODUCT_NUMBER_SYSTEM}')`;
+const theirProducts = `${authorisationNumbers}.select(value.replaceMatches('/[0-9]{3}$', ''))`;
+const euInvariants = [
+  {
+    key: "khs-eu-1",
+    human: `Every EU authorisation number is ${EU_AUTHORISATION_NUMBER_PATTERN}, and only a RegulatedAuthorization carries one`,
+    expression: `${authorisationNumbers}.all(value.matches('${EU_AUTHORISATION_NUMBER_PATTERN}')) and entry.resource.where(($this is RegulatedAuthorization).not()).descendants().ofType(Identifier).where(system = '${EU_AUTHORISATION_NUMBER_SYSTEM}').empty()`,
+  },
+  {
+    key: "khs-eu-2",
+    human: `Every EU product number is ${EU_PRODUCT_NUMBER_PATTERN}, and only a MedicinalProductDefinition carries one`,
+    expression: `${productNumbers}.all(value.matches('${EU_PRODUCT_NUMBER_PATTERN}')) and entry.resource.where(($this is MedicinalProductDefinition).not()).descendants().ofType(Identifier).where(system = '${EU_PRODUCT_NUMBER_SYSTEM}').empty()`,
+  },
+  {
+    key: "khs-eu-3",
+    human:
+      "One RegulatedAuthorization per EU authorisation number: none carries two, no two carry one",
+    expression: `entry.resource.ofType(RegulatedAuthorization).all(identifier.where(system = '${EU_AUTHORISATION_NUMBER_SYSTEM}').count() <= 1) and ${authorisationNumbers}.value.isDistinct()`,
+  },
+  {
+    key: "khs-eu-4",
+    human: "The EU product numbers are exactly the products of the EU authorisation numbers",
+    expression: `${theirProducts}.subsetOf(${productNumbers}.value) and ${productNumbers}.value.subsetOf(${theirProducts})`,
+  },
+];
+const euProductIdentity = {
+  resourceType: "StructureDefinition",
+  id: EU_PRODUCT_IDENTITY_PROFILE.split("/").at(-1),
+  url: EU_PRODUCT_IDENTITY_PROFILE,
+  version: PACKAGE_VERSION,
+  name: "EuProductIdentity",
+  title: "EU product identity of an ePI document",
+  status: "active",
+  experimental: true,
+  description:
+    "The EU number rules of an ePI document Bundle's product graph: EU authorisation numbers (EU/1/YY/NNN/PPP), one per RegulatedAuthorization, and the MedicinalProductDefinition's EU product numbers (EU/1/YY/NNN), exactly the authorisations' products. A graph with no EU number meets every rule.",
+  fhirVersion: "5.0.0",
+  kind: "resource",
+  abstract: false,
+  type: "Bundle",
+  baseDefinition: "http://hl7.org/fhir/StructureDefinition/Bundle",
+  derivation: "constraint",
+  differential: {
+    element: [
+      {
+        id: "Bundle",
+        path: "Bundle",
+        constraint: euInvariants.map(({ key, human, expression }) => ({
+          key,
+          severity: "error",
+          human,
+          expression,
+          source: EU_PRODUCT_IDENTITY_PROFILE,
+        })),
+      },
+    ],
+  },
+};
+
 const EMA_SMPC_SECTION_CODES = "http://ema.europa.eu/fhir/ValueSet/EUepismpcqrdcodesVs";
 
 const conceptMap = {
@@ -243,6 +495,8 @@ if (structureMap.version !== mapping.mappingVersion) {
 const resources: Record<string, unknown>[] = [
   ...terminology,
   approvalContentExtension,
+  euProductIdentity,
+  ...namingSystems,
   conceptMap,
   structureMap,
 ];
@@ -262,7 +516,7 @@ const packageJson = {
   canonical: CANONICAL,
   title: "ema-flow ePI definitions",
   description:
-    "The code systems, value sets, extension, ConceptMap and StructureMap this repository's ePI pipeline writes or publishes (scripts/fhir/generate-artifacts.ts).",
+    "The code systems, value sets, extension, naming systems, profile, ConceptMap and StructureMap this repository's ePI pipeline writes or publishes (scripts/fhir/generate-artifacts.ts).",
   fhirVersions: ["5.0.0"],
   dependencies: { "hl7.fhir.r5.core": "5.0.0" },
   author: "khs-dev",

@@ -13,9 +13,12 @@
 //    computed over exactly these strings. Nothing that the default product emits may change:
 //    not an id, not an identifier, not a space inside a sentence.
 // 2. A version is a content difference, not an identity. Version 2 of a label keeps the Type 2
-//    Bundle id and the Bundle identifier of version 1, because `src/fhir/transform.ts` derives
-//    the EMA document Bundle id from `Bundle.identifier.value` — so both versions transform to
-//    the same EMA Bundle id and the FHIR store versions one resource instead of creating two.
+//    Bundle id, the Bundle identifier and Bundle.timestamp of version 1, because the Global ePI
+//    profiles define both as persisting across versions and `src/fhir/transform.ts` derives the
+//    EMA document Bundle id from `Bundle.identifier.value` — so both versions transform to the
+//    same EMA Bundle id and the FHIR store versions one resource instead of creating two. What
+//    the profiles define per version differs: Composition.identifier and Composition.date
+//    (docs/design/version-identity.md).
 
 export type SyntheticProductId =
   "synthetic-paracetamol" | "synthetic-demoxetine" | "synthetic-placebolol" | "synthetic-smoketest";
@@ -54,8 +57,10 @@ export type SyntheticProduct = {
   compositionId: string;
   compositionIdentifier: string;
   bundleId: string;
-  // Stable document identity, unchanged between versions. The trailing `-v1` is part of the
-  // literal the default fixture was frozen with; it names the document, not its content version.
+  // Stable document identity, unchanged between versions (Bundle-uv-epi: "remains the same for
+  // all versions of this ePI"). The trailing `-v1` is part of the literal the default fixture was
+  // frozen with, and every EMA id in the store derives from it; it names the document, not its
+  // content version (docs/design/version-identity.md).
   bundleIdentifier: string;
   productIdentifier: string;
   authorizationId: string;
@@ -92,11 +97,28 @@ const DOCUMENT_DATE = "2026-09-19T00:00:00Z";
 const VERSION_ONE_APPROVAL = "2026-09-19T00:00:00Z";
 const VERSION_TWO_APPROVAL = "2026-09-20T00:00:00Z";
 
-// The document's own date is part of its content, and version 2 differs from version 1 by one
-// sentence and nothing else, so `Bundle.timestamp` and `Composition.date` are shared by both.
-// What differs outside the label is the approval: its own submission id, extraction run id, and
-// a later approval instant.
+// `Bundle.timestamp` is the ePI's original date, shared by both versions (Bundle-uv-epi: it
+// "persists across versions"). `Composition.date` is the date of this version's last revision
+// (Composition-uv-epi), so version 2 has its own, the day of its approval. Besides one sentence and
+// the Composition's identifier and date, what differs is the approval: its own submission id,
+// extraction run id, and a later approval instant.
 export const SYNTHETIC_DOCUMENT_DATE = DOCUMENT_DATE;
+
+export function syntheticCompositionDate(version: SyntheticVersion): string {
+  return version === 1 ? DOCUMENT_DATE : VERSION_TWO_APPROVAL;
+}
+
+// Composition.identifier names one version (Composition-uv-epi: "Each new version of the
+// Composition receives a new identifier"). Version 1's is the frozen literal; version 2's ends in
+// -v2 in its place.
+export function syntheticCompositionIdentifier(
+  product: SyntheticProduct,
+  version: SyntheticVersion,
+): string {
+  return version === 1
+    ? product.compositionIdentifier
+    : `${product.compositionIdentifier.replace(/-v1$/, "")}-v${version}`;
+}
 
 const PARACETAMOL: SyntheticProduct = {
   id: "synthetic-paracetamol",
