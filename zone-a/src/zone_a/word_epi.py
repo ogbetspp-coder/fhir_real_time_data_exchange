@@ -1,11 +1,11 @@
-r"""A Word label's SmPC as ePI sections: each one's narrative and page text (ADR 0006).
+r"""A Word label's SmPC or leaflet as ePI sections: each one's narrative and page text (ADR 0006).
 
 Input: a body the label reader certified (``zone_a.certified.read_body``) and its structure
-(``zone_a.structure``), which must be ``ready``. Output: each section that has a heading, in the
-template's order (a parent before its children, an empty parent included), with its title (its
-heading line), and either its narrative and page text or the reason it is refused. Nothing is
-added, reordered or reworded, and a person is never asked to fill a gap: what these rules cannot
-carry exactly is refused, section by section.
+(``zone_a.structure``, or ``zone_a.leaflet`` for a package leaflet), which must be ``ready``.
+Output: each section that has a heading, in the template's order (a parent before its children,
+an empty parent included), with its title (its heading line), and either its narrative and page
+text or the reason it is refused. Nothing is added, reordered or reworded, and a person is never
+asked to fill a gap: what these rules cannot carry exactly is refused, section by section.
 
 A section's text is the body paragraphs after its heading up to the next heading of any section,
 or the SmPC's end. The paragraphs before the root title (``ANNEX I``) are not in the SmPC. Of an
@@ -115,7 +115,7 @@ from zone_a.structure import line
 from zone_a.underline import underline_changes
 
 # The narrative builder's and the page serialiser's version: one, as they are one closed list.
-WORD_EPI_VERSION: Final = "word-epi/1.3.1"
+WORD_EPI_VERSION: Final = "word-epi/1.3.2"
 
 CARRIED: Final = {"bold": "strong", "italic": "em", "superscript": "sup", "subscript": "sub"}
 # Section 3 step 4's bullet glyphs: a list bullet in page text, removed at a line start.

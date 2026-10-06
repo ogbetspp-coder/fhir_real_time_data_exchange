@@ -1,6 +1,6 @@
 # Design note: the QRD template registry
 
-- Status: Built for the centrally authorised SmPC in English, QRD template 10.4
+- Status: Built for the centrally authorised SmPC and package leaflet in English, QRD template 10.4
 - Date: 2026-09-23
 - Related: `docs/roadmap.md` item 8 (the engine), `docs/design/extractor-spike.md`,
   `fhir/mappings/cap-smpc-en.json`, `AGENTS.md` ("Fail closed on missing, duplicate, or
@@ -168,6 +168,18 @@ and compared byte for byte with a fresh build in `zone-a/tests/test_qrd_registry
   Appendix II must be a single table whose first row is the "Ref | EN" header and whose every
   row has exactly two cells.
 
+**The package leaflet** has its own file, `qrd/registry/cap-pl-en-10.4.json`, built by the same
+script from the same pinned template and from the leaflet mapping (`fhir/mappings/cap-pl-en.json`,
+the EMA's leaflet profile written out). It holds headings only, for finding a leaflet's sections
+(`docs/design/pl-structure.md`): the root line "B. PACKAGE LEAFLET", the line that opens a leaflet
+("Package leaflet: Information for the <patient> <user>"), the six numbered headings, which the
+build requires the template to list after "What is in this leaflet" and then give in the same
+words, and each named section of the mapping as the template writes it. A named section's
+paragraph is the one paragraph of its parent section, outside a table, whose title flattened as
+the profile writes its titles (brackets dropped, fill-ins kept in braces: "Do not <take> <use> X"
+is "Do not take use X") is the mapping's title; all twenty are found once, and the build refuses
+a title the template does not have once. The leaflet's statements are not in it yet.
+
 `zone-a/src/zone_a/qrd/headings.py` recognises an SmPC heading in a line of label text that is
 already known to be Annex I (the labelling and the leaflet reuse lines such as "1. NAME OF THE
 MEDICINAL PRODUCT"): after runs of
@@ -217,9 +229,10 @@ segment, and the registry records the template's reading. Nothing changes.
 
 ## Known limits
 
-- Only the SmPC (Annex I), in English, from the centralised template. Annex II, the labelling,
-  the package leaflet, the national-procedure template 4.2, the ATMP template 1.1 and other
-  languages are not in the registry.
+- Only the SmPC (Annex I) and the package leaflet's headings (Annex IIIB), in English, from the
+  centralised template. The leaflet's statements, Annex II, the labelling, the
+  national-procedure template 4.2, the ATMP template 1.1 and other languages are not in the
+  registry.
 - The two optional ATMP subsections 2.1 and 2.2 are followed in the template by "<Excipient(s)
   with known effect>" and "<For the full list of excipients, see section 6.1.>", which apply to
   section 2 of every product. The registry files them under 2.2 because that is where they

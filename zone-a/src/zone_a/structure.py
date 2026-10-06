@@ -19,7 +19,8 @@ line that starts with a section's number but goes on otherwise ("4.4 Warnings an
 is a ``number`` candidate for that section, and a paragraph in a heading style that is no QRD
 heading is a ``style`` candidate in the section it stands in: both are shown to a person, and a
 section stays ``missing`` until the person names its heading (``assignments``), which makes it
-``assigned``.
+``assigned``. A heading a person names is a heading for the scan too: a named subsection after an
+assigned numbered section is found inside it.
 
 Text. The SmPC ends where a line is the registry's own end of it (``SMPC_END``, "ANNEX II"): a
 file of the whole product information goes on with the labelling, which reuses section 1's line,
@@ -51,7 +52,7 @@ from __future__ import annotations
 
 import itertools
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from label_docx.reader import Paragraph
@@ -60,7 +61,7 @@ from zone_a.qrd.check import is_statement
 from zone_a.qrd.headings import collapse, forms, index, match_heading
 from zone_a.qrd.registry import SMPC_END
 
-STRUCTURE_VERSION = "smpc-structure/1.2.0"
+STRUCTURE_VERSION = "smpc-structure/1.3.0"
 
 _NUMBER = re.compile(r"^(\d+(?:\.\d+)?)\.?\s+\S")
 _HEADING_STYLE = re.compile(r"Heading", re.IGNORECASE)
@@ -244,60 +245,101 @@ def structure(
     the first.
     """
     nodes = _nodes(registry, mapping)
-    by_key = {n["key"]: n for n in nodes}
-    order = {n["key"]: i for i, n in enumerate(nodes)}
     table = index(registry)
     root_title = collapse(nodes[0]["title"])
     named = {collapse(n["title"]): n for n in nodes if n["number"] is None and n["parent"]}
-    numbers = {n["number"]: n["key"] for n in nodes if n["number"] is not None}
 
-    found: list[tuple[int, str, str]] = []  # (paragraph, key, how): how = "found" or "assigned"
-    candidates: dict[str, list[dict[str, Any]]] = {}
-    current: str | None = None  # the numbered section the scan is in
+    def recognise(text: str, current: str | None) -> str | None:
+        hit = match_heading(text, table)
+        if hit is not None:
+            return hit.key
+        if text == root_title:
+            return str(nodes[0]["key"])
+        sub = named.get(text)
+        return str(sub["key"]) if sub is not None and sub["parent"] == current else None
+
     end = next((i for i, p in enumerate(paragraphs) if line(p) == collapse(SMPC_END)), None)
     start, shared = 0, None
     if part is not None:
         start, end, shared = part
+    return {
+        "structurer": STRUCTURE_VERSION,
+        "registryVersion": registry["registryVersion"],
+        "mappingVersion": mapping["mappingVersion"],
+        **find(paragraphs, nodes, recognise, start, end, shared, assignments),
+    }
+
+
+def find(
+    paragraphs: Sequence[Paragraph],
+    nodes: Sequence[Mapping[str, Any]],
+    recognise: Callable[[str, str | None], str | None],
+    start: int,
+    end: int | None,
+    shared: int | None,
+    assignments: Mapping[str, int] | None,
+    listed: frozenset[int] = frozenset(),
+) -> dict[str, Any]:
+    """The sections of a document's paragraphs from ``start`` to ``end`` (None: the last).
+
+    ``nodes`` are the template's sections in order (the root first), each with its key, parent,
+    number (None but for a numbered section), title, code and whether it is required;
+    ``recognise`` names the section a line is the heading of, given the numbered section the scan
+    is in, or None; ``shared`` is a root heading before ``start`` that the part shares; a paragraph
+    in ``listed`` is text, never a heading or a candidate. Statuses, candidates and assignments are
+    as the module docstring says.
+    """
+    by_key = {n["key"]: n for n in nodes}
+    order = {n["key"]: i for i, n in enumerate(nodes)}
+    numbers = {n["number"]: n["key"] for n in nodes if n["number"] is not None}
+
+    stop = len(paragraphs) if end is None else end
+    assigned: dict[int, str] = {}
+    for key, at in (assignments or {}).items():
+        if key not in by_key:
+            raise ValueError(f"no section {key} in the template")
+        if not start <= at < stop:
+            raise ValueError(f"no paragraph {at} in the SmPC")
+        if at in assigned:
+            raise ValueError(f"paragraph {at} is assigned twice")
+        assigned[at] = key
+
+    found: list[tuple[int, str, str]] = []  # (paragraph, key, how): how = "found" or "assigned"
+    candidates: dict[str, list[dict[str, Any]]] = {}
+    current: str | None = None  # the numbered section the scan is in
     if shared is not None:
         found.append((shared, nodes[0]["key"], "found"))
-    for i in range(start, len(paragraphs) if end is None else end):
+    for i in range(start, stop):
         paragraph = paragraphs[i]
         text = line(paragraph)
-        if not text:
-            continue
-        hit = match_heading(text, table)
+        hit = recognise(text, current) if text and i not in listed else None
+        if i in assigned:
+            # A person's heading is a heading for the scan too: a named section after an assigned
+            # numbered one is found inside it.
+            if hit is not None:
+                raise ValueError(f"paragraph {i} is already a heading")
+            hit = assigned[i]
+            found.append((i, hit, "assigned"))
+        elif hit is not None:
+            found.append((i, hit, "found"))
         if hit is not None:
-            found.append((i, hit.key, "found"))
-            current = hit.key
+            if by_key[hit]["number"] is not None:
+                current = hit
             continue
-        if text == root_title:
-            found.append((i, nodes[0]["key"], "found"))
-            continue
-        sub = named.get(text)
-        if sub is not None and sub["parent"] == current:
-            found.append((i, sub["key"], "found"))
+        if not text or i in listed:
             continue
         number = _NUMBER.match(text)
         if number is not None and number.group(1) in numbers:
-            key = numbers[number.group(1)]
-            candidates.setdefault(key, []).append({"paragraph": i, "why": "number"})
+            candidates.setdefault(numbers[number.group(1)], []).append(
+                {"paragraph": i, "why": "number"}
+            )
         elif paragraph.style is not None and _HEADING_STYLE.match(paragraph.style):
             where = current or nodes[0]["key"]
             candidates.setdefault(where, []).append({"paragraph": i, "why": "style"})
 
-    headings = {i for i, _, _ in found}
-    for key, at in (assignments or {}).items():
-        if key not in by_key:
-            raise ValueError(f"no section {key} in the template")
-        if not start <= at < (len(paragraphs) if end is None else end):
-            raise ValueError(f"no paragraph {at} in the SmPC")
-        if at in headings:
-            raise ValueError(f"paragraph {at} is already a heading")
-        if any(k == key for _, k, _ in found):
+    for key in set(assigned.values()):
+        if sum(1 for _, k, _ in found if k == key) > 1:
             raise ValueError(f"section {key} already has its heading")
-        found.append((at, key, "assigned"))
-        headings.add(at)
-    found.sort()
 
     seen: dict[str, int] = {}
     out_of_order: set[str] = set()
@@ -357,9 +399,6 @@ def structure(
         for status in ("mapped", "assigned", "missing", "absent", "duplicate", "order", "no-code")
     }
     return {
-        "structurer": STRUCTURE_VERSION,
-        "registryVersion": registry["registryVersion"],
-        "mappingVersion": mapping["mappingVersion"],
         "preamble": preamble,
         "start": start,
         "end": end,

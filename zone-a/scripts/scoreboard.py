@@ -1,7 +1,7 @@
 """How a set of Word SmPCs fares, label by label: read, structured, carried, drawn, and agreeing.
 
     uv run --frozen python scripts/scoreboard.py FOLDER [--keys KEYS] [--no-drawing]
-        [--view accepted|original] [--out FILE]
+        [--view accepted|original] [--document smpc|pl] [--out FILE]
 
 Each .docx in FOLDER is read with zone_a.certified, structured with zone_a.structure and built
 with zone_a.word_epi; where Chrome is installed and ``--no-drawing`` is not given, each carried
@@ -11,7 +11,10 @@ section of the same EMA code, as the label reader reads it, line by line (list l
 spaces collapsed); a key's sub-sections the template has no place for are read into their
 parent. An Annex I holding several SmPCs (``zone_a.structure.smpcs``) is counted over them all
 (``smpcs``), each structured and built on its own; it has no answer key, and one whose boundary
-a person must settle needs a person (``smpc-boundary``).
+a person must settle needs a person (``smpc-boundary``). With ``--document pl`` each file is
+read for its package leaflets instead (``zone_a.leaflet``), each structured and built on its own
+and counted together (``leaflets``), with no answer key; a file whose leaflet root line is not
+there once needs a person (``pl-root``).
 
 A document with tracked changes is refused unless a view is named; with ``--view`` it is
 measured by that view (``zone_a.certified.read_body``), as a person may import it (ADR 0006),
@@ -38,7 +41,7 @@ from label_docx import browser
 from label_docx.epi_output import read as read_epi
 from label_docx.reader import DocxRefusedError
 
-from zone_a import drawing, word_epi
+from zone_a import drawing, leaflet, word_epi
 from zone_a.canonical_json import canonical_json
 from zone_a.certified import read_body
 from zone_a.structure import smpcs, structure
@@ -46,6 +49,8 @@ from zone_a.structure import smpcs, structure
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = ROOT / "qrd" / "registry" / "cap-smpc-en-10.4.json"
 MAPPING = ROOT / "fhir" / "mappings" / "cap-smpc-en.json"
+LEAFLET_REGISTRY = ROOT / "qrd" / "registry" / "cap-pl-en-10.4.json"
+LEAFLET_MAPPING = ROOT / "fhir" / "mappings" / "cap-pl-en.json"
 _SPACE = re.compile("[ \t\n\u00a0]+")
 
 
@@ -86,7 +91,11 @@ def _key_lines(key: Mapping[str, Any], codes: set[str]) -> dict[str, list[str] |
 
 
 def score(
-    path: Path, keys: Path | None, chrome: Path | None, view: str | None = None
+    path: Path,
+    keys: Path | None,
+    chrome: Path | None,
+    view: str | None = None,
+    document: str = "smpc",
 ) -> dict[str, Any]:
     """One label's entry (the module docstring)."""
     data = path.read_bytes()
@@ -101,21 +110,32 @@ def score(
         except DocxRefusedError as again:
             return entry | {"outcome": "reader-refused", "code": again.code, "view": view}
         entry["view"] = view
-    registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
-    mapping = json.loads(MAPPING.read_text(encoding="utf-8"))
-    parts, why = smpcs(body.paragraphs, registry, mapping)
-    if why is not None:
-        return entry | {"outcome": "needs-a-person", "sections": ["smpc-boundary"]}
-    # One SmPC as before; several, each structured and built on its own, counted together.
-    several = len(parts) > 1
-    structures = [
-        structure(body.paragraphs, registry, mapping, None, part if several else None)
-        for part in parts
-    ]
+    if document == "pl":
+        registry = json.loads(LEAFLET_REGISTRY.read_text(encoding="utf-8"))
+        mapping = json.loads(LEAFLET_MAPPING.read_text(encoding="utf-8"))
+        parts, why = leaflet.leaflets(body.paragraphs, registry)
+        if why is not None:
+            return entry | {"outcome": "needs-a-person", "sections": ["pl-root"]}
+        several = len(parts) > 1
+        structures = [
+            leaflet.structure(body.paragraphs, registry, mapping, None, part) for part in parts
+        ]
+    else:
+        registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
+        mapping = json.loads(MAPPING.read_text(encoding="utf-8"))
+        parts, why = smpcs(body.paragraphs, registry, mapping)
+        if why is not None:
+            return entry | {"outcome": "needs-a-person", "sections": ["smpc-boundary"]}
+        # One SmPC as before; several, each structured and built on its own, counted together.
+        several = len(parts) > 1
+        structures = [
+            structure(body.paragraphs, registry, mapping, None, part if several else None)
+            for part in parts
+        ]
     summary = sum((Counter(s["summary"]) for s in structures), Counter[str]())
     entry["structure"] = {k: v for k, v in summary.items() if v}
     if several:
-        entry["smpcs"] = len(parts)
+        entry["smpcs" if document == "smpc" else "leaflets"] = len(parts)
     if not all(s["ready"] for s in structures):
         needs = [
             s["key"]
@@ -187,10 +207,13 @@ def main(argv: list[str] | None = None) -> int:
         "--view", choices=("accepted", "original"), help="measure a tracked document by this view"
     )
     parser.add_argument("--out", type=Path, help="write here instead of standard output")
+    parser.add_argument(
+        "--document", choices=("smpc", "pl"), default="smpc", help="the part each file is read for"
+    )
     arguments = parser.parse_args(argv)
     chrome = None if arguments.no_drawing else browser.find_chrome()
     entries = [
-        score(p, arguments.keys, chrome, arguments.view)
+        score(p, arguments.keys, chrome, arguments.view, arguments.document)
         for p in sorted(arguments.folder.glob("*.docx"))
     ]
     built = [e for e in entries if e["outcome"] == "built"]

@@ -85,6 +85,17 @@ COMPONENTS: dict[str, Component] = {
         "STRUCTURE_VERSION",
         ("src/zone_a/structure.py", "src/zone_a/qrd/headings.py", "src/zone_a/qrd/registry.py"),
     ),
+    "pl-structure": Component(
+        "zone_a.leaflet",
+        "LEAFLET_VERSION",
+        (
+            "src/zone_a/leaflet.py",
+            "src/zone_a/structure.py",
+            "src/zone_a/qrd/headings.py",
+            "src/zone_a/qrd/pattern.py",
+            "src/zone_a/qrd/registry.py",
+        ),
+    ),
     "word-epi": Component(
         "zone_a.word_epi",
         "WORD_EPI_VERSION",

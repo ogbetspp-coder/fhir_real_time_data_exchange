@@ -192,6 +192,18 @@ def test_a_named_subsection_counts_only_inside_its_section() -> None:
     assert at in result["smpc.4.3"]["paragraphs"]
 
 
+def test_a_named_subsection_after_an_assigned_heading_is_found() -> None:
+    paragraphs = _skeleton()
+    at = next(i for i, p in enumerate(paragraphs) if p.text.startswith("4.2"))
+    paragraphs[at] = _p("4.2 Posology and method of administration (adults)")
+    result = _by_key(structure(paragraphs, REGISTRY, MAPPING))
+    assert result["smpc.4.2"]["status"] == "missing"
+    assert result["smpc.4.2.posology"]["status"] == "missing"
+    result = _by_key(structure(paragraphs, REGISTRY, MAPPING, {"smpc.4.2": at}))
+    assert result["smpc.4.2"]["status"] == "assigned"
+    assert result["smpc.4.2.posology"]["status"] == "mapped"
+
+
 @pytest.mark.parametrize(
     ("assignments", "message"),
     [
