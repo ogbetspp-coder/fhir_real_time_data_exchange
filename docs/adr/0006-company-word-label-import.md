@@ -75,15 +75,18 @@ The record does not admit this today, for reasons this ADR has to answer rather 
 
 3. **The narrative builder, with closed lists.** Nothing is added, reordered or reworded.
    - **Text:** one `p` per paragraph.
-   - **Marks:** bold, italic, superscript and subscript become `b`, `i`, `sup` and `sub`. An
+   - **Marks:** bold, italic, superscript and subscript become `strong`, `em`, `sup` and `sub`
+     (amended 2026-10-05 from `b` and `i`: the EMA ePI style guide's elements; both pass the
+     validator). An
      underline is unwrapped where it cannot change the text (`zone_a.underline`) and refuses the
      section where it can.
    - **The template's own formatting:** shading and highlight are dropped only where the registry
      names them exactly. That is a list of one: the 4.8 reporting statement. Any other strike,
      faint text, highlight, shading or right-to-left text refuses the section.
-   - **Lists:** `ol` or `ul` only where the labels Word draws are exactly that list type's
-     sequence, from a closed list of bullet glyphs. A label such as "a)", which no HTML list
-     draws, refuses the section, and so does an empty numbered paragraph.
+   - **Lists:** `ul` for "•", and `ol` only for "1.", "2.", ... from one (amended 2026-10-05:
+     FHIR's narrative rule txt-1 allows no `start` or `type` on `ol`, and the official validator
+     with the EMA profiles refuses both, so any other numbering, "a)" or "3." included, refuses the
+     section), and so does an empty numbered paragraph.
    - **Pictures:** a picture is carried as a `data:` URI of its PNG or JPEG bytes (by signature)
      only if Word draws it uncropped and at no more than its own size. Any other picture, and any
      floating picture, shape, frame or floating table, refuses the section.

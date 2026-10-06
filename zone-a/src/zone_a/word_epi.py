@@ -16,8 +16,8 @@ Two outputs, written by separate code from the same read, so that the fidelity c
 - ``narrative`` (decision 3): an XHTML div. A paragraph is a ``p``; a run of list paragraphs is a
   ``ul`` or an ``ol``; a table is a ``table`` of ``tr`` and ``td`` with ``colspan`` and
   ``rowspan`` (each merged cell's rows worked out from Word's grid); a line break is ``br``;
-  bold, italic, superscript and subscript are ``b``, ``i``, ``sup`` and ``sub``. The div must
-  pass the fidelity scanner (``zone_a.fidelity.xhtml``).
+  bold, italic, superscript and subscript are ``strong``, ``em``, ``sup`` and ``sub`` (the EMA ePI
+  style guide's elements). The div must pass the fidelity scanner (``zone_a.fidelity.xhtml``).
 - ``page`` (decision 2): the section's text as section 7 of the fidelity specification writes a
   page. It begins with a line break, as the scanner's text does, and each paragraph is a line:
   the list label Word draws and a space (in a table cell a bullet is left out), then the text,
@@ -42,10 +42,10 @@ else, with the code in parentheses:
   other punctuation and symbols that no rule there reads as a number or a sign (categories Po,
   So, Pi, Pf, Pc, Zs), and lowered only, infinity and one half (as fidelity-norm/3.1.0 keeps
   them in ``sub``); anything else (``script``);
-- lists: a bullet "•", or an ordinal with a full stop whose labels are exactly the sequence an
-  ``ol`` of one type draws (decimal, letters, roman), followed by a tab or a space
-  (``list-label``); one list level in the section, since nesting is not carried
-  (``list-level``); no paragraph that draws a label and holds no text (``empty-numbered``);
+- lists: a bullet "•", or "1.", "2.", ... from one, followed by a tab or a space (``list-label``;
+  FHIR's narrative rule allows no ``start`` or ``type`` on ``ol``, so no other numbering); one
+  list level in the section, since nesting is not carried (``list-level``); no paragraph that
+  draws a label and holds no text (``empty-numbered``);
 - tables: one level, with Word's grid on record, no grid columns left out at a row's ends, and
   every vertically merged cell under a cell of the same columns that starts or continues the
   merge, with no text of its own (``table-grid``, ``table-shape``, ``nested-table``); no row of
@@ -78,7 +78,6 @@ from __future__ import annotations
 import base64
 import binascii
 import dataclasses
-import functools
 import hashlib
 import itertools
 import unicodedata
@@ -97,7 +96,7 @@ from zone_a.underline import is_underline_letter, underline_changes
 # The narrative builder's and the page serialiser's version: one, as they are one closed list.
 WORD_EPI_VERSION: Final = "word-epi/1.0.0"
 
-CARRIED: Final = {"bold": "b", "italic": "i", "superscript": "sup", "subscript": "sub"}
+CARRIED: Final = {"bold": "strong", "italic": "em", "superscript": "sup", "subscript": "sub"}
 # Section 3 step 4's bullet glyphs: a list bullet in page text, removed at a line start.
 BULLETS: Final = frozenset("\u2022\u2023\u25a0\u25a1\u25aa\u25ab\u25cb\u25cf\u25e6")
 # The only bullet an unstyled ``ul`` draws at the top level.
@@ -413,35 +412,18 @@ def _inline(paragraph: Paragraph, marks: Sequence[Mark], images: Mapping[str, by
     return "".join(out)
 
 
-@functools.cache
-def _ordinals(kind: str) -> dict[str, int]:
-    """Every marker an ``ol`` of this type draws (without ". "), and its ordinal."""
-    span = range(-999, 10000) if kind == "1" else range(1, 4000)
-    return {list_marker(kind, n)[:-2]: n for n in span}
-
-
 def _list(index: int, labels: Sequence[str]) -> str:
-    """The start tag of the list whose drawn markers are exactly ``labels``."""
+    """The start tag of the list whose drawn markers are exactly ``labels``.
+
+    A ``ul`` for bullets ("•"), and an ``ol`` only for "1.", "2.", ... from one: FHIR's narrative
+    rule (txt-1) allows neither ``start`` nor ``type`` on ``ol``, so a list that starts elsewhere or
+    counts otherwise is refused.
+    """
     if all(label == DISC for label in labels):
         return "<ul>"
-    # Every type whose markers these are; several can be (a lone "i." is roman 1 or letter 9),
-    # and each draws the same, so the one with the smallest start is taken.
-    found = sorted(
-        (start, n, kind)
-        for n, kind in enumerate(("1", "a", "A", "i", "I"))
-        if labels[0].endswith(".")
-        and (start := _ordinals(kind).get(labels[0][:-1])) is not None
-        and all(list_marker(kind, start + i) == label + " " for i, label in enumerate(labels))
-    )
-    if found:
-        start, _, kind = found[0]
-        return (
-            "<ol"
-            + ("" if kind == "1" else f' type="{kind}"')
-            + ("" if start == 1 else f' start="{start}"')
-            + ">"
-        )
-    raise RefusedError("list-label", index, "labels no unstyled HTML list draws")
+    if all(list_marker("1", n + 1) == label + " " for n, label in enumerate(labels)):
+        return "<ol>"
+    raise RefusedError("list-label", index, "labels an HTML list without start or type draws")
 
 
 def _flow(indices: Sequence[int], body: Body, marks: Mapping[int, list[Mark]]) -> str:

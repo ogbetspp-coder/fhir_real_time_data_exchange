@@ -110,7 +110,7 @@ def test_a_paragraph_carries_its_marks_and_folds_raised_digits_on_the_page() -> 
         _p("H2O a<b & c", (1, 2, "subscript")),
     )
     assert _inner(div) == (
-        "<p><b>Ta</b><b><i>ke</i></b><i> 10</i> <sup>9</sup>/l now</p>"
+        "<p><strong>Ta</strong><strong><em>ke</em></strong><em> 10</em> <sup>9</sup>/l now</p>"
         "<p>H<sub>2</sub>O a&lt;b &amp; c</p>"
     )
     assert text == "\nTake 10 \u2079/l now\nH\u2082O a<b & c\n"
@@ -128,22 +128,24 @@ def test_lists_are_the_html_list_that_draws_their_labels() -> None:
         _p("a", label="\u2022"),
         _p("b", label="\u2022"),
         _p("between"),
-        _p("c", label="3.", num=2),
-        _p("d", label="4.", num=2),
-        _p("e", label="b.", num=3),
-        _p("f", label="ii.", num=4),
-        _p("g", label="iii.", num=4),
-        _p("h", label="I.", num=5),
+        _p("c", label="1.", num=2),
+        _p("d", label="2.", num=2),
     )
     assert _inner(div) == (
-        "<ul><li>a</li><li>b</li></ul><p>between</p>"
-        '<ol start="3"><li>c</li><li>d</li></ol>'
-        '<ol type="a" start="2"><li>e</li></ol>'
-        '<ol type="i" start="2"><li>f</li><li>g</li></ol>'
-        '<ol type="I"><li>h</li></ol>'
+        "<ul><li>a</li><li>b</li></ul><p>between</p><ol><li>c</li><li>d</li></ol>"
     )
-    assert text == "\n\u2022 a\n\u2022 b\nbetween\n3. c\n4. d\nb. e\nii. f\niii. g\nI. h\n"
+    assert text == "\n\u2022 a\n\u2022 b\nbetween\n1. c\n2. d\n"
     assert _same(div, text)
+
+
+@pytest.mark.parametrize(
+    "labels", [["3.", "4."], ["a.", "b."], ["i.", "ii."], ["I."], ["1.", "3."]]
+)
+def test_a_list_fhir_cannot_number_is_refused(labels: list[str]) -> None:
+    """FHIR's narrative rule (txt-1) allows no ``start`` or ``type`` on ``ol``."""
+    with pytest.raises(RefusedError) as refused:
+        _build(*(_p(f"item {n}", label=label) for n, label in enumerate(labels)))
+    assert refused.value.code == "list-label"
 
 
 def test_a_table_carries_its_grid() -> None:
@@ -229,6 +231,7 @@ def test_the_templates_grey_is_left_out_only_where_the_registry_names_it() -> No
         (_p("x", label="a)"), "list-label"),
         (_p("x", label="-"), "list-label"),
         (_p("x", label="01."), "list-label"),
+        (_p("x", label="2."), "list-label"),
         (_p("x", comments=(CommentReference(0, 1),)), "comment"),
         (_p("x", mark_hidden=True), "hidden-mark"),
     ],
@@ -427,7 +430,7 @@ def test_whatever_is_not_refused_the_scanner_reads_as_the_page() -> None:
             continue
         assert scanned == normalize_text(text)
     # The run must reach both outcomes often enough to mean something.
-    assert outcomes["carried"] > 500
+    assert outcomes["carried"] > 250
     assert sum(outcomes.values()) - outcomes["carried"] > 500
 
 
