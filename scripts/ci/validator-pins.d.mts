@@ -4,7 +4,9 @@
 export const PACKAGE_LOCK: string;
 export const HERMETIC_PROPERTIES: readonly string[];
 
-export type SidecarArtefact = { file: string; url: string; sha256: string };
+// A download carries its URL; the repository's own package, copied from the build context, its
+// path in the repository.
+export type SidecarArtefact = { file: string; url?: string; path?: string; sha256: string };
 
 export type SidecarPins = {
   version: string;
@@ -35,3 +37,12 @@ export type OfflineStartVerdict = {
   evidence: string[];
 };
 export function offlineStartVerdict(lines: readonly string[]): OfflineStartVerdict;
+export type ValidatorWarning = { location: string; message: string };
+export function validatorWarnings(lines: readonly string[]): ValidatorWarning[];
+export type FileWarning = ValidatorWarning & { file: string };
+export type AllowedWarning = FileWarning & { reason: string };
+export function readWarningAllowlist(file: string): AllowedWarning[];
+export function warningVerdict(
+  found: readonly FileWarning[],
+  allowlist: readonly AllowedWarning[],
+): { unlisted: FileWarning[]; stale: AllowedWarning[] };

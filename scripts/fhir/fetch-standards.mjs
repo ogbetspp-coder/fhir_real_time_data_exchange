@@ -106,6 +106,10 @@ if (args.path !== undefined) {
   const destination = path.resolve(args.dest);
   await mkdir(destination, { recursive: true });
   for (const artifact of wanted) {
+    if (artifact.url === undefined) {
+      console.log(`${artifact.name}: in the repository at ${artifact.path}, not fetched`);
+      continue;
+    }
     const output = path.join(destination, outputName(artifact));
     const relative = path.relative(process.cwd(), output);
     if ((await sha256File(output)) === artifact.sha256) {

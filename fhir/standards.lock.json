@@ -47,6 +47,13 @@
       "usedBy": ["bootstrap"]
     },
     {
+      "name": "ema-flow ePI definitions package",
+      "package": "dev.khs.fhir.epi#0.1.0",
+      "path": "fhir/generated/dev.khs.fhir.epi.tgz",
+      "sha256": "368f98f10d82ef196ed97db4c1107513789e5dba9f7873c95fd647a47e2e35ff",
+      "status": "own"
+    },
+    {
       "name": "EMA EPI-23-1022 English commented sample",
       "url": "https://epi.ema.europa.eu/fhirig/1.0.0/EPI-23-1022-sample-english.zip",
       "sha256": "69631b7887b136490cdee07b74075d849e4024064f3354e7b1c8bfcbee29e51d",

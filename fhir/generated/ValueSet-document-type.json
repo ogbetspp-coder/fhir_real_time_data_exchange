@@ -1,0 +1,19 @@
+{
+  "resourceType": "ValueSet",
+  "id": "document-type",
+  "url": "https://khs.dev/fhir/ValueSet/document-type",
+  "version": "0.1.0",
+  "status": "active",
+  "experimental": true,
+  "name": "DocumentTypeAll",
+  "title": "Document type: all codes",
+  "description": "Every code of https://khs.dev/fhir/CodeSystem/document-type.",
+  "compose": {
+    "include": [
+      {
+        "system": "https://khs.dev/fhir/CodeSystem/document-type",
+        "version": "0.1.0"
+      }
+    ]
+  }
+}

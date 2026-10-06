@@ -23,7 +23,7 @@ import { readPackageLock } from "../scripts/ci/validator-pins.mjs";
 // fhir/standards.lock.json pins, each with the SHA-256 of its tarball, and the validator image's
 // digest, not literals and not a free-form environment variable.
 
-type LockArtifact = { name: string; package?: string; url: string; sha256: string };
+type LockArtifact = { name: string; package?: string; url?: string; sha256: string };
 const lock = JSON.parse(readFileSync(STANDARDS_LOCK, "utf8")) as { artifacts: LockArtifact[] };
 
 let mapping: EmaMapping;
@@ -89,8 +89,10 @@ describe("the pinned standards", () => {
       ...fromStandards,
       ...validatorLock.filter(({ package: ref }) => !fromStandards.some((p) => p.package === ref)),
     ]);
-    // The count the validator's own Package Summary reported on 2026-09-28.
-    expect(pinnedPackages()).toHaveLength(12);
+    // The count the validator's own Package Summary reported on 2026-10-05: twelve since
+    // 2026-09-28, and the repository's own package.
+    expect(pinnedPackages()).toHaveLength(13);
+    expect(pinnedPackage(pinnedPackages(), "dev.khs.fhir.epi")).toBe("dev.khs.fhir.epi#0.1.0");
     const terminology = pinnedPackages().filter(({ package: ref }) =>
       ref.startsWith("hl7.terminology.r5#"),
     );
@@ -120,6 +122,14 @@ describe("the pinned standards", () => {
       [{ name: "a", package: "x.y#1.0.0", url: "http://example.org/p" }],
     ],
     ["an artifact without a SHA-256", [{ name: "a", package: "x.y#1.0.0", sha256: "" }]],
+    [
+      "an artifact with neither a URL nor a path",
+      [{ name: "a", package: "x.y#1.0.0", url: undefined }],
+    ],
+    [
+      "an artifact with both a URL and a path",
+      [{ name: "a", package: "x.y#1.0.0", path: "fhir/p.tgz" }],
+    ],
   ])("refuse a lock with %s", (_, artifacts) => {
     const file = writeLock(
       artifacts.map((artifact) => ({

@@ -1,0 +1,20 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "document-type",
+  "url": "https://khs.dev/fhir/CodeSystem/document-type",
+  "version": "0.1.0",
+  "status": "active",
+  "experimental": true,
+  "name": "DocumentType",
+  "title": "Document type",
+  "description": "The type of a canonical record's Composition.",
+  "caseSensitive": true,
+  "valueSet": "https://khs.dev/fhir/ValueSet/document-type",
+  "content": "complete",
+  "concept": [
+    {
+      "code": "smpc",
+      "display": "Summary of Product Characteristics"
+    }
+  ]
+}

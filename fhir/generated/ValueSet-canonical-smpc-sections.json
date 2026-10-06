@@ -1,0 +1,19 @@
+{
+  "resourceType": "ValueSet",
+  "id": "canonical-smpc-sections",
+  "url": "https://khs.dev/fhir/ValueSet/canonical-smpc-sections",
+  "version": "1.3.0",
+  "status": "active",
+  "experimental": true,
+  "name": "CanonicalSmpcSectionsAll",
+  "title": "Canonical SmPC sections: all codes",
+  "description": "Every code of https://khs.dev/fhir/CodeSystem/canonical-smpc-sections.",
+  "compose": {
+    "include": [
+      {
+        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+        "version": "1.3.0"
+      }
+    ]
+  }
+}

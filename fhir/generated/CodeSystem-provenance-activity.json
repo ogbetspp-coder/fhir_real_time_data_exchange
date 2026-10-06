@@ -1,0 +1,24 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "provenance-activity",
+  "url": "https://khs.dev/fhir/CodeSystem/provenance-activity",
+  "version": "0.1.0",
+  "status": "active",
+  "experimental": true,
+  "name": "ProvenanceActivity",
+  "title": "Provenance activity",
+  "description": "What an ingestion Provenance records (src/fhir/provenance.ts).",
+  "caseSensitive": true,
+  "valueSet": "https://khs.dev/fhir/ValueSet/provenance-activity",
+  "content": "complete",
+  "concept": [
+    {
+      "code": "structuring",
+      "display": "Structuring of a drawn document, attested by an approver"
+    },
+    {
+      "code": "authority-import",
+      "display": "Import of an authority's published ePI"
+    }
+  ]
+}

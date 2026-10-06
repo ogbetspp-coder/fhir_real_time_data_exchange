@@ -1,0 +1,62 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "ext-approval-content-sha256",
+  "url": "https://khs.dev/fhir/StructureDefinition/ext-approval-content-sha256",
+  "version": "0.1.0",
+  "name": "ApprovalContentSha256",
+  "title": "Approved content SHA-256",
+  "status": "active",
+  "experimental": true,
+  "description": "The SHA-256 of the content an approval covers (the canonical submission's approval.approvedContentSha256), as 64 lowercase hexadecimal digits.",
+  "fhirVersion": "5.0.0",
+  "kind": "complex-type",
+  "abstract": false,
+  "context": [
+    {
+      "type": "element",
+      "expression": "Provenance"
+    }
+  ],
+  "type": "Extension",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Extension",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Extension",
+        "path": "Extension",
+        "short": "Approved content SHA-256",
+        "definition": "The SHA-256 of the content an approval covers, as 64 lowercase hexadecimal digits.",
+        "constraint": [
+          {
+            "key": "khs-sha256-1",
+            "severity": "error",
+            "human": "The value is 64 lowercase hexadecimal digits",
+            "expression": "value.matches('^[0-9a-f]{64}$')",
+            "source": "https://khs.dev/fhir/StructureDefinition/ext-approval-content-sha256"
+          }
+        ]
+      },
+      {
+        "id": "Extension.extension",
+        "path": "Extension.extension",
+        "max": "0"
+      },
+      {
+        "id": "Extension.url",
+        "path": "Extension.url",
+        "fixedUri": "https://khs.dev/fhir/StructureDefinition/ext-approval-content-sha256"
+      },
+      {
+        "id": "Extension.value[x]",
+        "path": "Extension.value[x]",
+        "min": 1,
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      }
+    ]
+  }
+}

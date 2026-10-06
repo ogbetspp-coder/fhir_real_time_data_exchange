@@ -17,7 +17,8 @@ PORT="${1:-8090}"
 
 missing=()
 for artefact in validator_cli.jar terminology-package.tgz extensions-package.tgz \
-  global-epi-package.tgz ema-epi-package.tgz home/.fhir/packages/packages.ini; do
+  global-epi-package.tgz ema-epi-package.tgz khs-epi-package.tgz \
+  home/.fhir/packages/packages.ini; do
   [[ -f "${CACHE}/${artefact}" ]] || missing+=("$artefact")
 done
 
@@ -48,5 +49,6 @@ exec java -Xms768m -Xmx1536m \
   -ig "${CACHE}/extensions-package.tgz" \
   -ig "${CACHE}/global-epi-package.tgz" \
   -ig "${CACHE}/ema-epi-package.tgz" \
+  -ig "${CACHE}/khs-epi-package.tgz" \
   -tx n/a \
   -no-http-access

@@ -39,7 +39,7 @@ expect_config() { # <image> <user> <cmd as JSON>
 }
 expect_config ema-flow/worker:ci node '["node","dist/server.js"]'
 expect_config ema-flow/query:ci node '["node","dist/query/server.js"]'
-expect_config ema-flow/validator:ci validator '["server","8090","-allowNetworkAccess","-version","5.0.0","-jurisdiction","uv","-locale","en-US","-ig","/opt/fhir/terminology-package.tgz","-ig","/opt/fhir/extensions-package.tgz","-ig","/opt/fhir/global-epi-package.tgz","-ig","/opt/fhir/ema-epi-package.tgz","-tx","n/a","-no-http-access"]'
+expect_config ema-flow/validator:ci validator '["server","8090","-allowNetworkAccess","-version","5.0.0","-jurisdiction","uv","-locale","en-US","-ig","/opt/fhir/terminology-package.tgz","-ig","/opt/fhir/extensions-package.tgz","-ig","/opt/fhir/global-epi-package.tgz","-ig","/opt/fhir/ema-epi-package.tgz","-ig","/opt/fhir/khs-epi-package.tgz","-tx","n/a","-no-http-access"]'
 
 # The standards the worker's manifest names, read inside the image as the pipeline reads them.
 docker run --rm --network none ema-flow/worker:ci node --input-type=module -e '

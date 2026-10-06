@@ -590,7 +590,12 @@ the branch that never builds a cloud client, so it needs no token and writes not
 
 All external packages, examples, and validator binaries are recorded in
 [fhir/standards.lock.json](fhir/standards.lock.json). Downloaded artifacts are checksum
-verified and excluded from git.
+verified and excluded from git. The repository's own definitions (the `https://khs.dev/fhir/` code
+systems and value sets, the approval-content extension, the ConceptMap and the StructureMap) are a
+FHIR package, `dev.khs.fhir.epi#0.1.0`, that `npm run artifacts:generate` builds byte for byte
+reproducibly into `fhir/generated/dev.khs.fhir.epi.tgz`. It is committed, pinned by SHA-256 in the
+lock and `Dockerfile.validator`, and loaded by the official validator as a fifth package; the FHIR
+store does not import it.
 
 The current normative validation targets are:
 

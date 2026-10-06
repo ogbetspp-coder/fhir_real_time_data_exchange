@@ -1,7 +1,13 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { args, checksummedDownloads, instructions, SHA256_HEX } from "./dockerfile.mjs";
+import {
+  args,
+  checksummedCopies,
+  checksummedDownloads,
+  instructions,
+  SHA256_HEX,
+} from "./dockerfile.mjs";
 
 // Reading the official validator's pins from the files that define them, so that the CI gate
 // (scripts/ci/official-validate.mjs) and the deployed sidecar (Dockerfile.validator) cannot
@@ -11,8 +17,9 @@ import { args, checksummedDownloads, instructions, SHA256_HEX } from "./dockerfi
 export const PACKAGE_LOCK = "fhir/validator-packages.lock";
 const REGISTRY = "https://packages2.fhir.org/packages";
 
-// The pins: the ARGs, the checksummed downloads of the RUN instruction (scripts/ci/dockerfile.mjs)
-// and the sidecar's validator flags from the CMD line. Each is required; a Dockerfile that has
+// The pins: the ARGs, the checksummed downloads of the RUN instruction and the checksummed copies
+// from the build context (scripts/ci/dockerfile.mjs), and the sidecar's validator flags from the
+// CMD line. Each is required; a Dockerfile that has
 // drifted from this shape fails here rather than being silently half-read.
 export function readSidecarPins(dockerfile) {
   const lines = instructions(readFileSync(dockerfile, "utf8")).map(({ text }) => text);
@@ -20,7 +27,10 @@ export function readSidecarPins(dockerfile) {
 
   const declared = args(lines, name);
   if (declared.size === 0) throw new Error(`${name}: no ARG name=value line could be parsed`);
-  const artefacts = checksummedDownloads(lines, declared, name);
+  const artefacts = [
+    ...checksummedDownloads(lines, declared, name),
+    ...checksummedCopies(lines, declared, name),
+  ];
   const jar = artefacts.find(({ file }) => file === "validator_cli.jar");
   if (jar === undefined) throw new Error(`${name}: no checksummed validator_cli.jar download`);
 
@@ -55,7 +65,9 @@ export function readSidecarPins(dockerfile) {
       if (typeof value !== "string") throw new Error(`${name}: CMD -ig has no value`);
       const file = path.posix.basename(value);
       if (!artefacts.some((artefact) => artefact.file === file)) {
-        throw new Error(`${name}: CMD loads ${value}, which the RUN line does not download`);
+        throw new Error(
+          `${name}: CMD loads ${value}, which is neither downloaded nor copied with a checksum`,
+        );
       }
       packages.push(file);
       index += 1;
@@ -72,7 +84,7 @@ export function readSidecarPins(dockerfile) {
     .map(({ file }) => file);
   for (const [list, where] of [
     [packages, "CMD loads"],
-    [expectedPackages, "the RUN line downloads"],
+    [expectedPackages, "the image checksums"],
   ]) {
     const repeated = list.filter((file, index) => list.indexOf(file) !== index);
     if (repeated.length > 0) {
@@ -82,7 +94,7 @@ export function readSidecarPins(dockerfile) {
   const unloaded = expectedPackages.filter((file) => !packages.includes(file));
   if (unloaded.length > 0 || packages.length !== expectedPackages.length) {
     throw new Error(
-      `${name}: CMD loads ${packages.length} packages but the RUN line downloads ${expectedPackages.length}; not loaded: ${unloaded.join(", ") || "none"}`,
+      `${name}: CMD loads ${packages.length} packages but the image checksums ${expectedPackages.length}; not loaded: ${unloaded.join(", ") || "none"}`,
     );
   }
 
@@ -214,6 +226,51 @@ export function packageSummary(lines) {
     .split(",")
     .map((entry) => entry.trim())
     .filter((entry) => entry !== "");
+}
+
+// The warnings of a validator run, each as { location, message }: the "Warning @" lines, the
+// location without its line and column, which move whenever the emitted JSON's layout does.
+const WARNING_LINE = /^\s*Warning @ (.+?)(?: \(line \d+, col\s*\d+\))?: (.*)$/;
+export function validatorWarnings(lines) {
+  return lines.flatMap((line) => {
+    const match = WARNING_LINE.exec(line);
+    return match === null ? [] : [{ location: match[1], message: match[2].trim() }];
+  });
+}
+
+// The reviewed warnings (scripts/ci/official-validation-warnings.json): each entry a file of the
+// validation set, a location and a message exactly as validatorWarnings reads them, and the reason
+// it is accepted. A malformed or repeated entry is refused.
+export function readWarningAllowlist(file) {
+  const entries = JSON.parse(readFileSync(file, "utf8"));
+  if (!Array.isArray(entries)) throw new Error(`${path.basename(file)} is not a list`);
+  const seen = new Set();
+  for (const entry of entries) {
+    const fields = ["file", "location", "message", "reason"];
+    if (
+      Object.keys(entry ?? {}).length !== fields.length ||
+      !fields.every((field) => typeof entry[field] === "string" && entry[field] !== "")
+    ) {
+      throw new Error(`${path.basename(file)}: an entry is not { ${fields.join(", ")} }`);
+    }
+    const key = warningKey(entry);
+    if (seen.has(key)) throw new Error(`${path.basename(file)}: ${key} is listed twice`);
+    seen.add(key);
+  }
+  return entries;
+}
+
+const warningKey = ({ file, location, message }) => JSON.stringify([file, location, message]);
+
+// The warnings no entry allows, and the entries no warning matched (stale): both fail the gate, so
+// the list stays exactly what the validator says.
+export function warningVerdict(found, allowlist) {
+  const allowed = new Set(allowlist.map(warningKey));
+  const seen = new Set(found.map(warningKey));
+  return {
+    unlisted: found.filter((warning) => !allowed.has(warningKey(warning))),
+    stale: allowlist.filter((entry) => !seen.has(warningKey(entry))),
+  };
 }
 
 // The verdict on the validator image started with no network at all (cloudbuild.images.yaml,

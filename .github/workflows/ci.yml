@@ -60,8 +60,10 @@ jobs:
       - name: Build
         run: npm run build
 
-  # The official HL7 validator over the resources a fixture run and an authority import send it, and
-  # the published ConceptMap and StructureMap (fhir/generated/), at the pins of
+  # The official HL7 validator over the resources a fixture run and an authority import send it, the
+  # Provenance a document run persists, and the repository's own definitions (fhir/generated/,
+  # also loaded as a package), failing on an error or on a warning not in
+  # scripts/ci/official-validation-warnings.json, at the pins of
   # Dockerfile.validator (scripts/ci/official-validate.mjs reads the version, URLs, checksums
   # and flags from that file, so this job has no pin of its own). It is its own job rather than
   # part of `npm run check` because it needs a JVM and ~200 MB of downloads; the downloads are
