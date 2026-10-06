@@ -25,6 +25,8 @@ each with its EMA code, flagging what only a person can confirm (`scripts/struct
 each with its narrative and page text or the reason a closed list refuses it, and
 `zone_a.drawing` holds each narrative to what Chrome draws (ADR 0006, `scripts/epi_from_word.py`,
 tested on five SmPCs Word wrote from the EMA's ePIs, `tests/fixtures/word-smpc/`);
+`zone_a.product` takes a label's EU authorisation numbers by their strict format and proposes its
+name and holder from its own text, for a person to confirm once per product (ADR 0006 decision 5);
 `zone_a.implementation` finds what changed between two CCDS versions and whether each label's text
 carries the new wording, the old, both or neither (`scripts/check_implementation.py`,
 `docs/design/ccds-implementation-check.md`).

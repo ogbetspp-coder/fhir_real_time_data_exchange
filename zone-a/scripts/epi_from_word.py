@@ -10,7 +10,8 @@ scripts/structure_label.py) and built with zone_a.word_epi; where Chrome is inst
 ``--no-drawing``), is refused. The result is written as canonical JSON to
 FILE, or to standard output, with the file's SHA-256 and every version that decided it. A file
 the reader refuses, or one with a floating object, gives its refusal; a structure a person must
-still confirm gives the structure alone (``ready`` false). See ADR 0006.
+still confirm gives the structure alone (``ready`` false), with ``product``, what the label says
+it is for (zone_a.product). See ADR 0006.
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ from typing import Any
 from label_docx import browser, output, reader
 from label_docx.reader import DocxRefusedError
 
-from zone_a import drawing, word_epi
+from zone_a import drawing, product, word_epi
 from zone_a.canonical_json import canonical_json
 from zone_a.certified import read_body
 from zone_a.structure import structure
@@ -57,6 +58,8 @@ def build(data: bytes, assignments: dict[str, int], chrome: Path | None) -> dict
     mapping = json.loads(MAPPING.read_text(encoding="utf-8"))
     structured = structure(body.paragraphs, registry, mapping, assignments)
     result["structure"] = structured
+    # Who it is for, from its sections 1, 7 and 8, for a person to confirm (zone_a.product).
+    result["product"] = product.propose(body.paragraphs, structured)
     if not structured["ready"]:
         return result
     try:
