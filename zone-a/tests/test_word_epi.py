@@ -32,13 +32,12 @@ from zone_a.certified import Body, read_body
 from zone_a.fidelity.normalize import normalize_text
 from zone_a.fidelity.xhtml import xhtml_to_text
 from zone_a.structure import structure
-from zone_a.word_epi import ROOT, RefusedError, _greys, _section, blank, sections
+from zone_a.word_epi import GREY_SPAN, ROOT, RefusedError, _section, blank, sections
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 REGISTRY = json.loads((REPOSITORY / "qrd/registry/cap-smpc-en-10.4.json").read_text("utf-8"))
 MAPPING = json.loads((REPOSITORY / "fhir/mappings/cap-smpc-en.json").read_text("utf-8"))
 TEMPLATE = REPOSITORY / "qrd/sources/qrd-product-information-template-version-104_en.docx"
-GREYS = _greys(REGISTRY)
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _SPEC = importlib.util.spec_from_file_location(
     "word_fixtures", Path(__file__).parents[1] / "scripts" / "word_fixtures.py"
@@ -85,12 +84,11 @@ def _grid(
 def _build(
     *paragraphs: Paragraph,
     tables: tuple[dict[str, Any], ...] = (),
-    key: str = "smpc.4.1",
     images: dict[str, bytes] | None = None,
 ) -> tuple[str, str]:
     """The narrative and page of a section holding ``paragraphs``; refusals raise."""
     body = Body(tuple(paragraphs), tables, images=images or {})
-    div, text = _section(key, range(len(paragraphs)), body, GREYS)
+    div, text = _section(range(len(paragraphs)), body)
     return div or "", text
 
 
@@ -139,13 +137,68 @@ def test_lists_are_the_html_list_that_draws_their_labels() -> None:
 
 
 @pytest.mark.parametrize(
-    "labels", [["3.", "4."], ["a.", "b."], ["i.", "ii."], ["I."], ["1.", "3."]]
+    "labels",
+    [
+        ["3.", "4."],
+        ["a.", "b."],
+        ["i.", "ii."],
+        ["I."],
+        ["1.", "3."],
+        ["a)"],
+        ["-", "-"],
+        ["\u2013"],
+        ["o"],
+        ["\u25aa", "\u25aa"],
+        ["01."],
+        ["\u2022", "-"],
+    ],
 )
-def test_a_list_fhir_cannot_number_is_refused(labels: list[str]) -> None:
-    """FHIR's narrative rule (txt-1) allows no ``start`` or ``type`` on ``ol``."""
+def test_a_list_no_html_list_draws_is_written_as_its_labels(labels: list[str]) -> None:
+    """FHIR's narrative rule (txt-1) allows no ``start`` or ``type`` on ``ol``, and EMA's
+    stylesheet draws every ``ul`` with discs: each item is a ``p`` of its label as Word draws it."""
+    div, text = _build(*(_p(f"item {n}", label=label) for n, label in enumerate(labels)))
+    assert _inner(div) == "".join(f"<p>{label} item {n}</p>" for n, label in enumerate(labels))
+    assert text == "\n" + "".join(f"{label} item {n}\n" for n, label in enumerate(labels))
+    assert _same(div, text)
+
+
+def test_a_list_as_text_is_written_apart_from_the_lists_html_draws() -> None:
+    div, text = _build(
+        _p("a", label="\u2022"),
+        _p("b", label="-", num=2),
+        _p("c", label="1.", num=3),
+        _p("d", label="a)", num=4),
+    )
+    assert _inner(div) == "<ul><li>a</li></ul><p>- b</p><ol><li>c</li></ol><p>a) d</p>"
+    assert text == "\n\u2022 a\n- b\n1. c\na) d\n"
+    assert _same(div, text)
+    labels = ["\u2022", "-", "1.", "a)"]
+    paragraphs = [
+        _p(x, label=y, num=n) for n, (x, y) in enumerate(zip("abcd", labels, strict=True))
+    ]
+    body = Body(tuple(paragraphs), ())
+    assert word_epi.text_labels(range(4), body) == {1, 3}
+
+
+def test_a_label_as_text_is_escaped_and_marks_stay_on_the_text() -> None:
+    div, text = _build(_p("bold", (0, 4, "bold"), label="<a>"))
+    assert _inner(div) == "<p>&lt;a&gt; <strong>bold</strong></p>"
+    assert text == "\n<a> bold\n"
+    assert _same(div, text)
+
+
+def test_a_bullet_no_html_list_draws_in_a_cell_is_refused() -> None:
+    """The page leaves a step 4 bullet glyph out of a cell, so the narrative cannot write it."""
+    table = (_grid(1, [(0, 1, None)]),)
     with pytest.raises(RefusedError) as refused:
-        _build(*(_p(f"item {n}", label=label) for n, label in enumerate(labels)))
+        _build(_p("x", label="\u25aa", table=(0, 0, 0)), tables=table)
     assert refused.value.code == "list-label"
+    div, text = _build(_p("x", label="a)", table=(0, 0, 0)), tables=table)
+    assert _inner(div) == "<table><tr><td><p>a) x</p></td></tr></table>"
+    assert _same(div, text)
+    div, text = _build(_p("x", label="\u2022", table=(0, 0, 0)), tables=table)
+    assert _inner(div) == "<table><tr><td><ul><li>x</li></ul></td></tr></table>"
+    assert _same(div, text)
 
 
 def test_a_tab_after_a_bullet_glyph_that_begins_the_text_is_a_space() -> None:
@@ -154,21 +207,48 @@ def test_a_tab_after_a_bullet_glyph_that_begins_the_text_is_a_space() -> None:
     div, page = _build(_p("\u2022\tOnce a day"), _p("  \u25aa\tor twice"))
     assert _inner(div) == "<p>\u2022 Once a day</p><p>  \u25aa or twice</p>"
     assert page == "\n\u2022 Once a day\n  \u25aa or twice\n"
-    # Every other tab is still Word's jump to a tab stop: a second one, one before the bullet,
-    # one in the text, after a dash, after a list label, or in a table cell.
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        *("-", "\u2013", "\u2014", "*", "**", "\u2020", "\u2021\u2021", "\u00a7", "#"),
+        *("1.", "12)", "a)", "B.", "(c)", "(iv)", "ix.", "- ", "1. ", "\u2022 "),
+    ],
+)
+def test_a_tab_after_a_typed_label_is_a_space(label: str) -> None:
+    """Owner decisions of 2026-10-06: a dash, a footnote mark or "1.", "a)", "(iv)" typed before
+    a tab is a label, as a typed bullet is; the narrative and the page write its tab as a space."""
+    div, page = _build(_p(f"{label}\tTake once daily."))
+    assert _inner(div) == f"<p>{label} Take once daily.</p>"
+    assert page == f"\n{label} Take once daily.\n"
+    assert _same(div, page)
+
+
+def test_every_other_tab_is_refused() -> None:
+    # A tab is still Word's jump to a tab stop: a second one, one before the label, one in the
+    # text, after a bare letter or number (a column: "n<tab>= 50"), after a decimal, after a list
+    # label, or in a table cell.
     cell = (_grid(1, [(0, 1, None)]),)
     for paragraph, tables in (
         (_p("\u2022\t\tdouble"), ()),
         (_p("\t\u2022\tled"), ()),
+        (_p("\t- led"), ()),
         (_p("a \u2022\tb"), ()),
         (_p("\u2022\ta\tb"), ()),
-        (_p("-\tdash"), ()),
+        (_p("-\ta\tb"), ()),
+        (_p("n\t= 50"), ()),
+        (_p("1\tTake"), ()),
+        (_p("2.5\tmg"), ()),
+        (_p("Adults\t10 mg"), ()),
+        (_p("e.g.\tx"), ()),
         (_p("\u2022\tx", label="1."), ()),
         (_p("\u2022\tx", table=(0, 0, 0)), cell),
+        (_p("-\tx", table=(0, 0, 0)), cell),
     ):
         with pytest.raises(RefusedError) as refused:
             _build(paragraph, tables=tables)
-        assert refused.value.code == "tab"
+        assert refused.value.code == "tab", paragraph.text
 
 
 def test_a_table_carries_its_grid() -> None:
@@ -217,21 +297,35 @@ def test_an_underline_is_left_out_only_where_it_cannot_change_the_text() -> None
     assert refused.value.code == "underline"
 
 
-def test_the_templates_grey_is_left_out_only_where_the_registry_names_it() -> None:
-    statement = next(g for g in GREYS if g.section == "smpc.4.8")
-    grey = (statement.start, statement.end, "highlight-lightGray")
-    div, _ = _build(_p(statement.text, grey), key="smpc.4.8.reporting")
-    assert "highlight" not in div
+@pytest.mark.parametrize("kind", sorted(word_epi.GREY))
+def test_the_templates_grey_is_the_style_guides_silver_span(kind: str) -> None:
+    """The EMA ePI style guide's form for QRD "not printed" text (owner decision 2026-10-06)."""
+    div, text = _build(_p("Report it here", (7, 14, kind)))
+    assert _inner(div) == f"<p>Report {GREY_SPAN}it here</span></p>"
+    assert text == "\nReport it here\n"
+    assert _same(div, text)
+
+
+def test_the_grey_span_holds_the_other_marks() -> None:
+    """``sup`` and ``sub`` hold no element, so the span is outermost."""
+    div, text = _build(
+        _p("m2 dose", (0, 7, "shading-D9D9D9"), (1, 2, "superscript"), (3, 7, "bold"))
+    )
+    assert _inner(div) == (
+        f"<p>{GREY_SPAN}m</span>{GREY_SPAN}<sup>2</sup></span>{GREY_SPAN} </span>"
+        f"{GREY_SPAN}<strong>dose</strong></span></p>"
+    )
+    assert text == "\nm\u00b2 dose\n"
+    assert _same(div, text)
+
+
+@pytest.mark.parametrize(
+    "kind", ["highlight-darkGray", "shading-BFBFBF", "shading-D9D9D8", "highlight-yellow"]
+)
+def test_another_grey_or_colour_is_refused(kind: str) -> None:
     with pytest.raises(RefusedError) as refused:
-        _build(_p(statement.text, grey), key="smpc.4.7")
+        _build(_p("x", (0, 1, kind)))
     assert refused.value.code == "formatting"
-    with pytest.raises(RefusedError):
-        _build(_p(statement.text + " ", grey), key="smpc.4.8")
-    with pytest.raises(RefusedError):
-        _build(
-            _p(statement.text, (statement.start, statement.end + 1, "highlight-lightGray")),
-            key="smpc.4.8",
-        )
 
 
 @pytest.mark.parametrize(
@@ -251,10 +345,6 @@ def test_the_templates_grey_is_left_out_only_where_the_registry_names_it() -> No
         (_p("a\ufffcb"), "picture"),
         (_p("x\n\u2022 y"), "bullet-after-break"),
         (_p(" ", label="1."), "empty-numbered"),
-        (_p("x", label="a)"), "list-label"),
-        (_p("x", label="-"), "list-label"),
-        (_p("x", label="01."), "list-label"),
-        (_p("x", label="2."), "list-label"),
         (_p("x", comments=(CommentReference(0, 1),)), "comment"),
         (_p("x", mark_hidden=True), "hidden-mark"),
     ],
@@ -270,8 +360,10 @@ def test_a_list_that_changes_level_or_misses_a_number_is_refused() -> None:
         _build(_p("a", label="1."), _p("b", label="\u2022", level=1))
     assert refused.value.code == "list-level"
     with pytest.raises(RefusedError) as refused:
-        _build(_p("a", label="1."), _p("b", label="3."))
-    assert refused.value.code == "list-label"
+        _build(_p("a", label="1."), _p("b", label="3."), _p("c", label="2", level=1))
+    assert refused.value.code == "list-level"
+    div, _ = _build(_p("a", label="1."), _p("b", label="3."))
+    assert _inner(div) == "<p>1. a</p><p>3. b</p>"
 
 
 @pytest.mark.parametrize(
@@ -374,9 +466,9 @@ def test_the_qrd_template_carries_what_its_markup_allows() -> None:
     structured = structure(body.paragraphs, REGISTRY, MAPPING, {"smpc.6.5": 192, "smpc.6.6": 196})
     built = sections(body, structured, REGISTRY)
     codes = Counter((s["refusal"] or {}).get("code", "carried") for s in built["sections"])
-    # The template's guidance in angle brackets, its tabs and its "*"; its black triangle, drawn
-    # 0.9% out of its own proportions, is carried.
-    assert codes == {"carried": 25, "underline": 3, "tab": 2, "formatting": 2}
+    # The template's guidance in angle brackets and its tabs; its black triangle, drawn 0.9% out
+    # of its own proportions, and its grey (a silver span, from word-epi 1.3.0) are carried.
+    assert codes == {"carried": 27, "underline": 3, "tab": 2}
 
 
 # ---- the two outputs, held to each other ---------------------------------------------------------

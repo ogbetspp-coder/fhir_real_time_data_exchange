@@ -61,7 +61,8 @@ The record does not admit this today, for reasons this ADR has to answer rather 
 
    Adding a qualified source invalidates no existing output, so it is a **minor** version:
    `fidelity-norm/3.2.0` (amended 2026-10-05: the withheld design, which had reserved 3.2.0 and is
-   not built, takes 3.3.0, so versions are released in order; §8 now names this case). Its new
+   not built, takes 3.4.0, after 3.3.0's grey, so versions are released in order; §8 now names
+   this case). Its new
    vectors are reviewed by hand and the differential run covers them.
 
 2. **The page text is defined exactly**, by a stated serialiser in §7's form:
@@ -81,13 +82,16 @@ The record does not admit this today, for reasons this ADR has to answer rather 
      validator). An
      underline is unwrapped where it cannot change the text (`zone_a.underline`) and refuses the
      section where it can.
-   - **The template's own formatting:** shading and highlight are dropped only where the registry
-     names them exactly. That is a list of one: the 4.8 reporting statement. Any other strike,
-     faint text, highlight, shading or right-to-left text refuses the section.
+   - **The template's own formatting:** the QRD template's grey (a light grey highlight or D9D9D9
+     shading) is a `span` styled `background-color: silver;`, the EMA ePI style guide's form for
+     "not printed" text (amended 2026-10-06, owner decision 5 below; until then it was dropped
+     where the registry named it, the 4.8 reporting statement only). Any other strike, faint
+     text, highlight, shading or right-to-left text refuses the section.
    - **Lists:** `ul` for "•", and `ol` only for "1.", "2.", ... from one (amended 2026-10-05:
      FHIR's narrative rule txt-1 allows no `start` or `type` on `ol`, and the official validator
-     with the EMA profiles refuses both, so any other numbering, "a)" or "3." included, refuses the
-     section), and so does an empty numbered paragraph.
+     with the EMA profiles refuses both). Any other list, "a)", "–" or "3." included, is written as
+     Word draws it, each item a `p` of its label and its text (amended 2026-10-06, owner decision 6
+     below; until then it refused the section). An empty numbered paragraph refuses the section.
    - **Pictures:** a picture is carried as a `data:` URI of its PNG or JPEG bytes (by signature)
      only if Word draws it uncropped and at no more than its own size. Any other picture, and any
      floating picture, shape, frame or floating table, refuses the section.
@@ -195,6 +199,32 @@ The record does not admit this today, for reasons this ADR has to answer rather 
 4. **"(S)" in a template heading:** the template leaves singular or plural to the author, so
    "NUMBER(S)", "NUMBER" and "NUMBERS" are each the template's wording for section 8
    (`zone_a.qrd.headings`). The ePI carries the label's own wording, as decision 4 says.
+
+## Owner decisions (2026-10-06, evening)
+
+The owner took the recommendations of the Wave 3 brief for every item. Where the brief named no
+recommendation (dash bullets), the choice below is the one that keeps what Word draws.
+
+5. **The QRD template's grey:** carried as the EMA ePI style guide's `<span style="background-color:
+silver;">`, the one style `fidelity-norm/3.3.0` allows (§5, exactly that value, on `span`
+   only: a background under text in its own colour hides nothing). Silver is the colour of Word's
+   light grey highlight. The drawing check holds it to Chrome drawing that background under
+   exactly the grey characters (`zone_a.drawing`), where it was left out before. Any other
+   highlight or shading is still refused.
+6. **Lists an HTML list cannot draw:** EMA's stylesheet draws every `ul` with discs, and FHIR
+   allows no `start` or `type` on `ol`, so a dash bullet, "a)" or "(i)" numbering, or numbering
+   that does not start at one would be refused or drawn with another marker. Each such item is
+   written as Word draws it, a `p` of its label, a space and its text, as a typed label is: the
+   page already writes that line (§7), and the drawing check reads the label as the line's start.
+   Nesting is still refused (one list level in a section), and so is a non-disc bullet glyph in a
+   table cell, where the page leaves a bullet glyph out.
+7. **A tab after a typed label:** decision 1 above, widened. The tab after a label typed at the
+   start of a paragraph is written as a space: a bullet glyph or a dash, one to three of the same
+   footnote mark (`*`, `†`, `§`, ...), or an enumerator with its punctuation ("1.", "a)", "(iv)"),
+   outside a table and after no list label (§7, `fidelity-norm/3.3.0`). A bare letter or number
+   before a tab is no label ("n" then a tab then "= 50" is a column) and is still refused, as is
+   every other tab. On the EMA SmPC cuts it carries 228 of the 845 body paragraphs still refused
+   for a tab.
 
 ## Progress
 

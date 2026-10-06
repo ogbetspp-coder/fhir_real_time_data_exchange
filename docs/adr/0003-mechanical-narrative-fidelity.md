@@ -185,11 +185,12 @@ reader sees without the check seeing it._
 ## Amendment (2026-09-25, a withheld section)
 
 _Decided, not implemented (ADR 0002's amendment of the same date): `NORMALIZATION_VERSION` is
-`fidelity-norm/3.2.0`, which a certified Word source took (ADR 0006); this design takes 3.3.0._
+`fidelity-norm/3.3.0`: a certified Word source took 3.2.0 and its grey 3.3.0 (ADR 0006); this
+design takes 3.4.0._
 
 The fidelity check covers "every section that carries the code and a `text.div`" except a
 **withheld** section of an authority import (`docs/design/authority-import-withheld.md`), whose
-only text is a fixed notice that is not narrative: `fidelity-norm/3.3.0` gives the report a
+only text is a fixed notice that is not narrative: `fidelity-norm/3.4.0` gives the report a
 `withheld` status, binds the section in `narrativeBindingSha256` and refuses the notice anywhere
 else. A section is withheld only on the renderer gate's evidence, from the browser's exact advances, its
 painted pixels and the pinned fonts' ink bounds, that the authority's own drawing cannot be read as

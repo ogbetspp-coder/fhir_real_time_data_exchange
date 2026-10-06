@@ -19,8 +19,12 @@ Two outputs, written by separate code from the same read, so that the fidelity c
 - ``narrative`` (decision 3): an XHTML div. A paragraph is a ``p``; a run of list paragraphs is a
   ``ul`` or an ``ol``; a table is a ``table`` of ``tr`` and ``td`` with ``colspan`` and
   ``rowspan`` (each merged cell's rows worked out from Word's grid); a line break is ``br``;
-  bold, italic, superscript and subscript are ``strong``, ``em``, ``sup`` and ``sub`` (the EMA ePI
-  style guide's elements). The div must pass the fidelity scanner (``zone_a.fidelity.xhtml``).
+  bold, italic, superscript and subscript are ``strong``, ``em``, ``sup`` and ``sub``, and the QRD
+  template's grey is a ``span`` styled ``background-color: silver;`` (the EMA ePI style guide's
+  elements and its form for "not printed" text). A list an HTML list cannot draw as Word does
+  (labels other than "•", or "1.", "2.", ... from one) is written as Word draws it: each item a
+  ``p`` of its label, a space and its text (``text_labels``). The div must pass the fidelity
+  scanner (``zone_a.fidelity.xhtml``).
 - ``page`` (decision 2): the section's text as section 7 of the fidelity specification writes a
   page. It begins with a line break, as the scanner's text does, and each paragraph is a line:
   the list label Word draws and a space (in a table cell a bullet is left out), then the text,
@@ -34,21 +38,24 @@ Two outputs, written by separate code from the same read, so that the fidelity c
 What is carried, a closed list. A section is refused on the first paragraph that holds anything
 else, with the code in parentheses:
 
-- marks: bold, italic, superscript and subscript (not both at once: ``script``). An underline is
-  left out where it cannot change what the text says (``zone_a.underline``, a hyphen inside an
-  underlined word included), else (``underline``). The QRD template's own grey over the 4.8
-  reporting statement is left out where the registry names it exactly (same section, same text,
-  same range), and so are capitals and small capitals over text that capitals draw the same ("4.");
-  any other mark, capitals elsewhere, strike-through, highlight, shading, faint, raised or lowered
-  by position, or right-to-left text, is refused (``formatting``);
+- marks: bold, italic, superscript and subscript (not both at once: ``script``), and the QRD
+  template's grey, a light grey highlight or D9D9D9 shading (``GREY``; owner decision 2026-10-06).
+  An underline is left out where it cannot change what the text says (``zone_a.underline``, a
+  hyphen inside an underlined word included), else (``underline``); so are capitals and small
+  capitals over text that capitals draw the same ("4."). Any other mark, capitals elsewhere,
+  strike-through, another highlight or shading, faint, raised or lowered by position, or
+  right-to-left text, is refused (``formatting``);
 - raised or lowered text: letters, the digits and signs of the specification's fold tables, and
   other punctuation and symbols that no rule there reads as a number or a sign (categories Po,
   So, Pi, Pf, Pc, Zs), and lowered only, infinity and one half (as fidelity-norm/3.1.0 keeps
   them in ``sub``); anything else (``script``);
-- lists: a bullet "•", or "1.", "2.", ... from one, followed by a tab or a space (``list-label``;
-  FHIR's narrative rule allows no ``start`` or ``type`` on ``ol``, so no other numbering); one
-  list level in the section, since nesting is not carried (``list-level``); no paragraph that
-  draws a label and holds no text (``empty-numbered``);
+- lists: a label followed by a tab or a space (``list-label``). A list of bullets "•" is a ``ul``
+  and one of "1.", "2.", ... from one an ``ol``; any other list is written as its labels' text
+  (FHIR's narrative rule allows no ``start`` or ``type`` on ``ol``, and EMA's stylesheet draws
+  every ``ul`` with discs), except a section 3 step 4 bullet glyph in a table cell, which the page
+  leaves out (``list-label``; owner decision 2026-10-06). One list level in the section, since
+  nesting is not carried (``list-level``); no paragraph that draws a label and holds no text
+  (``empty-numbered``);
 - tables: one level, with Word's grid on record, no grid columns left out at a row's ends, and
   every vertically merged cell under a cell of the same columns that starts or continues the
   merge, with no text of its own (``table-grid``, ``table-shape``, ``nested-table``); no row of
@@ -59,9 +66,10 @@ else, with the code in parentheses:
   2%; a picture is an ``img`` of the ``data:`` URI of its exact bytes, and on the page U+FFFC, the
   SHA-256 of that URI, and U+FFFC (``picture``);
 - text: no soft hyphen (``soft-hyphen``), tab (``tab``: Word draws it as a jump to a tab stop),
-  but one right after a bullet glyph that begins a paragraph's text outside a table and after
-  no list label, which the narrative and the page write as a space (``bullet_tab``; owner
-  decision 2026-10-06), line or paragraph separator (``line-separator``), or
+  but the one after a label typed at the start of a paragraph's text outside a table and after
+  no list label (a bullet glyph or dash, a footnote mark, or "1.", "a)", "(iv)"), which the
+  narrative and the page write as a space (``typed_tab``; owner decisions of 2026-10-06), line
+  or paragraph separator (``line-separator``), or
   line that starts with a bullet glyph after a line break (``bullet-after-break``: section 3 step
   4 would read it as a list bullet);
 - no comment (``comment``) and no hidden paragraph mark (``hidden-mark``, the paragraph runs on
@@ -92,6 +100,7 @@ import binascii
 import dataclasses
 import hashlib
 import itertools
+import re
 import unicodedata
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
@@ -106,7 +115,7 @@ from zone_a.structure import line
 from zone_a.underline import underline_changes
 
 # The narrative builder's and the page serialiser's version: one, as they are one closed list.
-WORD_EPI_VERSION: Final = "word-epi/1.2.0"
+WORD_EPI_VERSION: Final = "word-epi/1.3.0"
 
 CARRIED: Final = {"bold": "strong", "italic": "em", "superscript": "sup", "subscript": "sub"}
 # Section 3 step 4's bullet glyphs: a list bullet in page text, removed at a line start.
@@ -119,6 +128,9 @@ WHITESPACE: Final = frozenset(
 )
 # The template's grey, as the registry keeps it (``zone_a.qrd.registry``): highlight or shading.
 GREY: Final = frozenset({"highlight-lightGray", "shading-D9D9D9"})
+# How the narrative draws it: the EMA ePI style guide's form for QRD "not printed" text.
+GREY_SPAN: Final = '<span style="background-color: silver;">'
+
 ROOT: Final = '<div xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">'
 
 
@@ -130,28 +142,6 @@ class RefusedError(Exception):
         self.code = code
         self.paragraph = paragraph
         self.detail = detail
-
-
-@dataclass(frozen=True)
-class _Grey:
-    """The registry's own grey over a statement: its section, its text and where."""
-
-    section: str
-    text: str
-    start: int
-    end: int
-
-
-def _greys(registry: Mapping[str, Any]) -> list[_Grey]:
-    out: list[_Grey] = []
-    for section in registry["sections"]:
-        for item in section["items"]:
-            text = "".join(p["value"] for p in item.get("pattern", []) if p["kind"] == "text")
-            for mark in item.get("marks", []):
-                if mark["kind"] not in GREY:
-                    raise ValueError(f"the registry keeps {mark['kind']}, not the template's grey")
-                out.append(_Grey(section["key"], text, mark["start"], mark["end"]))
-    return out
 
 
 def _label(paragraph: Paragraph) -> str:
@@ -170,21 +160,37 @@ _INLINE_WHITESPACE: Final = "".join(sorted(WHITESPACE - {"\n"}))
 _SUFFIXES: Final = frozenset({"tab", "space"})
 
 
-def bullet_tab(paragraph: Paragraph) -> int | None:
-    """Where a tab stands right after a bullet glyph that begins the paragraph's text, else None.
+# A label typed at the start of a paragraph, before a tab (section 7; owner decisions of
+# 2026-10-06): a bullet glyph or a dash; one to three of the same footnote mark; or an
+# enumerator with its punctuation ("1.", "a)", "(iv)"); then any spaces. A bare letter or number
+# is not one: "n" before a tab reads as a column ("n<tab>= 50"), not as a label.
+_ENUMERATOR: Final = r"(?:[0-9]{1,3}|[A-Za-z]|[ivx]{1,4}|[IVX]{1,4})"
+TYPED_LABEL: Final = re.compile(
+    "(?:["
+    + "".join(sorted(BULLETS))
+    + "\\-\u2013\u2014]"
+    + "|([*\u2217\u2020\u2021\u00a7\u00b6#])\\1{0,2}"
+    + rf"|\({_ENUMERATOR}\)|{_ENUMERATOR}[.)]"
+    + ") *"
+)
+
+
+def typed_tab(paragraph: Paragraph) -> int | None:
+    """Where the tab after a label typed at the start of the paragraph's text stands, else None.
 
     Only outside a table and after no list label: the narrative and the page write that tab as a
-    space (owner decision 2026-10-06, ADR 0006 decision 3); the EMA's own ePIs carry no tab.
+    space (owner decisions of 2026-10-06, ADR 0006); the EMA's own ePIs carry no tab.
     """
     text = paragraph.text
     start = len(text) - len(text.lstrip(_INLINE_WHITESPACE))
+    tab = text.find("\t", start)
     if (
         paragraph.table is None
         and not _label(paragraph)
-        and text[start : start + 1] in BULLETS
-        and text[start + 1 : start + 2] == "\t"
+        and tab >= 0
+        and TYPED_LABEL.fullmatch(text[start:tab])
     ):
-        return start + 1
+        return tab
     return None
 
 
@@ -192,10 +198,10 @@ def _check(index: int, paragraph: Paragraph, images: Mapping[str, bytes] | None 
     """The refusals of the module docstring that do not depend on marks.
 
     A paragraph drawn as nothing may hold a tab; its marks are judged as any others are. A tab
-    right after a bullet glyph that begins the text is a space (``bullet_tab``).
+    after a label typed at the start of the text is a space (``typed_tab``).
     """
     text = paragraph.text.replace("\t", " ") if blank(paragraph) else paragraph.text
-    if (at := bullet_tab(paragraph)) is not None:
+    if (at := typed_tab(paragraph)) is not None:
         text = text[:at] + " " + text[at + 1 :]
     if paragraph.comments:
         raise RefusedError("comment", index, "a comment")
@@ -278,25 +284,17 @@ def unchanged_by_capitals(text: str) -> bool:
     return all(character.upper() == character for character in text)
 
 
-def _marks(index: int, paragraph: Paragraph, section: str, greys: Sequence[_Grey]) -> list[Mark]:
+def _marks(index: int, paragraph: Paragraph) -> list[Mark]:
     """The paragraph's carried marks; refuses one that is neither carried nor left out."""
     out: list[Mark] = []
     for mark in paragraph.marks:
-        if mark.kind in CARRIED:
+        if mark.kind in CARRIED or mark.kind in GREY:
             out.append(mark)
         elif mark.kind == "underline":
             if underline_changes(paragraph.text, mark.start, mark.end, hyphens_in_words=True):
                 raise RefusedError("underline", index, "an underline that can change the text")
-        elif mark.kind in CAPITALS and unchanged_by_capitals(paragraph.text[mark.start : mark.end]):
-            pass
         elif not (
-            mark.kind in GREY
-            and any(
-                (section == g.section or section.startswith(g.section + "."))
-                and paragraph.text == g.text
-                and (mark.start, mark.end) == (g.start, g.end)
-                for g in greys
-            )
+            mark.kind in CAPITALS and unchanged_by_capitals(paragraph.text[mark.start : mark.end])
         ):
             raise RefusedError("formatting", index, mark.kind)
     raised = {i for m in out if m.kind == "superscript" for i in range(m.start, m.end)}
@@ -405,7 +403,7 @@ def _source(picture: Picture, images: Mapping[str, bytes]) -> str:
 def _inline(paragraph: Paragraph, marks: Sequence[Mark], images: Mapping[str, bytes]) -> str:
     """The text as XHTML: a run of one set of marks in its elements, a break br, a picture img."""
     text = paragraph.text
-    if (at := bullet_tab(paragraph)) is not None:
+    if (at := typed_tab(paragraph)) is not None:
         text = text[:at] + " " + text[at + 1 :]
     pictures = {picture.offset: picture for picture in paragraph.pictures}
     cuts = sorted(
@@ -423,53 +421,95 @@ def _inline(paragraph: Paragraph, marks: Sequence[Mark], images: Mapping[str, by
             piece = "<br/>".join(_escape(part) for part in text[start:end].split("\n"))
         for kind in reversed(kinds):
             piece = f"<{CARRIED[kind]}>{piece}</{CARRIED[kind]}>"
+        if any(m.kind in GREY and m.start <= start < m.end for m in marks):
+            piece = f"{GREY_SPAN}{piece}</span>"
         out.append(piece)
     return "".join(out)
 
 
-def _list(index: int, labels: Sequence[str]) -> str:
-    """The start tag of the list whose drawn markers are exactly ``labels``.
+def _list(labels: Sequence[str]) -> str | None:
+    """The start tag of the list whose drawn markers are exactly ``labels``, or None.
 
     A ``ul`` for bullets ("•"), and an ``ol`` only for "1.", "2.", ... from one: FHIR's narrative
-    rule (txt-1) allows neither ``start`` nor ``type`` on ``ol``, so a list that starts elsewhere or
-    counts otherwise is refused.
+    rule (txt-1) allows neither ``start`` nor ``type`` on ``ol``, and EMA's stylesheet draws every
+    ``ul`` with discs, so no other list is drawn by HTML as Word draws it.
     """
     if all(label == DISC for label in labels):
         return "<ul>"
     if all(list_marker("1", n + 1) == label + " " for n, label in enumerate(labels)):
         return "<ol>"
-    raise RefusedError("list-label", index, "labels an HTML list without start or type draws")
+    return None
 
 
-def _flow(indices: Sequence[int], body: Body, marks: Mapping[int, list[Mark]]) -> str:
+def _lists(indices: Sequence[int], body: Body) -> Iterator[list[int]]:
+    """The paragraphs in blocks: each one of no list alone, each list's items together."""
+    items: list[int] = []
+    for i in indices:
+        numbering = body.paragraphs[i].numbering
+        if not _label(body.paragraphs[i]):
+            if items:
+                yield items
+                items = []
+            yield [i]
+            continue
+        previous = body.paragraphs[items[-1]].numbering if items else None
+        assert numbering is not None  # noqa: S101 - a list item has a label
+        if previous is not None and previous.num_id != numbering.num_id:
+            yield items
+            items = []
+        items.append(i)
+    if items:
+        yield items
+
+
+def _blocks(indices: Sequence[int], body: Body) -> Iterator[list[int]]:
+    """The drawn paragraphs as ``_flow`` writes them: outside a table, then cell by cell."""
+    for table, run in _segments(indices, body):
+        if table is None:
+            yield [i for i in run if not blank(body.paragraphs[i])]
+            continue
+        for row in _grid(table, run, body)[1]:
+            for cell in row:
+                yield [i for i in cell.paragraphs if not blank(body.paragraphs[i])]
+
+
+def text_labels(indices: Sequence[int], body: Body) -> frozenset[int]:
+    """The paragraphs whose list label the narrative writes as text, as Word draws it.
+
+    Those of a list ``_list`` gives no tag: each is a ``p`` of its label, a space and its text.
+    The drawing check reads them so (``zone_a.drawing``). Of a section the builder carried.
+    """
+    return frozenset(
+        i
+        for block in _blocks(indices, body)
+        for items in _lists(block, body)
+        if _label(body.paragraphs[items[0]])
+        and _list([_label(body.paragraphs[i]) for i in items]) is None
+        for i in items
+    )
+
+
+def _flow(
+    indices: Sequence[int], body: Body, marks: Mapping[int, list[Mark]], in_cell: bool
+) -> str:
     """Paragraphs outside a table, or in one cell, as XHTML blocks."""
     out: list[str] = []
-    items: list[int] = []
-
-    def close() -> None:
-        if items:
-            tag = _list(items[0], [_label(body.paragraphs[i]) for i in items])
-            out.append(tag)
-            out.extend(
-                f"<li>{_inline(body.paragraphs[i], marks[i], body.images)}</li>" for i in items
-            )
-            out.append("</ul>" if tag == "<ul>" else "</ol>")
-            items.clear()
-
-    for i in indices:
-        paragraph = body.paragraphs[i]
-        if not _label(paragraph):
-            close()
-            out.append(f"<p>{_inline(paragraph, marks[i], body.images)}</p>")
+    for items in _lists(indices, body):
+        paragraphs = [body.paragraphs[i] for i in items]
+        labels = [_label(p) for p in paragraphs]
+        inline = [_inline(p, marks[i], body.images) for p, i in zip(paragraphs, items, strict=True)]
+        if not labels[0]:
+            out.append(f"<p>{inline[0]}</p>")
             continue
-        if items:
-            previous = body.paragraphs[items[-1]].numbering
-            assert previous is not None  # noqa: S101 - a list item has a label
-            assert paragraph.numbering is not None  # noqa: S101
-            if previous.num_id != paragraph.numbering.num_id:
-                close()
-        items.append(i)
-    close()
+        tag = _list(labels)
+        if tag is not None:
+            out.append(tag + "".join(f"<li>{x}</li>" for x in inline) + tag.replace("<", "</"))
+            continue
+        for i, label, text in zip(items, labels, inline, strict=True):
+            if in_cell and label in BULLETS:
+                # The page leaves a bullet glyph's label out of a cell (section 7).
+                raise RefusedError("list-label", i, "a bullet no HTML list draws, in a cell")
+            out.append(f"<p>{_escape(label)} {text}</p>")
     return "".join(out)
 
 
@@ -478,7 +518,7 @@ def narrative(indices: Sequence[int], body: Body, marks: Mapping[int, list[Mark]
     out = [ROOT]
     for table, run in _segments(indices, body):
         if table is None:
-            out.append(_flow([i for i in run if not blank(body.paragraphs[i])], body, marks))
+            out.append(_flow([i for i in run if not blank(body.paragraphs[i])], body, marks, False))
             continue
         out.append("<table>")
         for row in _grid(table, run, body)[1]:
@@ -487,7 +527,7 @@ def narrative(indices: Sequence[int], body: Body, marks: Mapping[int, list[Mark]
                 attributes = "" if cell.span == 1 else f' colspan="{cell.span}"'
                 attributes += "" if cell.rows == 1 else f' rowspan="{cell.rows}"'
                 drawn = [i for i in cell.paragraphs if not blank(body.paragraphs[i])]
-                out.append(f"<td{attributes}>{_flow(drawn, body, marks)}</td>")
+                out.append(f"<td{attributes}>{_flow(drawn, body, marks, True)}</td>")
             out.append("</tr>")
         out.append("</table>")
     out.append("</div>")
@@ -565,11 +605,12 @@ def _line(
         text[picture.offset] = "\ufffc" + hashlib.sha256(uri.encode("utf-8")).hexdigest() + "\ufffc"
     label = _label(paragraph)
     head = "" if not label or (in_cell and label in BULLETS) else label + " "
-    # A tab right after a bullet glyph that begins the text, outside a table and after no label,
-    # is a space (section 7), on the page as in the narrative.
+    # The tab after a label typed at the start of the text, outside a table and after no list
+    # label, is a space (section 7), on the page as in the narrative.
     lead = paragraph.text.lstrip(_INLINE_WHITESPACE)
-    if not in_cell and not label and lead[:1] in BULLETS and lead[1:2] == "\t":
-        text[len(paragraph.text) - len(lead) + 1] = " "
+    tab = lead.find("\t")
+    if not in_cell and not label and tab >= 0 and TYPED_LABEL.fullmatch(lead[:tab]):
+        text[len(paragraph.text) - len(lead) + tab] = " "
     lines = "".join(text).split("\n")
     if in_cell:
         return head + " ".join(lines)
@@ -622,9 +663,7 @@ def page(indices: Sequence[int], body: Body, marks: Mapping[int, list[Mark]]) ->
 # ---- sections ----------------------------------------------------------------------------------
 
 
-def _section(
-    key: str, indices: range, body: Body, greys: Sequence[_Grey]
-) -> tuple[str | None, str]:
+def _section(indices: range, body: Body) -> tuple[str | None, str]:
     """The section's narrative (None where it draws nothing) and page; or RefusedError."""
     paragraphs = body.paragraphs
     for edge, beyond in ((indices.start, indices.start - 1), (indices.stop - 1, indices.stop)):
@@ -639,7 +678,7 @@ def _section(
     marks: dict[int, list[Mark]] = {}
     for i in indices:
         _check(i, paragraphs[i], body.images)
-        marks[i] = _marks(i, paragraphs[i], key, greys)
+        marks[i] = _marks(i, paragraphs[i])
     # One list level in a section: a list inside a list would be drawn as one flat list.
     levels = [(paragraphs[i].numbering.level, i) for i in indices if _label(paragraphs[i])]  # type: ignore[union-attr]
     for level, i in levels:
@@ -705,7 +744,6 @@ def sections(
     headings = sorted(s["heading"] for s in structured["sections"] if s["heading"] is not None)
     if headings and headings[-1] >= end:
         raise ValueError("a heading outside the body's SmPC")
-    greys = _greys(registry)
     out: list[dict[str, Any]] = []
     for section in structured["sections"]:
         heading = section["heading"]
@@ -731,7 +769,7 @@ def sections(
             if paragraphs[heading].table is not None:
                 raise RefusedError("heading-in-table", heading, "a heading in a table")
             _heading(heading, paragraphs[heading])
-            entry["narrative"], entry["page"] = _section(section["key"], indices, body, greys)
+            entry["narrative"], entry["page"] = _section(indices, body)
         except RefusedError as refused:
             entry["refusal"] = {
                 "code": refused.code,

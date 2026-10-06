@@ -2862,6 +2862,35 @@ export const verifyCases: VerifyCase[] = [
     })(),
     expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
   },
+  // fidelity-norm/3.3.0: the template's grey is a silver span the page does not mark, and a list
+  // an HTML list cannot draw (a dash, "a)") is written as its labels' text, each item a p, which
+  // is the line the page already writes. Reviewed by hand.
+  {
+    name: "certified-word-grey-and-labels-as-text",
+    input: (() => {
+      const page =
+        "\nReport it via the national system.\n- Adults: 10 mg.\n- Children: 5 mg.\n" +
+        "a) if the count falls;\n";
+      const narrative = div(
+        '<p>Report it <span style="background-color: silver;">via the national system</span>.</p>' +
+          "<p>- Adults: 10 mg.</p><p>- Children: 5 mg.</p><p>a) if the count falls;</p>",
+      );
+      const source = wordSource(page);
+      return toInput(source, single("smpc.4.8", narrative, [spanFor(source, 1, page)]));
+    })(),
+    expect: { status: "passed", sections: { "smpc.4.8": "verified" } },
+  },
+  // ... and the same dashes drawn as an HTML list: its discs are no dash, and fail.
+  {
+    name: "certified-word-dashes-as-discs",
+    input: (() => {
+      const page = "\n- Adults: 10 mg.\n- Children: 5 mg.\n";
+      const narrative = div("<ul><li>Adults: 10 mg.</li><li>Children: 5 mg.</li></ul>");
+      const source = wordSource(page);
+      return toInput(source, single("smpc.4.8", narrative, [spanFor(source, 1, page)]));
+    })(),
+    expect: { status: "failed", sections: { "smpc.4.8": "mismatch" } },
+  },
 ];
 
 export const throwCases: ThrowCase[] = [
@@ -3356,6 +3385,66 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "rejects-style-attribute",
     input: div('<p style="x">a</p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  // From 3.3.0 one style is allowed: the EMA ePI style guide's grey for QRD "not printed" text,
+  // on a `span`, in exactly this spelling. Any other value, element or spelling still rejects; a
+  // second declaration could hide the text (`color: silver`).
+  {
+    name: "accepts-grey-span",
+    input: div('<p>a <span style="background-color: silver;">b</span> c</p>'),
+    expected: "\n\na b c\n\n",
+  },
+  {
+    name: "accepts-grey-span-single-quoted",
+    input: div("<p><span style='background-color: silver;'>b</span></p>"),
+    expected: "\n\nb\n\n",
+  },
+  {
+    name: "rejects-grey-style-on-p",
+    input: div('<p style="background-color: silver;">a</p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-grey-style-on-strong",
+    input: div('<p><strong style="background-color: silver;">a</strong></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-grey-style-without-semicolon",
+    input: div('<p><span style="background-color: silver">a</span></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-grey-style-other-spacing",
+    input: div('<p><span style="background-color:silver;">a</span></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-grey-style-capitals",
+    input: div('<p><span style="Background-color: silver;">a</span></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-grey-style-other-colour",
+    input: div('<p><span style="background-color: white;">a</span></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-grey-style-second-declaration",
+    input: div('<p><span style="background-color: silver; color: silver;">a</span></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-grey-style-reference",
+    input: div('<p><span style="background-color&#58; silver;">a</span></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-grey-style-twice",
+    input: div(
+      '<p><span style="background-color: silver;" style="background-color: silver;">a</span></p>',
+    ),
     expected: { error: "forbidden-attribute" },
   },
   {

@@ -2,7 +2,7 @@
 // docs/fidelity-normalization.md sections 2-4; the golden vectors in test/fixtures/fidelity are
 // the language-neutral proof. Any change here is a new NORMALIZATION_VERSION.
 
-export const NORMALIZATION_VERSION = "fidelity-norm/3.2.0";
+export const NORMALIZATION_VERSION = "fidelity-norm/3.3.0";
 
 export class NormalizationError extends Error {
   public constructor(

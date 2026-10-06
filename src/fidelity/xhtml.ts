@@ -516,6 +516,9 @@ const TOKEN_VALUE = /^[A-Za-z0-9_.:-]{1,32}$/;
 export const LIST_TYPE_VALUE = /^[1aAiI]$/;
 export const LIST_START_VALUE = /^(?:0|-?[1-9][0-9]{0,3})$/;
 export const SPAN_VALUE = /^(?:[1-9][0-9]{0,2}|1000)$/;
+// The one style allowed (from 3.3.0): the EMA ePI style guide's grey for QRD "not printed" text,
+// on a `span` and in exactly this spelling. A background under black text hides nothing.
+export const GREY_STYLE = "background-color: silver;";
 // A picture's source is a PNG or JPEG `data:` URI: the picture's own bytes, compared with the
 // source through the hash `img` emits. A reference (a path or a URL) is refused: what it draws is
 // whatever the viewer's origin serves, or nothing, and neither is bound by the check.
@@ -547,6 +550,7 @@ function attributeAllowed(name: string, value: string, element: string, isRoot: 
   if (name === "src") {
     return element === "img" && isPictureData(value);
   }
+  if (name === "style") return element === "span" && value === GREY_STYLE;
   return false;
 }
 
