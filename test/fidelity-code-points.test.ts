@@ -21,6 +21,8 @@ const vectors = JSON.parse(readFileSync("test/fixtures/fidelity/vectors.json", "
 // one entry from it (an ignorable, a thin space) would otherwise pass every worked vector.
 const RELEASED_TABLES: Readonly<Record<string, string>> = {
   "fidelity-norm/3.1.0": "61927ab9e2345524a694ed2770de1fa29c25b7bfe0ac54d56ed258a1b1b5d8ae",
+  // 3.2.0 qualifies a source kind (section 7) and changes no list.
+  "fidelity-norm/3.2.0": "61927ab9e2345524a694ed2770de1fa29c25b7bfe0ac54d56ed258a1b1b5d8ae",
 };
 
 describe("the code point vectors", () => {

@@ -1,6 +1,6 @@
 # Narrative fidelity normalisation specification
 
-Version: `fidelity-norm/3.1.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
+Version: `fidelity-norm/3.2.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
 in section 9)
 
 This document is the language-neutral specification of the text normalisation and XHTML
@@ -703,9 +703,13 @@ The page text an extractor produces is the reference the narrative is checked ag
 extractor is a controlled component: its name and version are recorded in
 `IngestionProvenance.extraction.parser`, pinned, and checksummed like the FHIR packages.
 
-**What this version qualifies (from 3.0.0).** A structured source is an FHIR ePI document Bundle whose section
-narratives are XHTML (ADR 0005); every other source, a Word document however it is read
-included, is a drawn document. The rules below are complete for a structured source (the
+**What this version qualifies (from 3.0.0, and 3.2.0).** A structured source is an FHIR ePI
+document Bundle whose section narratives are XHTML (ADR 0005). From 3.2.0, a certified Word
+source is a Word SmPC read by the pinned label reader exactly, every character accounted for by
+its conservation check, and structured by the QRD template's own headings (ADR 0006), whose pages
+the certified Word rule below writes; its trust is that rule's together with ADR 0006's drawing
+check and Zone B's recompute. Every other source, a Word document read otherwise included, is a
+drawn document. The rules below are complete for a structured source (the
 structured-source rule below): its page text is exactly the scanner's text for each section,
 so none of the layout rules for drawn documents comes into play; whether T drops only what
 cannot change the drawn page is ADR 0005's to secure (its requirements and renderer cross-check). For a drawn document they are not complete. The independent reviews of 3.0.0 found cases where text
@@ -833,6 +837,59 @@ An extractor must:
   section's span covers that page's body, and sections 1 and 6 apply unchanged. The drawn-document rules of this section (line
   layout, continuation lines, discretionary hyphens, tables across page breaks, body ranges) do
   not apply;
+- for a certified Word source (from 3.2.0), emit one page per section of the label's structure
+  that has a heading, in the template's order, a parent before its children and a section with
+  no text of its own included, with the whole page as its body, holding exactly the text this rule
+  writes from the reader's certified read of the section's paragraphs (the body paragraphs after
+  its heading up to the next heading of any section, or the SmPC's end), and nothing else. A
+  paragraph is blank when it draws no list label and its text is only section 3 step 5
+  whitespace. The page is empty (`""`, `bodyStart` and `bodyEnd` 0) when every paragraph is blank;
+  otherwise it is U+000A followed by each run of paragraphs outside a table and each table, in
+  order:
+  - outside a table, each paragraph that is not blank is a line: the list label the reader reports
+    and U+0020, where the label is not empty, then the paragraph's text, then U+000A. Where the
+    paragraph draws no label and its text begins, past section 3 step 5 whitespace, with a
+    section 3 step 4 bullet glyph followed by U+0009, that U+0009 is written as U+0020 (a bullet
+    typed in the text, as ADR 0006 decision 3's narrative writes it). In the text
+    a code point inside a superscript or subscript mark is written by the raised or lowered rule
+    below (inside a subscript mark, U+221E and U+00BD are kept as they are, as section 5 keeps
+    them inside `sub`); each picture (U+FFFC) is U+FFFC, the SHA-256 of the `data:` URI of the
+    exact bytes the reader names for it (`data:image/png;base64,` or `data:image/jpeg;base64,`,
+    by the bytes' signature, and their canonical padded base64), and U+FFFC; and a line break the
+    reader reports (U+000A) is kept, with U+0009 inserted after it where the line it starts
+    begins, past section 3 step 5 whitespace, with a section 3 step 4 bullet glyph;
+  - a table is U+FDD0 U+000A, then each row of the grid the reader reports for it, read row by
+    row on its own, as U+FDD2, one slot per grid column, and U+000A, then U+FDD1 U+000A. A slot is
+    U+0009 U+FDD3 U+0009 and the cell's text where a cell starts, U+0009 U+FDD4 U+0009 where the
+    cell to its left spans it, and U+0009 U+FDD5 U+0009 for each column of a cell that continues a
+    vertical merge. A cell's text is its paragraphs that are not blank, joined by U+0020, each
+    written as outside a table but with no label that is a step 4 bullet glyph, its line breaks as
+    U+0020 and no U+000A of its own.
+
+  The extractor refuses the section where the read holds anything ADR 0006 decision 3's closed
+  lists do not carry (`zone_a.word_epi` names each refusal): a mark other than bold, italic,
+  superscript and subscript, except an underline that cannot change the text, the template's own
+  grey where the registry names it and capitals over text they draw the same; a list label other
+  than "•" or "1.", "2.", ... from one (FHIR's narrative rule txt-1 allows no `start` or `type` on
+  `ol`), or one not followed by a tab or a space, or two list levels in the section; a picture the reader does not vouch for, over 1 MiB, or drawn by Word larger than its
+  own size or out of its own proportions by more than 2%; a tab (but the one after a typed bullet
+  above), a soft hyphen, U+2028 or U+2029,
+  a bullet glyph starting a line after a line break, a comment or a hidden paragraph mark; a
+  heading drawn otherwise than its title; where the reader's grid is not on record, a row leaves
+  grid columns out, a vertically merged cell has text or no cell of its columns above, or a table
+  is nested, lies in two sections or holds a heading; where a raised or lowered run holds what
+  section 5 refuses inside the corresponding element; and where section 5's scanner does not read
+  the narrative built from the same read (ADR 0006 decision 3) as this page. It refuses a
+  document with a floating picture or shape, a floating table, a frame, a right-to-left table, or
+  a page or column break with a drawn character on both sides. The page rule and the narrative
+  builder are written separately (the page reads the grid row by row, the builder works out each
+  merged cell's rows), so the check between them compares two things; ADR 0006 decision 1's
+  drawing check holds the narrative to what a browser draws, and Zone B recomputes the pages from
+  the pinned bytes. The drawn-document rules of this section (line layout, continuation lines
+  across pages, discretionary hyphens, tables across page breaks, body ranges) do not apply. The
+  rule's version is recorded with the reader's, its format's, its conservation check's, the
+  structurer's and the registry's in the source's provenance (ADR 0006 decision 6);
+
 - in a raised or lowered glyph run, emit every digit and sign of section 5's folding tables as
   its script code point — raised: U+0030–U+0039 as U+2070, U+00B9, U+00B2, U+00B3,
   U+2074–U+2079, `+`, U+FE62, U+FF0B and U+2795 as U+207A, `-`, U+2212, U+2010–U+2015,
@@ -862,7 +919,8 @@ of the approved content hash.
 The increment states what changed. A **patch** increment documents behaviour the vectors
 already pin: no normalised text, extracted text, status, reason, coverage figure, or diff hint
 in any vector changes, and only the hashes that embed the version string move. A **minor**
-increment changes at least one vector's outcome. Anything that invalidates a span, a hash
+increment changes at least one vector's outcome, or qualifies in section 7 a kind of source it did
+not qualify before (from 3.2.0). Anything that invalidates a span, a hash
 rule, or the extractor contract is **major**. Every increment, patch included, is part of the
 approved content and so still requires re-approval of anything approved under the previous
 version.
@@ -874,6 +932,20 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
 
 ## 9. Version history
 
+- `fidelity-norm/3.2.0` (minor) — section 7 qualifies a third kind of source, a certified Word
+  source (ADR 0006): a Word SmPC the pinned label reader read exactly, whose conservation check
+  accounted for every character, structured by the QRD template's own headings, with one page
+  per section as section 7's certified Word rule writes it. Nothing in sections 1 to 6 changes:
+  every vector's outcome is as under 3.1.0, and they move only in the version string and the
+  hashes that embed it. Section 8's minor increment gains the case: what may support an approval
+  changes, since a report over a certified Word source's pages is evidence under 3.2.0, and
+  3.1.0 qualified no Word document. Four verify vectors are
+  added, reviewed by hand: a certified Word section's page against the narrative built from the
+  same read (passed), and the same page against that narrative with its merged cell unmerged or its
+  list numbered from one later, and a page that writes a bullet after a line break as content
+  against a narrative that draws it after a `br` (each failed). 3.2.0 was first reserved for the withheld section of
+  an authority import (`docs/design/authority-import-withheld.md`, not built), which takes 3.3.0.
+  The change record is `docs/validation/changes/2026-10-05-fidelity-norm-3-2-0.md`.
 - `fidelity-norm/3.1.0` (minor) — inside `sub`, U+221E INFINITY is kept unchanged instead of
   rejecting (`unmappable-script`), and U+00BD VULGAR FRACTION ONE HALF is kept under the
   lowered-half rule: only as the half-life, a `sub`'s whole content right after a `t` that starts

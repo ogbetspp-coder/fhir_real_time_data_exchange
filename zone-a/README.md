@@ -248,13 +248,13 @@ defaults are wrong:
 
 ## Vector results
 
-All 634 golden vectors of `fidelity-norm/3.1.0` pass, byte for byte, including every error case:
+All 638 golden vectors of `fidelity-norm/3.2.0` pass, byte for byte, including every error case:
 
 | Module                         | Result          |
 | ------------------------------ | --------------- |
 | `zone_a/fidelity/normalize.py` | normalize 71/71 |
 | `zone_a/fidelity/xhtml.py`     | xhtml 383/383   |
-| `zone_a/fidelity/verify.py`    | verify 180/180  |
+| `zone_a/fidelity/verify.py`    | verify 184/184  |
 
 The vectors also carry a `codePoints` family: for every code point U+0000–U+10FFFF, which class
 of which closed list it falls in (forbidden, whitespace, gap, Default_Ignorable, word character,
@@ -275,7 +275,9 @@ grids, pictures, the reserved and invisible code points, the nesting bounds, com
 across markup, the refusal of underlines and links, and the thin spaces and other gaps (`docs/validation/changes/2026-09-23-fidelity-norm-3-0-0.md`). The 43 added by
 `fidelity-norm/3.1.0` pin ∞ kept inside `sub`, the lowered-half rule, and both still refused
 inside `sup`
-(`docs/validation/changes/2026-09-24-fidelity-norm-3-1-0.md`). They are defined in
+(`docs/validation/changes/2026-09-24-fidelity-norm-3-1-0.md`). The 4 added by
+`fidelity-norm/3.2.0` pin a certified Word source's page against its narrative
+(`docs/validation/changes/2026-10-05-fidelity-norm-3-2-0.md`). They are defined in
 `test/fixtures/fidelity/cases.ts` on the Zone B side, where the TypeScript defines the expected
 behaviour, and regenerated with `npm run vectors:generate`.
 
@@ -653,7 +655,7 @@ all of item 16 — it now states the `\udXXX` escape and that a hashed number su
 integer 1. The entries are kept as the record of what a port had to discover for itself, and
 because one part of item 15 is still open: `sha256Utf8` is not `JSON.stringify`, and the
 replacement Node's UTF-8 encoder performs on an unpaired surrogate is not written down anywhere.
-This port is on `fidelity-norm/3.1.0`, in step with `NORMALIZATION_VERSION` in
+This port is on `fidelity-norm/3.2.0`, in step with `NORMALIZATION_VERSION` in
 `src/fidelity/normalize.ts`; whenever that constant moves, the Python constant, the vectors, and
 every recorded hash move with it. (It moved from `fidelity-norm/1.1.1` to 2.0.0, and then to 3.0.0,
 on 2026-09-23, and to 3.1.0 on 2026-09-24, each time in the same change as the TypeScript and by the same author; that is why the seeded differential run,
