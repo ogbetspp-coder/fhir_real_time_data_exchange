@@ -232,6 +232,8 @@ class _Segment:
 
 @dataclass
 class _Paragraph:
+    # Whether a row of exact height holds it.
+    in_exact_row: bool
     segments: list[_Segment] = field(default_factory=list)
     table: tuple[int, int, int] | None = None
     # What the list and note numbering need: the paragraph's properties, its style, its
@@ -249,8 +251,6 @@ class _Paragraph:
     # Each drawing read as U+FFFC, in order, with the reasons its run gives (a field's result, a
     # border), and what each stands for (``DocxSource._picture``).
     drawings: list[tuple[ET.Element, set[str]]] = field(default_factory=list)
-    # Whether a row of exact height holds it.
-    in_exact_row: bool = False
     pictures: list[dict[str, Json]] = field(default_factory=list)
 
 
@@ -1354,11 +1354,14 @@ def _line_rule(fonts: _Fonts, paragraph: _Paragraph) -> str | None:
         ),
         fonts.doc_ppr,
     ]
-    for source in sources:
-        for spacing in [] if source is None else source.findall(_w("spacing"))[:1]:
-            if spacing.get(_w("lineRule")) is not None:
-                return spacing.get(_w("lineRule"))
-    return None
+    rules = [
+        rule
+        for source in sources
+        if source is not None
+        for spacing in source.findall(_w("spacing"))[:1]
+        if (rule := spacing.get(_w("lineRule"))) is not None
+    ]
+    return rules[0] if rules else None
 
 
 def _grid_number(holder: ET.Element | None, name: str, absent: int) -> int:
@@ -1410,7 +1413,6 @@ _PREFIXES = {
     "http://schemas.openxmlformats.org/drawingml/2006/main": "a",
     "http://schemas.openxmlformats.org/drawingml/2006/picture": "pic",
     "http://schemas.microsoft.com/office/drawing/2010/main": "a14",
-    "http://schemas.microsoft.com/office/word/2010/wordprocessingShape": "wps",
 }
 # A PNG's colour types, each with the bit depths it may have.
 _PNG_KINDS = {
@@ -1475,7 +1477,8 @@ def _blip_fill(fill: ET.Element, blip: ET.Element, why: set[str]) -> dict[str, i
         why.add("effects")
     if stretch is not None and not all(_empty(c) for c in stretch):
         why.add("effects")
-    if not _keys(blip) <= {"r:embed", "r:link", "cstate"}:
+    # A link is ``linked``, which comes before ``effects``: it needs no place here.
+    if not _keys(blip) - {"r:link"} <= {"r:embed", "cstate"}:
         why.add("effects")
     if "r:link" in _keys(blip):
         why.add("linked")
@@ -1569,12 +1572,14 @@ def _png_facts(data: bytes) -> tuple[list[int] | None, set[str]]:
             return broken
         length, kind = struct.unpack_from(">I4s", data, at)
         stop = at + length + 12
-        if length >= 1 << 31 or stop > len(data) or not re.fullmatch(rb"[A-Za-z]{4}", kind):
+        # A length of 2**31 or more runs past any image a package holds.
+        if stop > len(data) or not re.fullmatch(rb"[A-Za-z]{4}", kind):
             return broken
         (crc,) = struct.unpack_from(">I", data, stop - 4)
         if crc != zlib.crc32(memoryview(data)[at + 4 : stop - 4]):
             return broken
-        critical = 65 <= kind[0] <= 90
+        # Upper-case letters stand below the lower-case ones.
+        critical = kind[0] < 0x61
         if (number == 0) != (kind == b"IHDR"):
             return broken
         if critical and kind not in (b"IHDR", b"PLTE", b"IDAT", b"IEND"):
@@ -2637,23 +2642,34 @@ class DocxSource:
         if _short(drawing.tag) == "w:pict":
             image = next(n for n in drawing.iter() if _local(n.tag) == "imagedata")
             why |= {"vml", *self._image(image.get(f"{{{_R}}}id"), source, found)}
-            found["reason"] = next(w for w in _NOT_AS_IS if w in why)
-            return found
-        if _short(drawing.tag) == "mc:AlternateContent":
-            drawing = next(c for c in drawing if _short(c.tag) == "mc:Choice")[0]
-        frame = drawing[0]
-        extent = _whole(_child(frame, "wp:extent"), ("cx", "cy"), why, False)
-        found["extent"] = extent
-        spread = _child(frame, "wp:effectExtent")
-        if spread is not None and _whole(spread, ("l", "t", "r", "b"), why, True) != [0] * 4:
-            why.add("effects")
-        data = [n for n in frame.iter() if _short(n.tag) == "a:graphicData"]
-        if any(
-            d.get("uri") == "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
-            for d in data
-        ):
-            found["kind"], found["reason"] = "shape", "shape"
-            return found
+        else:
+            if _short(drawing.tag) == "mc:AlternateContent":
+                drawing = next(c for c in drawing if _short(c.tag) == "mc:Choice")[0]
+            frame = drawing[0]
+            extent = _whole(_child(frame, "wp:extent"), ("cx", "cy"), why, False)
+            found["extent"] = extent
+            spread = _child(frame, "wp:effectExtent")
+            if spread is not None and _whole(spread, ("l", "t", "r", "b"), why, True) != [0] * 4:
+                why.add("effects")
+            data = [n for n in frame.iter() if _short(n.tag) == "a:graphicData"]
+            shape = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+            if any(d.get("uri") == shape for d in data):
+                found["kind"] = "shape"
+                why.add("shape")
+            else:
+                self._drawn(data, extent, source, found, why)
+        found["reason"] = next((w for w in _NOT_AS_IS if w in why), None)
+        return found
+
+    def _drawn(
+        self,
+        data: list[ET.Element],
+        extent: list[int] | None,
+        source: str,
+        found: dict[str, Json],
+        why: set[str],
+    ) -> None:
+        """A DrawingML picture's image and drawing: its one ``pic:pic`` and what it holds."""
         picture = data[0][0] if len(data) == 1 and _kids(data[0]) == ["pic:pic"] else None
         fill = _child(picture, "pic:blipFill")
         blip = _child(fill, "a:blip")
@@ -2669,8 +2685,6 @@ class DocxSource:
         if picture is not None and fill is not None and blip is not None:
             found["crop"] = _blip_fill(fill, blip, why)
             why |= self._image(blip.get(f"{{{_R}}}embed"), source, found)
-        found["reason"] = next((w for w in _NOT_AS_IS if w in why), None)
-        return found
 
     def _image(self, rid: str | None, source: str, found: dict[str, Json]) -> set[str]:
         """The image part ``source``'s relationship ``rid`` names, into ``found``; its reasons.

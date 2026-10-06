@@ -1921,18 +1921,31 @@ def chunk(kind: bytes, body: bytes) -> bytes:
     return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
 
 
+# The samples a pixel of each PNG colour type has: grey, RGB, palette index, grey and alpha,
+# RGB and alpha.
+CHANNELS = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}
+
+
 def png(
-    width: int = 2, height: int = 1, extra: bytes = b"", depth: int = 8, colour: int = 2
+    width: int = 2,
+    height: int = 1,
+    extra: bytes = b"",
+    depth: int = 8,
+    colour: int = 2,
+    interlace: int = 0,
+    end: bool = True,
 ) -> bytes:
-    """A real PNG of ``width`` by ``height`` black pixels (RGB, or palette index 0 for colour
-    type 3), ``extra`` chunks after IHDR."""
-    rows = b"".join(b"\x00" + b"\x00" * (3 if colour == 2 else 1) * width for _ in range(height))
+    """A real PNG of ``width`` by ``height`` black pixels of colour type ``colour`` (a palette
+    image needs a PLTE in ``extra``), ``extra`` chunks after IHDR, IEND unless not ``end``."""
+    row = (width * depth * CHANNELS.get(colour, 1) + 7) // 8
+    rows = b"".join(b"\x00" + bytes(row) for _ in range(height))
+    header = struct.pack(">IIBBBBB", width, height, depth, colour, 0, 0, interlace)
     return (
         b"\x89PNG\r\n\x1a\n"
-        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, depth, colour, 0, 0, 0))
+        + chunk(b"IHDR", header)
         + extra
         + chunk(b"IDAT", zlib.compress(rows))
-        + chunk(b"IEND", b"")
+        + (chunk(b"IEND", b"") if end else b"")
     )
 
 
@@ -1947,10 +1960,13 @@ def jpeg(
     extra: bytes = b"",
     precision: int = 8,
     parts: int = 1,
+    specs: int | None = None,
 ) -> bytes:
-    """A real baseline JPEG of one grey 8x8 block, ``width`` by ``height`` (``extra`` first)."""
+    """A real baseline JPEG of one grey 8x8 block, ``width`` by ``height`` (``extra`` first),
+    its frame naming ``parts`` components and holding ``specs`` of them (all by default)."""
     huffman = bytes([1] + [0] * 15) + b"\x00"  # one code of one bit, for symbol 0
-    components = b"".join(bytes((i + 1, 0x11, 0)) for i in range(parts))
+    count = parts if specs is None else specs
+    components = b"".join(bytes((i + 1, 0x11, 0)) for i in range(count))
     return (
         b"\xff\xd8"
         + extra
@@ -1963,12 +1979,19 @@ def jpeg(
     )
 
 
-def exif(orientation: int, order: str = "MM") -> bytes:
-    """An APP1 Exif body: one IFD with the orientation tag."""
+def exif(orientation: int, order: str = "MM", before: int = 0, tight: bool = False) -> bytes:
+    """An APP1 Exif body: one IFD with ``before`` other tags and then the orientation tag, and
+    the next IFD's offset after it unless ``tight``."""
     pack = ">" if order == "MM" else "<"
-    tiff = order.encode() + struct.pack(pack + "HI", 42, 8) + struct.pack(pack + "H", 1)
-    tiff += struct.pack(pack + "HHIHH", 0x0112, 3, 1, orientation, 0) + struct.pack(pack + "I", 0)
-    return b"Exif\x00\x00" + tiff
+    tiff = order.encode() + struct.pack(pack + "HI", 42, 8) + struct.pack(pack + "H", before + 1)
+    tiff += struct.pack(pack + "HHIHH", 0x0100, 3, 1, 9, 0) * before
+    tiff += struct.pack(pack + "HHIHH", 0x0112, 3, 1, orientation, 0)
+    return b"Exif\x00\x00" + tiff + (b"" if tight else struct.pack(pack + "I", 0))
+
+
+def tiff_png(tiff: bytes) -> bytes:
+    """A PNG whose eXIf chunk holds ``tiff``."""
+    return png(extra=chunk(b"eXIf", tiff))
 
 
 def picture(
@@ -2034,10 +2057,12 @@ def read_pictures(run: str, media: dict[str, bytes], rels: dict[str, str] | None
 
 
 PNG = png()
+FILLED = picture()
 IMAGE = "word/media/image1.png"
 MEDIA = {IMAGE: PNG}
 IHDR = struct.pack(">IIBBBBB", 2, 1, 8, 2, 0, 0, 0)
 PALETTE = png(colour=3)
+PLTE = chunk(b"PLTE", bytes(3))
 VML = VML_PICTURE.replace('xmlns:r="urn:r" r:id="rId8"', f'xmlns:r="{REL}" r:id="rIdImg"')
 TURNED = jpeg(extra=segment(0xE1, exif(6)))
 # Each picture the reader cannot vouch for, its media and relationships, and the reason it gives.
@@ -2211,6 +2236,296 @@ PICTURE_CASES: list[tuple[str, str, dict[str, bytes], dict[str, str] | None, str
         "colour",
     ),
     ("jpeg-cmyk", picture(), {IMAGE: jpeg(parts=4)}, None, "colour"),
+    # One check at a time, each alone in a picture: what each part of the closed list holds.
+    (
+        "fill-attribute",
+        FILLED.replace("<pic:blipFill>", '<pic:blipFill dpi="96">'),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    (
+        "fill-extra-child",
+        picture(fill="<a:stretch><a:fillRect/></a:stretch><a:tile/>"),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    (
+        "stretch-attribute",
+        picture(fill='<a:stretch x="1"><a:fillRect/></a:stretch>'),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    (
+        "fill-rect-inset",
+        picture(fill='<a:stretch><a:fillRect l="1"/></a:stretch>'),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    (
+        "fill-rect-child",
+        picture(fill="<a:stretch><a:fillRect><a:x/></a:fillRect></a:stretch>"),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    ("blip-attribute", picture(blip='r:embed="rIdImg" x="1"'), MEDIA, None, "effects"),
+    ("blip-cstate", picture(blip='r:embed="rIdImg" cstate="print"'), MEDIA, None, None),
+    (
+        "other-extension",
+        picture(
+            inside=f'<a:extLst><a:ext uri="{{X}}"><a14:useLocalDpi xmlns:a14="{A14}"/>'
+            "</a:ext></a:extLst>"
+        ),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    (
+        "empty-dpi-extension",
+        picture(inside=f'<a:extLst><a:ext uri="{DPI}"/></a:extLst>'),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    ("crop-child", picture(crop="<a:srcRect><a:x/></a:srcRect>"), MEDIA, None, "effects"),
+    ("crop-attribute", picture(crop='<a:srcRect x="1"/>'), MEDIA, None, "effects"),
+    ("crop-all-zero", picture(crop='<a:srcRect l="0" t="0" r="0" b="0"/>'), MEDIA, None, None),
+    (
+        "crop-each-side",
+        picture(crop='<a:srcRect l="1" t="2" r="3" b="4"/>'),
+        MEDIA,
+        None,
+        "cropped",
+    ),
+    ("crop-outward", picture(crop='<a:srcRect l="-500"/>'), MEDIA, None, "cropped"),
+    (
+        "no-shape-properties",
+        re.sub("<pic:spPr.*</pic:spPr>", "", picture()),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    (
+        "pic-extension",
+        picture().replace("</pic:spPr>", "</pic:spPr><pic:extLst/>"),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    (
+        "hidden-true",
+        picture().replace("name='p'/>", "name='p' hidden='true'/>"),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    ("no-blip", FILLED.replace('<a:blip r:embed="rIdImg"></a:blip>', ""), MEDIA, None, "no-part"),
+    ("xfrm-attribute", picture(shape='<a:xfrm x="1"/>'), MEDIA, None, "effects"),
+    (
+        "xfrm-two-offsets",
+        picture(shape='<a:xfrm><a:off x="0" y="0"/><a:off x="0" y="0"/></a:xfrm>'),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    ("xfrm-all-zero", picture(shape='<a:xfrm rot="0" flipH="0" flipV="0"/>'), MEDIA, None, None),
+    (
+        "xfrm-child",
+        picture(shape='<a:xfrm><a:chOff x="0" y="0"/></a:xfrm>'),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    ("rotated-back", picture(shape='<a:xfrm rot="-5400000"/>'), MEDIA, None, "rotated"),
+    ("flipped-true", picture(shape='<a:xfrm flipH="true"/>'), MEDIA, None, "flipped"),
+    ("unflipped-false", picture(shape='<a:xfrm flipH="false" flipV="false"/>'), MEDIA, None, None),
+    ("moved-back", picture(shape='<a:xfrm><a:off x="-1" y="0"/></a:xfrm>'), MEDIA, None, "effects"),
+    (
+        "negative-size",
+        picture(shape='<a:xfrm><a:ext cx="-1" cy="9525"/></a:xfrm>'),
+        MEDIA,
+        None,
+        "bad-number",
+    ),
+    (
+        "adjusted-rect",
+        picture(shape='<a:prstGeom prst="rect"><a:avLst><a:gd name="a"/></a:avLst></a:prstGeom>'),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    ("no-fill-child", picture(shape="<a:noFill><a:x/></a:noFill>"), MEDIA, None, "effects"),
+    (
+        "line-no-fill-attribute",
+        picture(shape='<a:ln><a:noFill x="1"/></a:ln>'),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    ("negative-extent", picture(extent='cx="-1" cy="9525"'), MEDIA, None, "bad-number"),
+    ("negative-effect-extent", picture(effect='l="-1" t="0" r="0" b="0"'), MEDIA, None, "effects"),
+    (
+        "absolute-target",
+        picture(),
+        MEDIA,
+        {"word/_rels/document.xml.rels": relationship("/word/media/image1.png")},
+        None,
+    ),
+    # Every colour type and bit depth PNG allows, and some it does not.
+    *(
+        (
+            f"png-{colour}-{depth}",
+            picture(),
+            {IMAGE: png(1, 1, PLTE if colour == 3 else b"", depth, colour)},
+            None,
+            None,
+        )
+        for colour, depths in (
+            (0, (1, 2, 4, 8, 16)),
+            (2, (8, 16)),
+            (3, (1, 2, 4, 8)),
+            (4, (8, 16)),
+            (6, (8, 16)),
+        )
+        for depth in depths
+    ),
+    *(
+        (
+            f"png-{colour}-{depth}",
+            picture(),
+            {IMAGE: png(1, 1, PLTE if colour == 3 else b"", depth, colour)},
+            None,
+            "bad-image-header",
+        )
+        for colour, depth in ((0, 3), (2, 4), (3, 16), (4, 4), (5, 8), (6, 1))
+    ),
+    ("png-widest", picture(), {IMAGE: png(10_000, 1)}, None, None),
+    ("png-highest", picture(), {IMAGE: png(1, 10_000)}, None, None),
+    ("png-interlaced", picture(), {IMAGE: png(1, 1, interlace=1)}, None, None),
+    ("png-interlace-2", picture(), {IMAGE: png(1, 1, interlace=2)}, None, "bad-image-header"),
+    (
+        "png-long-ihdr",
+        picture(),
+        {IMAGE: PNG.replace(chunk(b"IHDR", IHDR), chunk(b"IHDR", IHDR + b"\x00"))},
+        None,
+        "bad-image-header",
+    ),
+    (
+        "png-critical-z",
+        picture(),
+        {IMAGE: png(extra=chunk(b"Zzzz", b""))},
+        None,
+        "bad-image-header",
+    ),
+    ("png-ancillary-a", picture(), {IMAGE: png(extra=chunk(b"abcd", b""))}, None, None),
+    (
+        "png-two-exif",
+        picture(),
+        {IMAGE: png(extra=chunk(b"eXIf", exif(1)[6:]) * 2)},
+        None,
+        "bad-image-header",
+    ),
+    ("png-exif-tight", picture(), {IMAGE: tiff_png(exif(3, tight=True)[6:])}, None, "orientation"),
+    (
+        "png-exif-short-entry",
+        picture(),
+        {IMAGE: tiff_png(exif(3, tight=True)[6:-4])},
+        None,
+        "bad-image-header",
+    ),
+    ("jpeg-restarts", picture(), {IMAGE: jpeg(extra=b"\xff\xd1\xff\x01")}, None, None),
+    (
+        "jpeg-scan-at-end",
+        picture(),
+        {IMAGE: jpeg()[: jpeg().index(b"\xff\xda")] + b"\xff\xda\x00\x02"},
+        None,
+        None,
+    ),
+    (
+        "jpeg-second-soi",
+        picture(),
+        {IMAGE: jpeg(extra=b"\xff\xd8\x00\x02")},
+        None,
+        "bad-image-header",
+    ),
+    ("jpeg-extended", picture(), {IMAGE: jpeg(frame=0xC1)}, None, None),
+    ("jpeg-progressive", picture(), {IMAGE: jpeg(frame=0xC2)}, None, None),
+    ("jpeg-arithmetic", picture(), {IMAGE: jpeg(frame=0xC9)}, None, "bad-image-header"),
+    ("jpeg-jpg-marker", picture(), {IMAGE: jpeg(extra=segment(0xC8, b""))}, None, None),
+    ("jpeg-short-frame", picture(), {IMAGE: jpeg(parts=3, specs=1)}, None, "bad-image-header"),
+    ("jpeg-widest", picture(), {IMAGE: jpeg(10_000, 1)}, None, None),
+    ("jpeg-highest", picture(), {IMAGE: jpeg(1, 10_000)}, None, None),
+    (
+        "exif-little-endian",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xE1, exif(8, "II")))},
+        None,
+        "orientation",
+    ),
+    (
+        "exif-orientation-second",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xE1, exif(6, before=1)))},
+        None,
+        "orientation",
+    ),
+    (
+        "exif-orientation-tight",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xE1, exif(6, tight=True)))},
+        None,
+        "orientation",
+    ),
+    (
+        "exif-entry-cut-short",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xE1, exif(6, tight=True)[:-2]))},
+        None,
+        "bad-image-header",
+    ),
+    (
+        "exif-eight-bytes",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xE1, b"Exif\x00\x00MM\x00*\x00\x00\x00\x04"))},
+        None,
+        None,
+    ),
+    (
+        "exif-empty-ifd-at-end",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xE1, b"Exif\x00\x00MM\x00*\x00\x00\x00\x08\x00\x00"))},
+        None,
+        None,
+    ),
+    (
+        "exif-ifd-past-end",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xE1, b"Exif\x00\x00MM\x00*\x00\x00\x00\x09\x00\x00"))},
+        None,
+        "bad-image-header",
+    ),
+    (
+        "exif-many-entries",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xE1, b"Exif\x00\x00MM\x00*\x00\x00\x00\x08\x00\x64"))},
+        None,
+        "bad-image-header",
+    ),
+    (
+        "exif-wrong-type",
+        picture(),
+        {
+            IMAGE: jpeg(
+                extra=segment(0xE1, exif(6).replace(b"\x01\x12\x00\x03", b"\x01\x12\x00\x04"))
+            )
+        },
+        None,
+        "bad-image-header",
+    ),
 ]
 
 
@@ -2291,6 +2606,7 @@ EXACT = '<w:spacing w:line="240" w:lineRule="exact"/>'
 BORDER = '<w:bdr w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
 ROW = '<w:trPr><w:trHeight w:val="2000" w:hRule="exact"/></w:trPr>'
 INNER = f"<w:tr><w:tc>{p(r(picture()))}</w:tc></w:tr>"
+STYLED = '<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr>'
 # Where a picture stands, and the reason its place gives: Word prints a field's result again
 # (a REF to a bookmark round another picture prints that one), and clips a picture to an exact
 # line or row; a border on the run is drawn round it.
@@ -2372,6 +2688,49 @@ PLACED_CASES: list[tuple[str, str, str | None, str | None]] = [
         p(r(picture(), '<w:rStyle w:val="B"/>')),
         f'<w:style w:type="character" w:styleId="B"><w:rPr>{BORDER}</w:rPr></w:style>',
         "border",
+    ),
+    ("border-nil", p(r(picture(), '<w:bdr w:val="nil"/>')), None, None),
+    (
+        "after-a-simple-field",
+        p(
+            f'<w:fldSimple w:instr=" DOCPROPERTY T ">{r("<w:t>x</w:t>")}</w:fldSimple>'
+            + r(picture())
+        ),
+        None,
+        None,
+    ),
+    ("first-spacing-only", p(r(picture()), '<w:spacing w:after="0"/>' + EXACT), None, None),
+    (
+        "exact-line-by-table-style",
+        tbl(1, f"<w:tr><w:tc>{p(r(picture()))}</w:tc></w:tr>").replace("<w:tbl>", STYLED),
+        f'<w:style w:type="table" w:styleId="T"><w:pPr>{EXACT}</w:pPr></w:style>',
+        "line-height",
+    ),
+    (
+        "exact-line-by-default-table-style",
+        tbl(1, f"<w:tr><w:tc>{p(r(picture()))}</w:tc></w:tr>"),
+        f'<w:style w:type="table" w:default="1" w:styleId="T"><w:pPr>{EXACT}</w:pPr></w:style>',
+        "line-height",
+    ),
+    (
+        "exact-line-of-a-table-style-outside",
+        p(r(picture())) + tbl(1, f"<w:tr><w:tc>{p('')}</w:tc></w:tr>"),
+        f'<w:style w:type="table" w:default="1" w:styleId="T"><w:pPr>{EXACT}</w:pPr></w:style>',
+        None,
+    ),
+    (
+        "exact-row-by-default-table-style",
+        tbl(1, f"<w:tr><w:tc>{p(r(picture()))}</w:tc></w:tr>"),
+        f'<w:style w:type="table" w:default="1" w:styleId="T">{ROW}</w:style>',
+        "row-height",
+    ),
+    (
+        "row-after-an-exact-row",
+        tbl(
+            1, f"<w:tr>{ROW}<w:tc>{p('')}</w:tc></w:tr><w:tr><w:tc>{p(r(picture()))}</w:tc></w:tr>"
+        ),
+        None,
+        None,
     ),
 ]
 

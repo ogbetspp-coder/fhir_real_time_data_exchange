@@ -46,11 +46,13 @@ from label_docx.output import canonical
 from label_docx.reader import _image as reader_image
 from label_docx.word import SUFFIXES, label_as_drawn
 from lock import MANIFESTS
+from test_headers_comments import with_parts
 from test_reader import (
     _NO_GRID,
     ALL_LOOKS,
     APPLIED,
     HEADERS,
+    IMAGE,
     LAST_LEFT_OUT,
     LINE,
     MEDIA,
@@ -68,7 +70,10 @@ from test_reader import (
     exif,
     jpeg,
     p,
+    picture,
     png,
+    r,
+    relationship,
     segment,
     t_style,
     t_table,
@@ -1304,6 +1309,32 @@ def test_the_checks_image_reading_agrees_with_the_readers_on_damaged_images() ->
         else:
             mine = (None, None, {"not-png-or-jpeg"})
         assert (kind, None if pixels is None else list(pixels), why) == mine, data.hex()[:80]
+
+
+def test_a_pictures_part_is_found_through_its_own_storys_relationships() -> None:
+    # A note's picture through the notes part's relationships, a comment's through the
+    # comments part's; with none, there is no part.
+    note = f'<w:footnote w:id="1">{p(r(picture()))}</w:footnote>'
+    noted = docx(p(r('<w:footnoteReference w:id="1"/>')), footnotes=note)
+    comment = f'<w:comment w:id="0" w:author="A">{p(r(picture()))}</w:comment>'
+    commented = with_parts(
+        docx(p(r("<w:t>x</w:t>") + r('<w:commentReference w:id="0"/>'))),
+        {"comments.xml": f'<w:comments xmlns:w="{W}">{comment}</w:comments>'},
+        [("c", "comments", "comments.xml")],
+    )
+    for data, rels, where in (
+        (noted, "word/_rels/footnotes.xml.rels", "footnotes"),
+        (commented, "word/_rels/comments.xml.rels", "comments"),
+    ):
+        for given, part in (({rels: relationship()}, IMAGE), ({}, None)):
+            packed = with_media(data, MEDIA, given)
+            value, source = _docx_value(packed), DocxSource(packed)
+            (found,) = value[where][0]["paragraphs"][0]["pictures"]
+            assert (found["part"], found["reason"]) == (part, None if part else "no-part")
+            source.certify(value)
+            found["reason"] = "no-part" if part else None
+            with pytest.raises(CertificationError, match="pictures"):
+                source.certify(value)
 
 
 def _standing(reason: str, offset: int = 0, kind: str = "picture") -> dict[str, Any]:

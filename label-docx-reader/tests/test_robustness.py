@@ -156,5 +156,9 @@ def test_an_image_of_more_chunks_or_segments_than_read_is_a_bad_one(pieces: int)
     bad = pieces > 100_000
     assert (reader._image(image)[2] == {"bad-image-header"}) is bad
     assert (certify._png_facts(image)[1] == {"bad-image-header"}) is bad
+    # As many without IEND, ending with the last of them: given up all the same.
+    endless = png(extra=chunk(b"zzZz", b"") * (pieces - 2), end=False)
+    assert reader._image(endless)[2] == {"bad-image-header"}
+    assert certify._png_facts(endless)[1] == {"bad-image-header"}
     assert (reader._image(jpeg(extra=comments))[2] == {"bad-image-header"}) is bad
     assert (certify._jpeg_facts(jpeg(extra=comments))[1] == {"bad-image-header"}) is bad
