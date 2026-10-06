@@ -5,7 +5,8 @@
     "label-docx-json/1.15.7": "0cc9f57af0651a7eff6141f89f75d4358a1f91247df2495cc1c0f603bf00d7e7",
     "label-docx-json/1.16.0": "8ea8365876133a160b1e1da828b824ad26b4eb219f5f3b7b15a43e8cfc634f13",
     "label-docx-json/1.17.0": "08018a9a10d138d38b5f851bc2eee58a81b4af0818ca54481cbc880dbbfdf35e",
-    "label-docx-json/1.17.1": "87509c0337207b5fc2fab01cb5f11e8d11d2191b3534f1b12e5d79daf541c5d0"
+    "label-docx-json/1.17.1": "87509c0337207b5fc2fab01cb5f11e8d11d2191b3534f1b12e5d79daf541c5d0",
+    "label-docx-json/1.18.0": "6e6444b5854c1cb5e35b83b464542ad59284a235388a8ffb08496e9317bfef08"
   },
   "docx-reader": {
     "docx-reader/1.1.0": "fe8d2711b071d26ad210f9541ffa1d11ea13b49401f38d7ce77040f30d7cc572",
@@ -13,12 +14,14 @@
     "docx-reader/1.26.0": "49d437a531e36c81a48c61dd7ec58af97edac2246331b2030c31e4043059b066",
     "docx-reader/1.27.0": "89648044df0d2eb04a871c210175cf4611babff6f4c3f952451427bf2d139b89",
     "docx-reader/1.28.0": "da764385ec6b8b0ff262d776038bc375362003f522fea539ba1900170a975def",
-    "docx-reader/1.29.0": "f60b73461c2d0d28d1bfc53e2798c2f24731b23f60e56ec51c3f9bc364d89bab"
+    "docx-reader/1.29.0": "f60b73461c2d0d28d1bfc53e2798c2f24731b23f60e56ec51c3f9bc364d89bab",
+    "docx-reader/1.30.0": "ee775fa786ebcb0572a8b92c400c0746199748e6dd913a1b87d2fc0d810753ca"
   },
   "epi-format": {
     "label-epi-json/1.11.10": "66d14a7c4db479bd132579b71160fde2d13d104eac6cfdd05226ca7f0a0a5182",
     "label-epi-json/1.11.11": "2f31812ef81edc47825fd8f5a8cbeaf52515516f76841cef5bd01d909b7d6b91",
     "label-epi-json/1.11.12": "772376bf77295bae7865d3676859b0fddb9f4abcf294797551d6acf776a5b46a",
+    "label-epi-json/1.11.13": "ebbeb9cd8528512d297a43f39ba4c75debd4f042523a646c19d4ad809e386d37",
     "label-epi-json/1.11.7": "6a8bcf96814f1cba3b8e02e0bd02bb40b13cc2f46d3aaf7a2c9e0a5d834fb007",
     "label-epi-json/1.11.8": "f4088ce541f0b97afacd7f480c1c1fce4a51bd5b55f484d2c7b5ea40e3254c26",
     "label-epi-json/1.11.9": "1a651a6c6ad5c98fea503bd91339eee8e94aceb5999f7948b9c9f429f63e409e"
@@ -29,17 +32,20 @@
     "epi-reader/1.3.1": "d8ab4b095fc1c77fe71e7c16de12226d363532f63df20fe8bdc4341302ce351c",
     "epi-reader/1.3.2": "424e99bd4e31a08f11bbc0400a6fab82816335394a85cb67c5ad1992a81d8746",
     "epi-reader/1.3.3": "706e64abe226f5bb0d012a77be11fb0f2d845f4ae2af5740d86e11a1add3fecb",
-    "epi-reader/1.3.4": "7cd39a1ceb60049cdec322115b10e867e9d6be9f22f08bb5eb9331d16c65825b"
+    "epi-reader/1.3.4": "7cd39a1ceb60049cdec322115b10e867e9d6be9f22f08bb5eb9331d16c65825b",
+    "epi-reader/1.3.5": "cf68d5e22e9f6c106ae85e43c4356f3a6bfe75f21e41b26f6c69153b6e4118c8"
   },
   "implementation-check": {
     "implementation-check/1.0.0": "8d0188c8c37aecdfce10776597c2645f99c7083d0326da4080a46d9512a7c031",
     "implementation-check/1.1.0": "ead0c2d188706f99e193c8b07e5f8bcb943d86f02f87415aebc9a6dc282e94bd",
     "implementation-check/1.1.1": "b4a5f68b03005cfbd40efe16f33dfc54517df8efac90cc477dabafa509948d1e",
-    "implementation-check/1.1.2": "96f1667325408aeee1eecaef09ca9fe5b611d2ed9faa2a5700732c3fdacc956e"
+    "implementation-check/1.1.2": "96f1667325408aeee1eecaef09ca9fe5b611d2ed9faa2a5700732c3fdacc956e",
+    "implementation-check/1.1.3": "e4b1fa958fa22cba2ad6b529e755a1eb9e0f9bb016b1740617fe762da55d588e"
   },
   "product": {
     "product/1.0.0": "b6f1973ec1eb760f11fd254f6b3c950da944e5e50d35ab3e856ef55a071a4f6e",
-    "product/1.0.1": "3dc2e85fdccd9bcfb1c56706cbaa182a2858add3110cc6745de44a8366c63fa8"
+    "product/1.0.1": "3dc2e85fdccd9bcfb1c56706cbaa182a2858add3110cc6745de44a8366c63fa8",
+    "product/1.0.2": "b94dbd8e50b4aaefe2e00bf7c88e0c26740094c4f20eaec874ef0e6523022d26"
   },
   "qrd-check": {
     "qrd-check/1.2.0": "731151adfff83d6948e3269d090099b214af594e8ffee153a7621acf4fe920b2",
@@ -47,7 +53,8 @@
     "qrd-check/1.4.0": "7e1c22e5d9acaeccf2fb4ab7d66edbef8b246d67495568b42ca6c0b44d5ae5fb",
     "qrd-check/1.4.1": "69e362f9b5e993328b7cf4b549ec55973d570bc62cedd74f8aca8e162938cd4a",
     "qrd-check/1.4.2": "272d4e64c999321cec6863df7eb47d0671252dced8b101291b4c675f39320268",
-    "qrd-check/1.4.3": "0613b81301c5315866d50b79b9e55b5dbf06d3264df31723275167b07c626960"
+    "qrd-check/1.4.3": "0613b81301c5315866d50b79b9e55b5dbf06d3264df31723275167b07c626960",
+    "qrd-check/1.4.4": "d59439cd9256308817b473df5a053b4a322e8a9d3bb368f6290319eb850d3258"
   },
   "qrd-registry": {
     "1.0.0": "fa7df5a8d2c5a3900eb6b34c0cd3071f67d51af25182e68da29b44e7a23c32e7",
@@ -55,20 +62,24 @@
     "1.2.0": "8f070ba8e2f9ba42ee4b126dfea84767a97848524a7d4f94b1dd10827b9461f5",
     "1.2.1": "dbc27a6178f4d2e0371ddc593cf51600ec5654c4fbbf0b632b5a81d2f61305d5",
     "1.2.2": "5ed89d7e8988d57fdddc1a7e37db71d8b1cd4def953dc7f2c94f1aaa7b68e8e9",
-    "1.2.3": "0ed7c507f4f22a668fc29dba097a5dcf777117ec411ec07a90cc515292921dff"
+    "1.2.3": "0ed7c507f4f22a668fc29dba097a5dcf777117ec411ec07a90cc515292921dff",
+    "1.2.4": "0eef0e6a14cfc82e5535faa7b78b3c82c7f030132f9451dcc7b751b457eb2b5e"
   },
   "smpc-structure": {
     "smpc-structure/1.0.0": "0f48158ea52293644d3a1f11c96575a47c447b343de7938b88e30e21f35989a5",
     "smpc-structure/1.0.1": "d2205703de343e5e4bd0f2b3c84de440a1762fbd04a3bcbba254a25d095b47f3",
     "smpc-structure/1.0.2": "35b754f977f6acf8e07604b2d68eb9ab2ded8b40c7a847c3e2a950753f4ef06a",
-    "smpc-structure/1.0.3": "991c58b3dbc16b8de30cdc43c587dd062e46c29c050543ddcc661db564740ec5"
+    "smpc-structure/1.0.3": "991c58b3dbc16b8de30cdc43c587dd062e46c29c050543ddcc661db564740ec5",
+    "smpc-structure/1.0.4": "165054063f98098bf46599f71070321b1a54fd088043c61cad65718bfc74ca34"
   },
   "word-drawing": {
     "word-drawing/1.0.0": "c3750aef78ac1f6ee7e61a1e4f1d121359be7bade1a29b1a0b02fb90ccd66a98",
-    "word-drawing/1.0.1": "a00c4ae830cab12c01975ecaa65aa718a372a33c389d1f7dbe55c4c1e3fdf10e"
+    "word-drawing/1.0.1": "a00c4ae830cab12c01975ecaa65aa718a372a33c389d1f7dbe55c4c1e3fdf10e",
+    "word-drawing/1.0.2": "e565ab171dfba8ba11eb85b3449835d1cbc9ee76f6e01db52f0833e1a3305c1a"
   },
   "word-epi": {
     "word-epi/1.0.0": "be254f42d394d190be7bb080cf4497db17fa3fe64569bf4d37633c96b7859b19",
-    "word-epi/1.0.1": "54a8b6ae42852204b29a70d39256680b71bb80e5de99f44b3496e4abe9190c5b"
+    "word-epi/1.0.1": "54a8b6ae42852204b29a70d39256680b71bb80e5de99f44b3496e4abe9190c5b",
+    "word-epi/1.1.0": "3624dfb869e153421315df3ce0d72ac327139e63a30acfa9ffe7aa5363017ebd"
   }
 }

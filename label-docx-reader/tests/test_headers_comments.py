@@ -101,6 +101,20 @@ def test_headers_and_footers_are_read_once_each_with_their_uses() -> None:
     assert "word/header2.xml" in value["certificate"]["scope"]
 
 
+def test_a_floating_object_in_a_header_is_placed_and_a_text_box_set_aside_as_in_the_body() -> None:
+    from test_reader import FLOATING_TEXT
+
+    body = p(r("<w:t>One</w:t>")) + f"<w:sectPr>{reference('header', 'h1')}</w:sectPr>"
+    boxed = FLOATING_TEXT["text-box-drawing"][0]
+    parts = {"header1.xml": header(p(r("<w:t>Logo</w:t>" + boxed)))}
+    data = _document(body, parts, [("h1", "header", "header1.xml")])
+    value = json.loads(output.read(data)[0])
+    (paragraph,) = value["headers"][0]["paragraphs"]
+    assert paragraph["text"] == "Logo"
+    assert paragraph["anchored"] == [{"kind": "text-box", "offset": 4, "read": False}]
+    assert value["certificate"]["setAside"]["unreadObjects"] == 1
+
+
 def test_a_footer_the_reader_cannot_read_is_refused_on_its_own() -> None:
     date = PAGE.replace(" PAGE ", " DATE ")
     body = p(r("<w:t>Body</w:t>")) + f"<w:sectPr>{reference('footer', 'f1')}</w:sectPr>"

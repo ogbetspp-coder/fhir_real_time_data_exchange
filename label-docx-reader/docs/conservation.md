@@ -2,8 +2,8 @@
 
 Every result the reader serves carries a certificate from an independent check
 ([`certify.py`](../src/label_docx/certify.py)). A result the check cannot account for is not
-served; it becomes the refusal `uncertified`. Requirements R-24 to R-28, R-34 to R-36, R-39, R-43
-and R-44 in [requirements.md](requirements.md); tests in `tests/test_certify.py`.
+served; it becomes the refusal `uncertified`. Requirements R-24 to R-28, R-34 to R-36, R-39 and
+R-43 to R-45 in [requirements.md](requirements.md); tests in `tests/test_certify.py`.
 
 ## The statement
 
@@ -19,7 +19,9 @@ For a document `D` and the reader's result `R`:
 - **Set aside**, each for a reason the check works out from `D` itself: field code (never
   shown), page numbers (set by layout; their places must be in `pages`), page and column breaks,
   hidden whitespace, floating pictures and shapes (anchored to a paragraph: Word's text shows
-  none); for an ePI, whitespace CSS collapses and a break ending a paragraph.
+  none), and a floating object holding text that nothing elsewhere counts or refers to, whole,
+  with its text in every branch of alternate content (below); for an ePI, whitespace CSS
+  collapses and a break ending a paragraph.
 - **Character:** a text character is itself, or its Symbol-table character in a Symbol-font run;
   `w:tab` is U+0009, `w:br` U+000A, `w:sym` (only in Symbol, by one to four hex digits) its
   Symbol-table character, a picture or shape in line with the text U+FFFC.
@@ -31,7 +33,7 @@ of a kind the format names; each body table's grid is the one `D` stores, read b
 own rules; what each U+FFFC stands for is the drawing `D` has there, read by its own rules too)
 and the ledger:
 `text + instructions + elements = output + field code + page numbers + page breaks + hidden
-whitespace + floating objects`. Equality is all or nothing, so a dropped, added, changed, repeated, swapped or moved
+whitespace + floating objects + unread objects' text`. Equality is all or nothing, so a dropped, added, changed, repeated, swapped or moved
 character, and a dropped, split or merged paragraph, all fail it.
 
 `tests/test_certify.py` applies up to four seeded changes of each of its kinds to the result of
@@ -92,6 +94,23 @@ stands in; or, where a row does not fill its grid, a count is not digits, or a m
 drawing of is not on record, no grid and the same first reason the result names.
 It draws lists in the body only; a list anywhere else, a label in capitals, hidden or drawn as
 a picture, and a custom note mark's echo are never certified.
+
+So must every paragraph's `anchored` (R-45): the check finds each object anchored to a paragraph
+on its own, where its run stands outside a field's code or a page number, and its kind: a
+picture or a shape holding no text; or one holding a text box (`w:txbxContent`) that floats (a
+DrawingML `wp:anchor`, alone or as alternate content's one `wps`, `wpg` or `wpc` choice; VML of
+one shape or group positioned absolutely) and holds nothing Word refers to or counts elsewhere,
+by its own copy of that condition: no field, note mark, bookmark, comment, section or revision,
+no list item by its own properties, a style, a table style or the defaults, no content control
+shown from elsewhere, no WordArt or embedded object, no graphic but a picture, shape, group or
+canvas, none of Word's own elements outside the text boxes but the drawing and its fallback, and
+no field around it. Such an object is set aside whole: its text elements' characters and its
+runs' elements, in every branch, are counted in the source and set aside (`unreadObjects`,
+`unreadObjectCharacters`), and its paragraphs are not the walk's. Any other object holding text
+is never certified. Every entry must be the check's, offset, kind and `read` false: one added,
+dropped, moved, of another kind or marked read is never certified, and an object's text put in
+its paragraph fails the text's equality. In a tracked document a revision inside a drawing is
+never certified (`certify_tracked`): its text is in neither view.
 
 So must every paragraph's `pictures` (R-44), in the body, notes, headers, footers and comments:
 for each drawing it reads as U+FFFC, in order, the check finds on its own the image part (the
@@ -169,7 +188,8 @@ divs of an ePI. A header, footer or comment the reader refuses on its own is lis
 anywhere else is listed under `notRead`: for a .docx each part (the glossary, a header no section
 names...), note separator or continuation notice, with the size of its text (every text character
 and every element that stands for one); for an ePI only the number of other narratives in the
-Bundle.
+Bundle. The text of a floating object set aside unread is in the parts read, counted under
+`setAside` (`unreadObjectCharacters`), not under `notRead`.
 
 ## Who checks the checker
 

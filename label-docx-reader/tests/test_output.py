@@ -44,6 +44,7 @@ def test_a_read_is_canonical_and_names_its_source_and_versions() -> None:
     assert value["source"] == {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
     first = value["paragraphs"][0]
     assert sorted(first) == [
+        "anchored",
         "comments",
         "markHidden",
         "marks",

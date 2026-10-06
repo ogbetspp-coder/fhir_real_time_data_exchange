@@ -17,7 +17,7 @@ import pytest
 
 from label_docx import output
 from label_docx.certify import CertificationError, certify_tracked
-from label_docx.reader import DocxRefusedError, read_document, tracked
+from label_docx.reader import DocxRefusedError, changed_drawing, read_document, tracked
 from label_docx.store import Store
 from label_docx.word import tracked_verdict
 from test_headers_comments import header, reference, with_parts
@@ -303,7 +303,7 @@ def test_the_check_holds_each_view_to_the_source_on_its_own() -> None:
     source = docx(p(t("a"), mark("ins")) + p(t("b") + dele("c") + ins(t("d"))))
     accepted, original, _ = tracked(source)
     assert certify_tracked(source, {"accepted": accepted, "original": original}) == {
-        "checker": "conservation-check/1.17.0",
+        "checker": "conservation-check/1.18.0",
         "accepted": {"characters": 3, "elements": 0, "paragraphsJoined": 0},
         "original": {"characters": 3, "elements": 0, "paragraphsJoined": 1},
     }
@@ -420,7 +420,7 @@ def test_the_check_counts_what_each_view_holds_and_only_the_revised_parts() -> N
     source = _with_part(docx(body, footnotes=note), "word/media/image1.png", b"\x89PNG\r\n")
     accepted, original, _ = tracked(source)
     assert certify_tracked(source, {"accepted": accepted, "original": original}) == {
-        "checker": "conservation-check/1.17.0",
+        "checker": "conservation-check/1.18.0",
         "accepted": {"characters": 5, "elements": 2, "paragraphsJoined": 0},
         "original": {"characters": 4, "elements": 1, "paragraphsJoined": 0},
     }
@@ -687,3 +687,33 @@ def test_a_section_break_a_view_drops_between_sections_that_differ_in_what_is_re
         tracked(docx(body + "<w:sectPr/>"))
     # The same settings on both sides: the join is read (mark-deleted-section-end).
     tracked(docx(body + f"<w:sectPr>{first}</w:sectPr>"))
+
+
+def test_a_change_inside_a_floating_object_is_refused_and_one_outside_it_is_read() -> None:
+    from test_reader import FLOATING_TEXT, IN_BOX
+
+    drawing = FLOATING_TEXT["text-box"][0]
+    # A change beside the object: both views read, each with the object set aside unread.
+    value = result(docx(p(t("a") + ins(t("b")) + r(drawing))))
+    for view in VIEWS:
+        (paragraph,) = value["tracked"][view]["paragraphs"]
+        assert paragraph["anchored"] == [
+            {"kind": "text-box", "offset": len(paragraph["text"]), "read": False}
+        ]
+    # A change inside it: in neither view's text, yet listed; refused, and never certified.
+    changed = docx(p(t("a") + r(drawing.replace(IN_BOX, p(ins(t("b")))))))
+    assert changed_drawing(changed) == "word/document.xml"
+    assert changed_drawing(docx(p(t("a") + ins(t("b")) + r(drawing)))) is None
+    assert result(changed)["refusal"] == {
+        "code": "tracked-change",
+        "detail": "a change inside a drawing in word/document.xml",
+    }
+    # A view refused first keeps its own refusal, in the order the reader meets it.
+    refused = docx(
+        p(r('<w:sym w:font="Wingdings" w:char="F0A7"/>'))
+        + p(t("a") + r(drawing.replace(IN_BOX, p(ins(t("b"))))))
+    )
+    assert result(refused)["refusal"]["detail"].startswith("accepted view: ")
+    data = docx(p(t("a") + r(drawing)))
+    with pytest.raises(CertificationError, match="a revision inside a drawing"):
+        certify_tracked(changed, dict.fromkeys(VIEWS, data))

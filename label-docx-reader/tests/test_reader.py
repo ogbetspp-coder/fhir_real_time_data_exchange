@@ -22,6 +22,7 @@ from label_docx import read as served
 from label_docx.certify import CertificationError, DocxSource
 from label_docx.reader import (
     REASONS,
+    Anchored,
     Document,
     DocxRefusedError,
     NoteReference,
@@ -308,7 +309,7 @@ def test_a_drawn_shape_with_no_text_reads_as_a_picture_does() -> None:
     textbox = SHAPE.replace("<wps:spPr/>", "<wps:txbx><w:txbxContent/></wps:txbx>")
     for body in (
         p(r(_alternate(SHAPE.replace(f"xmlns:wps='{WPS}'", "xmlns:wps='urn:wps'"), LINE))),
-        p(r(_alternate(textbox, LINE))),  # a text box
+        p(r(_alternate(textbox.replace("wp:anchor", "wp:inline"), LINE))),  # a text box in line
         p(r(_alternate(SHAPE, "<w:pict><v:textbox xmlns:v='urn:v'/></w:pict>"))),  # in VML
         p(r(_alternate(SHAPE, "<w:sym w:font='Symbol' w:char='F0B7'/>"))),  # run content
         p(r(_alternate(SHAPE, "<w:tab/>"))),
@@ -2966,6 +2967,200 @@ def _field(code: str, stored: str) -> str:
 
 def _marked(name: str, inner: str, key: int = 1) -> str:
     return f'<w:bookmarkStart w:id="{key}" w:name="{name}"/>{inner}<w:bookmarkEnd w:id="{key}"/>'
+
+
+# --- floating objects holding text ("Anchored" in the reader's docstring) -----------------------
+
+WPG = "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"
+WPC = "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+VML = "urn:schemas-microsoft-com:vml"
+IN_BOX = p(r("<w:t>in the box</w:t>"))
+
+
+def box(inner: str = IN_BOX) -> str:
+    """A ``wps`` shape holding a text box of ``inner``."""
+    return (
+        f"<wps:wsp xmlns:wps='{WPS}'><wps:spPr/><wps:txbx><w:txbxContent>{inner}"
+        "</w:txbxContent></wps:txbx></wps:wsp>"
+    )
+
+
+def floating(graphic: str, uri: str = WPS, frame: str = "anchor") -> str:
+    """A DrawingML drawing of ``graphic``, anchored to its paragraph (or ``frame``)."""
+    return (
+        f"<w:drawing><wp:{frame} xmlns:wp='{WP}'><a:graphic xmlns:a='{A}'>"
+        f"<a:graphicData uri='{uri}'>{graphic}</a:graphicData></a:graphic></wp:{frame}></w:drawing>"
+    )
+
+
+def vml_box(inner: str = IN_BOX, style: str = "position:absolute;margin-left:9pt") -> str:
+    """A VML shape holding a text box of ``inner``."""
+    return (
+        f"<w:pict><v:shapetype xmlns:v='{VML}'/><v:shape xmlns:v='{VML}' style='{style}'>"
+        f"<v:textbox><w:txbxContent>{inner}</w:txbxContent></v:textbox></v:shape></w:pict>"
+    )
+
+
+def group(inner: str = IN_BOX) -> str:
+    """Word's text box group, a ``wpg`` choice with its VML group as fallback."""
+    shapes = f"<wpg:wgp xmlns:wpg='{WPG}'>{box(inner)}<wps:wsp xmlns:wps='{WPS}'/></wpg:wgp>"
+    fallback = (
+        f"<w:pict><v:group xmlns:v='{VML}' style='position:absolute'><v:shape>"
+        f"<v:textbox><w:txbxContent>{inner}</w:txbxContent></v:textbox></v:shape></v:group></w:pict>"
+    )
+    return _alternate(floating(shapes, WPG), fallback, requires="wpg")
+
+
+# Each floating object holding text the reader sets aside, as Word writes it, and its kind.
+FLOATING_TEXT = {
+    "text-box": (_alternate(floating(box()), vml_box()), "text-box"),
+    "text-box-drawing": (floating(box()), "text-box"),
+    "group": (group(), "shapes"),
+    "canvas": (
+        _alternate(floating(f"<wpc:wpc xmlns:wpc='{WPC}'>{box()}</wpc:wpc>", WPC), requires="wpc"),
+        "shapes",
+    ),
+    "vml-text-box": (vml_box(), "text-box"),
+    "vml-group": (
+        f"<w:pict><v:group xmlns:v='{VML}' style='Position: Absolute'>"
+        f"{vml_box()[len('<w:pict>') : -len('</w:pict>')]}</v:group></w:pict>",
+        "shapes",
+    ),
+}
+
+
+@pytest.mark.parametrize("name", FLOATING_TEXT)
+def test_a_floating_object_holding_text_is_set_aside_unread_where_it_is_anchored(name: str) -> None:
+    drawing, kind = FLOATING_TEXT[name]
+    data = docx(p(r("<w:t>a</w:t>") + r(drawing) + r("<w:t>b</w:t>")))
+    (paragraph,) = read_docx(data)
+    assert (paragraph.text, paragraph.anchored) == ("ab", (Anchored(1, kind),))
+    # Certified as such: the check finds it on its own (tests/test_certify.py).
+    value = json.loads(served(data)[0])
+    assert value["paragraphs"][0]["anchored"] == [{"kind": kind, "offset": 1, "read": False}]
+
+
+def test_every_floating_object_is_placed_where_it_is_anchored() -> None:
+    line = _alternate(SHAPE, LINE)
+    picture = PICTURE.replace("wp:inline", "wp:anchor")
+    absolute = VML_PICTURE.replace('style="', 'style="position:absolute;')
+    body = p(r("<w:t>ab</w:t>" + line) + r(picture + "<w:t>c</w:t>" + absolute) + r(vml_box()))
+    (paragraph,) = read_docx(docx(body))
+    assert paragraph.text == "abc"
+    kinds = [(a.offset, a.kind, a.read) for a in paragraph.anchored]
+    assert kinds == [
+        (2, "shape", False),
+        (2, "picture", False),
+        (3, "picture", False),
+        (3, "text-box", False),
+    ]
+
+
+# What, in a floating object, Word refers to or counts elsewhere: each keeps it refused whole.
+COUNTED_INSIDE = {
+    "field": p(_field("DOCPROPERTY Title", "x")),
+    "seq": p(_field("SEQ Figure", "1")),
+    "simple-field": p('<w:fldSimple w:instr=" SEQ Figure "><w:r><w:t>1</w:t></w:r></w:fldSimple>'),
+    "footnote": p(r('<w:footnoteReference w:id="1"/>')),
+    "endnote": p(r('<w:endnoteReference w:id="1"/>')),
+    "list-item": p(r("<w:t>x</w:t>"), '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>'),
+    "list-by-style": p(r("<w:t>x</w:t>"), '<w:pStyle w:val="L"/>'),
+    "bookmark": p(_marked("b", r("<w:t>x</w:t>"))),
+    "comment-range": p('<w:commentRangeStart w:id="0"/>' + r("<w:t>x</w:t>")),
+    "comment-mark": p(r('<w:commentReference w:id="0"/>')),
+    "section": p(r("<w:t>x</w:t>"), "<w:sectPr/>"),
+    "bound": '<w:sdt><w:sdtPr><w:dataBinding w:xpath="/a"/></w:sdtPr><w:sdtContent>'
+    + IN_BOX
+    + "</w:sdtContent></w:sdt>",
+}
+LIST_STYLE = (
+    '<w:style w:type="paragraph" w:styleId="L"><w:pPr><w:numPr><w:numId w:val="1"/></w:numPr>'
+    "</w:pPr></w:style>"
+)
+
+
+@pytest.mark.parametrize("inside", COUNTED_INSIDE)
+@pytest.mark.parametrize("name", ["text-box", "group", "vml-text-box"])
+def test_a_floating_object_holding_what_is_counted_elsewhere_is_refused_as_before(
+    name: str, inside: str
+) -> None:
+    drawing = FLOATING_TEXT[name][0].replace(IN_BOX, COUNTED_INSIDE[inside])
+    detail = {"text-box": "AlternateContent", "group": "AlternateContent", "vml-text-box": "pict"}
+    with pytest.raises(DocxRefusedError, match=detail[name]) as caught:
+        read_docx(docx(p(r(drawing)), LIST_STYLE))
+    assert caught.value.code == "unsupported-element"
+
+
+def test_a_list_set_by_the_defaults_or_a_table_style_keeps_a_floating_object_refused() -> None:
+    defaults = '<w:docDefaults><w:pPrDefault><w:pPr><w:numPr><w:numId w:val="1"/></w:numPr>'
+    defaults += "</w:pPr></w:pPrDefault></w:docDefaults>"
+    assert refusal(p(r(vml_box())), defaults) == "unsupported-element"
+    table_style = LIST_STYLE.replace('w:type="paragraph"', 'w:type="table"')
+    in_table = vml_box(
+        f'<w:tbl><w:tblPr><w:tblStyle w:val="L"/></w:tblPr><w:tr><w:tc>{IN_BOX}</w:tc></w:tr>'
+        "</w:tbl>"
+    )
+    assert refusal(p(r(in_table)), table_style) == "unsupported-element"
+    assert text_of(p(r(in_table))) == [""]  # no list there: set aside
+
+
+_CHART = "http://schemas.openxmlformats.org/drawingml/2006/chart"
+_END = r('<w:fldChar w:fldCharType="end"/>')
+# Floating objects holding text that are not set aside: each is refused as before.
+NOT_SET_ASIDE = {
+    "in-line": p(r(_alternate(floating(box(), frame="inline"), vml_box()))),
+    "vml-in-line": p(r(vml_box(style="margin-left:9pt"))),
+    "vml-relative": p(r(vml_box(style="position:relative"))),
+    # In a field's result, which Word may print again.
+    "in-a-field": p(_field('HYPERLINK "https://x"', "x").replace(_END, r(vml_box()) + _END)),
+    "ink": p(r(_alternate(floating(box()), vml_box(), requires="wpi"))),
+    "two-choices": p(
+        r(
+            _alternate(floating(box()), vml_box()).replace(
+                "<mc:Fallback>",
+                '<mc:Choice Requires="wps">' + floating(box()) + "</mc:Choice><mc:Fallback>",
+            )
+        )
+    ),
+    "choice-not-one-drawing": p(r(_alternate(floating(box()) + floating(box())))),
+    "two-frames": p(
+        r(floating(box()).replace("</wp:anchor>", f"</wp:anchor><wp:anchor xmlns:wp='{WP}'/>"))
+    ),
+    "chart-in-group": p(
+        r(
+            _alternate(
+                floating(
+                    f"<wpg:wgp xmlns:wpg='{WPG}'>{box()}<wpg:graphicFrame><a:graphic xmlns:a='{A}'>"
+                    f"<a:graphicData uri='{_CHART}'/></a:graphic></wpg:graphicFrame></wpg:wgp>",
+                    WPG,
+                ),
+                requires="wpg",
+            )
+        )
+    ),
+    "chart": p(r(floating(box(), _CHART))),
+    "wordart": p(r(vml_box().replace("<v:textbox>", "<v:textpath string='x'/><v:textbox>"))),
+    "activex": p(r(vml_box().replace("</w:pict>", '<w:control w:name="x"/></w:pict>'))),
+    "two-shapes": p(r(vml_box().replace("</w:pict>", f"<v:shape xmlns:v='{VML}'/></w:pict>"))),
+    "run-outside-the-box": p(r(_alternate(floating(box()), "<w:t>x</w:t>"))),
+}
+
+
+@pytest.mark.parametrize("name", NOT_SET_ASIDE)
+def test_a_text_box_in_line_in_a_field_or_of_another_drawing_is_refused_as_before(
+    name: str,
+) -> None:
+    assert refusal(NOT_SET_ASIDE[name]) == "unsupported-element"
+
+
+def test_a_styleref_or_a_seq_restarting_at_headings_beside_unread_text_is_refused() -> None:
+    heading = '<w:style w:type="paragraph" w:styleId="H1"><w:name w:val="heading 1"/></w:style>'
+    titled = p(r("<w:t>Title</w:t>"), '<w:pStyle w:val="H1"/>')
+    for field, stored in (("STYLEREF 1", "Title"), ("SEQ Figure \\s 1", "1")):
+        body = titled + p(_field(field, stored)) + p(r(vml_box()))
+        with pytest.raises(DocxRefusedError, match="beside text that is not read"):
+            read_docx(docx(body, heading))
+        assert text_of(titled + p(_field(field, stored)), heading)[1] == stored
 
 
 def test_a_cross_reference_that_prints_its_stored_text_is_read() -> None:

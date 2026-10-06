@@ -198,6 +198,12 @@ The record does not admit this today, for reasons this ADR has to answer rather 
   fixtures' README says why not; the 13 refused are shading the narrative cannot carry and
   underlines over "+" or "≥". An independent review found ten holes, each fixed and tested
   (`zone-a/tests/test_word_epi.py`, "the independent review's cases").
+- **Scoped refusals, phase 1** (2026-10-05, `docs/design/scoped-refusals.md`): the reader places
+  every object anchored to a paragraph (`anchored`, `docx-reader/1.30.0`, `label-docx-json/1.18.0`)
+  and sets a floating text box, group or canvas aside unread where nothing in it is counted or
+  referred to elsewhere, certified by the check's own walk; `zone_a.word_epi` (`word-epi/1.1.0`)
+  refuses the section that anchors a floating object (`anchored-object`), not the document, and a
+  header's or footer's floating object (a logo) refuses nothing.
 - **P1, pictures** (2026-10-05): each U+FFFC the reader writes says what it stands for (part,
   SHA-256, type by signature, pixels, extent, crop, and a reason from a closed list where it cannot
   be carried), certified; Word's own saves agree on every DrawingML picture of the corpus.

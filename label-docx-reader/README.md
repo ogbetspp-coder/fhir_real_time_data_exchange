@@ -9,8 +9,11 @@ normalises or repairs.
 - **Exact text.** Characters as stored. Tabs, breaks and special hyphens become their
   characters; Symbol-font glyphs ("≥", "°", "μ") and Wingdings bullets ("▪") map through closed
   tables. A picture in line with the text is U+FFFC, as is a shape in alternate content that
-  holds no text (any other shape is refused); a floating one is not in the text, as in Word, and
-  the certificate counts it. Each U+FFFC says what it stands for: the image part, its SHA-256,
+  holds no text (any other shape is refused); a floating one is not in the text, as in Word, but
+  placed where it is anchored, and the certificate counts it. A floating text box, group or
+  canvas is placed too, its text set aside unread, where nothing in it is counted or referred to
+  elsewhere (a field, a note, a list item, a bookmark, a comment, a tracked change); else it is
+  refused. Each U+FFFC says what it stands for: the image part, its SHA-256,
   type, pixels, extent and crop, and the first reason found that its bytes may not be the
   picture Word draws. Formatting that changes meaning (bold, italic, super/subscript,
   underline, strike, caps, highlight, shading, faint text) is reported as marks over the text,
@@ -23,8 +26,8 @@ normalises or repairs.
 - **Tracked changes: two texts, never one.** A tracked document is read with every change
   accepted and with every change rejected, plus the list of changes. There is no default text;
   the caller chooses.
-- **Refuses rather than guesses.** Hidden text, fields Word recomputes (DATE, IF...), text boxes,
-  equations, embedded objects, dingbat fonts and more are refused with a code. The full lists:
+- **Refuses rather than guesses.** Hidden text, fields Word recomputes (DATE, IF...), text boxes
+  in line or holding what is counted elsewhere, equations, embedded objects, dingbat fonts and more are refused with a code. The full lists:
   the docstrings of [`reader.py`](src/label_docx/reader.py) and [`epi.py`](src/label_docx/epi.py).
 - **Certified.** An independent check ([`certify.py`](src/label_docx/certify.py)) re-reads the
   source with its own walk and rules (for a .docx through the same standard-library XML parser,
@@ -86,14 +89,15 @@ from another web page.
 
 ```json
 {"certificate": {…}, "comments": [], "endnotes": [], "footers": [], "footnotes": [],
- "format": "label-docx-json/1.17.1", "headers": [],
- "paragraphs": [{"comments": [], "markHidden": false,
+ "format": "label-docx-json/1.18.0", "headers": [],
+ "paragraphs": [{"anchored": [{"kind": "text-box", "offset": 2, "read": false}],
+   "comments": [], "markHidden": false,
    "marks": [{"end": 5, "kind": "superscript", "start": 4}], "notes": [], "numbering": null,
    "pages": [], "pictures": [{"crop": null, "extent": [76200, 76200], "kind": "picture",
      "offset": 8, "part": "word/media/image1.png", "pixels": [8, 8], "reason": null,
      "sha256": "…", "type": "png"}],
    "style": "Heading2", "table": [0, 1, 0], "text": "x 109/l \ufffc"}],
- "reader": "docx-reader/1.29.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
+ "reader": "docx-reader/1.30.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
  "tables": [{"grid": {"columns": 2, "rows": [
    {"after": 0, "before": 0, "cells": [{"column": 0, "merge": null, "span": 2}],
     "exactHeight": false},
@@ -133,6 +137,15 @@ from another web page.
   hold the rest. Whether Word draws it larger than its pixels is the caller's to judge (9525 EMU
   a pixel at 96 dpi). No picture refuses a read; the lists: "Pictures" in
   [`reader.py`](src/label_docx/reader.py).
+- `anchored` places each object anchored to the paragraph, which Word draws apart from the
+  text (body, notes, headers, footers, comments), in order: its `offset` (where its anchor
+  stands in `text`), its `kind` (`picture` or `shape`, holding no text; `text-box`, or `shapes`
+  for a group or canvas, holding text) and `read`, whether its own text is read: never yet,
+  so its text is in no paragraph, and the certificate counts it (`setAside`: `unreadObjects`,
+  `unreadObjectCharacters`, every branch of alternate content). One is set aside only where
+  nothing in it is counted or referred to elsewhere (a field, a footnote or endnote mark, a list
+  item, a bookmark, a comment, a section, a tracked change) and it stands in no field; any
+  other is refused as before. The lists: "Anchored" in [`reader.py`](src/label_docx/reader.py).
 - A refusal has `"refusal": {"code": …, "detail": …}` in place of the text.
 - A tracked document has `"tracked": {"accepted": {…}, "original": {…}, "changes": […]}` in place
   of the text; each view has the shape above.

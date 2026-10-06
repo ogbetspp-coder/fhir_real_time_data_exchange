@@ -14,7 +14,7 @@ those of field instructions, ``E`` the elements that stand for one character: ta
 picture...; ``O`` the output characters)::
 
     |T| + |I| + |E| = |O| + field code + page numbers + hidden whitespace + page breaks
-                        + floating objects
+                        + floating objects + unread objects' text
 
 and, stronger than the count, the sequence: paragraph by paragraph, the output text equals the
 tokens not set aside, in order, each mapped by a fixed table (a ``w:t`` character to itself, or
@@ -32,8 +32,12 @@ whitespace is left out, counted as ``hiddenWhitespace``; hidden text with charac
 never certified). The set-aside reasons are fixed too: a field's instruction (code, not shown),
 a page number (set by the layout; its place must be in ``pages``), a page or column break
 (layout), a picture or shape anchored to its paragraph (it floats apart from the text, and
-Word's text shows none; one in line is U+FFFC). The walk reads a closed list of elements and
-refuses any other, so no text is passed over unseen.
+Word's text shows none; one in line is U+FFFC), and a floating object holding text whose text
+nothing elsewhere counts or refers to (``_unread_kind``): set aside whole, its text in every
+branch of alternate content counted (``unreadObjects``, ``unreadObjectCharacters``). Each
+floating object must be placed where the check finds its anchor, of the kind it finds
+(``anchored``, never read). The walk reads a closed list of elements and refuses any other, so
+no text is passed over unseen.
 
 Its scope, and what it lists as not read, is stated in ``docs/conservation.md`` ("Scope").
 
@@ -97,7 +101,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT, WINGDINGS_BULLETS
 
-CHECKER_VERSION = "conservation-check/1.17.0"
+CHECKER_VERSION = "conservation-check/1.18.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -208,13 +212,17 @@ class _Ledger:
     hidden: int = 0
     page_breaks: int = 0
     floating: int = 0
+    # Floating objects holding text, set aside whole (``_unread_kind``), and the characters of
+    # their text elements and run elements, in every branch.
+    objects: int = 0
+    unread: int = 0
     symbol: int = 0
     output: int = 0
 
     def balanced(self) -> bool:
         source = self.text + self.instruction + self.elements
         kept = self.output + self.field_code + self.page_numbers + self.hidden + self.page_breaks
-        return source == kept + self.floating
+        return source == kept + self.floating + self.unread
 
 
 # --- .docx: the source's tokens -----------------------------------------------------------
@@ -618,6 +626,108 @@ def _in_line(drawing: ET.Element) -> bool:
     return False
 
 
+_VML = "urn:schemas-microsoft-com:vml"
+_PICTURE = "http://schemas.openxmlformats.org/drawingml/2006/picture"
+_SHAPE = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+# A floating object holding text, by the graphic its anchor draws: a text box, or shapes.
+_HOLDING = {
+    _SHAPE: "text-box",
+    "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup": "shapes",
+    "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas": "shapes",
+}
+# What in such an object Word refers to or counts elsewhere (and any revision, ``_REVISIONS``).
+_REFERRED = frozenset(
+    {
+        *("fldChar", "instrText", "fldSimple", "bookmarkStart", "bookmarkEnd", "numPr", "sectPr"),
+        *("commentRangeStart", "commentRangeEnd", "commentReference", "annotationRef"),
+        *_NOTE_MARKS,
+    }
+)
+
+
+def _unread_kind(drawing: ET.Element, fonts: _Fonts) -> str | None:
+    """The kind of a floating object whose text the walk sets aside unread, else None.
+
+    One that holds a text box (``w:txbxContent``) and floats: a DrawingML drawing whose one frame
+    is ``wp:anchor``, alone or the one ``wps``, ``wpg`` or ``wpc`` choice of alternate content
+    (Word draws the choice), of a shape (``text-box``), a group or a canvas (``shapes``); or VML
+    whose one shape or group (a ``shapetype`` aside) is positioned absolutely. And holding nothing
+    Word refers to or counts elsewhere: no field, note mark, bookmark, comment, section or
+    revision, no list item (``numPr``, or a style, a table style or the defaults that set one),
+    no content control Word shows from elsewhere, no WordArt or embedded object, no graphic but a
+    picture, a shape, a group or a canvas, and none of Word's own elements outside the text boxes
+    but the drawing and its fallback. Anything else is a token as before (``token``).
+    """
+    texts = [n for n in drawing.iter() if n.tag == _w("txbxContent")]
+    if not texts:
+        return None
+    shown = drawing
+    if _local(drawing.tag) == "AlternateContent":
+        choices = [c for c in drawing if _local(c.tag) == "Choice"]
+        if len(choices) != 1 or choices[0].get("Requires") not in ("wps", "wpg", "wpc"):
+            return None
+        if [c.tag for c in choices[0]] != [_w("drawing")]:
+            return None
+        shown = choices[0][0]
+    kind: str | None = None
+    if shown.tag == _w("drawing"):
+        if [c.tag for c in shown] != [f"{{{_WP}}}anchor"]:
+            return None
+        top = next((g for g in shown[0].iter() if _local(g.tag) == "graphicData"), None)
+        kind = None if top is None else _HOLDING.get(top.get("uri", ""))
+    elif shown.tag == _w("pict"):
+        drawn = [c for c in shown if c.tag != f"{{{_VML}}}shapetype"]
+        if len(drawn) == 1 and drawn[0].tag.startswith(f"{{{_VML}}}"):
+            position = _POSITION.search(drawn[0].get("style", ""))
+            if position is not None and position.group(1).strip().lower() == "absolute":
+                kind = "shapes" if _local(drawn[0].tag) == "group" else "text-box"
+    if kind is None:
+        return None
+    within = {id(n) for text in texts for n in text.iter()}
+    try:
+        for node in drawing.iter():
+            name = _local(node.tag)
+            ours = node.tag.startswith(f"{{{W}}}")
+            if node is drawing:
+                continue
+            if (
+                (ours and id(node) not in within and node.tag not in (_w("drawing"), _w("pict")))
+                or (ours and name in _REFERRED)
+                or node.tag in _REVISIONS
+                or name in ("textpath", "OLEObject")
+                or (name == "graphicData" and node.get("uri") not in (_PICTURE, *_HOLDING))
+            ):
+                return None
+            if node.tag == _w("sdt"):
+                _control(node)
+        styled = [t.find(f"{_w('tblPr')}/{_w('tblStyle')}") for t in drawing.iter(_w("tbl"))]
+        tables = [
+            i
+            for s in styled
+            for i in fonts.style_ids(None if s is None else s.get(_w("val")), "table")
+        ]
+        for paragraph in drawing.iter(_w("p")):
+            named = paragraph.find(f"{_w('pPr')}/{_w('pStyle')}")
+            ids = fonts.style_ids(None if named is None else named.get(_w("val")), "paragraph")
+            sources = [*(fonts.ppr.get(i) for i in [*ids, *tables]), fonts.doc_ppr]
+            if any(
+                n.find(_w("numId")) is not None or n.find(_w("ilvl")) is not None
+                for source in sources
+                if source is not None
+                for n in source.findall(_w("numPr"))
+            ):
+                return None
+    except CertificationError:
+        return None
+    return kind
+
+
+def _floating_kind(drawing: ET.Element) -> str:
+    """What a floating object without text is: ``shape`` (a ``wps`` graphic) or ``picture``."""
+    uris = {n.get("uri") for n in drawing.iter() if _local(n.tag) == "graphicData"}
+    return "shape" if _SHAPE in uris else "picture"
+
+
 def _bullet_reading(code: int) -> str:
     for low, reading in WINGDINGS_BULLETS.items():
         if code in (low, 0xF000 + low):
@@ -728,7 +838,18 @@ class _Story:
     def paragraph(
         self, element: ET.Element, table: tuple[int, int, int] | None, table_style: str | None
     ) -> None:
-        if any(node.tag == _w("p") for node in element.iter() if node is not element):
+        # A floating object's text is set aside whole (``_unread_kind``), its paragraphs too.
+        unread = {
+            id(node)
+            for run in element.iter(_w("r"))
+            for drawing in run
+            if _local(drawing.tag) in ("drawing", "pict", "AlternateContent")
+            and _unread_kind(drawing, self.fonts) is not None
+            for node in drawing.iter()
+        }
+        if any(
+            n.tag == _w("p") and id(n) not in unread for n in element.iter() if n is not element
+        ):
             raise CertificationError("a paragraph inside a paragraph")
         properties = element.find(_w("pPr"))
         style = None if properties is None else properties.find(_w("pStyle"))
@@ -886,6 +1007,25 @@ class _Story:
                 if self.fields[-1][0]:
                     self.fields[-1][1].append(text)
                 continue
+            if (
+                local in ("drawing", "pict", "AlternateContent")
+                and not (self.fields or self.simple or self.layout)
+                and (boxed := _unread_kind(child, self.fonts)) is not None
+            ):
+                # Set aside whole: one token, and its text, every branch's, in the source.
+                characters = sum(len(n.text or "") for n in child.iter(_w("t")))
+                elements = sum(
+                    1 for r in child.iter(_w("r")) for c in r if _local(c.tag) in _STANDS
+                )
+                self.ledger.text += characters
+                self.ledger.elements += 1 + elements
+                self.ledger.floating += 1
+                self.ledger.objects += 1
+                self.ledger.unread += characters + elements
+                self.flush_run(shown, hidden, kinds)
+                shown = []
+                self.mark("anchored", boxed)
+                continue
             token = self.token(child, local, symbol)
             # One token for each character of a text element, one for any other element.
             length = len(child.text or "") if local == "t" else 1
@@ -902,6 +1042,9 @@ class _Story:
                 self.ledger.page_breaks += 1
             elif not token and local in ("drawing", "pict", "AlternateContent"):
                 self.ledger.floating += 1
+                self.flush_run(shown, hidden, kinds)
+                shown = []
+                self.mark("anchored", _floating_kind(child))
             else:
                 shown.append(token)
                 if local in ("drawing", "pict", "AlternateContent"):
@@ -1840,6 +1983,7 @@ def _match(paragraph: _Paragraph, value: dict[str, Json], where: str) -> None:
     pages: list[int] = []
     notes: list[tuple[int, tuple[str, int]]] = []
     comments: list[tuple[int, int]] = []
+    anchored: list[dict[str, Json]] = []
     position = 0
     for segment in paragraph.segments:
         if segment.marker is None:
@@ -1849,10 +1993,14 @@ def _match(paragraph: _Paragraph, value: dict[str, Json], where: str) -> None:
             pages.append(position)
         elif segment.marker[0] == "comment":
             comments.append((position, segment.marker[1]))
+        elif segment.marker[0] == "anchored":
+            anchored.append({"kind": segment.marker[1], "offset": position, "read": False})
         else:
             notes.append((position, segment.marker[1]))
     if text != "".join(expected):
         raise CertificationError(f"{where}: the text is not the document's")
+    if value["anchored"] != anchored:
+        raise CertificationError(f"{where}: not the floating objects the document anchors there")
     # What each U+FFFC stands for, where it stands.
     places = [at for at, character in enumerate(text) if character == _OBJECT]
     if len(places) != len(paragraph.pictures) or value["pictures"] != [
@@ -2918,6 +3066,8 @@ class DocxSource:
                 "floatingObjects": ledger.floating,
                 "pageBreaks": ledger.page_breaks,
                 "pageNumbers": ledger.page_numbers,
+                "unreadObjects": ledger.objects,
+                "unreadObjectCharacters": ledger.unread,
             },
             "symbolMapped": ledger.symbol,
             "marksChecked": sorted(CHECKED_MARKS),
@@ -3264,6 +3414,15 @@ def certify_tracked(source: bytes, views: dict[str, bytes]) -> dict[str, Json]:
                     if not dropped and not any(e.tag in _REVISIONS for e in source_root.iter()):
                         # Not the source's bytes (those are passed over above), yet nothing to undo.
                         raise CertificationError(f"{view} view: {name} is changed")
+                    if source_root.tag != _w("glossaryDocument") and any(
+                        e.tag in _REVISIONS
+                        for run in source_root.iter(_w("r"))
+                        for drawing in run
+                        if _local(drawing.tag) in ("drawing", "pict", "AlternateContent")
+                        for e in drawing.iter()
+                    ):
+                        # A floating object's text is in neither view, its change only listed.
+                        raise CertificationError(f"{view} view: a revision inside a drawing")
                     drops = _VIEW_DROPS[view]
                     expected, joins = _run_tokens(source_root, drops)
                     # Every paragraph's content and make, and everything outside paragraphs.
