@@ -11,8 +11,10 @@ import letters from "./data/underline-letters.json" with { type: "json" };
 // closed allowlist below, judged on the drawn text around it: letters and decimal digits of the
 // Latin, Greek and Cyrillic scripts, spaces, and plain punctuation, with no underlined lower-case
 // letter directly after a number (read past code points drawn as nothing, not past a space), and
-// no underlined "o" after an "N" ("Nº"), look-alikes included. A hyphen between two letters
-// ("Breast-feeding") cannot read as "=" and is allowed where a caller says so.
+// no underlined "o" after an "N" ("Nº"), look-alikes included. A hyphen (U+002D, U+2010, U+2011)
+// inside an underlined word, with the line under a letter on each side ("Breast-feeding"
+// underlined whole), cannot read as "=" and is allowed where a caller says so; a hyphen at the
+// line's edge ("CL-CR" with only the hyphen underlined) can, and so can any other dash.
 
 // Space, no-break space, plain punctuation and the curly quotation marks: none of them changes
 // under a line (an e-mail address and a link's text are often underlined).
@@ -58,7 +60,9 @@ export function isUnderlineLetter(character: string): boolean {
 const isDigit = (character: string): boolean => character >= "0" && character <= "9";
 const LOWER = /^\p{Ll}$/u;
 const NUMBER = /^\p{N}$/u;
-const DASH = /^\p{Pd}$/u;
+// The hyphens an underline may run through inside a word: a hyphen-minus, a hyphen, a
+// non-breaking hyphen.
+const HYPHENS: ReadonlySet<string> = new Set(["-", "\u2010", "\u2011"]);
 
 // The first code point before `index` that a renderer draws: a Default_Ignorable code point such
 // as U+2063 is drawn as nothing; a space is drawn, and stops the reading.
@@ -73,7 +77,7 @@ function drawnBefore(points: readonly string[], index: number): string {
 export type UnderlineOptions = {
   // Code points a caller reads as markup rather than text (the QRD template's own brackets).
   also?: ReadonlySet<string>;
-  // A dash between two letters is allowed.
+  // A hyphen inside an underlined word (a letter underlined on each side of it) is allowed.
   hyphensInWords?: boolean;
 };
 
@@ -91,7 +95,9 @@ export function underlineChanges(
     if (options.also?.has(character) === true) continue;
     if (
       options.hyphensInWords === true &&
-      DASH.test(character) &&
+      HYPHENS.has(character) &&
+      index > start &&
+      index < end - 1 &&
       isUnderlineLetter(points[index - 1] ?? "") &&
       isUnderlineLetter(points[index + 1] ?? "")
     ) {

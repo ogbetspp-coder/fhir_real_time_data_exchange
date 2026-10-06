@@ -53,7 +53,7 @@ from label_docx.reader import Paragraph
 from zone_a.qrd.headings import collapse, forms, index, match_heading
 from zone_a.qrd.registry import SMPC_END
 
-STRUCTURE_VERSION = "smpc-structure/1.0.2"
+STRUCTURE_VERSION = "smpc-structure/1.0.3"
 
 _NUMBER = re.compile(r"^(\d+(?:\.\d+)?)\.?\s+\S")
 _HEADING_STYLE = re.compile(r"Heading", re.IGNORECASE)

@@ -32,10 +32,10 @@ What is carried, a closed list. A section is refused on the first paragraph that
 else, with the code in parentheses:
 
 - marks: bold, italic, superscript and subscript (not both at once: ``script``). An underline is
-  left out where it cannot change what the text says (``zone_a.underline``, and a hyphen inside
-  an underlined word), else (``underline``). The QRD template's own grey over the 4.8 reporting
-  statement is left out where the registry names it exactly (same section, same text, same
-  range), and so are capitals and small capitals over text that capitals draw the same ("4.");
+  left out where it cannot change what the text says (``zone_a.underline``, a hyphen inside an
+  underlined word included), else (``underline``). The QRD template's own grey over the 4.8
+  reporting statement is left out where the registry names it exactly (same section, same text,
+  same range), and so are capitals and small capitals over text that capitals draw the same ("4.");
   any other mark, capitals elsewhere, strike-through, highlight, shading, faint, raised or lowered
   by position, or right-to-left text, is refused (``formatting``);
 - raised or lowered text: letters, the digits and signs of the specification's fold tables, and
@@ -91,10 +91,10 @@ from zone_a.certified import Body
 from zone_a.fidelity.normalize import NormalizationError, normalize_text
 from zone_a.fidelity.xhtml import XhtmlError, list_marker, xhtml_to_text
 from zone_a.structure import line
-from zone_a.underline import is_underline_letter, underline_changes
+from zone_a.underline import underline_changes
 
 # The narrative builder's and the page serialiser's version: one, as they are one closed list.
-WORD_EPI_VERSION: Final = "word-epi/1.0.0"
+WORD_EPI_VERSION: Final = "word-epi/1.0.1"
 
 CARRIED: Final = {"bold": "strong", "italic": "em", "superscript": "sup", "subscript": "sub"}
 # Section 3 step 4's bullet glyphs: a list bullet in page text, removed at a line start.
@@ -233,7 +233,6 @@ def _pictures(index: int, paragraph: Paragraph, images: Mapping[str, bytes] | No
             raise RefusedError("picture", index, "a picture drawn larger or out of proportion")
 
 
-_HYPHENS: Final = frozenset("-\u2010\u2011")
 CAPITALS: Final = frozenset({"caps", "smallCaps"})
 
 
@@ -246,25 +245,6 @@ def unchanged_by_capitals(text: str) -> bool:
     return all(character.upper() == character for character in text)
 
 
-def _underline_changes(text: str, start: int, end: int) -> bool:
-    """``zone_a.underline``'s rule, with one more allowance: a hyphen inside an underlined word.
-
-    A hyphen (U+002D, U+2010, U+2011) between two letters, with the line running under the letters
-    on both sides ("Long-term" underlined whole), cannot read as "=": it is checked as the gap
-    between two underlined pieces. A hyphen at the line's edge, or any other dash, is judged by
-    the rule itself, which refuses it.
-    """
-    cuts = [
-        at
-        for at in range(start + 1, end - 1)
-        if text[at] in _HYPHENS
-        and is_underline_letter(text[at - 1])
-        and is_underline_letter(text[at + 1])
-    ]
-    edges = [start, *(x for at in cuts for x in (at, at + 1)), end]
-    return any(underline_changes(text, a, b) for a, b in zip(edges[::2], edges[1::2], strict=True))
-
-
 def _marks(index: int, paragraph: Paragraph, section: str, greys: Sequence[_Grey]) -> list[Mark]:
     """The paragraph's carried marks; refuses one that is neither carried nor left out."""
     out: list[Mark] = []
@@ -272,7 +252,7 @@ def _marks(index: int, paragraph: Paragraph, section: str, greys: Sequence[_Grey
         if mark.kind in CARRIED:
             out.append(mark)
         elif mark.kind == "underline":
-            if _underline_changes(paragraph.text, mark.start, mark.end):
+            if underline_changes(paragraph.text, mark.start, mark.end, hyphens_in_words=True):
                 raise RefusedError("underline", index, "an underline that can change the text")
         elif mark.kind in CAPITALS and unchanged_by_capitals(paragraph.text[mark.start : mark.end]):
             pass
@@ -654,7 +634,9 @@ def _heading(index: int, paragraph: Paragraph) -> None:
             or (mark.kind in CAPITALS and unchanged_by_capitals(text))
             or (
                 mark.kind == "underline"
-                and not _underline_changes(paragraph.text, mark.start, mark.end)
+                and not underline_changes(
+                    paragraph.text, mark.start, mark.end, hyphens_in_words=True
+                )
             )
         ):
             raise RefusedError("heading-formatting", index, mark.kind)

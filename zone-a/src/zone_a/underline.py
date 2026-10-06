@@ -6,8 +6,10 @@ and an underlined "a" read "1ª"). An underline changes nothing only over the cl
 judged on the drawn text around it: letters and decimal digits of the Latin, Greek and Cyrillic
 scripts, spaces, and plain punctuation, with no underlined lower-case letter directly after a number
 (read past code points drawn as nothing, not past a space), and no underlined "o" after an "N"
-("Nº"), look-alikes included. A hyphen between two letters ("Breast-feeding") cannot read as "=" and
-is allowed where a caller says so.
+("Nº"), look-alikes included. A hyphen (U+002D, U+2010, U+2011) inside an underlined word, with
+the line running under a letter on each side ("Breast-feeding" underlined whole), cannot read as
+"=" and is allowed where a caller says so; a hyphen at the line's edge ("CL-CR" with only the
+hyphen underlined) can, and so can any other dash, and neither is.
 """
 
 from __future__ import annotations
@@ -31,6 +33,7 @@ _PUNCTUATION: Final = frozenset(" .,;:()[]/'\"%@_&#!?*") | frozenset(
 _NUMERO: Final = frozenset("Nn") | frozenset(map(chr, (0x039D, 0xFF2E)))
 _O_LETTERS: Final = frozenset("o") | frozenset(map(chr, (0x043E, 0x03BF, 0x1D0F)))
 _SCRIPTS: Final = ("LATIN ", "GREEK ", "CYRILLIC ")
+_HYPHENS: Final = frozenset("-\u2010\u2011")
 
 
 def is_underline_letter(character: str) -> bool:
@@ -72,7 +75,8 @@ def underline_changes(
     """Whether an underline over ``text[start:end]`` can change what the drawn text says.
 
     ``also`` adds code points a caller reads as markup rather than text (the QRD template's own
-    brackets); ``hyphens_in_words`` allows a dash between two letters.
+    brackets); ``hyphens_in_words`` allows a hyphen inside an underlined word (the module
+    docstring).
     """
     for index in range(start, end):
         character = text[index]
@@ -82,9 +86,10 @@ def underline_changes(
             continue
         if (
             hyphens_in_words
-            and unicodedata.category(character) == "Pd"
-            and _letter(_at(text, index - 1))
-            and _letter(_at(text, index + 1))
+            and character in _HYPHENS
+            and start < index < end - 1
+            and _letter(text[index - 1])
+            and _letter(text[index + 1])
         ):
             continue
         return True
