@@ -2,8 +2,8 @@
 
 Every result the reader serves carries a certificate from an independent check
 ([`certify.py`](../src/label_docx/certify.py)). A result the check cannot account for is not
-served; it becomes the refusal `uncertified`. Requirements R-24 to R-28, R-34 to R-36, R-39 and R-43
-in [requirements.md](requirements.md); tests in `tests/test_certify.py`.
+served; it becomes the refusal `uncertified`. Requirements R-24 to R-28, R-34 to R-36, R-39, R-43
+and R-44 in [requirements.md](requirements.md); tests in `tests/test_certify.py`.
 
 ## The statement
 
@@ -28,13 +28,15 @@ The check verifies the sequence (string equality per paragraph), the structure (
 table cells, paragraph styles, hidden paragraph marks, notes in the order the body refers to
 them, sections and note and page places are `D`'s; every mark is a span of its paragraph's text,
 of a kind the format names; each body table's grid is the one `D` stores, read by the check's
-own rules) and the ledger:
+own rules; what each U+FFFC stands for is the drawing `D` has there, read by its own rules too)
+and the ledger:
 `text + instructions + elements = output + field code + page numbers + page breaks + hidden
 whitespace + floating objects`. Equality is all or nothing, so a dropped, added, changed, repeated, swapped or moved
 character, and a dropped, split or merged paragraph, all fail it.
 
 `tests/test_certify.py` applies up to four seeded changes of each of its kinds to the result of
-every corpus document read (a tracked document's views aside): every changed result is refused,
+every corpus document read (a tracked document's views aside; among them, what a picture stands
+for, said otherwise): every changed result is refused,
 and every unchanged result is certified. These are samples, not every possible change.
 
 ## Why it is independent
@@ -47,9 +49,11 @@ and every unchanged result is certified. These are samples, not every possible c
   Wingdings bullet table, reviewed mappings from Adobe's `symbol.txt` (as the Unicode Consortium
   maps it) and ISO/IEC N4384. Word does not check them: the Word oracle reads Word's stored codes
   through the same tables (`word.as_drawn`, `word.label_as_drawn`).
-- It shares rules by design: Word's precedence for fonts and hiding, the toggles, list labels and
-  note marks are the reader's rules written again, apart. A rule wrong in both is caught only by
-  Word's recorded answers (`test_word_oracle.py`).
+- It shares rules by design: Word's precedence for fonts and hiding, the toggles, list labels,
+  note marks, table grids and what a picture stands for are the reader's rules written again,
+  apart. That transcription, in code of its own, catches a slip in the reader's code, not a
+  wrong rule: a rule wrong in both is caught only by Word's recorded answers
+  (`test_word_oracle.py`), where Word has been asked, and by nothing where it has not.
 - It treats the result as untrusted: a wrong result can only fail.
 - Each token has one reading. Whether a run is in the Symbol font, or hidden, the check decides
   itself by Word's precedence (run, character style, paragraph style, table style, defaults).
@@ -83,6 +87,25 @@ drawing of is not on record, no grid and the same first reason the result names.
 It draws lists in the body only; a list anywhere else, a label in capitals, hidden or drawn as
 a picture, and a custom note mark's echo are never certified.
 
+So must every paragraph's `pictures` (R-44), in the body, notes, headers, footers and comments:
+for each drawing it reads as U+FFFC, in order, the check finds on its own the image part (the
+picture's `blip`, or a VML picture's first `imagedata`, through the story part's own
+relationships: one internal relationship of the image type, to a part stored under that very
+name), hashes its bytes, tells PNG from JPEG by the signature alone, reads the size from the
+PNG's chunks (each whole with its CRC, one IHDR first to IEND at the end, no unknown critical
+chunk) or the JPEG's segments (to its scan, one frame of precision 8), at most 100,000 of
+either and none kept, and any Exif orientation or colour management; finds where the picture
+stands (in a field's result, in a paragraph of exact line height, in a row whose height may be
+exact, on a bordered run); and reads the drawing's extent, crop, rotation, flips and every other
+element and attribute against its own closed list. The reason it names is the first of a fixed
+list (`shape`, `vml`, `field`, `linked`, `no-part`, `not-png-or-jpeg`, `bad-image-header`,
+`colour`, `animated`, `orientation`, `bad-number`, `cropped`, `rotated`, `flipped`,
+`line-height`, `row-height`, `border`, `effects`); an entry in any other way, one too many or
+one missing is never certified. A null reason says only that nothing on those lists was found:
+the lists rest on what is known of Word, not on Word's drawing. A picture never refuses a read:
+what the reader cannot vouch for it reports with its reason, and the check holds that reason as
+it holds every other value. Each grid row's `exactHeight` is the check's own reading too.
+
 ## Tracked changes
 
 A tracked document has two views, all changes accepted and all rejected, each certified as above
@@ -112,7 +135,11 @@ The proof covers the text. How it is shown is held to the application that shows
 Table grids are held to the source alone (the check above): Word has not yet been asked where
 it draws each cell. The grid is what the document stores; where Word would have to lay it out by
 rules of its own (a row that does not fill it, say), no grid is reported, and the text is read
-all the same.
+all the same. So are pictures: which part a picture's bytes are in, and its extent and crop, are
+what the document stores; that Word draws nothing else (no recolouring, outline, turn...) rests
+on the closed list, not on Word's drawing. Chrome's decoded size of each ePI picture is
+recorded by the browser oracle (`browser_sections`, `pictures`), for the builder to hold to the
+reader's `pixels`.
 
 Word is asked about emphasis per body paragraph: whether all its letters are bold, italic, in
 capitals or struck through, white space's formatting aside, so Word's "no" agrees with a
@@ -146,8 +173,9 @@ turned round, a number one off, a statement removed...) and runs the check's tes
 its tests and the corpus, at least 90% of faults killed, and every survivor recorded with the
 reason it cannot change a result; each reason names one fault. The run works on a copy of the
 files taken when it starts, so an edit made meanwhile cannot reach it. Counts are in
-`docs/checker-mutants.json`. The last run took 31 minutes on eight cores; a run resumes in parts
-(`--budget`).
+`docs/checker-mutants.json`: the last run killed 3,420 of 3,514 faults and recorded 94 as unable
+to change a result, with none unexplained. It took 64 minutes on eight cores with other work
+running; a run resumes in parts (`--budget`).
 
 ## Every time
 

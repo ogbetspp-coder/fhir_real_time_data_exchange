@@ -22,7 +22,8 @@ What a paragraph carries:
   hold it), or alternate content whose choice is a DrawingML picture or shape (``wps``: a line,
   a box) and which holds no text. A DrawingML shape outside alternate content, and a VML shape,
   are refused. One anchored to the paragraph (floating) is not in the text: Word's text shows
-  none, and the check counts it (``floatingObjects``).
+  none, and the check counts it (``floatingObjects``). What each U+FFFC stands for is in
+  ``pictures``; see "Pictures" below.
 - ``marks``: ranges of ``text`` whose appearance changes what a reader sees or means, set on the
   run, its styles or the document defaults (``Mark`` lists the kinds): bold, italic, superscript,
   subscript, raised or lowered text, capitals and small capitals, single and double strike-through,
@@ -94,10 +95,62 @@ found): no ``tblGrid`` (Word builds one by rules of its own) or more than one, a
 digits, a legacy horizontal merge (``hMerge``: Word shows the merged-away cell's text as its own
 cell's, but where it draws it is not on record), a ``vMerge`` of another value, a span of 0, or a
 row whose ``before`` + spans + ``after`` is not ``columns``. The text is read all the same: no
-grid refuses a document. A vertical merge is reported as stored, the cells it continues not
-checked: which cells Word joins is a layout question for whoever draws the table. Widths
-(``tcW``, ``wBefore``...) are not reported. Tables in notes, headers, footers and comments are not
-reported (their paragraphs' ``table`` is as above).
+grid refuses a document. Each row says whether its height may be ``exact`` (Word clips what does
+not fit): its own ``trHeight`` of rule ``exact``, or one its table's style sets in its own or a
+conditional part's row properties, which is taken as possibly any row's (how Word applies a
+style's row height is not on record). A vertical merge is reported as stored, the cells it
+continues not checked: which cells Word joins is a layout question for whoever draws the table.
+Widths (``tcW``, ``wBefore``...) are not reported. Tables in notes, headers, footers and
+comments are not reported (their paragraphs' ``table`` is as above).
+
+Pictures. Each U+FFFC in a paragraph's ``text``, in the body, a note, a header, a footer or a
+comment, has a ``Picture`` in its ``pictures``, in order, with its ``offset``: its ``kind``,
+``shape`` (a ``wps`` shape: no image) or ``picture``; the image ``part`` (the ``r:embed`` of its
+``a:blip``, or the ``r:id`` of a VML picture's first ``imagedata``), only through an internal
+relationship of the type Word writes for an image, from the part the paragraph is in, to a part
+stored under that very name; the part's ``sha256``; its ``type`` by its signature alone, ``png``
+or ``jpeg`` (never by its name or content type); its ``pixels`` (width, height) from its header
+(a PNG's IHDR, a JPEG's frame header, as stored); its ``extent`` in EMU (``wp:extent``; None for
+VML); and its ``crop`` (``a:srcRect``'s left, top, right and bottom in thousandths of a percent, an
+absent side 0; None without one). What can be read is reported whatever the reason. ``reason``
+is the first of ``PICTURE_REASONS`` found against the picture, or None where none is. None does
+not say Word draws these bytes so: it says nothing on the closed list below was found, and the
+list rests on what the reader knows Word to do, not on Word's drawing (the builder and the
+browser hold the rest). The reasons: ``shape``; ``vml`` (its drawing in VML is not read);
+``field`` (in any field's result, a complex field's between ``separate`` and ``end`` or a
+``fldSimple``'s: Word may print the field again with another picture, as a REF to a bookmark
+round one does); ``linked`` (``r:link``); ``no-part`` (no ``wp:inline`` holding one
+``a:graphicData`` of one ``pic:pic`` with a ``blipFill`` and a ``blip``, no ``r:embed``, or no
+part as above); ``not-png-or-jpeg``; ``bad-image-header`` (a PNG whose chunks, each of four
+ASCII letters and with its CRC, do not run whole from one IHDR, first, of a size up to 10,000
+pixels a side, a bit depth and colour type PNG allows, to IEND and the end of the bytes, with
+image data, a palette image's PLTE before it, and no critical chunk but those four; a JPEG with
+a marker out of place or a segment past its end before its scan, or not one baseline, extended or
+progressive frame header there of precision 8, 1, 3 or 4 components and a size of 1 to 10,000
+a side; Exif data, a JPEG's APP1 or a PNG's ``eXIf``, that cannot be read or stands twice; and an
+image of more than 100,000 chunks or segments, read no further); ``colour`` (a PNG with
+``iCCP`` or ``cHRM``, or ``gAMA`` without ``sRGB``; a JPEG with an ICC profile or four
+components: a browser manages colour, and what Word does is not on record); ``animated`` (a PNG
+with ``acTL``); ``orientation`` (Exif data whose orientation is not 1: an application may turn or
+mirror it, or not); ``bad-number`` (an extent, effect extent, crop, offset, rotation or flip that
+is not a number); ``cropped`` (any side not 0); ``rotated`` (``a:xfrm`` ``rot`` not 0);
+``flipped`` (``flipH`` or ``flipV``); ``line-height`` (an exact line height, the paragraph's
+nearest ``spacing`` with a ``lineRule`` through its styles and the defaults: Word clips the
+picture to it); ``row-height`` (in a row whose height may be exact, at any depth of tables; see
+"Tables"); ``border`` (a ``w:bdr`` other than none on its run, by the run's nearest level that
+sets one); and ``effects``, anything else that may make Word draw other than the pixels
+stretched over the extent, by a closed list: an effect extent not 0; a ``pic:pic`` of other
+than its non-visual properties, one ``blipFill`` and its shape properties, or hidden
+(``cNvPr``); a ``blipFill`` with attributes, or of other than its ``blip``, a ``srcRect`` and a
+stretch of a bare ``fillRect``; a ``blip`` with attributes but ``r:embed``, ``r:link`` and
+``cstate``, or children but extensions of Word's compression setting (``a14:useLocalDpi``)
+alone (so any recolouring, transparency, duotone, grayscale, artistic effect or SVG); shape
+properties with attributes but ``bwMode``, or children but each of a transform (``a:xfrm``, with
+``rot``, ``flipH`` and ``flipV`` alone, at offset 0 and of the extent), a rectangle
+(``prstGeom`` ``rect``, no adjustments), no fill, and a line of no fill, once. Whether Word draws
+it larger than its pixels is for the caller: ``extent`` and ``pixels`` are both given (9525 EMU
+are a pixel at 96 dpi). Only the image's headers are read, chunk by chunk with none kept, never
+its pixels; and the reader never refuses for a picture.
 
 Symbol fonts. A run whose effective ``ascii`` and ``hAnsi`` fonts (set directly, by a style, by the
 document defaults or through the theme) are both Symbol, by that exact name, with no complex-script
@@ -329,6 +382,7 @@ type takes the one before it. The glossary (building blocks) is not read.
 from __future__ import annotations
 
 import colorsys
+import hashlib
 import io
 import itertools
 import posixpath
@@ -336,6 +390,7 @@ import re
 import unicodedata
 import xml.etree.ElementTree as ET
 import zipfile
+import zlib
 from collections import Counter
 from collections.abc import Iterator
 from copy import deepcopy
@@ -343,7 +398,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 # The version of the rules above; versions.lock.json ties it to this file (tests/test_locks.py).
-READER_VERSION = "docx-reader/1.27.0"
+READER_VERSION = "docx-reader/1.28.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -611,13 +666,53 @@ class NoteReference:
     mark: str | None = None
 
 
+# Why a picture's bytes cannot stand for it as Word draws it, the first found in this order
+# ("Pictures" in the module docstring).
+PICTURE_REASONS = (
+    "shape",
+    "vml",
+    "field",
+    "linked",
+    "no-part",
+    "not-png-or-jpeg",
+    "bad-image-header",
+    "colour",
+    "animated",
+    "orientation",
+    "bad-number",
+    "cropped",
+    "rotated",
+    "flipped",
+    "line-height",
+    "row-height",
+    "border",
+    "effects",
+)
+
+
+@dataclass(frozen=True)
+class Picture:
+    """What the U+FFFC at ``text[offset]`` stands for ("Pictures" in the module docstring)."""
+
+    offset: int
+    kind: str
+    part: str | None = None
+    sha256: str | None = None
+    type: str | None = None
+    pixels: tuple[int, int] | None = None
+    extent: tuple[int, int] | None = None
+    # The source rectangle's left, top, right and bottom, in thousandths of a percent.
+    crop: tuple[int, int, int, int] | None = None
+    reason: str | None = None
+
+
 @dataclass(frozen=True)
 class Paragraph:
     """One paragraph of the body or of a note, as the reader produced it.
 
     The module docstring describes ``text``, ``marks``, ``mark_hidden``, ``numbering``,
-    ``table`` and ``notes``; ``style`` is the paragraph style id written on the paragraph, if
-    any.
+    ``table``, ``notes`` and ``pictures``; ``style`` is the paragraph style id written on the
+    paragraph, if any.
     """
 
     text: str
@@ -631,6 +726,8 @@ class Paragraph:
     pages: tuple[int, ...] = ()
     # Where a comment's mark stands, and which comment it is.
     comments: tuple[CommentReference, ...] = ()
+    # What each U+FFFC of ``text`` stands for, in order.
+    pictures: tuple[Picture, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -695,11 +792,16 @@ class TableCell:
 
 @dataclass(frozen=True)
 class TableRow:
-    """A row: the grid columns it leaves out ``before`` and ``after`` its cells, and its cells."""
+    """A row: the grid columns it leaves out ``before`` and ``after`` its cells, and its cells.
+
+    ``exact``: its height may be exact (``trHeight`` ``hRule="exact"``, its own or one its
+    table's style may set), so that Word clips what does not fit.
+    """
 
     before: int
     after: int
     cells: tuple[TableCell, ...]
+    exact: bool = False
 
 
 @dataclass(frozen=True)
@@ -844,6 +946,9 @@ class _Package:
         if len({name.lower() for name in names}) != len(names):
             raise DocxRefusedError("invalid-package", "a part name occurs twice")
         self.names = set(names)
+        self.data = data
+        # Each image part's facts (``_Pictures.image``), read once.
+        self.images: dict[str, tuple[str, str | None, tuple[int, int] | None, set[str]]] = {}
         # Each part parsed once. The reader never changes a parsed part (``tracked`` writes its
         # views from deep copies of the parsed parts), so the one parse serves every use.
         self.parsed: dict[str, ET.Element] = {}
@@ -952,20 +1057,44 @@ class _Package:
             raise DocxRefusedError("invalid-package", f"a relationship of type {found!r}")
         return rel.get("TargetMode") != "External" and found == _RELATIONSHIPS + kind
 
-    def target(self, source: str, relationship: str | None, kind: str) -> str:
-        """The part ``source``'s relationship ``relationship`` names; refused unless a ``kind``."""
+    def _ids(self, source: str) -> dict[str | None, tuple[ET.Element, str]]:
+        """The first relationship of each Id of ``source``, looked up once per source part."""
         if source not in self.by_id:
-            # The first relationship of each Id, looked up once per source part.
             by_id: dict[str | None, tuple[ET.Element, str]] = {}
             for rel, name in self._relationships(source):
                 by_id.setdefault(rel.get("Id"), (rel, name))
             self.by_id[source] = by_id
-        found = self.by_id[source].get(relationship)
+        return self.by_id[source]
+
+    def target(self, source: str, relationship: str | None, kind: str) -> str:
+        """The part ``source``'s relationship ``relationship`` names; refused unless a ``kind``."""
+        found = self._ids(source).get(relationship)
         if found is None:
             raise DocxRefusedError("invalid-package", f"no relationship {relationship}")
         if not self._is(found[0], kind):
             raise DocxRefusedError("invalid-package", f"{relationship} is not a {kind} part")
         return found[1]
+
+    def image(self, source: str, relationship: str | None) -> str | None:
+        """The image part ``source``'s relationship names, or None (never refused: "Pictures").
+
+        Only an internal relationship of the type Word writes for an image, to a part stored
+        under that very name.
+        """
+        found = self._ids(source).get(relationship)
+        if (
+            found is None
+            or found[0].get("TargetMode") == "External"
+            or found[0].get("Type") != _RELATIONSHIPS + "image"
+            or found[1] not in self.names
+        ):
+            return None
+        return found[1]
+
+    def raw(self, name: str) -> bytes:
+        """A part's bytes, read from an archive of its own (the reader's is closed by then)."""
+        with zipfile.ZipFile(io.BytesIO(self.data)) as archive:
+            return archive.read(name)
 
     def related(self, source: str, kind: str) -> list[str]:
         """Target part names of ``source``'s internal relationships whose type ends in ``kind``."""
@@ -994,6 +1123,8 @@ class _Style:
     shadings: tuple[ET.Element, ...] = ()
     # The style's name (w:name), which Word's heading levels and STYLEREF go by.
     name: str | None = None
+    # Whether its row properties, its own or a conditional part's, set an exact row height.
+    exact_rows: bool = False
 
 
 @dataclass
@@ -1213,6 +1344,13 @@ def _styles(
             ),
             parts={part.get(_w("type"), ""): part for part in style.findall(_w("tblStylePr"))},
             bands=(_band_size(style, "Row"), _band_size(style, "Col")),
+            exact_rows=any(
+                _exact(row)
+                for row in (
+                    *style.findall(_w("trPr")),
+                    *style.findall(f"{_w('tblStylePr')}/{_w('trPr')}"),
+                )
+            ),
         )
         if style.get(_w("default")) in ("1", "true", "on"):
             # With more than one default of a kind, the last one is used (ECMA-376 17.7.4.17).
@@ -1708,6 +1846,364 @@ def _alternate(element: ET.Element) -> str:
     return _placed(drawn[0])
 
 
+# --- pictures ("Pictures" in the module docstring) ------------------------------------------
+
+A14 = "http://schemas.microsoft.com/office/drawing/2010/main"
+# The one extension a picture's blip may carry: Word's compression setting (a14:useLocalDpi).
+_LOCAL_DPI = "{28A0092B-C50C-407E-A947-70E740481C1C}"
+_PNG = b"\x89PNG\r\n\x1a\n"
+# The bit depths PNG allows for each colour type.
+_PNG_DEPTHS = {0: (1, 2, 4, 8, 16), 2: (8, 16), 3: (1, 2, 4, 8), 4: (8, 16), 6: (8, 16)}
+# JPEG's frame headers (SOF0 to SOF15 but DHT, JPG and DAC); only the first three are read.
+_FRAMES = set(range(0xC0, 0xD0)) - {0xC4, 0xC8, 0xCC}
+# Past this many chunks or segments, or this many pixels on a side, an image is not read on.
+_MAX_PIECES = 100_000
+_MAX_SIDE = 10_000
+_NOT_FILL = re.compile(rb"[^\xff]")
+
+
+def _a(tag: str) -> str:
+    return f"{{{A}}}{tag}"
+
+
+def _pic(tag: str) -> str:
+    return f"{{{PICTURE_URI}}}{tag}"
+
+
+@dataclass(frozen=True)
+class _Pictures:
+    """What each U+FFFC of one part stands for, through that part's relationships."""
+
+    package: _Package
+    source: str
+
+    def image(
+        self, relationship: str | None
+    ) -> tuple[str | None, str | None, str | None, tuple[int, int] | None, set[str]]:
+        """The part, its SHA-256, its type, its pixels, and what stops it standing as its bytes."""
+        name = None if relationship is None else self.package.image(self.source, relationship)
+        if name is None:
+            return None, None, None, None, {"no-part"}
+        if name not in self.package.images:
+            data = self.package.raw(name)
+            self.package.images[name] = (hashlib.sha256(data).hexdigest(), *_image(data))
+        digest, kind, pixels, reasons = self.package.images[name]
+        return name, digest, kind, pixels, set(reasons)
+
+    def read(self, element: ET.Element, offset: int, around: frozenset[str]) -> Picture:
+        """What a ``w:drawing``, ``w:pict`` or alternate content read as U+FFFC stands for.
+
+        ``around`` holds the reasons its place gives (``field``, ``line-height``, ``row-height``,
+        ``border``).
+        """
+        found: set[str] = set(around)
+        if element.tag == _w("pict"):
+            image = next(n for n in element.iter() if _local(n.tag) == "imagedata")
+            part, digest, kind, pixels, _ = self.image(image.get(f"{{{R}}}id"))
+            return Picture(offset, "picture", part, digest, kind, pixels, reason="vml")
+        if element.tag == _ALTERNATE:
+            element = next(c for c in element if c.tag == f"{{{MC}}}Choice")[0]
+        inline = element[0]
+        size = _numbers(inline.find(f"{{{WP}}}extent"), ("cx", "cy"), found, unsigned=True)
+        extent = None if size is None else (size[0], size[1])
+        effect = inline.find(f"{{{WP}}}effectExtent")
+        if effect is not None and _numbers(effect, ("l", "t", "r", "b"), found) != (0, 0, 0, 0):
+            found.add("effects")
+        graphics = [n for n in inline.iter() if n.tag == _a("graphicData")]
+        if any(g.get("uri") == _SHAPE_URI for g in graphics):
+            return Picture(offset, "shape", extent=extent, reason="shape")
+        held = list(graphics[0]) if len(graphics) == 1 else []
+        if [c.tag for c in held] != [_pic("pic")]:
+            return Picture(offset, "picture", extent=extent, reason=_first({"no-part", *found}))
+        picture = held[0]
+        if [c.tag for c in picture] != [_pic("nvPicPr"), _pic("blipFill"), _pic("spPr")]:
+            found.add("effects")
+        own = picture.find(f"{_pic('nvPicPr')}/{_pic('cNvPr')}")
+        if own is not None and own.get("hidden") in ("1", "true"):
+            found.add("effects")
+        _plain_shape(picture.find(_pic("spPr")), extent, found)
+        fill = picture.find(_pic("blipFill"))
+        blip = None if fill is None else fill.find(_a("blip"))
+        if fill is None or blip is None:
+            return Picture(offset, "picture", extent=extent, reason=_first({"no-part", *found}))
+        crop = _plain_fill(fill, blip, found)
+        part, digest, kind, pixels, reasons = self.image(blip.get(f"{{{R}}}embed"))
+        return Picture(
+            offset, "picture", part, digest, kind, pixels, extent, crop, _first(found | reasons)
+        )
+
+
+def _first(found: set[str]) -> str | None:
+    return next((reason for reason in PICTURE_REASONS if reason in found), None)
+
+
+def _numbers(
+    element: ET.Element | None,
+    names: tuple[str, ...],
+    found: set[str],
+    absent: int | None = None,
+    unsigned: bool = False,
+) -> tuple[int, ...] | None:
+    """``element``'s attributes ``names`` as integers (an absent one ``absent``), or bad-number."""
+    values: list[int] = []
+    for name in names:
+        value = None if element is None else element.get(name)
+        if value is None and absent is not None:
+            values.append(absent)
+        elif value is not None and re.fullmatch(
+            r"[0-9]{1,15}" if unsigned else r"-?[0-9]{1,15}", value
+        ):
+            values.append(int(value))
+        else:
+            found.add("bad-number")
+            return None
+    return tuple(values)
+
+
+def _plain_fill(
+    fill: ET.Element, blip: ET.Element, found: set[str]
+) -> tuple[int, int, int, int] | None:
+    """The crop of a picture's ``blipFill``, and what in it may change how Word draws the image."""
+    stretch = fill.find(_a("stretch"))
+    if (
+        fill.attrib
+        or [c.tag for c in fill]
+        not in ([_a("blip"), _a("stretch")], [_a("blip"), _a("srcRect"), _a("stretch")])
+        or stretch is None
+        or stretch.attrib
+        or [c.tag for c in stretch] != [_a("fillRect")]
+        or stretch[0].attrib
+        or len(stretch[0])
+    ):
+        found.add("effects")
+    if set(blip.attrib) - {f"{{{R}}}embed", f"{{{R}}}link", "cstate"}:
+        found.add("effects")
+    if blip.get(f"{{{R}}}link") is not None:
+        found.add("linked")
+    for extensions in blip:
+        if extensions.tag != _a("extLst") or any(
+            ext.tag != _a("ext")
+            or ext.get("uri") != _LOCAL_DPI
+            or [c.tag for c in ext] != [f"{{{A14}}}useLocalDpi"]
+            for ext in extensions
+        ):
+            found.add("effects")
+    rect = fill.find(_a("srcRect"))
+    if rect is None:
+        return None
+    if set(rect.attrib) - {"l", "t", "r", "b"} or len(rect):
+        found.add("effects")
+    crop = _numbers(rect, ("l", "t", "r", "b"), found, absent=0)
+    if crop is not None and any(crop):
+        found.add("cropped")
+    return None if crop is None else (crop[0], crop[1], crop[2], crop[3])
+
+
+def _plain_shape(
+    properties: ET.Element | None, extent: tuple[int, int] | None, found: set[str]
+) -> None:
+    """What in a picture's shape properties may change how Word draws its image."""
+    if properties is None:
+        return
+    tags = [c.tag for c in properties]
+    allowed = {_a("xfrm"), _a("prstGeom"), _a("noFill"), _a("ln")}
+    if set(properties.attrib) - {"bwMode"} or len(set(tags)) != len(tags) or set(tags) - allowed:
+        found.add("effects")
+    turn = properties.find(_a("xfrm"))
+    if turn is not None:
+        inner = [c.tag for c in turn]
+        if (
+            set(turn.attrib) - {"rot", "flipH", "flipV"}
+            or len(set(inner)) != len(inner)
+            or set(inner) - {_a("off"), _a("ext")}
+        ):
+            found.add("effects")
+        rotation = _numbers(turn, ("rot",), found, absent=0)
+        if rotation is not None and rotation[0]:
+            found.add("rotated")
+        for flip in (turn.get("flipH"), turn.get("flipV")):
+            if flip in ("1", "true"):
+                found.add("flipped")
+            elif flip not in (None, "0", "false"):
+                found.add("bad-number")
+        place = turn.find(_a("off"))
+        if place is not None and _numbers(place, ("x", "y"), found) != (0, 0):
+            found.add("effects")
+        size = turn.find(_a("ext"))
+        if size is not None and _numbers(size, ("cx", "cy"), found, unsigned=True) != extent:
+            found.add("effects")
+    geometry = properties.find(_a("prstGeom"))
+    if geometry is not None and (
+        set(geometry.attrib) != {"prst"}
+        or geometry.get("prst") != "rect"
+        or [c.tag for c in geometry] not in ([], [_a("avLst")])
+        or any(c.attrib or len(c) for c in geometry)
+    ):
+        found.add("effects")
+    empty = properties.find(_a("noFill"))
+    if empty is not None and (empty.attrib or len(empty)):
+        found.add("effects")
+    line = properties.find(_a("ln"))
+    if line is not None and (
+        [c.tag for c in line] != [_a("noFill")] or line[0].attrib or len(line[0])
+    ):
+        found.add("effects")
+
+
+def _image(data: bytes) -> tuple[str | None, tuple[int, int] | None, set[str]]:
+    """An image part's type by its signature, its pixels by its header, and its reasons."""
+    if data.startswith(_PNG):
+        return ("png", *_png(data))
+    if data.startswith(b"\xff\xd8\xff"):
+        return ("jpeg", *_jpeg(data))
+    return None, None, {"not-png-or-jpeg"}
+
+
+def _png(data: bytes) -> tuple[tuple[int, int] | None, set[str]]:
+    """A PNG's width and height from its IHDR, every chunk whole with its CRC up to IEND.
+
+    Read as it goes, keeping no chunk but the header and Exif data, and given up past
+    ``_MAX_PIECES`` chunks.
+    """
+    bad: tuple[None, set[str]] = (None, {"bad-image-header"})
+    view = memoryview(data)
+    kinds: set[bytes] = set()
+    exif: list[bytes] = []
+    colour = width = height = 0
+    at, count = len(_PNG), 0
+    while True:
+        count += 1
+        if count > _MAX_PIECES or at + 12 > len(data):
+            return bad
+        size = int.from_bytes(data[at : at + 4])
+        kind = data[at + 4 : at + 8]
+        end = at + 12 + size
+        if size > 0x7FFFFFFF or end > len(data) or not kind.isalpha():
+            return bad
+        if zlib.crc32(view[at + 4 : end - 4]) != int.from_bytes(data[end - 4 : end]):
+            return bad
+        # IHDR once and first; no critical chunk PNG does not define; a palette before the
+        # image data of an image that needs one.
+        if (kind == b"IHDR") != (count == 1) or (
+            kind[:1].isupper() and kind not in (b"IHDR", b"PLTE", b"IDAT", b"IEND")
+        ):
+            return bad
+        if kind == b"IHDR":
+            if size != 13:
+                return bad
+            width, height = (
+                int.from_bytes(data[at + 8 : at + 12]),
+                int.from_bytes(data[at + 12 : at + 16]),
+            )
+            depth, colour, compression, filtering, interlace = data[at + 16 : at + 21]
+            if (
+                not 0 < width <= _MAX_SIDE
+                or not 0 < height <= _MAX_SIDE
+                or depth not in _PNG_DEPTHS.get(colour, ())
+                or compression
+                or filtering
+                or interlace > 1
+            ):
+                return bad
+        if kind == b"IDAT" and b"IDAT" not in kinds and colour == 3 and b"PLTE" not in kinds:
+            return bad
+        if kind == b"eXIf" and len(exif) < 2:
+            exif.append(data[at + 8 : end - 4])
+        kinds.add(kind)
+        at = end
+        if kind == b"IEND":
+            break
+    if at != len(data) or b"IDAT" not in kinds:
+        return bad
+    reasons = _turned(exif)
+    if kinds & {b"iCCP", b"cHRM"} or (b"gAMA" in kinds and b"sRGB" not in kinds):
+        reasons.add("colour")
+    if b"acTL" in kinds:
+        reasons.add("animated")
+    return (width, height), reasons
+
+
+def _jpeg(data: bytes) -> tuple[tuple[int, int] | None, set[str]]:
+    """A JPEG's width and height from its one frame header, its segments whole up to its scan.
+
+    Given up past ``_MAX_PIECES`` segments.
+    """
+    bad: tuple[None, set[str]] = (None, {"bad-image-header"})
+    frames: list[tuple[int, bytes]] = []
+    exif: list[bytes] = []
+    profiled = False
+    at, count = 2, 0
+    while True:
+        count += 1
+        if count > _MAX_PIECES or at >= len(data) or data[at] != 0xFF:
+            return bad
+        # Fill bytes (0xFF) before the marker's code.
+        filled = _NOT_FILL.search(data, at)
+        if filled is None:
+            return bad
+        at = filled.start()
+        marker = data[at]
+        at += 1
+        if marker == 0x01 or 0xD0 <= marker <= 0xD7:
+            continue  # a marker without a segment
+        if marker in (0x00, 0xD8, 0xD9) or at + 2 > len(data):
+            return bad
+        size = int.from_bytes(data[at : at + 2])
+        if size < 2 or at + size > len(data):
+            return bad
+        start = at + 2
+        at += size
+        if marker == 0xDA:
+            break
+        if marker in _FRAMES and len(frames) < 2:
+            frames.append((marker, data[start:at]))
+        elif marker in _FRAMES:
+            return bad
+        elif marker == 0xE1 and data.startswith(b"Exif\x00\x00", start, at) and len(exif) < 2:
+            exif.append(data[start + 6 : at])
+        elif marker == 0xE2 and data.startswith(b"ICC_PROFILE\x00", start, at):
+            profiled = True
+    if len(frames) != 1 or frames[0][0] not in (0xC0, 0xC1, 0xC2) or len(frames[0][1]) < 6:
+        return bad
+    header = frames[0][1]
+    height, width, parts = int.from_bytes(header[1:3]), int.from_bytes(header[3:5]), header[5]
+    if (
+        header[0] != 8
+        or parts not in (1, 3, 4)
+        or len(header) < 6 + 3 * parts
+        or not 0 < width <= _MAX_SIDE
+        or not 0 < height <= _MAX_SIDE
+    ):
+        return bad
+    reasons = _turned(exif)
+    if profiled or parts == 4:
+        reasons.add("colour")
+    return (width, height), reasons
+
+
+def _turned(exif: list[bytes]) -> set[str]:
+    """``orientation`` if the image's Exif data turns or mirrors it; a bad header if unreadable."""
+    if not exif:
+        return set()
+    tiff = exif[0]
+    little = tiff[:2] == b"II"
+
+    def number(at: int, size: int) -> int:
+        return int.from_bytes(tiff[at : at + size], "little" if little else "big")
+
+    if len(exif) > 1 or tiff[:2] not in (b"II", b"MM") or len(tiff) < 8 or number(2, 2) != 42:
+        return {"bad-image-header"}
+    first = number(4, 4)
+    if first + 2 > len(tiff) or first + 2 + 12 * number(first, 2) > len(tiff):
+        return {"bad-image-header"}
+    for entry in range(first + 2, first + 2 + 12 * number(first, 2), 12):
+        if number(entry, 2) == 0x0112:
+            if number(entry + 2, 2) != 3 or number(entry + 4, 4) != 1:
+                return {"bad-image-header"}
+            return set() if number(entry + 8, 2) == 1 else {"orientation"}
+    return set()
+
+
 class _ParagraphReader:
     def __init__(
         self,
@@ -1761,6 +2257,11 @@ class _ParagraphReader:
         self.bookmark_ends: list[tuple[str, int, int]] = []
         self.parts: list[str] = []
         self.length = 0
+        # Each U+FFFC read into the text: where it stands, the element it stands for, and the
+        # reasons its run gives (in a field's result, a border on the run).
+        self.objects: list[tuple[int, ET.Element, frozenset[str]]] = []
+        # How many simple fields (fldSimple) hold what is being read.
+        self.simple = 0
         self.marks: list[Mark] = []
         # Where in ``marks`` the last mark of each kind is.
         self.last_mark: dict[str, int] = {}
@@ -1794,7 +2295,9 @@ class _ParagraphReader:
                     self.container(child)
                     self.layout -= 1
                     continue
+                self.simple += 1
                 self.container(child)
+                self.simple -= 1
                 if self.length == before:
                     raise DocxRefusedError("field-without-result", "a simple field shows nothing")
                 if code in _COMPUTED_FIELDS:
@@ -1867,6 +2370,12 @@ class _ParagraphReader:
         placed: list[str] = []
         references: list[NoteReference] = []
         comments: list[CommentReference] = []
+        # Each picture read into the text: the index of its character in ``emitted``, its element
+        # and its run's reasons: in a field's result (Word prints the field again, maybe with
+        # another picture), or bordered (``w:bdr`` other than none, through the run's levels).
+        objects: list[tuple[int, ET.Element, frozenset[str]]] = []
+        border = properties.element("bdr")
+        bordered = border is not None and border.get(_w("val")) not in ("nil", "none")
         for child in run:
             tag = child.tag
             if tag == _w("commentReference"):
@@ -1907,6 +2416,13 @@ class _ParagraphReader:
                 self.symbolic = self.symbolic or (symbol and bool(text))
             else:
                 produced = self._special(child)
+            if produced == OBJECT and not self.in_instruction() and not self.layout:
+                # Not in an instruction, so every field open is in its result.
+                in_field = bool(self.fields) or self.carried > 0 or self.simple > 0
+                why = {"field"} if in_field else set()
+                objects.append(
+                    (len(emitted), child, frozenset(why | ({"border"} if bordered else set())))
+                )
             if not self.in_instruction():
                 (placed if self.layout else emitted).append(produced)
             elif self.fields[-1]:
@@ -1957,6 +2473,8 @@ class _ParagraphReader:
                 "unsupported-element", "conditional table formatting may make text faint or not"
             )
         start = self.length
+        ends = [0, *itertools.accumulate(len(part) for part in emitted)] if objects else []
+        self.objects += [(start + ends[i], element, why) for i, element, why in objects]
         self.parts.append(text)
         self.length += len(text)
         self._mark(properties, start, self.length)
@@ -2531,6 +3049,8 @@ def _paragraph(
     carried: int = 0,
     under: tuple[_Rgb, ...] = (),
     conditional: tuple[ET.Element, ...] = (),
+    pictures: _Pictures | None = None,
+    exact_row: bool = False,
 ) -> tuple[Paragraph, _Context]:
     ppr = element.find(_w("pPr"))
     style = None
@@ -2600,7 +3120,33 @@ def _paragraph(
         notes=tuple(reader.notes),
         pages=tuple(reader.pages),
         comments=tuple(reader.comments),
+        pictures=()
+        if pictures is None
+        else tuple(
+            pictures.read(element, offset, why | _clipped(levels, exact_row))
+            for offset, element, why in reader.objects
+        ),
     ), context
+
+
+def _clipped(levels: list[ET.Element | None], exact_row: bool) -> frozenset[str]:
+    """Where Word may clip a paragraph's pictures: an exact line height, a row of exact height.
+
+    The line rule is the nearest level's that sets one (as ``_layout`` reads it).
+    """
+    rule = next(
+        (
+            spacing.get(_w("lineRule"))
+            for level in levels
+            if level is not None
+            and (spacing := level.find(_w("spacing"))) is not None
+            and spacing.get(_w("lineRule")) is not None
+        ),
+        None,
+    )
+    return frozenset({"line-height"} if rule == "exact" else set()) | frozenset(
+        {"row-height"} if exact_row else set()
+    )
 
 
 def _paragraph_marks(reader: _ParagraphReader, levels: list[ET.Element | None]) -> tuple[Mark, ...]:
@@ -3241,7 +3787,7 @@ def _note_marks(
 
 
 def _read_notes(
-    root: ET.Element | None, kind: str, styles: _Styles
+    root: ET.Element | None, kind: str, styles: _Styles, pictures: _Pictures
 ) -> dict[int, tuple[Paragraph, ...]]:
     """The paragraphs of every note in a footnotes or endnotes part, by id."""
     if root is None:
@@ -3260,7 +3806,7 @@ def _read_notes(
         note = _int(element.get(_w("id"), ""), f"{kind} id")
         if note in notes:
             raise DocxRefusedError("invalid-package", f"{kind} {note} is defined twice")
-        reader = _Body(styles, (kind, note))
+        reader = _Body(styles, pictures, (kind, note))
         reader.read(element)
         _check_accounted(element, reader.runs)
         if any(c.fields for c in reader.contexts):
@@ -3552,17 +4098,22 @@ def _styleref(
 
 # --- blocks and tables ---------------------------------------------------------------------
 
-# A table as the walk finds it: its element, the cell it stands in, its rows, each row's cells.
+# A table as the walk finds it: its element, the cell it stands in, its rows, each row's cells,
+# and whether each row may be of exact height.
 type _Found = tuple[
-    ET.Element, tuple[int, int, int] | None, list[ET.Element], list[list[ET.Element]]
+    ET.Element, tuple[int, int, int] | None, list[ET.Element], list[list[ET.Element]], list[bool]
 ]
 
 
 class _Body:
     """Reads the blocks of one story: the body, a note, a header, a footer or a comment."""
 
-    def __init__(self, styles: _Styles, story: tuple[str, int] | None = None) -> None:
+    def __init__(
+        self, styles: _Styles, pictures: _Pictures, story: tuple[str, int] | None = None
+    ) -> None:
         self.styles = styles
+        # What the story's pictures stand for, through its part's relationships.
+        self.pictures = pictures
         self.story = story
         self.out: list[Paragraph] = []
         self.contexts: list[_Context] = []
@@ -3570,6 +4121,8 @@ class _Body:
         # Each table as found, in document order (nested ones too): its element, the cell it
         # stands in, its rows and each row's cells; the body's grids are read from them (_grid).
         self.found: list[_Found] = []
+        # How many rows of exact height hold what is being read.
+        self.exact_rows = 0
         self.rows_ended = 0
         # Every run read, so that the part's every run is known to be accounted for.
         self.runs: set[ET.Element] = set()
@@ -3606,6 +4159,8 @@ class _Body:
                     self.contexts[-1].fields_open if self.contexts else 0,
                     under,
                     conditional,
+                    self.pictures,
+                    self.exact_rows > 0,
                 )
                 self.out.append(paragraph)
                 self.contexts.append(replace(context, rows_ended=self.rows_ended))
@@ -3664,7 +4219,11 @@ class _Body:
         for row in rows:
             cells_of.append([])
             _collect(row, _w("tc"), cells_of[-1], {_w("trPr"), _w("tblPrEx")})
-        self.found.append((element, outer, rows, cells_of))
+        # A row's own exact height, or one its table's style may set (in its own or a
+        # conditional part's row properties): how Word applies a style's is not on record.
+        styled = any(style.exact_rows for style in chain)
+        exact = [styled or _exact(row.find(_w("trPr"))) for row in rows]
+        self.found.append((element, outer, rows, cells_of, exact))
         layout = (
             _TableLayout(
                 element, rows, cells_of, chain, active, self.story is not None or bool(outer)
@@ -3682,6 +4241,7 @@ class _Body:
         painted = [c for shd in shadings for c in self.styles.painted(shd)]
         table_under = tuple(dict.fromkeys([*painted, *(under or self.styles.page)]))
         for row_index, (row, cells) in enumerate(zip(rows, cells_of, strict=True)):
+            self.exact_rows += exact[row_index]
             for cell_index, cell in enumerate(cells):
                 start, first = len(self.out), len(self.contexts)
                 own = tuple(self.styles.painted(cell.find(f"{_w('tcPr')}/{_w('shd')}")))
@@ -3731,6 +4291,7 @@ class _Body:
                     raise DocxRefusedError(
                         "unsupported-element", "text, a label or a mark in a merged-away cell"
                     )
+            self.exact_rows -= exact[row_index]
             self.rows_ended += 1
 
 
@@ -4007,14 +4568,20 @@ def _collect(element: ET.Element, wanted: str, out: list[ET.Element], silent: se
 def _grid(found: list[_Found]) -> tuple[Table, ...]:
     """Each table's grid, or None and why Word's grid for it is not on record ("Tables")."""
     out: list[Table] = []
-    for element, parent, rows, cells_of in found:
-        grid, reason = _laid(element, rows, cells_of)
+    for element, parent, rows, cells_of, exact in found:
+        grid, reason = _laid(element, rows, cells_of, exact)
         out.append(Table(parent, grid, reason))
     return tuple(out)
 
 
+def _exact(properties: ET.Element | None) -> bool:
+    """Whether row properties (a row's ``trPr``) set a height of rule ``exact``."""
+    height = None if properties is None else properties.find(_w("trHeight"))
+    return height is not None and height.get(_w("hRule")) == "exact"
+
+
 def _laid(
-    element: ET.Element, rows: list[ET.Element], cells_of: list[list[ET.Element]]
+    element: ET.Element, rows: list[ET.Element], cells_of: list[list[ET.Element]], exact: list[bool]
 ) -> tuple[TableGrid | None, str | None]:
     """A table's cells laid on its grid, or None and the first reason it cannot be (``REASONS``)."""
     grids = element.findall(_w("tblGrid"))
@@ -4022,7 +4589,7 @@ def _laid(
         return None, "two-grids" if grids else "no-grid"
     columns = len(grids[0].findall(_w("gridCol")))
     placed: list[TableRow] = []
-    for row, cells in zip(rows, cells_of, strict=True):
+    for row, cells, fixed in zip(rows, cells_of, exact, strict=True):
         before = _grid_count(row.find(_w("trPr")), "gridBefore", 0)
         after = _grid_count(row.find(_w("trPr")), "gridAfter", 0)
         if before is None or after is None:
@@ -4049,7 +4616,7 @@ def _laid(
         if column + after != columns:
             # Word lays such a row out by rules not on record.
             return None, "row-off-grid"
-        placed.append(TableRow(before, after, tuple(laid)))
+        placed.append(TableRow(before, after, tuple(laid), fixed))
     return TableGrid(columns, tuple(placed)), None
 
 
@@ -4078,8 +4645,11 @@ def read_document(data: bytes) -> Document:
         if document is None:
             raise DocxRefusedError("invalid-package", f"no {mains[0]}")
         parts: list[ET.Element | None] = []
+        # Each part's name, for its pictures' relationships.
+        names: list[str] = []
         for kind in ("styles", "theme", "fontTable", "settings", "numbering", *_NOTE_KINDS):
             targets = package.related(mains[0], kind + "s" if kind in _NOTE_KINDS else kind)
+            names.append(targets[0] if targets else "")
             if len(targets) > 1:
                 raise DocxRefusedError("invalid-package", f"more than one {kind} part")
             part = package.part(targets[0]) if targets else None
@@ -4124,7 +4694,7 @@ def read_document(data: bytes) -> Document:
     body = document.find(_w("body"))
     if body is None:
         raise DocxRefusedError("invalid-package", "no w:body")
-    reader = _Body(styles)
+    reader = _Body(styles, _Pictures(package, mains[0]))
     reader.read(body)
     _check_accounted(document, reader.runs)
     paragraphs = _labelled(reader.out, reader.contexts, lists)
@@ -4139,8 +4709,8 @@ def read_document(data: bytes) -> Document:
         reader.loose_bookmarks | _unreadable_bookmarks(document, others),
     )
     notes = {
-        kind: _read_notes(part, kind, styles)
-        for kind, part in zip(_NOTE_KINDS, parts[5:], strict=True)
+        kind: _read_notes(part, kind, styles, _Pictures(package, name))
+        for kind, part, name in zip(_NOTE_KINDS, parts[5:], names[5:], strict=True)
     }
     for kind, key in marks:
         if key not in notes[kind]:
@@ -4172,7 +4742,7 @@ def read_document(data: bytes) -> Document:
     footnotes, endnotes = in_order("footnote"), in_order("endnote")
     read_stories = {
         kind: tuple(
-            _story(kind, name, tuple(uses), root, index, styles)
+            _story(kind, name, tuple(uses), root, index, styles, _Pictures(package, name))
             if shown
             # Word shows it on no page; its text is in the file all the same.
             else Story(kind, name, tuple(uses), (), ("never-shown", f"a {kind} Word never shows"))
@@ -4180,7 +4750,9 @@ def read_document(data: bytes) -> Document:
         )
         for kind, found in stories.items()
     }
-    comments = _read_comments(comments_root, styles)
+    comments = _read_comments(
+        comments_root, styles, _Pictures(package, comment_parts[0] if comment_parts else "")
+    )
     # Every comment is anchored exactly once, in the body, a note, a header or a footer.
     anchored = [
         reference.id
@@ -4275,16 +4847,17 @@ def _story(
     root: ET.Element,
     index: int,
     styles: _Styles,
+    pictures: _Pictures,
 ) -> Story:
     """A header or footer read, or refused on its own: the body is read all the same."""
     try:
-        return Story(kind, name, uses, _read_blocks(root, (kind, index), styles))
+        return Story(kind, name, uses, _read_blocks(root, (kind, index), styles, pictures))
     except DocxRefusedError as refused:
         return Story(kind, name, uses, (), (refused.code, refused.detail))
 
 
 def _read_blocks(
-    root: ET.Element, story: tuple[str, int], styles: _Styles
+    root: ET.Element, story: tuple[str, int], styles: _Styles, pictures: _Pictures
 ) -> tuple[Paragraph, ...]:
     """The paragraphs of a header, a footer or a comment, by every rule of the body.
 
@@ -4292,7 +4865,7 @@ def _read_blocks(
     body is not on record. PAGE, NUMPAGES and SECTIONPAGES are placed; a PAGEREF is refused.
     """
     _check_part(root)
-    reader = _Body(styles, story)
+    reader = _Body(styles, pictures, story)
     reader.read(root)
     _check_accounted(root, reader.runs)
     if any(c.fields for c in reader.contexts):
@@ -4302,7 +4875,9 @@ def _read_blocks(
     return tuple(reader.out)
 
 
-def _read_comments(root: ET.Element | None, styles: _Styles) -> tuple[Comment, ...]:
+def _read_comments(
+    root: ET.Element | None, styles: _Styles, pictures: _Pictures
+) -> tuple[Comment, ...]:
     """Every comment of the comments part, in the order stored."""
     if root is None:
         return ()
@@ -4317,7 +4892,7 @@ def _read_comments(root: ET.Element | None, styles: _Styles) -> tuple[Comment, .
         seen.add(comment_id)
         stored = (element.get(_w("author")), element.get(_w("initials")), element.get(_w("date")))
         try:
-            text = _read_blocks(element, ("comment", comment_id), styles)
+            text = _read_blocks(element, ("comment", comment_id), styles, pictures)
         except DocxRefusedError as refused:
             # Refused on its own: the body is read all the same.
             comments.append(Comment(comment_id, *stored, (), (refused.code, refused.detail)))

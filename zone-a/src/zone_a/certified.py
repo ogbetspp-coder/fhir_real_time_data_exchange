@@ -29,7 +29,16 @@ from label_docx.reader import (
     NoteReference,
     Numbering,
     Paragraph,
+    Picture,
 )
+
+
+def _pair(value: list[int] | None) -> tuple[int, int] | None:
+    return None if value is None else (value[0], value[1])
+
+
+def _crop(value: dict[str, int] | None) -> tuple[int, int, int, int] | None:
+    return None if value is None else (value["l"], value["t"], value["r"], value["b"])
 
 
 def _paragraph(value: dict[str, Any]) -> Paragraph:
@@ -51,6 +60,21 @@ def _paragraph(value: dict[str, Any]) -> Paragraph:
         ),
         pages=tuple(value["pages"]),
         comments=tuple(CommentReference(c["offset"], c["id"]) for c in value["comments"]),
+        # A .docx paragraph's; an ePI's has none.
+        pictures=tuple(
+            Picture(
+                x["offset"],
+                x["kind"],
+                x["part"],
+                x["sha256"],
+                x["type"],
+                _pair(x["pixels"]),
+                _pair(x["extent"]),
+                _crop(x["crop"]),
+                x["reason"],
+            )
+            for x in value.get("pictures", [])
+        ),
     )
 
 

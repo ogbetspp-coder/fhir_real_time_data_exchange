@@ -1,26 +1,26 @@
 {
   "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": {
-    "certificateSha256": "df42b5611b44ac5dbb337db4b60481f8895d72e9371b81d0c8cec78508131700",
+    "certificateSha256": "256c60e8498dfbaf75021665796ac3ce5833bfebf66a0479b6bcf246158ad3c3",
     "paragraphsSha256": "41736e9d01f35559645c1def7237aed09818bdd258cd476e1a757354705486c9",
-    "resultSha256": "e8aa0562fb4a4e08b59b3c9a6df031c332d5c4d3298d208e6d6eef21c7f1aff6",
+    "resultSha256": "0fec6dc79f061e53205e4831765df913730c5b25477d7ed32db986e09fc9063b",
     "sha256": "13031dfae722bfe2479cb9323be96adfe18941da1c489731ea805082e5f886b3"
   },
   "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx": {
-    "certificateSha256": "d5dced3cd666b0906028f76fb445f4d2888dac08044f2617d72d0f75d308a79b",
+    "certificateSha256": "256e9f776d633ee303a12ba4279cfe08d076d255bb7f44fde29d3dcf8da71a03",
     "paragraphsSha256": "2dc7ebacbcd5ee986c511b6a9c4ed2c9266e12e433a7d356e10ef02da6bb09c9",
-    "resultSha256": "c97c4df2a6003246673db20d82732e2cf6f5bf80edb9e6bf88de69930e24e3eb",
+    "resultSha256": "24bd6c8c052500962af34c0ac125f471d039370cfeae6ce0b390a477b7678aa4",
     "sha256": "68a8026e6d99f22f9a380edf04df34bb5f29f35574f9e507fb4b5d5f16e996ae"
   },
   "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx": {
-    "certificateSha256": "56911d54ce93a8fae1a37bfcce33dc665b11d82b5c084dbbbc0717cc81ccf96b",
+    "certificateSha256": "e837e6fdcf55272e54edb49e8d1fe771904ae55558531ec3550cf7d836dbe351",
     "paragraphsSha256": "cfa69ad12d071020f4121217d9490416eb691a20f4cea062b218031f8ac80295",
-    "resultSha256": "6e5aed6ff1755af1edace65a13266bb90166e0297065549e3daeebcdc3ef50d0",
+    "resultSha256": "49526a4b6ea43c854c97157e1b8f464bd20c78d6b53485e8836e308f93f6c353",
     "sha256": "10aed02c52b69740041841d09a3fca2239bc9839eb3317bc1c1dd732532a9215"
   },
   "qrd-product-information-template-version-104_en.docx": {
-    "certificateSha256": "5b5dcc43a69c01f0299c393c37433d9840fde25eaa9c8f4112b8787868458b54",
+    "certificateSha256": "199a0a33f6a03978cca9ae5e96c3558815f36381e75bbf6acadb10e4415f6c6c",
     "paragraphsSha256": "c2aceda77663feebd44dac1c7f0e2d06b94518c5f67d561c0dea0aaf3ecba1c1",
-    "resultSha256": "7f8a4410bccee73b111b8603231691b43b61ea68be9e547edb7469b60b6db12d",
+    "resultSha256": "3aaf7d8851d381b66a89018a34d984874d536bbb34799a87767158513f330761",
     "sha256": "6c9da03b2c72f055c81dc14f12c82da61a1609e7beffcc71f95e8046d7104fd1"
   }
 }

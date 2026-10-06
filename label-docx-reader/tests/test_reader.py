@@ -6,6 +6,7 @@ reads the four pinned EMA files in corpus/ema-qrd, which is where the rules were
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import re
@@ -13,6 +14,7 @@ import struct
 import zipfile
 import zlib
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -1903,6 +1905,868 @@ def test_a_vml_picture_is_an_object_replacement_character() -> None:
 )
 def test_vml_that_holds_text_or_is_not_a_picture_is_refused(pict: str) -> None:
     assert refusal(p(r(pict))) == "unsupported-element"
+
+
+# --- what a picture stands for ("Pictures" in the reader's docstring) ------------------------
+
+PIC = "http://schemas.openxmlformats.org/drawingml/2006/picture"
+REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+PACKAGE_RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
+DPI = "{28A0092B-C50C-407E-A947-70E740481C1C}"
+A14 = "http://schemas.microsoft.com/office/drawing/2010/main"
+
+
+def chunk(kind: bytes, body: bytes) -> bytes:
+    """A PNG chunk with its length and CRC."""
+    return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
+
+
+# The samples a pixel of each PNG colour type has: grey, RGB, palette index, grey and alpha,
+# RGB and alpha.
+CHANNELS = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}
+
+
+def png(
+    width: int = 2,
+    height: int = 1,
+    extra: bytes = b"",
+    depth: int = 8,
+    colour: int = 2,
+    interlace: int = 0,
+    end: bool = True,
+) -> bytes:
+    """A real PNG of ``width`` by ``height`` black pixels of colour type ``colour`` (a palette
+    image needs a PLTE in ``extra``), ``extra`` chunks after IHDR, IEND unless not ``end``."""
+    row = (width * depth * CHANNELS.get(colour, 1) + 7) // 8
+    rows = b"".join(b"\x00" + bytes(row) for _ in range(height))
+    header = struct.pack(">IIBBBBB", width, height, depth, colour, 0, 0, interlace)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", header)
+        + extra
+        + chunk(b"IDAT", zlib.compress(rows))
+        + (chunk(b"IEND", b"") if end else b"")
+    )
+
+
+def segment(marker: int, body: bytes) -> bytes:
+    return bytes((0xFF, marker)) + struct.pack(">H", len(body) + 2) + body
+
+
+def jpeg(
+    width: int = 1,
+    height: int = 1,
+    frame: int = 0xC0,
+    extra: bytes = b"",
+    precision: int = 8,
+    parts: int = 1,
+    specs: int | None = None,
+) -> bytes:
+    """A real baseline JPEG of one grey 8x8 block, ``width`` by ``height`` (``extra`` first),
+    its frame naming ``parts`` components and holding ``specs`` of them (all by default)."""
+    huffman = bytes([1] + [0] * 15) + b"\x00"  # one code of one bit, for symbol 0
+    count = parts if specs is None else specs
+    components = b"".join(bytes((i + 1, 0x11, 0)) for i in range(count))
+    return (
+        b"\xff\xd8"
+        + extra
+        + segment(0xDB, b"\x00" + b"\x01" * 64)
+        + segment(frame, struct.pack(">BHHB", precision, height, width, parts) + components)
+        + segment(0xC4, b"\x00" + huffman)
+        + segment(0xC4, b"\x10" + huffman)
+        + segment(0xDA, b"\x01\x01\x00\x00\x3f\x00")
+        + b"\x3f\xff\xd9"
+    )
+
+
+def exif(orientation: int, order: str = "MM", before: int = 0, tight: bool = False) -> bytes:
+    """An APP1 Exif body: one IFD with ``before`` other tags and then the orientation tag, and
+    the next IFD's offset after it unless ``tight``."""
+    pack = ">" if order == "MM" else "<"
+    tiff = order.encode() + struct.pack(pack + "HI", 42, 8) + struct.pack(pack + "H", before + 1)
+    tiff += struct.pack(pack + "HHIHH", 0x0100, 3, 1, 9, 0) * before
+    tiff += struct.pack(pack + "HHIHH", 0x0112, 3, 1, orientation, 0)
+    return b"Exif\x00\x00" + tiff + (b"" if tight else struct.pack(pack + "I", 0))
+
+
+def tiff_png(tiff: bytes) -> bytes:
+    """A PNG whose eXIf chunk holds ``tiff``."""
+    return png(extra=chunk(b"eXIf", tiff))
+
+
+def picture(
+    blip: str = 'r:embed="rIdImg"',
+    inside: str = "",
+    crop: str = "",
+    shape: str = '<a:xfrm><a:off x="0" y="0"/><a:ext cx="19050" cy="9525"/></a:xfrm>'
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln>',
+    extent: str = 'cx="19050" cy="9525"',
+    effect: str = 'l="0" t="0" r="0" b="0"',
+    fill: str = "<a:stretch><a:fillRect/></a:stretch>",
+) -> str:
+    """An in-line DrawingML picture as Word writes it, each part replaceable."""
+    return (
+        f"<w:drawing><wp:inline xmlns:wp='{WP}'><wp:extent {extent}/><wp:effectExtent {effect}/>"
+        f"<wp:docPr id='1' name='Picture 1'/><a:graphic xmlns:a='{A}'>"
+        f"<a:graphicData uri='{PIC}'><pic:pic xmlns:pic='{PIC}' xmlns:r='{REL}'>"
+        "<pic:nvPicPr><pic:cNvPr id='1' name='p'/><pic:cNvPicPr/></pic:nvPicPr>"
+        f"<pic:blipFill><a:blip {blip}>{inside}</a:blip>{crop}{fill}</pic:blipFill>"
+        f"<pic:spPr bwMode='auto'>{shape}</pic:spPr></pic:pic></a:graphicData></a:graphic>"
+        "</wp:inline></w:drawing>"
+    )
+
+
+def relationship(
+    target: str = "media/image1.png", rid: str = "rIdImg", kind: str = "image", mode: str = ""
+) -> str:
+    return (
+        f'<Relationship Id="{rid}" Type="{REL}/{kind}" Target="{target}"'
+        f"{f' TargetMode={chr(34)}{mode}{chr(34)}' if mode else ''}/>"
+    )
+
+
+def with_media(data: bytes, media: dict[str, bytes], rels: dict[str, str] | None = None) -> bytes:
+    """``data`` with ``media`` parts added, and ``rels`` (by .rels part) added or made."""
+    rels = {"word/_rels/document.xml.rels": relationship()} if rels is None else rels
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(out, "w") as target:
+        for info in source.infolist():
+            content = source.read(info)
+            if info.filename in rels:
+                added = rels[info.filename].encode()
+                content = content.replace(b"</Relationships>", added + b"</Relationships>")
+            target.writestr(info, content)
+        for name, made in rels.items():
+            if name not in source.namelist():
+                target.writestr(
+                    name, f'<Relationships xmlns="{PACKAGE_RELS}">{made}</Relationships>'
+                )
+        for name, image in media.items():
+            target.writestr(name, image)
+    return out.getvalue()
+
+
+def read_pictures(run: str, media: dict[str, bytes], rels: dict[str, str] | None = None) -> Any:
+    """The served result of "a", ``run``, "b" with ``media``: certified, so never refused."""
+    value = json.loads(
+        served(with_media(docx(p(r("<w:t>a</w:t>") + r(run) + r("<w:t>b</w:t>"))), media, rels))[0]
+    )
+    assert "refusal" not in value, value.get("refusal")
+    assert [q["text"] for q in value["paragraphs"]] == ["a￼b"]
+    return value
+
+
+PNG = png()
+FILLED = picture()
+IMAGE = "word/media/image1.png"
+MEDIA = {IMAGE: PNG}
+IHDR = struct.pack(">IIBBBBB", 2, 1, 8, 2, 0, 0, 0)
+PALETTE = png(colour=3)
+PLTE = chunk(b"PLTE", bytes(3))
+VML = VML_PICTURE.replace('xmlns:r="urn:r" r:id="rId8"', f'xmlns:r="{REL}" r:id="rIdImg"')
+TURNED = jpeg(extra=segment(0xE1, exif(6)))
+# Each picture the reader cannot vouch for, its media and relationships, and the reason it gives.
+PICTURE_CASES: list[tuple[str, str, dict[str, bytes], dict[str, str] | None, str | None]] = [
+    ("plain", picture(), MEDIA, None, None),
+    ("jpeg", picture(), {"word/media/image1.png": jpeg()}, None, None),
+    (
+        "upright-exif",
+        picture(),
+        {"word/media/image1.png": jpeg(extra=segment(0xE1, exif(1, "II")))},
+        None,
+        None,
+    ),
+    (
+        "useLocalDpi",
+        picture(
+            inside=f'<a:extLst><a:ext uri="{DPI}"><a14:useLocalDpi xmlns:a14="{A14}" val="0"/>'
+            "</a:ext></a:extLst>"
+        ),
+        MEDIA,
+        None,
+        None,
+    ),
+    ("uncropped", picture(crop="<a:srcRect/>"), MEDIA, None, None),
+    ("shape", _alternate(SHAPE.replace("wp:anchor", "wp:inline"), LINE), {}, {}, "shape"),
+    ("vml", VML, MEDIA, None, "vml"),
+    ("linked", picture(blip='r:embed="rIdImg" r:link="rIdImg"'), MEDIA, None, "linked"),
+    ("no-embed", picture(blip=""), MEDIA, None, "no-part"),
+    ("no-relationship", picture(), MEDIA, {}, "no-part"),
+    (
+        "external",
+        picture(),
+        MEDIA,
+        {"word/_rels/document.xml.rels": relationship(mode="External")},
+        "no-part",
+    ),
+    (
+        "not-an-image",
+        picture(),
+        MEDIA,
+        {"word/_rels/document.xml.rels": relationship(kind="oleObject")},
+        "no-part",
+    ),
+    ("no-such-part", picture(), {}, None, "no-part"),
+    ("other-case", picture(), {"word/media/Image1.png": PNG}, None, "no-part"),
+    ("no-pic", PICTURE, MEDIA, None, "no-part"),
+    (
+        "gif",
+        picture(),
+        {"word/media/image1.png": b"GIF89a\x01\x00\x01\x00"},
+        None,
+        "not-png-or-jpeg",
+    ),
+    ("bad-crc", picture(), {"word/media/image1.png": PNG[:-1] + b"\x00"}, None, "bad-image-header"),
+    ("truncated", picture(), {"word/media/image1.png": PNG[:40]}, None, "bad-image-header"),
+    ("bad-depth", picture(), {"word/media/image1.png": png(depth=4)}, None, "bad-image-header"),
+    (
+        "no-idat",
+        picture(),
+        {"word/media/image1.png": PNG[:33] + chunk(b"IEND", b"")},
+        None,
+        "bad-image-header",
+    ),
+    (
+        "lossless-jpeg",
+        picture(),
+        {"word/media/image1.png": jpeg(frame=0xC3)},
+        None,
+        "bad-image-header",
+    ),
+    (
+        "no-frame",
+        picture(),
+        {"word/media/image1.png": b"\xff\xd8\xff\xda\x00\x02"},
+        None,
+        "bad-image-header",
+    ),
+    (
+        "bad-exif",
+        picture(),
+        {"word/media/image1.png": jpeg(extra=segment(0xE1, b"Exif\x00\x00XX"))},
+        None,
+        "bad-image-header",
+    ),
+    (
+        "animated",
+        picture(),
+        {"word/media/image1.png": png(extra=chunk(b"acTL", bytes(8)))},
+        None,
+        "animated",
+    ),
+    ("turned-jpeg", picture(), {"word/media/image1.png": TURNED}, None, "orientation"),
+    (
+        "turned-png",
+        picture(),
+        {"word/media/image1.png": png(extra=chunk(b"eXIf", exif(3)[6:]))},
+        None,
+        "orientation",
+    ),
+    ("bad-extent", picture(extent='cx="1.5" cy="9525"'), MEDIA, None, "bad-number"),
+    ("bad-crop", picture(crop='<a:srcRect l="10%"/>'), MEDIA, None, "bad-number"),
+    ("bad-flip", picture(shape='<a:xfrm flipH="yes"/>'), MEDIA, None, "bad-number"),
+    ("cropped", picture(crop='<a:srcRect b="25000"/>'), MEDIA, None, "cropped"),
+    ("rotated", picture(shape='<a:xfrm rot="5400000"/>'), MEDIA, None, "rotated"),
+    ("flipped", picture(shape='<a:xfrm flipV="1"/>'), MEDIA, None, "flipped"),
+    ("recoloured", picture(inside="<a:grayscl/>"), MEDIA, None, "effects"),
+    ("transparent", picture(inside='<a:alphaModFix amt="50000"/>'), MEDIA, None, "effects"),
+    (
+        "svg",
+        picture(
+            inside='<a:extLst><a:ext uri="{96DAC541-7B7A-43D3-8B79-37D633B846F1}"/></a:extLst>'
+        ),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    ("tiled", picture(fill="<a:tile/>"), MEDIA, None, "effects"),
+    (
+        "outlined",
+        picture(shape='<a:ln w="9525"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:ln>'),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    ("ellipse", picture(shape='<a:prstGeom prst="ellipse"/>'), MEDIA, None, "effects"),
+    ("shadow", picture(shape="<a:effectLst><a:outerShdw/></a:effectLst>"), MEDIA, None, "effects"),
+    ("moved", picture(shape='<a:xfrm><a:off x="5" y="0"/></a:xfrm>'), MEDIA, None, "effects"),
+    ("resized", picture(shape='<a:xfrm><a:ext cx="1" cy="1"/></a:xfrm>'), MEDIA, None, "effects"),
+    ("effect-extent", picture(effect='l="0" t="0" r="9525" b="0"'), MEDIA, None, "effects"),
+    ("hidden", picture().replace("name='p'/>", "name='p' hidden='1'/>"), MEDIA, None, "effects"),
+    # Headers browsers and Word may read otherwise, or not at all.
+    ("palette-without-plte", picture(), {IMAGE: PALETTE}, None, "bad-image-header"),
+    ("palette", picture(), {IMAGE: png(extra=chunk(b"PLTE", bytes(3)), colour=3)}, None, None),
+    (
+        "unknown-critical",
+        picture(),
+        {IMAGE: png(extra=chunk(b"ABCD", b"x"))},
+        None,
+        "bad-image-header",
+    ),
+    ("second-ihdr", picture(), {IMAGE: png(extra=chunk(b"IHDR", IHDR))}, None, "bad-image-header"),
+    ("not-letters", picture(), {IMAGE: png(extra=chunk(b"ab1d", b""))}, None, "bad-image-header"),
+    ("after-iend", picture(), {IMAGE: PNG + b"x"}, None, "bad-image-header"),
+    ("too-wide", picture(), {IMAGE: png(width=10_001)}, None, "bad-image-header"),
+    ("jpeg-12-bit", picture(), {IMAGE: jpeg(precision=12)}, None, "bad-image-header"),
+    ("jpeg-2-components", picture(), {IMAGE: jpeg(parts=2)}, None, "bad-image-header"),
+    ("jpeg-too-high", picture(), {IMAGE: jpeg(height=10_001)}, None, "bad-image-header"),
+    (
+        "jpeg-two-frames",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xC0, bytes(9)))},
+        None,
+        "bad-image-header",
+    ),
+    # Colour Chrome manages and Word's handling of is not on record.
+    ("iccp", picture(), {IMAGE: png(extra=chunk(b"iCCP", b"p\x00\x00x"))}, None, "colour"),
+    ("chrm", picture(), {IMAGE: png(extra=chunk(b"cHRM", bytes(32)))}, None, "colour"),
+    ("gama-alone", picture(), {IMAGE: png(extra=chunk(b"gAMA", bytes(4)))}, None, "colour"),
+    (
+        "gama-srgb",
+        picture(),
+        {IMAGE: png(extra=chunk(b"sRGB", b"\x00") + chunk(b"gAMA", bytes(4)))},
+        None,
+        None,
+    ),
+    (
+        "jpeg-icc",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xE2, b"ICC_PROFILE\x00\x01\x01"))},
+        None,
+        "colour",
+    ),
+    ("jpeg-cmyk", picture(), {IMAGE: jpeg(parts=4)}, None, "colour"),
+    # One check at a time, each alone in a picture: what each part of the closed list holds.
+    (
+        "fill-attribute",
+        FILLED.replace("<pic:blipFill>", '<pic:blipFill dpi="96">'),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    (
+        "fill-extra-child",
+        picture(fill="<a:stretch><a:fillRect/></a:stretch><a:tile/>"),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    (
+        "stretch-attribute",
+        picture(fill='<a:stretch x="1"><a:fillRect/></a:stretch>'),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    (
+        "fill-rect-inset",
+        picture(fill='<a:stretch><a:fillRect l="1"/></a:stretch>'),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    (
+        "fill-rect-child",
+        picture(fill="<a:stretch><a:fillRect><a:x/></a:fillRect></a:stretch>"),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    ("blip-attribute", picture(blip='r:embed="rIdImg" x="1"'), MEDIA, None, "effects"),
+    ("blip-cstate", picture(blip='r:embed="rIdImg" cstate="print"'), MEDIA, None, None),
+    (
+        "other-extension",
+        picture(
+            inside=f'<a:extLst><a:ext uri="{{X}}"><a14:useLocalDpi xmlns:a14="{A14}"/>'
+            "</a:ext></a:extLst>"
+        ),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    (
+        "empty-dpi-extension",
+        picture(inside=f'<a:extLst><a:ext uri="{DPI}"/></a:extLst>'),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    ("crop-child", picture(crop="<a:srcRect><a:x/></a:srcRect>"), MEDIA, None, "effects"),
+    ("crop-attribute", picture(crop='<a:srcRect x="1"/>'), MEDIA, None, "effects"),
+    ("crop-all-zero", picture(crop='<a:srcRect l="0" t="0" r="0" b="0"/>'), MEDIA, None, None),
+    (
+        "crop-each-side",
+        picture(crop='<a:srcRect l="1" t="2" r="3" b="4"/>'),
+        MEDIA,
+        None,
+        "cropped",
+    ),
+    ("crop-outward", picture(crop='<a:srcRect l="-500"/>'), MEDIA, None, "cropped"),
+    (
+        "no-shape-properties",
+        re.sub("<pic:spPr.*</pic:spPr>", "", picture()),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    (
+        "pic-extension",
+        picture().replace("</pic:spPr>", "</pic:spPr><pic:extLst/>"),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    (
+        "hidden-true",
+        picture().replace("name='p'/>", "name='p' hidden='true'/>"),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    ("no-blip", FILLED.replace('<a:blip r:embed="rIdImg"></a:blip>', ""), MEDIA, None, "no-part"),
+    ("xfrm-attribute", picture(shape='<a:xfrm x="1"/>'), MEDIA, None, "effects"),
+    (
+        "xfrm-two-offsets",
+        picture(shape='<a:xfrm><a:off x="0" y="0"/><a:off x="0" y="0"/></a:xfrm>'),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    ("xfrm-all-zero", picture(shape='<a:xfrm rot="0" flipH="0" flipV="0"/>'), MEDIA, None, None),
+    (
+        "xfrm-child",
+        picture(shape='<a:xfrm><a:chOff x="0" y="0"/></a:xfrm>'),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    ("rotated-back", picture(shape='<a:xfrm rot="-5400000"/>'), MEDIA, None, "rotated"),
+    ("flipped-true", picture(shape='<a:xfrm flipH="true"/>'), MEDIA, None, "flipped"),
+    ("unflipped-false", picture(shape='<a:xfrm flipH="false" flipV="false"/>'), MEDIA, None, None),
+    ("moved-back", picture(shape='<a:xfrm><a:off x="-1" y="0"/></a:xfrm>'), MEDIA, None, "effects"),
+    (
+        "negative-size",
+        picture(shape='<a:xfrm><a:ext cx="-1" cy="9525"/></a:xfrm>'),
+        MEDIA,
+        None,
+        "bad-number",
+    ),
+    (
+        "adjusted-rect",
+        picture(shape='<a:prstGeom prst="rect"><a:avLst><a:gd name="a"/></a:avLst></a:prstGeom>'),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    ("no-fill-child", picture(shape="<a:noFill><a:x/></a:noFill>"), MEDIA, None, "effects"),
+    (
+        "line-no-fill-attribute",
+        picture(shape='<a:ln><a:noFill x="1"/></a:ln>'),
+        MEDIA,
+        None,
+        "effects",
+    ),
+    ("negative-extent", picture(extent='cx="-1" cy="9525"'), MEDIA, None, "bad-number"),
+    ("negative-effect-extent", picture(effect='l="-1" t="0" r="0" b="0"'), MEDIA, None, "effects"),
+    (
+        "absolute-target",
+        picture(),
+        MEDIA,
+        {"word/_rels/document.xml.rels": relationship("/word/media/image1.png")},
+        None,
+    ),
+    # Every colour type and bit depth PNG allows, and some it does not.
+    *(
+        (
+            f"png-{colour}-{depth}",
+            picture(),
+            {IMAGE: png(1, 1, PLTE if colour == 3 else b"", depth, colour)},
+            None,
+            None,
+        )
+        for colour, depths in (
+            (0, (1, 2, 4, 8, 16)),
+            (2, (8, 16)),
+            (3, (1, 2, 4, 8)),
+            (4, (8, 16)),
+            (6, (8, 16)),
+        )
+        for depth in depths
+    ),
+    *(
+        (
+            f"png-{colour}-{depth}",
+            picture(),
+            {IMAGE: png(1, 1, PLTE if colour == 3 else b"", depth, colour)},
+            None,
+            "bad-image-header",
+        )
+        for colour, depth in ((0, 3), (2, 4), (3, 16), (4, 4), (5, 8), (6, 1))
+    ),
+    ("png-widest", picture(), {IMAGE: png(10_000, 1)}, None, None),
+    ("png-highest", picture(), {IMAGE: png(1, 10_000)}, None, None),
+    ("png-interlaced", picture(), {IMAGE: png(1, 1, interlace=1)}, None, None),
+    ("png-interlace-2", picture(), {IMAGE: png(1, 1, interlace=2)}, None, "bad-image-header"),
+    (
+        "png-long-ihdr",
+        picture(),
+        {IMAGE: PNG.replace(chunk(b"IHDR", IHDR), chunk(b"IHDR", IHDR + b"\x00"))},
+        None,
+        "bad-image-header",
+    ),
+    (
+        "png-critical-z",
+        picture(),
+        {IMAGE: png(extra=chunk(b"Zzzz", b""))},
+        None,
+        "bad-image-header",
+    ),
+    ("png-ancillary-a", picture(), {IMAGE: png(extra=chunk(b"abcd", b""))}, None, None),
+    (
+        "png-two-exif",
+        picture(),
+        {IMAGE: png(extra=chunk(b"eXIf", exif(1)[6:]) * 2)},
+        None,
+        "bad-image-header",
+    ),
+    ("png-exif-tight", picture(), {IMAGE: tiff_png(exif(3, tight=True)[6:])}, None, "orientation"),
+    (
+        "png-exif-short-entry",
+        picture(),
+        {IMAGE: tiff_png(exif(3, tight=True)[6:-4])},
+        None,
+        "bad-image-header",
+    ),
+    ("jpeg-restarts", picture(), {IMAGE: jpeg(extra=b"\xff\xd1\xff\x01")}, None, None),
+    (
+        "jpeg-scan-at-end",
+        picture(),
+        {IMAGE: jpeg()[: jpeg().index(b"\xff\xda")] + b"\xff\xda\x00\x02"},
+        None,
+        None,
+    ),
+    (
+        "jpeg-second-soi",
+        picture(),
+        {IMAGE: jpeg(extra=b"\xff\xd8\x00\x02")},
+        None,
+        "bad-image-header",
+    ),
+    ("jpeg-extended", picture(), {IMAGE: jpeg(frame=0xC1)}, None, None),
+    ("jpeg-progressive", picture(), {IMAGE: jpeg(frame=0xC2)}, None, None),
+    ("jpeg-arithmetic", picture(), {IMAGE: jpeg(frame=0xC9)}, None, "bad-image-header"),
+    ("jpeg-jpg-marker", picture(), {IMAGE: jpeg(extra=segment(0xC8, b""))}, None, None),
+    ("jpeg-short-frame", picture(), {IMAGE: jpeg(parts=3, specs=1)}, None, "bad-image-header"),
+    ("jpeg-widest", picture(), {IMAGE: jpeg(10_000, 1)}, None, None),
+    ("jpeg-highest", picture(), {IMAGE: jpeg(1, 10_000)}, None, None),
+    (
+        "exif-little-endian",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xE1, exif(8, "II")))},
+        None,
+        "orientation",
+    ),
+    (
+        "exif-orientation-second",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xE1, exif(6, before=1)))},
+        None,
+        "orientation",
+    ),
+    (
+        "exif-orientation-tight",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xE1, exif(6, tight=True)))},
+        None,
+        "orientation",
+    ),
+    (
+        "exif-entry-cut-short",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xE1, exif(6, tight=True)[:-2]))},
+        None,
+        "bad-image-header",
+    ),
+    (
+        "exif-eight-bytes",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xE1, b"Exif\x00\x00MM\x00*\x00\x00\x00\x04"))},
+        None,
+        None,
+    ),
+    (
+        "exif-empty-ifd-at-end",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xE1, b"Exif\x00\x00MM\x00*\x00\x00\x00\x08\x00\x00"))},
+        None,
+        None,
+    ),
+    (
+        "exif-ifd-past-end",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xE1, b"Exif\x00\x00MM\x00*\x00\x00\x00\x09\x00\x00"))},
+        None,
+        "bad-image-header",
+    ),
+    (
+        "exif-many-entries",
+        picture(),
+        {IMAGE: jpeg(extra=segment(0xE1, b"Exif\x00\x00MM\x00*\x00\x00\x00\x08\x00\x64"))},
+        None,
+        "bad-image-header",
+    ),
+    (
+        "exif-wrong-type",
+        picture(),
+        {
+            IMAGE: jpeg(
+                extra=segment(0xE1, exif(6).replace(b"\x01\x12\x00\x03", b"\x01\x12\x00\x04"))
+            )
+        },
+        None,
+        "bad-image-header",
+    ),
+]
+
+
+def test_a_picture_reports_its_part_bytes_type_pixels_and_extent() -> None:
+    value = read_pictures(picture(), MEDIA)
+    assert value["paragraphs"][0]["pictures"] == [
+        {
+            "crop": None,
+            "extent": [19050, 9525],
+            "kind": "picture",
+            "offset": 1,
+            "part": "word/media/image1.png",
+            "pixels": [2, 1],
+            "reason": None,
+            "sha256": hashlib.sha256(PNG).hexdigest(),
+            "type": "png",
+        }
+    ]
+    # Two in one paragraph, one a JPEG, each where it stands; one in a table cell.
+    media = {"word/media/image1.png": PNG, "word/media/photo.jpg": jpeg(3, 2)}
+    rels = relationship() + relationship("/word/media/photo.jpg", "rIdJpg")
+    two = p(r(picture()) + r("<w:t>x</w:t>") + r(picture(blip='r:embed="rIdJpg"')))
+    body = two + tbl(1, f"<w:tr><w:tc>{p(r(picture(crop='<a:srcRect l="-500"/>')))}</w:tc></w:tr>")
+    document = read_document(with_media(docx(body), media, {"word/_rels/document.xml.rels": rels}))
+    first, second = document.body
+    assert [(x.offset, x.part, x.type, x.pixels) for x in first.pictures] == [
+        (0, "word/media/image1.png", "png", (2, 1)),
+        (2, "word/media/photo.jpg", "jpeg", (3, 2)),
+    ]
+    assert second.table == (0, 0, 0)
+    assert (second.pictures[0].crop, second.pictures[0].reason) == ((-500, 0, 0, 0), "cropped")
+    # A note's picture is found through the notes' own relationships.
+    note = f'<w:footnote w:id="1">{p(r(picture()))}</w:footnote>'
+    body = p(r('<w:footnoteReference w:id="1"/>'))
+    data = with_media(
+        docx(body, footnotes=note), MEDIA, {"word/_rels/footnotes.xml.rels": relationship()}
+    )
+    assert (
+        read_document(data).footnotes[0].paragraphs[0].pictures[0].part == "word/media/image1.png"
+    )
+    assert (
+        read_document(with_media(docx(body, footnotes=note), MEDIA))
+        .footnotes[0]
+        .paragraphs[0]
+        .pictures[0]
+        .reason
+        == "no-part"
+    )
+
+
+@pytest.mark.parametrize(
+    ("run", "media", "rels", "reason"),
+    [case[1:] for case in PICTURE_CASES],
+    ids=[case[0] for case in PICTURE_CASES],
+)
+def test_a_picture_its_bytes_cannot_stand_for_has_the_first_reason_and_is_read(
+    run: str, media: dict[str, bytes], rels: dict[str, str] | None, reason: str | None
+) -> None:
+    (found,) = read_pictures(run, media, rels)["paragraphs"][0]["pictures"]
+    assert (found["offset"], found["reason"]) == (1, reason)
+    assert found["kind"] == ("shape" if reason == "shape" else "picture")
+    if found["part"] is not None:
+        assert found["sha256"] == hashlib.sha256(media[found["part"]]).hexdigest()
+
+
+def field(instruction: str, result: str) -> str:
+    """A complex field with ``instruction`` showing ``result`` (runs)."""
+    return (
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r(f'<w:instrText xml:space="preserve"> {instruction} </w:instrText>')
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + result
+        + r('<w:fldChar w:fldCharType="end"/>')
+    )
+
+
+EXACT = '<w:spacing w:line="240" w:lineRule="exact"/>'
+BORDER = '<w:bdr w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
+ROW = '<w:trPr><w:trHeight w:val="2000" w:hRule="exact"/></w:trPr>'
+INNER = f"<w:tr><w:tc>{p(r(picture()))}</w:tc></w:tr>"
+STYLED = '<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr>'
+# Where a picture stands, and the reason its place gives: Word prints a field's result again
+# (a REF to a bookmark round another picture prints that one), and clips a picture to an exact
+# line or row; a border on the run is drawn round it.
+PLACED_CASES: list[tuple[str, str, str | None, str | None]] = [
+    ("plain", p(r(picture())), None, None),
+    ("complex-field", p(field("DOCPROPERTY Title", r(picture()))), None, "field"),
+    (
+        "simple-field",
+        p(f'<w:fldSimple w:instr=" DOCPROPERTY Title ">{r(picture())}</w:fldSimple>'),
+        None,
+        "field",
+    ),
+    (
+        "ref-to-another",
+        p('<w:bookmarkStart w:id="0" w:name="logo"/>' + r(picture()) + '<w:bookmarkEnd w:id="0"/>')
+        + p(field("REF logo \\h", r(picture()))),
+        None,
+        "field",
+    ),
+    (
+        "carried-field",
+        p(
+            r('<w:fldChar w:fldCharType="begin"/>')
+            + r('<w:instrText xml:space="preserve"> DOCPROPERTY T </w:instrText>')
+            + r('<w:fldChar w:fldCharType="separate"/>')
+            + r("<w:t>x</w:t>")
+        )
+        + p(r(picture()) + r('<w:fldChar w:fldCharType="end"/>')),
+        None,
+        "field",
+    ),
+    ("exact-line", p(r(picture()), EXACT), None, "line-height"),
+    ("at-least-line", p(r(picture()), EXACT.replace("exact", "atLeast")), None, None),
+    (
+        "exact-line-by-style",
+        p(r(picture())),
+        '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:pPr>'
+        + EXACT
+        + "</w:pPr></w:style>",
+        "line-height",
+    ),
+    (
+        "exact-line-by-default",
+        p(r(picture())),
+        f"<w:docDefaults><w:pPrDefault><w:pPr>{EXACT}</w:pPr></w:pPrDefault></w:docDefaults>",
+        "line-height",
+    ),
+    (
+        "nearest-rule-wins",
+        p(r(picture()), EXACT.replace("exact", "auto")),
+        f"<w:docDefaults><w:pPrDefault><w:pPr>{EXACT}</w:pPr></w:pPrDefault></w:docDefaults>",
+        None,
+    ),
+    ("exact-row", tbl(1, f"<w:tr>{ROW}<w:tc>{p(r(picture()))}</w:tc></w:tr>"), None, "row-height"),
+    (
+        "at-least-row",
+        tbl(1, f"<w:tr>{ROW.replace('exact', 'atLeast')}<w:tc>{p(r(picture()))}</w:tc></w:tr>"),
+        None,
+        None,
+    ),
+    (
+        "nested-in-exact-row",
+        tbl(1, f"<w:tr>{ROW}<w:tc>{tbl(1, INNER)}{p('')}</w:tc></w:tr>"),
+        None,
+        "row-height",
+    ),
+    (
+        "exact-row-by-style",
+        tbl(1, f"<w:tr><w:tc>{p(r(picture()))}</w:tc></w:tr>").replace(
+            "<w:tbl>", '<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr>'
+        ),
+        f'<w:style w:type="table" w:styleId="T">{ROW}</w:style>',
+        "row-height",
+    ),
+    ("border", p(r(picture(), BORDER)), None, "border"),
+    ("no-border", p(r(picture(), '<w:bdr w:val="none"/>')), None, None),
+    (
+        "border-by-style",
+        p(r(picture(), '<w:rStyle w:val="B"/>')),
+        f'<w:style w:type="character" w:styleId="B"><w:rPr>{BORDER}</w:rPr></w:style>',
+        "border",
+    ),
+    ("border-nil", p(r(picture(), '<w:bdr w:val="nil"/>')), None, None),
+    (
+        "after-a-simple-field",
+        p(
+            f'<w:fldSimple w:instr=" DOCPROPERTY T ">{r("<w:t>x</w:t>")}</w:fldSimple>'
+            + r(picture())
+        ),
+        None,
+        None,
+    ),
+    ("first-spacing-only", p(r(picture()), '<w:spacing w:after="0"/>' + EXACT), None, None),
+    (
+        "exact-line-by-table-style",
+        tbl(1, f"<w:tr><w:tc>{p(r(picture()))}</w:tc></w:tr>").replace("<w:tbl>", STYLED),
+        f'<w:style w:type="table" w:styleId="T"><w:pPr>{EXACT}</w:pPr></w:style>',
+        "line-height",
+    ),
+    (
+        "exact-line-by-default-table-style",
+        tbl(1, f"<w:tr><w:tc>{p(r(picture()))}</w:tc></w:tr>"),
+        f'<w:style w:type="table" w:default="1" w:styleId="T"><w:pPr>{EXACT}</w:pPr></w:style>',
+        "line-height",
+    ),
+    (
+        "exact-line-of-a-table-style-outside",
+        p(r(picture())) + tbl(1, f"<w:tr><w:tc>{p('')}</w:tc></w:tr>"),
+        f'<w:style w:type="table" w:default="1" w:styleId="T"><w:pPr>{EXACT}</w:pPr></w:style>',
+        None,
+    ),
+    (
+        "exact-row-by-default-table-style",
+        tbl(1, f"<w:tr><w:tc>{p(r(picture()))}</w:tc></w:tr>"),
+        f'<w:style w:type="table" w:default="1" w:styleId="T">{ROW}</w:style>',
+        "row-height",
+    ),
+    (
+        "row-after-an-exact-row",
+        tbl(
+            1, f"<w:tr>{ROW}<w:tc>{p('')}</w:tc></w:tr><w:tr><w:tc>{p(r(picture()))}</w:tc></w:tr>"
+        ),
+        None,
+        None,
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("body", "styles", "reason"),
+    [case[1:] for case in PLACED_CASES],
+    ids=[case[0] for case in PLACED_CASES],
+)
+def test_a_picture_word_may_print_otherwise_or_clip_says_so_and_is_read(
+    body: str, styles: str | None, reason: str | None
+) -> None:
+    value = json.loads(served(with_media(docx(body, styles), MEDIA))[0])
+    assert "refusal" not in value, value.get("refusal")
+    found = [x for q in value["paragraphs"] for x in q["pictures"]]
+    assert found[-1]["reason"] == reason
+    assert found[-1]["sha256"] == hashlib.sha256(PNG).hexdigest()
+
+
+def test_a_tables_rows_say_whether_their_height_is_exact() -> None:
+    rows = f"<w:tr>{ROW}<w:tc>{p('')}</w:tc></w:tr><w:tr><w:tc>{p('')}</w:tc></w:tr>"
+    styled = '<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr>'
+    part = f'<w:tblStylePr w:type="firstRow">{ROW}</w:tblStylePr>'
+    for table, styles, exact in (
+        (tbl(1, rows), None, [True, False]),
+        (tbl(1, rows.replace("exact", "atLeast")), None, [False, False]),
+        # A style's row height, its own or a part's, may apply to any row: how is not on record.
+        (
+            tbl(1, rows).replace("<w:tbl>", styled),
+            f'<w:style w:type="table" w:styleId="T">{part}</w:style>',
+            [True, True],
+        ),
+    ):
+        (found,) = read_document(docx(table, styles)).tables
+        assert found.grid is not None
+        assert [row.exact for row in found.grid.rows] == exact
 
 
 def test_smart_tag_and_custom_xml_properties_are_not_text() -> None:

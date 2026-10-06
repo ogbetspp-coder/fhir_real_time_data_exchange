@@ -107,6 +107,12 @@ _ATTRIBUTES = (
     "XML parser has checked first (_parse)"
 )
 _GUARD = '_ATTRIBUTE.findall(body, len(name)) if "xmlns" in body or "&" in body else ()'
+_TWO_EXIF = "two Exif blocks are refused as more than one: keeping a third as well changes nothing"
+_FRAME_EDGE = "if frame is None or frame[0] > 0xC2 or len(frame[1]) < 6:"
+_SIX_BYTES = (
+    "a frame of six bytes holds no component: it is refused just after, as naming none or too "
+    "short for those it names"
+)
 EQUIVALENT: dict[tuple[str, str, str, int], str] = {
     ("_raw_texts", _GUARD, "compare:0", 1): _ATTRIBUTES,
     ("_raw_texts", _GUARD, "str:'&'", 0): _ATTRIBUTES,
@@ -397,6 +403,38 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
         "for Horz both names are firstRow; for Vert the test of way is false whichever is "
         "looked for"
     ),
+    # certify survivors, pictures
+    ("_short", 'space, local = name[1:].split("}", 1)', "int:1", 1): (
+        "a {namespace}local name holds one '}' (XML names cannot hold one): split at two or at "
+        "one, the parts are the same"
+    ),
+    ("_png_facts", "colour = -1", "int:1", 0): (
+        "IHDR is the first chunk or the image is broken, so colour is set from it before any "
+        "IDAT reads it"
+    ),
+    ("_png_facts", 'elif kind == b"eXIf" and len(exif) < 2:', "compare:0", 1): _TWO_EXIF,
+    ("_png_facts", 'elif kind == b"eXIf" and len(exif) < 2:', "int:2", 0): _TWO_EXIF,
+    ("_jpeg_facts", "exif = [*exif, segment[6:]][:2]", "int:2", 0): _TWO_EXIF,
+    ("_jpeg_facts", _FRAME_EDGE, "compare:0", 2): _SIX_BYTES,
+    ("_jpeg_facts", _FRAME_EDGE, "int:6", 0): _SIX_BYTES,
+    ("_blip_fill", 'return dict(zip(("l", "t", "r", "b"), sides, strict=True))', "bool", 0): (
+        "four names and the four sides _whole reads for them, so zip(strict=True) never raises"
+    ),
+    (
+        "_blip_fill",
+        'if not _keys(blip) - {"r:link"} <= {"r:embed", "cstate"}:',
+        "str:'r:link'",
+        0,
+    ): (
+        "a blip with r:link is linked, which comes before effects: taken as an effect too, the "
+        "reason is the same"
+    ),
+    (
+        "_match",
+        '{**picture, "offset": at} for at, picture in zip(places, paragraph.pictures, strict=True)',
+        "bool",
+        0,
+    ): _STRICT,
 }
 
 _COMPARE = {

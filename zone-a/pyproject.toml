@@ -14,10 +14,10 @@ dependencies = ["label-docx", "pydantic==2.13.5"]
 [dependency-groups]
 dev = [
   "datamodel-code-generator==0.83.0",
-  "mypy==2.3.1",
+  "mypy==2.4.0",
   "pytest==9.1.1",
   "pytest-cov==7.1.0",
-  "ruff==0.16.9",
+  "ruff==0.16.10",
 ]
 
 [build-system]
