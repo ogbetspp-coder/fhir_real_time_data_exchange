@@ -86,7 +86,7 @@ from label_docx.reader import DocxRefusedError, Paragraph
 
 from zone_a import certified
 
-IMPLEMENTATION_VERSION = "implementation-check/1.1.1"
+IMPLEMENTATION_VERSION = "implementation-check/1.1.2"
 # Words of unchanged text kept on each side of an edit.
 CONTEXT = 4
 

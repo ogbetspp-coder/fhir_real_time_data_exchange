@@ -85,6 +85,24 @@ COMPONENTS: dict[str, Component] = {
         "STRUCTURE_VERSION",
         ("src/zone_a/structure.py", "src/zone_a/qrd/headings.py", "src/zone_a/qrd/registry.py"),
     ),
+    "word-epi": Component(
+        "zone_a.word_epi",
+        "WORD_EPI_VERSION",
+        (
+            "src/zone_a/word_epi.py",
+            "src/zone_a/certified.py",
+            "src/zone_a/structure.py",
+            "src/zone_a/qrd/headings.py",
+            "src/zone_a/underline.py",
+            "src/zone_a/fidelity/normalize.py",
+            "src/zone_a/fidelity/xhtml.py",
+        ),
+    ),
+    "word-drawing": Component(
+        "zone_a.drawing",
+        "DRAWING_VERSION",
+        ("src/zone_a/drawing.py", "src/zone_a/word_epi.py", f"{_LABEL_DOCX}/browser.py"),
+    ),
     "qrd-check": Component(
         "zone_a.qrd.check",
         "CHECKER_VERSION",

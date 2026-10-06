@@ -21,6 +21,9 @@ zone-a/.ruff_cache/
 
 # The differential corpora: JSONL, generated, and not formatted by anything.
 zone-a/tests/fixtures/differential-smoke.jsonl
+# What Chrome drew for the Word fixtures, written by zone-a/scripts/word_fixtures.py as canonical
+# JSON and replayed by digest.
+zone-a/tests/fixtures/word-smpc/chrome.json
 differential.jsonl
 
 # The agent (Python). Same shape as Zone A: two virtualenvs and the tool caches are local

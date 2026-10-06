@@ -16,8 +16,13 @@ Zone A reads a footnote's or endnote's text, so a body that refers to one is ref
 
 from __future__ import annotations
 
+import hashlib
+import io
 import json
-from typing import Any
+import xml.etree.ElementTree as ET
+import zipfile
+from dataclasses import dataclass, field
+from typing import Any, Final
 
 from label_docx.epi import Document, EpiRefusedError, Section, SectionRefusal
 from label_docx.epi_output import read as read_epi_json
@@ -78,8 +83,97 @@ def _paragraph(value: dict[str, Any]) -> Paragraph:
     )
 
 
-def read_docx(data: bytes) -> list[Paragraph]:
-    """The body paragraphs of a .docx, as the reader certified them.
+@dataclass(frozen=True)
+class Body:
+    """A .docx body as the reader certified it.
+
+    ``tables`` are the reader's table entries as JSON (each table's grid, or why there is none);
+    ``floating`` counts the floating pictures and shapes of every part read, which Word draws and
+    the text leaves out (the certificate's ``setAside``); ``layout`` names what else Word draws
+    that the read does not yet report (``layout``, below); ``images`` are the bytes of each body
+    picture the reader found nothing against (``reason`` null), by their SHA-256, as the package
+    stores them.
+    """
+
+    paragraphs: tuple[Paragraph, ...]
+    tables: tuple[dict[str, Any], ...]
+    floating: int
+    layout: tuple[str, ...] = field(default=())
+    images: dict[str, bytes] = field(default_factory=dict)
+
+
+# Elements whose drawing the read does not yet report (ADR 0006 P1), by local name, and what each
+# is: a table positioned off the text flow, a positioned paragraph (a frame, a drop capital), and
+# a table drawn right to left.
+_LAYOUT: Final = {
+    "tblpPr": "floating-table",
+    "framePr": "frame",
+    "bidiVisual": "right-to-left-table",
+}
+_DRAWN_AS_TEXT: Final = frozenset({"t", "sym", "noBreakHyphen", "drawing", "pict", "object"})
+
+
+def layout(data: bytes) -> tuple[str, ...]:
+    """What Word draws in the package that the reader's text does not yet say, by name.
+
+    Not a reading: a scan of every XML part under ``word/`` for the elements of ``_LAYOUT`` (in
+    any style, header or part, used or not; a part that does not parse is ``unreadable-part``),
+    and for a page or column break with a drawn character right before and right after it in its
+    paragraph, where Word draws the two on different pages or columns and the text, which leaves
+    the break out, runs them together ("10" and "5 mg" read "105 mg"), and for character scaling
+    (``w:w``, anywhere) in a package with a picture, which may stretch the picture. Conservative by
+    design, until the reader reports these itself.
+    """
+    found: set[str] = set()
+    pictures = scaled = False
+    with zipfile.ZipFile(io.BytesIO(data)) as package:
+        for name in package.namelist():
+            if not (name.startswith("word/") and name.endswith(".xml")):
+                continue
+            try:
+                root = ET.fromstring(package.read(name))
+            except ET.ParseError:
+                found.add("unreadable-part")  # Word's own parts: none the reader read is so
+                continue
+            for element in root.iter():
+                local = element.tag.rsplit("}", 1)[-1]
+                if local in _LAYOUT:
+                    found.add(_LAYOUT[local])
+                elif local in ("drawing", "pict"):
+                    pictures = True
+                elif local == "w" and any(
+                    k.endswith("}val") and v != "100" for k, v in element.attrib.items()
+                ):
+                    scaled = True
+                elif local == "p" and _break_between_words(element):
+                    found.add("page-break")
+    if pictures and scaled:
+        found.add("character-scale")
+    return tuple(sorted(found))
+
+
+def _break_between_words(paragraph: ET.Element) -> bool:
+    """A page or column break with a drawn, non-white character on each side, in reading order."""
+    pieces: list[str] = []  # each drawn piece of the paragraph, or "\f" for a page or column break
+    for element in paragraph.iter():
+        local = element.tag.rsplit("}", 1)[-1]
+        if local == "br":
+            kind = next((v for k, v in element.attrib.items() if k.endswith("}type")), None)
+            pieces.append("\f" if kind in ("page", "column") else "\n")
+        elif local in ("tab", "ptab"):
+            pieces.append("\t")
+        elif local in _DRAWN_AS_TEXT:
+            pieces.append(element.text or "" if local == "t" else "x")
+    text = "".join(pieces)
+    return any(
+        0 < at < len(text) - 1 and not text[at - 1].isspace() and not text[at + 1].isspace()
+        for at, character in enumerate(text)
+        if character == "\f"
+    )
+
+
+def read_body(data: bytes) -> Body:
+    """The body of a .docx, as the reader certified it.
 
     A footnote or endnote's text is in the reader's result but not in these paragraphs, and
     nothing here reads it, so a body that refers to one is refused rather than read without it;
@@ -101,7 +195,29 @@ def read_docx(data: bytes) -> list[Paragraph]:
     if any(paragraph["pages"] for paragraph in value["paragraphs"]):
         # The text keeps only the place of a page number: Word prints one there.
         raise DocxRefusedError("page-number", "a page number, which the text leaves out")
-    return [_paragraph(paragraph) for paragraph in value["paragraphs"]]
+    paragraphs = tuple(_paragraph(paragraph) for paragraph in value["paragraphs"])
+    images: dict[str, bytes] = {}
+    with zipfile.ZipFile(io.BytesIO(data)) as package:
+        for paragraph in paragraphs:
+            for picture in paragraph.pictures:
+                if picture.reason is None and picture.part is not None:
+                    image = package.read(picture.part)
+                    # The reader certified the part's hash; held to it again here, as read now.
+                    if hashlib.sha256(image).hexdigest() != picture.sha256:
+                        raise DocxRefusedError("uncertified", f"{picture.part} is not as certified")
+                    images[hashlib.sha256(image).hexdigest()] = image
+    return Body(
+        paragraphs=paragraphs,
+        tables=tuple(value["tables"]),
+        floating=value["certificate"]["setAside"]["floatingObjects"],
+        layout=layout(data),
+        images=images,
+    )
+
+
+def read_docx(data: bytes) -> list[Paragraph]:
+    """The body paragraphs of a .docx, as the reader certified them (``read_body``)."""
+    return list(read_body(data).paragraphs)
 
 
 def _section(value: dict[str, Any]) -> Section:
