@@ -13,7 +13,25 @@ A paragraph (``paragraph``; ``reader.Paragraph`` says what each means): ``text``
 (``start``, ``end``, ``kind``), ``style`` (the style id as written, or null), ``markHidden``,
 ``table`` (``[table, row, cell]``, or null; see ``tables``), ``numbering`` (null, or ``numId``,
 ``level``, ``text`` and ``suffix``; ``level`` is Word's ``ilvl``, from 0), and ``notes``,
-``pages`` and ``comments`` as below.
+``pages``, ``comments`` and ``pictures`` as below.
+
+Each paragraph's ``pictures`` (a .docx's, in the body, notes, headers, footers and comments)
+says what each U+FFFC of its ``text`` stands for (``reader.Picture``; "Pictures" in the
+reader's docstring), in order: ``offset`` (where it stands in ``text``), ``kind`` (``picture``
+or ``shape``), ``part`` (the image part's name, or null), ``sha256`` (of the part's bytes),
+``type`` (``png`` or ``jpeg`` by the bytes' signature, or null), ``pixels`` (``[width,
+height]`` from the image's header, or null), ``extent`` (``[cx, cy]`` in EMU from
+``wp:extent``, or null), ``crop`` (``a:srcRect``'s ``l``, ``t``, ``r`` and ``b`` in thousandths
+of a percent, or null where there is none) and ``reason``: the first of
+``reader.PICTURE_REASONS`` found against it (``shape``, ``vml``, ``field``, ``linked``,
+``no-part``, ``not-png-or-jpeg``, ``bad-image-header``, ``colour``, ``animated``,
+``orientation``, ``bad-number``, ``cropped``, ``rotated``, ``flipped``, ``line-height``,
+``row-height``, ``border``, ``effects``), or null where none is. Null does not say Word draws
+these bytes so: it says nothing on the reader's closed list was found ("Pictures" in its
+docstring), a list that rests on what is known of Word, not on Word's drawing; the builder and
+the browser hold the rest. The image's bytes are not in the result: a consumer reads ``part``
+from the source and holds it to ``sha256``. Whether Word draws it larger than its ``pixels``
+(9525 EMU a pixel at 96 dpi) is the consumer's to judge. No picture refuses a read.
 
 A read::
 
@@ -27,8 +45,10 @@ document order, a nested table as its own entry after the table holding it: ``pa
 ``columns`` (its ``gridCol`` count) and ``rows``, each with ``before`` and ``after`` (grid columns
 left out, ``gridBefore`` and ``gridAfter``) and ``cells``, each with ``column`` (the first grid
 column it covers, from 0), ``span`` (``gridSpan``) and ``merge`` (``vMerge`` as stored: null,
-``restart`` or ``continue``); ``reason`` is then null. Where Word's grid is not on record, ``grid``
-is null and ``reason`` one of ``reader.REASONS``: ``no-grid``, ``two-grids``, ``bad-number``,
+``restart`` or ``continue``), and ``exactHeight`` (whether the row's height may be exact: its own
+``trHeight`` ``hRule="exact"``, or one its table's style sets); ``reason`` is then null. Where
+Word's grid is not on record, ``grid`` is null and ``reason`` one of ``reader.REASONS``:
+``no-grid``, ``two-grids``, ``bad-number``,
 ``h-merge``, ``bad-merge``, ``bad-span``, ``row-off-grid``. The text is read either way. A body
 paragraph's ``table`` is ``[table, row, cell]`` of its own table (a nested table's, not the
 outermost's), ``cell`` counting the row's ``<w:tc>`` cells, not grid columns. Tables in notes,
@@ -106,7 +126,7 @@ from label_docx.reader import (
 
 # The version of the shape above, and of the check that certifies it: versions.lock.json ties
 # it to both files (tests/test_locks.py).
-FORMAT_VERSION = "label-docx-json/1.16.0"
+FORMAT_VERSION = "label-docx-json/1.17.0"
 
 type Json = str | int | bool | list[Json] | dict[str, Json] | None
 
@@ -161,10 +181,35 @@ def paragraphs(items: list[Paragraph]) -> list[Json]:
     return [paragraph(item) for item in items]
 
 
+def docx_paragraphs(items: list[Paragraph]) -> list[Json]:
+    """A .docx's paragraphs as JSON, in document order, each with its ``pictures``."""
+    return [
+        {
+            **paragraph(item),
+            "pictures": [
+                {
+                    "crop": None if p.crop is None else dict(zip("ltrb", p.crop, strict=True)),
+                    "extent": None if p.extent is None else list(p.extent),
+                    "kind": p.kind,
+                    "offset": p.offset,
+                    "part": p.part,
+                    "pixels": None if p.pixels is None else list(p.pixels),
+                    "reason": p.reason,
+                    "sha256": p.sha256,
+                    "type": p.type,
+                }
+                for p in item.pictures
+            ],
+        }
+        for item in items
+    ]
+
+
 def notes(items: tuple[Note, ...]) -> list[Json]:
     """Footnotes or endnotes as JSON, in the order the body refers to them."""
     return [
-        {"id": n.id, "mark": n.mark, "paragraphs": paragraphs(list(n.paragraphs))} for n in items
+        {"id": n.id, "mark": n.mark, "paragraphs": docx_paragraphs(list(n.paragraphs))}
+        for n in items
     ]
 
 
@@ -178,7 +223,7 @@ def stories(items: tuple[Story, ...]) -> list[Json]:
         {
             "part": s.part,
             "uses": [{"section": section, "type": kind} for section, kind in s.uses],
-            "paragraphs": paragraphs(list(s.paragraphs)),
+            "paragraphs": docx_paragraphs(list(s.paragraphs)),
             "refusal": _refusal(s.refusal),
         }
         for s in items
@@ -193,7 +238,7 @@ def comments(items: tuple[Comment, ...]) -> list[Json]:
             "date": c.date,
             "id": c.id,
             "initials": c.initials,
-            "paragraphs": paragraphs(list(c.paragraphs)),
+            "paragraphs": docx_paragraphs(list(c.paragraphs)),
             "refusal": _refusal(c.refusal),
         }
         for c in items
@@ -237,6 +282,7 @@ def tables(items: tuple[Table, ...]) -> list[Json]:
                         "cells": [
                             {"column": c.column, "merge": c.merge, "span": c.span} for c in r.cells
                         ],
+                        "exactHeight": r.exact,
                     }
                     for r in t.grid.rows
                 ],
@@ -252,7 +298,7 @@ def content(document: Document) -> dict[str, Json]:
     """A document's text as JSON: paragraphs, notes, headers, footers, comments; body tables."""
     return {
         "tables": tables(document.tables),
-        "paragraphs": paragraphs(list(document.body)),
+        "paragraphs": docx_paragraphs(list(document.body)),
         "footnotes": notes(document.footnotes),
         "endnotes": notes(document.endnotes),
         "headers": stories(document.headers),

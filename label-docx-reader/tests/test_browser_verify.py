@@ -9,6 +9,7 @@ without a browser; the last ones ask Chrome itself, where it is installed.
 
 from __future__ import annotations
 
+import base64
 import copy
 import json
 import os
@@ -22,6 +23,7 @@ import pytest
 from label_docx import browser, epi, epi_output
 from label_docx.service import Service
 from label_docx.store import Checker, Store
+from test_reader import jpeg, png
 from test_service import _call
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
@@ -309,3 +311,18 @@ def test_chrome_facts_see_line_colours_block_backgrounds_alignment_and_markers()
     ]
     markers = ['<ul><li style="color:white">x</li></ul>', "<ul><li>x</li></ul>"]
     assert browser.browser_markers(markers, CHROME) == [[""], ["\u2022 "]]
+
+
+@pytest.mark.skipif(CHROME is None, reason="Chrome is not installed")
+def test_chrome_reports_each_pictures_decoded_size_in_order() -> None:
+    assert CHROME is not None
+    shown_png = "data:image/png;base64," + base64.b64encode(png(3, 2)).decode()
+    shown_jpeg = "data:image/jpeg;base64," + base64.b64encode(jpeg(5, 4)).decode()
+    divs = [
+        f'<div><p>a<img src="{shown_png}"/>b<img src="data:image/png;base64,AAAA"/></p></div>',
+        f'<div><img src="{shown_jpeg}"/></div>',
+        "<div><p>none</p></div>",
+    ]
+    shown = browser.browser_sections(divs, CHROME)
+    assert [s["text"] for s in shown] == ["a￼b￼", "￼", "none"]
+    assert [s["pictures"] for s in shown] == [[[3, 2], [0, 0]], [[5, 4]], []]

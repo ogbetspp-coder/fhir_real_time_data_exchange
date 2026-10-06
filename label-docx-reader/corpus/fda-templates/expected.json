@@ -1,20 +1,20 @@
 {
   "fda-medication-guide-template.docx": {
-    "certificateSha256": "653c5d60708da01aa1818e61c8bba68981ccc72772346294f797749967e22a1e",
+    "certificateSha256": "955de001586b57d42845cf7ddd12863e2a00193c2b18a56aa68d919e8c95f06a",
     "paragraphsSha256": "df1e36da087f5d98126ef45531d8d0930f0285de02aa076f58ca2f120ff1a73c",
-    "resultSha256": "d27e345ba063b65e736c31aec0c01257a111331d7a5e9c560f0ec949244e6c01",
+    "resultSha256": "92a44c70de4bafcba5ece4fe43e7a50079fa84df3f0507302ce123951704448b",
     "sha256": "435c5e9d5c10722e78db6bb90c7489a5b4ede8e08fb08334b7bb9e5ec2c5511c"
   },
   "fda-patient-package-insert-template.docx": {
-    "certificateSha256": "5f39207b61f5291996d000b067c9699def1b3da8e8a751a594c10d540d48d0d5",
+    "certificateSha256": "5a7660f2919f06bc6d4de94b722c56bc9d3b51cecceab39f32825f20bdbb310d",
     "paragraphsSha256": "bcb26488cec3afc4dde8d2b020c8a37ec936f05f02be1dba7199d90f2f89ae7d",
-    "resultSha256": "d31447659fa87abbbcdec6b375c4294c4d349ccd73c25faf27dee83b3d0eb730",
+    "resultSha256": "07d6d9c7b66374bbaa1acf019b65d9660ab59a7b67577fb9a5d4699bca98ecf3",
     "sha256": "3442be0483c834bb3d178a56857c9d93f4d17e817629a18c5204e2c0eeaf12c2"
   },
   "fda-prescribing-information-template.docx": {
-    "certificateSha256": "bdd888d7f76d37bf2e8e609bc6b33057bbdc5a8471c43cd9bcd2619acf512b00",
+    "certificateSha256": "a5c1b6963821a32cb64eac70fd03819608d64004dbc211649b22e6e56d048e39",
     "paragraphsSha256": "e29d6609f5c81f5aa58ca273e13010176a94b1c4ba33bedb0663ce90d5e95875",
-    "resultSha256": "8f482e754ad03d471e66370e31725fb2b30f24900d6e331ba671bec099fd4a00",
+    "resultSha256": "76ddf89ce95c307e9035e6f3444b4234d683b934be18e968f865945a7ca12831",
     "sha256": "6b9ae21fae9183418e05688cb3e826c7cabd050ceed564a5d177d8119cb64561"
   }
 }

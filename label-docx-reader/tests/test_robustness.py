@@ -19,9 +19,10 @@ from pathlib import Path
 
 import pytest
 
-from label_docx import documents, reader
+from label_docx import certify, documents, reader
 from label_docx.epi import EpiRefusedError, read_epi
 from label_docx.epi import _html_otherwise as epi_html_otherwise
+from test_reader import IMAGE, chunk, docx, jpeg, p, picture, png, r, segment, with_media
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 DOCUMENTS = [
@@ -125,3 +126,39 @@ def test_a_section_built_to_rescan_its_attributes_is_read_at_once() -> None:
     # Each "<a" in an attribute value once re-scanned every attribute after it for "/>".
     div = '<div xmlns="http://www.w3.org/1999/xhtml"><p' + ' x="&lt;a"' * 50_000 + ">t</p></div>"
     assert _seconds(lambda: epi_html_otherwise(div.replace("&lt;", "<"))) < 5
+
+
+def test_an_image_built_to_cost_time_or_memory_is_given_up_at_once() -> None:
+    # A PNG of a million empty ancillary chunks: each chunk was once kept as it was read (5
+    # million took 5.8 s and 683 MB through the service). Past 100,000 chunks or segments an
+    # image is a bad one, read no further, and no chunk is kept.
+    image = png(extra=chunk(b"zzZz", b"") * 1_000_000)
+    data = with_media(docx(p(r(picture()))), {IMAGE: image})
+    assert _seconds(lambda: documents.kind(data).read(data)) < 5
+    tracemalloc.start()
+    try:
+        result, read = documents.kind(data).read(data)
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+    assert read
+    (found,) = json.loads(result)["paragraphs"][0]["pictures"]
+    assert found["reason"] == "bad-image-header"
+    assert peak < 6 * len(image), peak
+
+
+@pytest.mark.parametrize("pieces", [100_000, 100_001])
+def test_an_image_of_more_chunks_or_segments_than_read_is_a_bad_one(pieces: int) -> None:
+    # IHDR, IDAT and IEND, and empty ancillary chunks up to ``pieces``; a JPEG likewise, of
+    # SOI's followers: comments up to ``pieces`` segments with its frame and tables.
+    image = png(extra=chunk(b"zzZz", b"") * (pieces - 3))
+    comments = segment(0xFE, b"") * (pieces - 5)
+    bad = pieces > 100_000
+    assert (reader._image(image)[2] == {"bad-image-header"}) is bad
+    assert (certify._png_facts(image)[1] == {"bad-image-header"}) is bad
+    # As many without IEND, ending with the last of them: given up all the same.
+    endless = png(extra=chunk(b"zzZz", b"") * (pieces - 2), end=False)
+    assert reader._image(endless)[2] == {"bad-image-header"}
+    assert certify._png_facts(endless)[1] == {"bad-image-header"}
+    assert (reader._image(jpeg(extra=comments))[2] == {"bad-image-header"}) is bad
+    assert (certify._jpeg_facts(jpeg(extra=comments))[1] == {"bad-image-header"}) is bad
