@@ -28,6 +28,7 @@ from label_docx.epi import Document, EpiRefusedError, Section, SectionRefusal
 from label_docx.epi_output import read as read_epi_json
 from label_docx.output import read as read_docx_json
 from label_docx.reader import (
+    Anchored,
     CommentReference,
     DocxRefusedError,
     Mark,
@@ -80,6 +81,9 @@ def _paragraph(value: dict[str, Any]) -> Paragraph:
             )
             for x in value.get("pictures", [])
         ),
+        anchored=tuple(
+            Anchored(a["offset"], a["kind"], a["read"]) for a in value.get("anchored", [])
+        ),
     )
 
 
@@ -88,16 +92,15 @@ class Body:
     """A .docx body as the reader certified it.
 
     ``tables`` are the reader's table entries as JSON (each table's grid, or why there is none);
-    ``floating`` counts the floating pictures and shapes of every part read, which Word draws and
-    the text leaves out (the certificate's ``setAside``); ``layout`` names what else Word draws
-    that the read does not yet report (``layout``, below); ``images`` are the bytes of each body
-    picture the reader found nothing against (``reason`` null), by their SHA-256, as the package
-    stores them.
+    each paragraph's ``anchored`` places the floating objects Word draws apart from its text;
+    ``layout`` names what else Word draws that the read does not yet report (``layout``, below);
+    ``images`` are the bytes of each body picture the reader found nothing against (``reason``
+    null), by their SHA-256, as the package stores them. Floating objects in headers, footers,
+    notes and comments are not here: they are not the body's.
     """
 
     paragraphs: tuple[Paragraph, ...]
     tables: tuple[dict[str, Any], ...]
-    floating: int
     layout: tuple[str, ...] = field(default=())
     images: dict[str, bytes] = field(default_factory=dict)
 
@@ -207,11 +210,7 @@ def read_body(data: bytes) -> Body:
                         raise DocxRefusedError("uncertified", f"{picture.part} is not as certified")
                     images[hashlib.sha256(image).hexdigest()] = image
     return Body(
-        paragraphs=paragraphs,
-        tables=tuple(value["tables"]),
-        floating=value["certificate"]["setAside"]["floatingObjects"],
-        layout=layout(data),
-        images=images,
+        paragraphs=paragraphs, tables=tuple(value["tables"]), layout=layout(data), images=images
     )
 
 

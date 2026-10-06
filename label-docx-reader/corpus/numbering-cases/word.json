@@ -28,6 +28,7 @@
     "drawing-anchored-line.docx": [],
     "drawing-anchored-picture.docx": [],
     "drawing-anchored-shape.docx": [],
+    "drawing-anchored-text-box.docx": [],
     "drawing-inline-picture.docx": [],
     "drawing-inline-shape.docx": [],
     "drawing-vml-floating-picture.docx": [],
@@ -395,6 +396,7 @@
     "drawing-anchored-line.docx": [],
     "drawing-anchored-picture.docx": [],
     "drawing-anchored-shape.docx": [],
+    "drawing-anchored-text-box.docx": [],
     "drawing-inline-picture.docx": [],
     "drawing-inline-shape.docx": [],
     "drawing-vml-floating-picture.docx": [],
@@ -882,6 +884,21 @@
     "drawing-anchored-shape.docx": {
       "": [],
       "0": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "drawing-anchored-text-box.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
         false,
         false,
         false,
@@ -7161,6 +7178,7 @@
     "drawing-anchored-line.docx": [],
     "drawing-anchored-picture.docx": [],
     "drawing-anchored-shape.docx": [],
+    "drawing-anchored-text-box.docx": [],
     "drawing-inline-picture.docx": [],
     "drawing-inline-shape.docx": [],
     "drawing-vml-floating-picture.docx": [],
@@ -7799,6 +7817,7 @@
     "drawing-anchored-line.docx": true,
     "drawing-anchored-picture.docx": true,
     "drawing-anchored-shape.docx": true,
+    "drawing-anchored-text-box.docx": true,
     "drawing-inline-picture.docx": true,
     "drawing-inline-shape.docx": true,
     "drawing-vml-floating-picture.docx": true,
@@ -7942,7 +7961,7 @@
     "table-style-whole-vs-row.docx": true,
     "two-definitions.docx": true
   },
-  "recorded": "2026-10-04",
+  "recorded": "2026-10-06",
   "sha256": {
     "ancestor-never-counted.docx": "617e136f80bd10bd5c208c4431e43acb31bbe05864cb6a3f4e8fc54efbfb7837",
     "ancestor-two-levels.docx": "b9dc3744b284c81a68ab252f2050e17fcb331003cd10e5e9be8dbfa984f5d9a7",
@@ -7953,6 +7972,7 @@
     "drawing-anchored-line.docx": "831bd598649e83a84c4edd3c9dc135e256288d910221b0fbe1474deedf520ae2",
     "drawing-anchored-picture.docx": "a42be95767a36a3cd4afe4a29758d00f89c1dcaf3bba28d109b79893083b0099",
     "drawing-anchored-shape.docx": "750b0013e7fce81a82b98c78a73661362e97b615de68d825705ed0780b025c04",
+    "drawing-anchored-text-box.docx": "e1abd86463e0b31f3b4f47fc7b30d23d4dcb072188dd72c29b671c959230a563",
     "drawing-inline-picture.docx": "f3cce2aad2510916e04eee9dd73ba6dee49fa8b653fcf0e93e29368f7d77e996",
     "drawing-inline-shape.docx": "3dd60e1af142e6f18d1f69139062e00a2db13cc09d1aac1b6d8ec8672d72ee01",
     "drawing-vml-floating-picture.docx": "f8d5a4e96fa7e285690698c77fee83e672a992335572a196760353cd32b6d4ae",
@@ -8135,6 +8155,10 @@
     ],
     "drawing-anchored-shape.docx": [
       "ab"
+    ],
+    "drawing-anchored-text-box.docx": [
+      "ab",
+      "after"
     ],
     "drawing-inline-picture.docx": [
       "a/b"

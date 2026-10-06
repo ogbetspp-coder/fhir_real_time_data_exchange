@@ -501,6 +501,12 @@
       "bytes": 4575
     },
     {
+      "name": "A text box anchored to the paragraph, holding text: Word's text leaves its text out.",
+      "file": "drawing-anchored-text-box.docx",
+      "sha256": "e1abd86463e0b31f3b4f47fc7b30d23d4dcb072188dd72c29b671c959230a563",
+      "bytes": 4911
+    },
+    {
       "name": "A drawn line anchored to the paragraph, as the FDA template's rules: Word's text.",
       "file": "drawing-anchored-line.docx",
       "sha256": "831bd598649e83a84c4edd3c9dc135e256288d910221b0fbe1474deedf520ae2",

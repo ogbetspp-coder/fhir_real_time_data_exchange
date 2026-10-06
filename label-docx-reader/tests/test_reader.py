@@ -22,6 +22,7 @@ from label_docx import read as served
 from label_docx.certify import CertificationError, DocxSource
 from label_docx.reader import (
     REASONS,
+    Anchored,
     Document,
     DocxRefusedError,
     NoteReference,
@@ -308,7 +309,7 @@ def test_a_drawn_shape_with_no_text_reads_as_a_picture_does() -> None:
     textbox = SHAPE.replace("<wps:spPr/>", "<wps:txbx><w:txbxContent/></wps:txbx>")
     for body in (
         p(r(_alternate(SHAPE.replace(f"xmlns:wps='{WPS}'", "xmlns:wps='urn:wps'"), LINE))),
-        p(r(_alternate(textbox, LINE))),  # a text box
+        p(r(_alternate(textbox.replace("wp:anchor", "wp:inline"), LINE))),  # a text box in line
         p(r(_alternate(SHAPE, "<w:pict><v:textbox xmlns:v='urn:v'/></w:pict>"))),  # in VML
         p(r(_alternate(SHAPE, "<w:sym w:font='Symbol' w:char='F0B7'/>"))),  # run content
         p(r(_alternate(SHAPE, "<w:tab/>"))),
@@ -2968,6 +2969,221 @@ def _marked(name: str, inner: str, key: int = 1) -> str:
     return f'<w:bookmarkStart w:id="{key}" w:name="{name}"/>{inner}<w:bookmarkEnd w:id="{key}"/>'
 
 
+# --- floating objects holding text ("Anchored" in the reader's docstring) -----------------------
+
+WPG = "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"
+WPC = "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+VML = "urn:schemas-microsoft-com:vml"
+IN_BOX = p(r("<w:t>in the box</w:t>"))
+
+
+def box(inner: str = IN_BOX) -> str:
+    """A ``wps`` shape holding a text box of ``inner``."""
+    return (
+        f"<wps:wsp xmlns:wps='{WPS}'><wps:spPr/><wps:txbx><w:txbxContent>{inner}"
+        "</w:txbxContent></wps:txbx></wps:wsp>"
+    )
+
+
+def floating(graphic: str, uri: str = WPS, frame: str = "anchor") -> str:
+    """A DrawingML drawing of ``graphic``, anchored to its paragraph (or ``frame``)."""
+    return (
+        f"<w:drawing><wp:{frame} xmlns:wp='{WP}'><a:graphic xmlns:a='{A}'>"
+        f"<a:graphicData uri='{uri}'>{graphic}</a:graphicData></a:graphic></wp:{frame}></w:drawing>"
+    )
+
+
+def vml_box(inner: str = IN_BOX, style: str = "position:absolute;margin-left:9pt") -> str:
+    """A VML shape holding a text box of ``inner``."""
+    return (
+        f"<w:pict><v:shapetype xmlns:v='{VML}'/><v:shape xmlns:v='{VML}' style='{style}'>"
+        f"<v:textbox><w:txbxContent>{inner}</w:txbxContent></v:textbox></v:shape></w:pict>"
+    )
+
+
+def group(inner: str = IN_BOX) -> str:
+    """Word's text box group, a ``wpg`` choice with its VML group as fallback."""
+    shapes = f"<wpg:wgp xmlns:wpg='{WPG}'>{box(inner)}<wps:wsp xmlns:wps='{WPS}'/></wpg:wgp>"
+    fallback = (
+        f"<w:pict><v:group xmlns:v='{VML}' style='position:absolute'><v:shape>"
+        f"<v:textbox><w:txbxContent>{inner}</w:txbxContent></v:textbox></v:shape></v:group></w:pict>"
+    )
+    return _alternate(floating(shapes, WPG), fallback, requires="wpg")
+
+
+# Each floating object holding text the reader sets aside, as Word writes it, and its kind.
+FLOATING_TEXT = {
+    "text-box": (_alternate(floating(box()), vml_box()), "text-box"),
+    "text-box-drawing": (floating(box()), "text-box"),
+    # A picture in the box's text: a graphic Word draws there, holding no text.
+    "text-box-picture": (floating(box(IN_BOX + p(r(PICTURE)))), "text-box"),
+    "group": (group(), "shapes"),
+    "canvas": (
+        _alternate(floating(f"<wpc:wpc xmlns:wpc='{WPC}'>{box()}</wpc:wpc>", WPC), requires="wpc"),
+        "shapes",
+    ),
+    "vml-text-box": (vml_box(), "text-box"),
+    "vml-group": (
+        f"<w:pict><v:group xmlns:v='{VML}' style='Position: Absolute'>"
+        f"{vml_box()[len('<w:pict>') : -len('</w:pict>')]}</v:group></w:pict>",
+        "shapes",
+    ),
+}
+
+
+@pytest.mark.parametrize("name", FLOATING_TEXT)
+def test_a_floating_object_holding_text_is_set_aside_unread_where_it_is_anchored(name: str) -> None:
+    drawing, kind = FLOATING_TEXT[name]
+    data = docx(p(r("<w:t>a</w:t>") + r(drawing) + r("<w:t>b</w:t>")))
+    (paragraph,) = read_docx(data)
+    assert (paragraph.text, paragraph.anchored) == ("ab", (Anchored(1, kind),))
+    # Certified as such: the check finds it on its own (tests/test_certify.py).
+    value = json.loads(served(data)[0])
+    assert value["paragraphs"][0]["anchored"] == [{"kind": kind, "offset": 1, "read": False}]
+
+
+@pytest.mark.parametrize("name", ["text-box", "vml-text-box", "picture"])
+def test_a_floating_object_in_a_hidden_run_is_refused(name: str) -> None:
+    # Whether Word draws it is not on record.
+    drawing = PICTURE.replace("wp:inline", "wp:anchor") if name == "picture" else None
+    hidden = r(drawing or FLOATING_TEXT[name][0], "<w:vanish/>")
+    assert refusal(p(r("<w:t>a</w:t>") + hidden)) == "hidden-text"
+
+
+def test_every_floating_object_is_placed_where_it_is_anchored() -> None:
+    line = _alternate(SHAPE, LINE)
+    picture = PICTURE.replace("wp:inline", "wp:anchor")
+    absolute = VML_PICTURE.replace('style="', 'style="position:absolute;')
+    body = p(r("<w:t>ab</w:t>" + line) + r(picture + "<w:t>c</w:t>" + absolute) + r(vml_box()))
+    (paragraph,) = read_docx(docx(body))
+    assert paragraph.text == "abc"
+    kinds = [(a.offset, a.kind, a.read) for a in paragraph.anchored]
+    assert kinds == [
+        (2, "shape", False),
+        (2, "picture", False),
+        (3, "picture", False),
+        (3, "text-box", False),
+    ]
+
+
+# What, in a floating object, Word refers to or counts elsewhere: each keeps it refused whole.
+COUNTED_INSIDE = {
+    "field": p(_field("DOCPROPERTY Title", "x")),
+    "field-marks": p(
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + r("<w:t>x</w:t>")
+        + r('<w:fldChar w:fldCharType="end"/>')
+    ),
+    "field-code": p(r("<w:instrText> PAGE </w:instrText>")),
+    "seq": p(_field("SEQ Figure", "1")),
+    "simple-field": p('<w:fldSimple w:instr=" SEQ Figure "><w:r><w:t>1</w:t></w:r></w:fldSimple>'),
+    "footnote": p(r('<w:footnoteReference w:id="1"/>')),
+    "endnote": p(r('<w:endnoteReference w:id="1"/>')),
+    "list-item": p(r("<w:t>x</w:t>"), '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>'),
+    "list-by-style": p(r("<w:t>x</w:t>"), '<w:pStyle w:val="L"/>'),
+    "bookmark": p(_marked("b", r("<w:t>x</w:t>"))),
+    "bookmark-start": p('<w:bookmarkStart w:id="1" w:name="b"/>' + r("<w:t>x</w:t>")),
+    "bookmark-end": p(r("<w:t>x</w:t>") + '<w:bookmarkEnd w:id="1"/>'),
+    "comment-range": p('<w:commentRangeStart w:id="0"/>' + r("<w:t>x</w:t>")),
+    "comment-range-end": p(r("<w:t>x</w:t>") + '<w:commentRangeEnd w:id="0"/>'),
+    "comment-mark": p(r('<w:commentReference w:id="0"/>')),
+    "comment-echo": p(r("<w:annotationRef/>")),
+    "section": p(r("<w:t>x</w:t>"), "<w:sectPr/>"),
+    "bound": '<w:sdt><w:sdtPr><w:dataBinding w:xpath="/a"/></w:sdtPr><w:sdtContent>'
+    + IN_BOX
+    + "</w:sdtContent></w:sdt>",
+}
+LIST_STYLE = (
+    '<w:style w:type="paragraph" w:styleId="L"><w:pPr><w:numPr><w:numId w:val="1"/></w:numPr>'
+    "</w:pPr></w:style>"
+)
+
+
+@pytest.mark.parametrize("inside", COUNTED_INSIDE)
+@pytest.mark.parametrize("name", ["text-box", "group", "vml-text-box"])
+def test_a_floating_object_holding_what_is_counted_elsewhere_is_refused_as_before(
+    name: str, inside: str
+) -> None:
+    drawing = FLOATING_TEXT[name][0].replace(IN_BOX, COUNTED_INSIDE[inside])
+    detail = {"text-box": "AlternateContent", "group": "AlternateContent", "vml-text-box": "pict"}
+    with pytest.raises(DocxRefusedError, match=detail[name]) as caught:
+        read_docx(docx(p(r(drawing)), LIST_STYLE))
+    assert caught.value.code == "unsupported-element"
+
+
+def test_a_list_set_by_the_defaults_or_a_table_style_keeps_a_floating_object_refused() -> None:
+    defaults = '<w:docDefaults><w:pPrDefault><w:pPr><w:numPr><w:numId w:val="1"/></w:numPr>'
+    defaults += "</w:pPr></w:pPrDefault></w:docDefaults>"
+    assert refusal(p(r(vml_box())), defaults) == "unsupported-element"
+    table_style = LIST_STYLE.replace('w:type="paragraph"', 'w:type="table"')
+    in_table = vml_box(
+        f'<w:tbl><w:tblPr><w:tblStyle w:val="L"/></w:tblPr><w:tr><w:tc>{IN_BOX}</w:tc></w:tr>'
+        "</w:tbl>"
+    )
+    assert refusal(p(r(in_table)), table_style) == "unsupported-element"
+    assert text_of(p(r(in_table))) == [""]  # no list there: set aside
+
+
+_CHART = "http://schemas.openxmlformats.org/drawingml/2006/chart"
+_END = r('<w:fldChar w:fldCharType="end"/>')
+# Floating objects holding text that are not set aside: each is refused as before.
+NOT_SET_ASIDE = {
+    "in-line": p(r(_alternate(floating(box(), frame="inline"), vml_box()))),
+    "vml-in-line": p(r(vml_box(style="margin-left:9pt"))),
+    "vml-relative": p(r(vml_box(style="position:relative"))),
+    # In a field's result, which Word may print again.
+    "in-a-field": p(_field('HYPERLINK "https://x"', "x").replace(_END, r(vml_box()) + _END)),
+    "ink": p(r(_alternate(floating(box()), vml_box(), requires="wpi"))),
+    "two-choices": p(
+        r(
+            _alternate(floating(box()), vml_box()).replace(
+                "<mc:Fallback>",
+                '<mc:Choice Requires="wps">' + floating(box()) + "</mc:Choice><mc:Fallback>",
+            )
+        )
+    ),
+    "choice-not-one-drawing": p(r(_alternate(floating(box()) + floating(box())))),
+    "two-frames": p(
+        r(floating(box()).replace("</wp:anchor>", f"</wp:anchor><wp:anchor xmlns:wp='{WP}'/>"))
+    ),
+    "chart-in-group": p(
+        r(
+            _alternate(
+                floating(
+                    f"<wpg:wgp xmlns:wpg='{WPG}'>{box()}<wpg:graphicFrame><a:graphic xmlns:a='{A}'>"
+                    f"<a:graphicData uri='{_CHART}'/></a:graphic></wpg:graphicFrame></wpg:wgp>",
+                    WPG,
+                ),
+                requires="wpg",
+            )
+        )
+    ),
+    "chart": p(r(floating(box(), _CHART))),
+    "wordart": p(r(vml_box().replace("<v:textbox>", "<v:textpath string='x'/><v:textbox>"))),
+    "activex": p(r(vml_box().replace("</w:pict>", '<w:control w:name="x"/></w:pict>'))),
+    "two-shapes": p(r(vml_box().replace("</w:pict>", f"<v:shape xmlns:v='{VML}'/></w:pict>"))),
+    "run-outside-the-box": p(r(_alternate(floating(box()), "<w:t>x</w:t>"))),
+}
+
+
+@pytest.mark.parametrize("name", NOT_SET_ASIDE)
+def test_a_text_box_in_line_in_a_field_or_of_another_drawing_is_refused_as_before(
+    name: str,
+) -> None:
+    assert refusal(NOT_SET_ASIDE[name]) == "unsupported-element"
+
+
+def test_a_styleref_or_a_seq_restarting_at_headings_beside_unread_text_is_refused() -> None:
+    heading = '<w:style w:type="paragraph" w:styleId="H1"><w:name w:val="heading 1"/></w:style>'
+    titled = p(r("<w:t>Title</w:t>"), '<w:pStyle w:val="H1"/>')
+    for field, stored in (("STYLEREF 1", "Title"), ("SEQ Figure \\s 1", "1")):
+        body = titled + p(_field(field, stored)) + p(r(vml_box()))
+        with pytest.raises(DocxRefusedError, match="beside text that is not read"):
+            read_docx(docx(body, heading))
+        assert text_of(titled + p(_field(field, stored)), heading)[1] == stored
+
+
 def test_a_cross_reference_that_prints_its_stored_text_is_read() -> None:
     body = p(_marked("t", r("<w:t>below 25 C</w:t>"))) + p(_field("REF t \\h", "below 25 C"))
     assert text_of(body) == ["below 25 C", "below 25 C"]
@@ -4411,3 +4627,431 @@ def test_a_based_on_table_style_whose_parts_set_no_mark_changes_nothing() -> Non
     marking = based.replace(shaded, "<w:rPr><w:i/></w:rPr>")
     styles = t_style(("firstRow", "<w:b/>"), base='<w:basedOn w:val="U"/>', extra=marking)
     assert refusal(t_table(), styles) == "unsupported-element"
+
+
+# --- what company-written labels hold (EMA product information, 2026-10-05) ---------------
+
+
+def with_settings(body: str, settings: str) -> bytes:
+    """A .docx of ``body`` whose settings part holds ``settings``."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as package:
+        package.writestr("[Content_Types].xml", CONTENT_TYPES)
+        package.writestr("_rels/.rels", ROOT_RELS.format(target="word/document.xml"))
+        package.writestr(
+            "word/_rels/document.xml.rels",
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            + RELATIONSHIP.format(kind="settings", target="settings.xml")
+            + "</Relationships>",
+        )
+        package.writestr("word/document.xml", document_xml(body))
+        package.writestr("word/settings.xml", f'<w:settings xmlns:w="{W}">{settings}</w:settings>')
+    return buffer.getvalue()
+
+
+def variables(*pairs: tuple[str, str]) -> str:
+    """Document variables (``w:docVar``), each a name and its value as XML writes it."""
+    held = "".join(f'<w:docVar w:name="{name}" w:val="{value}"/>' for name, value in pairs)
+    return f"<w:docVars>{held}</w:docVars>"
+
+
+# Veeva Vault's anchor at a heading: a DOCVARIABLE whose variable and stored result are a space.
+VAULT = "VAULT_ND_0f6b2c1e-7d4a-4c1b-9e2a-3b5c6d7e8f90"
+SPACE = r('<w:t xml:space="preserve"> </w:t>')
+
+
+def complex_field(instruction: str, result: str) -> str:
+    return (
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r(f'<w:instrText xml:space="preserve">{instruction}</w:instrText>')
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + result
+        + r('<w:fldChar w:fldCharType="end"/>')
+    )
+
+
+def simple_field(instruction: str, result: str) -> str:
+    return f'<w:fldSimple w:instr="{instruction}">{result}</w:fldSimple>'
+
+
+def anchored(field: str, settings: str) -> bytes:
+    return with_settings(p(r("<w:t>4.1</w:t>") + field + r("<w:t>b</w:t>")), settings)
+
+
+_LOWER = VAULT.replace("VAULT_ND_", "vault_nd_")
+
+
+# Each a DOCVARIABLE read: its name, the field, the variable's name and value as XML writes it,
+# and the text read. First every form EMA product-information files hold (2026-10-05), where
+# the variable's value and the stored result are one space; then the rule beyond them:
+# CHARFORMAT, no switch, a code in any case, a value as XML reads it, split over runs.
+DOCVARIABLE_READS: list[tuple[str, str, str, str, str]] = [
+    ("complex", complex_field(f" DOCVARIABLE {VAULT} \\* MERGEFORMAT ", SPACE), VAULT, " ", " "),
+    (
+        "two-formats",
+        complex_field(f" DOCVARIABLE {VAULT} \\* MERGEFORMAT \\* CHARFORMAT ", SPACE),
+        VAULT,
+        " ",
+        " ",
+    ),
+    (
+        "complex-no-trailing-space",
+        complex_field(f" DOCVARIABLE {VAULT} \\* MERGEFORMAT", SPACE),
+        VAULT,
+        " ",
+        " ",
+    ),
+    (
+        "complex-no-spaces",
+        complex_field(f"DOCVARIABLE {VAULT} \\* MERGEFORMAT", SPACE),
+        VAULT,
+        " ",
+        " ",
+    ),
+    (
+        "complex-lower-case-name",
+        complex_field(f" DOCVARIABLE {_LOWER} \\* MERGEFORMAT ", SPACE),
+        _LOWER,
+        " ",
+        " ",
+    ),
+    ("simple", simple_field(f" DOCVARIABLE {VAULT} \\* MERGEFORMAT ", SPACE), VAULT, " ", " "),
+    (
+        "simple-no-trailing-space",
+        simple_field(f" DOCVARIABLE {VAULT} \\* MERGEFORMAT", SPACE),
+        VAULT,
+        " ",
+        " ",
+    ),
+    (
+        "simple-no-spaces",
+        simple_field(f"DOCVARIABLE {VAULT} \\* MERGEFORMAT", SPACE),
+        VAULT,
+        " ",
+        " ",
+    ),
+    (
+        "simple-lower-case-name",
+        simple_field(f" DOCVARIABLE {_LOWER} \\* MERGEFORMAT ", SPACE),
+        _LOWER,
+        " ",
+        " ",
+    ),
+    ("charformat", complex_field(f" docvariable {VAULT} \\* charformat ", SPACE), VAULT, " ", " "),
+    ("no-switch", complex_field(f" DOCVARIABLE {VAULT} ", SPACE), VAULT, " ", " "),
+    (
+        "escaped-value",
+        complex_field(f" DOCVARIABLE {VAULT} ", r("<w:t>a&amp;</w:t>") + r("<w:t>&lt;b</w:t>")),
+        VAULT,
+        "a&amp;&#60;b",
+        "a&<b",
+    ),
+]
+
+
+def read_settings(name: str, value: str) -> str:
+    """The variable, beside one of another name and one of none."""
+    held = variables((name, value), ("VAULT_ND_other", "x"))
+    return held.replace("</w:docVars>", '<w:docVar w:val="y"/></w:docVars>')
+
+
+@pytest.mark.parametrize(
+    ("field", "name", "value", "shown"),
+    [case[1:] for case in DOCVARIABLE_READS],
+    ids=[case[0] for case in DOCVARIABLE_READS],
+)
+def test_a_docvariable_showing_its_variables_value_is_read(
+    field: str, name: str, value: str, shown: str
+) -> None:
+    # Word shows the stored result until fields are updated, then the variable's value: where
+    # the two are one text, it is what Word shows either way.
+    data = anchored(field, read_settings(name, value))
+    assert [x.text for x in read_docx(data)] == [f"4.1{shown}b"]
+    value_read = json.loads(served(data)[0])
+    assert "refusal" not in value_read, value_read.get("refusal")
+
+
+_NESTED = complex_field(" QUOTE x ", r("<w:t>x</w:t>"))
+
+# Each a DOCVARIABLE Word may show otherwise than read: its name, the field, the settings, the
+# reader's refusal (code and detail).
+DOCVARIABLE_REFUSALS: list[tuple[str, str, str, str, str]] = [
+    (
+        "no-variable",
+        complex_field(f" DOCVARIABLE {VAULT} \\* MERGEFORMAT ", SPACE),
+        "",
+        "computed-field",
+        "a DOCVARIABLE without one variable of its name",
+    ),
+    (
+        "another-value",
+        complex_field(f" DOCVARIABLE {VAULT} ", SPACE),
+        variables((VAULT, "x")),
+        "computed-field",
+        "a DOCVARIABLE showing other than its value",
+    ),
+    (
+        "another-case",
+        complex_field(f" DOCVARIABLE {VAULT} ", SPACE),
+        variables((_LOWER, " ")),
+        "computed-field",
+        "a DOCVARIABLE without one variable of its name",
+    ),
+    (
+        "two-ignoring-case",
+        complex_field(f" DOCVARIABLE {VAULT} ", SPACE),
+        variables((VAULT, " "), (_LOWER, " ")),
+        "computed-field",
+        "a DOCVARIABLE without one variable of its name",
+    ),
+    (
+        "no-value",
+        complex_field(f" DOCVARIABLE {VAULT} ", SPACE),
+        f'<w:docVars><w:docVar w:name="{VAULT}"/></w:docVars>',
+        "computed-field",
+        "a DOCVARIABLE without one variable of its name",
+    ),
+    (
+        "empty-result",
+        complex_field(f" DOCVARIABLE {VAULT} ", r("<w:t/>")),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE showing other than its value",
+    ),
+    (
+        "hidden-result",
+        complex_field(
+            f" DOCVARIABLE {VAULT} ", r('<w:t xml:space="preserve"> </w:t>', "<w:vanish/>")
+        ),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE showing other than its value",
+    ),
+    (
+        "another-switch",
+        complex_field(f" DOCVARIABLE {VAULT} \\h ", SPACE),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE field the reader cannot read",
+    ),
+    (
+        "another-format",
+        complex_field(f" DOCVARIABLE {VAULT} \\* Upper ", SPACE),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE field the reader cannot read",
+    ),
+    (
+        "quoted-name",
+        complex_field(f' DOCVARIABLE "{VAULT}" ', SPACE),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE field the reader cannot read",
+    ),
+    (
+        "no-name",
+        complex_field(" DOCVARIABLE \\* MERGEFORMAT ", SPACE),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE field the reader cannot read",
+    ),
+    (
+        "bare-code",
+        complex_field(" DOCVARIABLE ", SPACE),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE field the reader cannot read",
+    ),
+    (
+        "format-switch-without-its-format",
+        complex_field(f" DOCVARIABLE {VAULT} \\* ", SPACE),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE field the reader cannot read",
+    ),
+    (
+        "field-in-its-code",
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r('<w:instrText xml:space="preserve"> DOCVARIABLE x </w:instrText>')
+        + _NESTED
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + SPACE
+        + r('<w:fldChar w:fldCharType="end"/>'),
+        variables(("x", " ")),
+        "computed-field",
+        "a DOCVARIABLE field with a field in its code",
+    ),
+    (
+        "tab",
+        complex_field(f" DOCVARIABLE {VAULT} ", r("<w:tab/>")),
+        variables((VAULT, "&#9;")),
+        "computed-field",
+        "a DOCVARIABLE's result holding other than text",
+    ),
+    (
+        "symbol",
+        complex_field(
+            f" DOCVARIABLE {VAULT} ",
+            r('<w:t xml:space="preserve"> </w:t>', '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/>'),
+        ),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE's result holding other than text",
+    ),
+    (
+        "note-mark",
+        complex_field(f" DOCVARIABLE {VAULT} ", SPACE + r('<w:footnoteReference w:id="1"/>')),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE's result holding other than text",
+    ),
+    (
+        "field-in-its-result",
+        complex_field(f" DOCVARIABLE {VAULT} ", _NESTED),
+        variables((VAULT, "x")),
+        "computed-field",
+        "a field in a DOCVARIABLE's result",
+    ),
+    (
+        "simple-field-in-its-result",
+        complex_field(f" DOCVARIABLE {VAULT} ", simple_field(" HYPERLINK x ", SPACE)),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a field in a DOCVARIABLE's result",
+    ),
+    (
+        "field-character-in-a-simple-result",
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r('<w:instrText xml:space="preserve"> HYPERLINK x </w:instrText>')
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + simple_field(f" DOCVARIABLE {VAULT} ", SPACE + r('<w:fldChar w:fldCharType="end"/>')),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE's result holding other than text",
+    ),
+    (
+        "no-stored-result",
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r(f'<w:instrText xml:space="preserve"> DOCVARIABLE {VAULT} </w:instrText>')
+        + r('<w:fldChar w:fldCharType="end"/>'),
+        variables((VAULT, " ")),
+        "field-without-result",
+        "a field with no stored result",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("field", "settings", "code", "detail"),
+    [case[1:] for case in DOCVARIABLE_REFUSALS],
+    ids=[case[0] for case in DOCVARIABLE_REFUSALS],
+)
+def test_a_docvariable_word_may_show_otherwise_is_refused(
+    field: str, settings: str, code: str, detail: str
+) -> None:
+    with pytest.raises(DocxRefusedError) as caught:
+        read_document(anchored(field, settings))
+    assert (caught.value.code, caught.value.detail) == (code, detail)
+
+
+def test_a_docvariable_result_past_its_paragraph_is_refused() -> None:
+    body = p(
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r(f'<w:instrText xml:space="preserve"> DOCVARIABLE {VAULT} </w:instrText>')
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + SPACE
+    ) + p(r('<w:fldChar w:fldCharType="end"/>'))
+    with pytest.raises(DocxRefusedError) as caught:
+        read_document(with_settings(body, variables((VAULT, " "))))
+    assert caught.value.code == "unbalanced-field"
+
+
+def _declaring(declaration: str, name: str, content: bytes, before: bytes = b"") -> bytes:
+    """A one-paragraph .docx with ``name`` holding ``content`` under an XML ``declaration``."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(docx(p(r("<w:t>x</w:t>"))))) as source:
+        parts = {n: source.read(n) for n in source.namelist()}
+    parts[name] = before + f'<?xml version="1.0" encoding="{declaration}"?>'.encode() + content
+    with zipfile.ZipFile(buffer, "w") as package:
+        for part, data in parts.items():
+            package.writestr(part, data)
+    return buffer.getvalue()
+
+
+# A customXml part, as Word keeps a bibliography.
+_ITEM = "customXml/item1.xml"
+_SOURCES = b"<b:Sources xmlns:b='x'/>"
+
+
+@pytest.mark.parametrize("spelling", ["us-ascii", "US-ASCII", "ascii", "us_ascii"])
+def test_a_part_declaring_ascii_is_read_when_every_byte_is_ascii(spelling: str) -> None:
+    # ASCII is UTF-8's first 128 characters: such a part reads alike either way. EMA
+    # product-information files hold customXml parts that declare us-ascii, every byte below 0x80.
+    assert [x.text for x in read_docx(_declaring(spelling, _ITEM, _SOURCES))] == ["x"]
+    # The document itself too: a character reference is ASCII bytes for any character.
+    body = document_xml(p(r("<w:t>caf&#233;</w:t>"))).encode()
+    data = _declaring(spelling, "word/document.xml", body)
+    assert [x.text for x in read_docx(data)] == ["caf\u00e9"]
+    DocxSource(data).certify(json.loads(served(data)[0]))
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        _declaring("us-ascii", _ITEM, "<b:Sources xmlns:b='x'>caf\u00e9</b:Sources>".encode()),
+        _declaring("us-ascii", _ITEM, _SOURCES + b"<!-- \xef\xbb\xbf -->"),
+        _declaring("windows-1252", _ITEM, _SOURCES),
+        _declaring("ASCII-ish", _ITEM, _SOURCES),
+    ],
+    ids=["a-letter-past-ascii", "a-byte-past-ascii", "another-encoding", "an-unknown-encoding"],
+)
+def test_a_part_declaring_ascii_over_other_bytes_or_another_encoding_is_refused(
+    data: bytes,
+) -> None:
+    with pytest.raises(DocxRefusedError) as caught:
+        read_docx(data)
+    assert caught.value.code == "invalid-package"
+    with pytest.raises(CertificationError):
+        DocxSource(data)
+
+
+def test_an_underline_without_a_value_sets_nothing_at_any_level() -> None:
+    """A bare ``w:u`` draws no underline and leaves a style's underline as it is.
+
+    Word's answer: Microsoft Word 16.113.3 for Mac, asked 2026-10-05 with two documents of
+    this very XML (uval.docx: the first three paragraphs; uval2.docx: the rest, its styles U and
+    UC). A bare ``<w:u/>`` draws no underline, with a ``w:color`` or without; under a paragraph
+    style's single underline the text stays underlined (single), and under a character style's
+    double it stays underlined (double). The reader passes it over at every level, as absent.
+    """
+    styles = (
+        '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/>'
+        "</w:style>"
+        '<w:style w:type="paragraph" w:styleId="U"><w:name w:val="U"/>'
+        '<w:rPr><w:u w:val="single"/></w:rPr></w:style>'
+        '<w:style w:type="character" w:styleId="UC"><w:name w:val="UC"/>'
+        '<w:rPr><w:u w:val="double"/></w:rPr></w:style>'
+    )
+    underlined = '<w:pStyle w:val="U"/>'
+    body = (
+        p(r("<w:t>noval</w:t>", "<w:u/>"))
+        + p(r("<w:t>single</w:t>", '<w:u w:val="single"/>'))
+        + p(r("<w:t>plain</w:t>"))
+        + p(r("<w:t>styleSingleRunBare</w:t>", "<w:u/>"), underlined)
+        + p(r("<w:t>styleSingleRunNothing</w:t>"), underlined)
+        + p(r("<w:t>charStyleDoubleRunBare</w:t>", '<w:rStyle w:val="UC"/><w:u/>'))
+        + p(r("<w:t>bareWithColour</w:t>", '<w:u w:color="FF0000"/>'))
+    )
+    paragraphs = read_docx(docx(body, styles))
+    assert [[m.kind for m in x.marks if m.kind == "underline"] for x in paragraphs] == [
+        [],
+        ["underline"],
+        [],
+        ["underline"],
+        ["underline"],
+        ["underline"],
+        [],
+    ]
+    # The check works it out on its own: the result is certified.
+    value = json.loads(served(docx(body, styles))[0])
+    assert "refusal" not in value, value.get("refusal")

@@ -68,10 +68,16 @@ rules above and may carry only bold, italic, capitals (its title is its line as 
 capitals applied), an underline that cannot change it and small capitals over text they draw the
 same (``heading-formatting``).
 
-A document is refused whole where Word draws something the read does not say: a floating picture
-or shape (``floating-object``, counted by the certificate but not placed), or one of
-``Body.layout`` (``floating-table``, ``frame``, ``right-to-left-table``, a ``page-break`` between
-two words, an ``unreadable-part``).
+A section is refused whose heading or paragraphs anchor a floating object (``anchored-object``,
+the detail its kind: ``picture``, ``shape``, ``text-box`` or ``shapes``): Word draws it apart from
+the text, and the read says where it stands but not what it shows (a floating text box's text is
+set aside unread), so the section would be carried without it. The other sections are carried.
+Floating objects in headers, footers, notes and comments refuse nothing: they are not in any
+section, and Word draws a header's or footer's on every page, apart from the body's text (a
+logo); notes and comments do not reach here (``zone_a.certified``). A document is refused whole
+where Word draws something the read does not yet say: one of ``Body.layout``
+(``floating-table``, ``frame``, ``right-to-left-table``, a ``page-break`` between two words, an
+``unreadable-part``).
 """
 
 from __future__ import annotations
@@ -95,7 +101,7 @@ from zone_a.structure import line
 from zone_a.underline import underline_changes
 
 # The narrative builder's and the page serialiser's version: one, as they are one closed list.
-WORD_EPI_VERSION: Final = "word-epi/1.0.2"
+WORD_EPI_VERSION: Final = "word-epi/1.1.0"
 
 CARRIED: Final = {"bold": "strong", "italic": "em", "superscript": "sup", "subscript": "sub"}
 # Section 3 step 4's bullet glyphs: a list bullet in page text, removed at a line start.
@@ -650,16 +656,13 @@ def sections(
     """Each section with a heading, in the template's order, as JSON values.
 
     Raises:
-        RefusedError: The document has a floating picture or shape (``floating-object``), or
-            something else Word draws that the read does not yet say (``Body.layout``: a
-            ``floating-table``, a ``frame``, a ``right-to-left-table``, a ``page-break`` between
-            two words).
+        RefusedError: The document holds something Word draws that the read does not yet say
+            (``Body.layout``: a ``floating-table``, a ``frame``, a ``right-to-left-table``, a
+            ``page-break`` between two words).
         ValueError: The structure is not ready, or not of this body.
     """
     if not structured["ready"]:
         raise ValueError("the structure is not ready")
-    if body.floating:
-        raise RefusedError("floating-object", None, f"{body.floating} floating objects")
     if body.layout:
         raise RefusedError(body.layout[0], None, "Word draws it; the read does not yet say how")
     paragraphs = body.paragraphs
@@ -687,6 +690,9 @@ def sections(
             "refusal": None,
         }
         try:
+            anchors = [(i, a.kind) for i in range(heading, stop) for a in paragraphs[i].anchored]
+            if anchors:
+                raise RefusedError("anchored-object", *anchors[0])
             if paragraphs[heading].table is not None:
                 raise RefusedError("heading-in-table", heading, "a heading in a table")
             _heading(heading, paragraphs[heading])

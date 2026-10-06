@@ -25,7 +25,7 @@ from typing import Any
 
 import pytest
 from label_docx import browser
-from label_docx.reader import CommentReference, Mark, Numbering, Paragraph, Picture
+from label_docx.reader import Anchored, CommentReference, Mark, Numbering, Paragraph, Picture
 
 from zone_a import certified, drawing, word_epi
 from zone_a.certified import Body, read_body
@@ -89,7 +89,7 @@ def _build(
     images: dict[str, bytes] | None = None,
 ) -> tuple[str, str]:
     """The narrative and page of a section holding ``paragraphs``; refusals raise."""
-    body = Body(tuple(paragraphs), tables, 0, images=images or {})
+    body = Body(tuple(paragraphs), tables, images=images or {})
     div, text = _section(key, range(len(paragraphs)), body, GREYS)
     return div or "", text
 
@@ -305,7 +305,7 @@ def _structured(headings: dict[str, int]) -> dict[str, Any]:
 
 
 def test_sections_are_cut_at_every_heading_and_an_empty_one_has_no_narrative() -> None:
-    body = Body((_p("4. X"), _p("4.1 Y"), _p("text"), _p(" "), _p("4.2 Z")), (), 0)
+    body = Body((_p("4. X"), _p("4.1 Y"), _p("text"), _p(" "), _p("4.2 Z")), ())
     built = sections(body, _structured({"smpc.4": 0, "smpc.4.1": 1, "smpc.4.2": 4}), REGISTRY)
     by_key = {s["key"]: s for s in built["sections"]}
     assert by_key["smpc.4"]["narrative"] is None
@@ -318,17 +318,29 @@ def test_sections_are_cut_at_every_heading_and_an_empty_one_has_no_narrative() -
 
 def test_a_table_across_two_sections_or_under_a_heading_is_refused() -> None:
     table = (_grid(1, [(0, 1, None)], [(0, 1, None)]),)
-    body = Body((_p("4.1 Y"), _p("a", table=(0, 0, 0)), _p("4.2 Z", table=(0, 1, 0))), table, 0)
+    body = Body((_p("4.1 Y"), _p("a", table=(0, 0, 0)), _p("4.2 Z", table=(0, 1, 0))), table)
     built = sections(body, _structured({"smpc.4.1": 0, "smpc.4.2": 2}), REGISTRY)
     codes = {s["key"]: s["refusal"]["code"] for s in built["sections"]}
     assert codes == {"smpc.4.1": "table-across-sections", "smpc.4.2": "heading-in-table"}
 
 
-def test_a_floating_object_refuses_the_document_and_an_unready_structure_is_an_error() -> None:
-    body = Body((_p("4.1 Y"),), (), 1)
-    with pytest.raises(RefusedError) as refused:
-        sections(body, _structured({"smpc.4.1": 0}), REGISTRY)
-    assert refused.value.code == "floating-object"
+def test_a_floating_object_refuses_its_section_alone_and_an_unready_structure_is_an_error() -> None:
+    box = (Anchored(0, "text-box"),)
+    body = Body(
+        (_p("4.1 Y"), _p("text"), _p("", anchored=box), _p("4.2 Z"), _p("more"), _p("4.3 W")), ()
+    )
+    built = sections(body, _structured({"smpc.4.1": 0, "smpc.4.2": 3, "smpc.4.3": 5}), REGISTRY)
+    refusals = {s["key"]: s["refusal"] for s in built["sections"]}
+    assert refusals == {
+        "smpc.4.1": {"code": "anchored-object", "paragraph": 2, "detail": "text-box"},
+        "smpc.4.2": None,
+        "smpc.4.3": None,
+    }
+    # One anchored in a heading refuses the heading's section: Word draws it there.
+    logo = (Anchored(3, "picture"),)
+    body = Body((_p("4.1 Y", anchored=logo), _p("text"), _p("4.2 Z"), _p("more")), ())
+    built = sections(body, _structured({"smpc.4.1": 0, "smpc.4.2": 2}), REGISTRY)
+    assert [(s["refusal"] or {}).get("detail") for s in built["sections"]] == ["picture", None]
     with pytest.raises(ValueError, match="not ready"):
         sections(body, {**_structured({}), "ready": False}, REGISTRY)
 
@@ -622,6 +634,44 @@ def test_what_word_draws_and_the_read_does_not_say_refuses_the_document(
     assert refused.value.code == code
 
 
+_WPS = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+# A floating text box, as Word writes one (its VML fallback left out).
+_TEXT_BOX = (
+    '<w:p><w:r><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/'
+    'markup-compatibility/2006"><mc:Choice Requires="wps"><w:drawing>'
+    '<wp:anchor xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">'
+    '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+    f'<a:graphicData uri="{_WPS}"><wps:wsp xmlns:wps="{_WPS}"><wps:txbx><w:txbxContent>'
+    "<w:p><w:r><w:t>Months</w:t></w:r></w:p></w:txbxContent></wps:txbx></wps:wsp>"
+    "</a:graphicData></a:graphic></wp:anchor></w:drawing></mc:Choice></mc:AlternateContent>"
+    "</w:r></w:p>"
+)
+
+
+def test_a_floating_text_box_refuses_the_section_it_is_anchored_in_and_no_other() -> None:
+    def add(xml: str) -> str:
+        at = xml.index("</w:p>", xml.index("glycaemic control")) + len("</w:p>")
+        return xml[:at] + _TEXT_BOX + xml[at:]
+
+    def built(body: Body) -> dict[str, Any]:
+        out = sections(body, structure(body.paragraphs, REGISTRY, MAPPING), REGISTRY)
+        return {
+            s["key"]: (s["narrative"], s["page"], s["refusal"] and s["refusal"]["code"])
+            for s in out["sections"]
+        }
+
+    plain = read_body((FIXTURES / "jentadueto-smpc-en.docx").read_bytes())
+    boxed = read_body(_rewritten("jentadueto-smpc-en", add))
+    assert boxed.layout == plain.layout == ()
+    (anchored,) = [p for p in boxed.paragraphs if p.anchored]
+    assert (anchored.text, anchored.anchored) == ("", (Anchored(0, "text-box"),))
+    before, after = built(plain), built(boxed)
+    changed = {key for key in before if before[key] != after[key]}
+    assert len(changed) == 1
+    (key,) = changed
+    assert (before[key][2], after[key][2]) == (None, "anchored-object")
+
+
 def test_a_page_break_beside_a_space_or_alone_is_layout_only() -> None:
     for xml in (
         '<w:p><w:r><w:t xml:space="preserve">a </w:t><w:br w:type="page"/><w:t>b</w:t></w:r></w:p>',
@@ -694,7 +744,7 @@ def test_a_section_of_blank_paragraphs_and_cells_has_no_narrative_and_the_empty_
 
 
 def test_a_heading_is_plain_text() -> None:
-    body = Body((_p("4.1\tY", (0, 3, "caps")), _p("text"), _p("4.2 Z")), (), 0)
+    body = Body((_p("4.1\tY", (0, 3, "caps")), _p("text"), _p("4.2 Z")), ())
     built = sections(body, _structured({"smpc.4.1": 0, "smpc.4.2": 2}), REGISTRY)
     assert built["refused"] == 0
     for heading, code in (
@@ -704,7 +754,7 @@ def test_a_heading_is_plain_text() -> None:
         (_p("4.1 Y", mark_hidden=True), "hidden-mark"),
         (_p("4.1 Y", comments=(CommentReference(0, 1),)), "comment"),
     ):
-        body = Body((heading, _p("text"), _p("4.2 Z")), (), 0)
+        body = Body((heading, _p("text"), _p("4.2 Z")), ())
         built = sections(body, _structured({"smpc.4.1": 0, "smpc.4.2": 2}), REGISTRY)
         assert built["sections"][0]["refusal"]["code"] == code
 
@@ -817,7 +867,7 @@ def test_a_heading_with_a_picture_is_refused() -> None:
     heading = dataclasses.replace(
         heading, text="4.1 \ufffcY", pictures=(dataclasses.replace(heading.pictures[0], offset=4),)
     )
-    body = Body((heading, _p("text"), _p("4.2 Z")), (), 0, images=images)
+    body = Body((heading, _p("text"), _p("4.2 Z")), (), images=images)
     built = sections(body, _structured({"smpc.4.1": 0, "smpc.4.2": 2}), REGISTRY)
     assert built["sections"][0]["refusal"]["code"] == "picture"
 

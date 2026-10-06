@@ -38,7 +38,7 @@ from label_docx.reader import Paragraph
 from zone_a.certified import Body
 from zone_a.word_epi import CAPITALS, GREY, WHITESPACE, blank, unchanged_by_capitals
 
-DRAWING_VERSION: Final = "word-drawing/1.0.2"
+DRAWING_VERSION: Final = "word-drawing/1.0.3"
 LEFT_OUT: Final = frozenset({"underline"}) | GREY
 _SPACE: Final = re.compile(r"[ \t\r\f]+|[^ \t\r\f]")
 

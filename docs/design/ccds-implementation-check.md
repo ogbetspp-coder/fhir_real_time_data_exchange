@@ -1,6 +1,6 @@
 # Design note: the CCDS implementation check
 
-- Status: Built (`implementation-check/1.1.2`, `zone-a/src/zone_a/implementation.py`); tested on synthetic documents
+- Status: Built (`implementation-check/1.1.3`, `zone-a/src/zone_a/implementation.py`); tested on synthetic documents
   only. No company CCDS or local label is in the repository.
 - Date: 2026-10-05; 1.1.0 adds wording in other languages and deadlines
 - Related: the UI proposal (Claude Docs, "Label Intake — UI proposal"), `zone-a/src/zone_a/certified.py`

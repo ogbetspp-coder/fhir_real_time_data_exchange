@@ -171,6 +171,29 @@ def picture(key: int, anchored: bool = False) -> str:
     return f"<w:r><w:drawing>{_frame(key, _SIZE, _PICTURE, wrap)}</w:drawing></w:r>"
 
 
+def text_box(key: int, text: str) -> str:
+    """A run holding a text box anchored to the paragraph, holding ``text``: VML as fallback."""
+    content = f"<w:txbxContent><w:p><w:r><w:t>{text}</w:t></w:r></w:p></w:txbxContent>"
+    graphic = (
+        '<a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/'
+        'wordprocessingShape"><wps:wsp><wps:cNvSpPr txBox="1"/><wps:spPr><a:xfrm>'
+        '<a:off x="0" y="0"/><a:ext cx="1828800" cy="457200"/></a:xfrm><a:prstGeom prst="rect">'
+        f"<a:avLst/></a:prstGeom></wps:spPr><wps:txbx>{content}</wps:txbx><wps:bodyPr/></wps:wsp>"
+        "</a:graphicData></a:graphic>"
+    )
+    size = '<wp:extent cx="1828800" cy="457200"/>'
+    frame = _frame(key, size, graphic, '<wp:wrapSquare wrapText="bothSides"/>')
+    fallback = (
+        '<v:shape style="position:absolute;width:144pt;height:36pt" type="#_x0000_t202">'
+        f"<v:textbox>{content}</v:textbox></v:shape>"
+    )
+    return (
+        f'<w:r><mc:AlternateContent><mc:Choice Requires="wps"><w:drawing>{frame}</w:drawing>'
+        f"</mc:Choice><mc:Fallback><w:pict>{fallback}</w:pict></mc:Fallback>"
+        "</mc:AlternateContent></w:r>"
+    )
+
+
 def shape(key: int, geometry: str, anchored: bool) -> str:
     """A run holding a drawn shape (``line`` or ``rect``), as Word writes one: VML as fallback."""
     line = geometry == "line"
@@ -1082,6 +1105,12 @@ CASES: dict[str, Case] = {
         "A picture anchored to the paragraph (floating): what Word's text shows for it.",
         "",
         para(words("a"), picture(2, anchored=True), words("b")),
+        media=True,
+    ),
+    "drawing-anchored-text-box": Case(
+        "A text box anchored to the paragraph, holding text: Word's text leaves its text out.",
+        "",
+        para(words("a"), text_box(5, "boxed"), words("b")) + para(words("after")),
         media=True,
     ),
     "drawing-anchored-line": Case(

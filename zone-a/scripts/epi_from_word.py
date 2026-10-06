@@ -9,7 +9,8 @@ scripts/structure_label.py) and built with zone_a.word_epi; where Chrome is inst
 (zone_a.drawing); a section Chrome draws otherwise, or that it did not draw (no Chrome, or
 ``--no-drawing``), is refused. The result is written as canonical JSON to
 FILE, or to standard output, with the file's SHA-256 and every version that decided it. A file
-the reader refuses, or one with a floating object, gives its refusal; a structure a person must
+the reader refuses, or one with something Word draws the read does not yet say (``Body.layout``),
+gives its refusal; a section anchoring a floating object is refused alone; a structure a person must
 still confirm gives the structure alone (``ready`` false), with ``product``, what the label says
 it is for (zone_a.product). See ADR 0006.
 """

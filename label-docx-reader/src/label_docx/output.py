@@ -13,7 +13,7 @@ A paragraph (``paragraph``; ``reader.Paragraph`` says what each means): ``text``
 (``start``, ``end``, ``kind``), ``style`` (the style id as written, or null), ``markHidden``,
 ``table`` (``[table, row, cell]``, or null; see ``tables``), ``numbering`` (null, or ``numId``,
 ``level``, ``text`` and ``suffix``; ``level`` is Word's ``ilvl``, from 0), and ``notes``,
-``pages``, ``comments`` and ``pictures`` as below.
+``pages``, ``comments``, ``pictures`` and ``anchored`` as below.
 
 Each paragraph's ``pictures`` (a .docx's, in the body, notes, headers, footers and comments)
 says what each U+FFFC of its ``text`` stands for (``reader.Picture``; "Pictures" in the
@@ -32,6 +32,12 @@ docstring), a list that rests on what is known of Word, not on Word's drawing; t
 the browser hold the rest. The image's bytes are not in the result: a consumer reads ``part``
 from the source and holds it to ``sha256``. Whether Word draws it larger than its ``pixels``
 (9525 EMU a pixel at 96 dpi) is the consumer's to judge. No picture refuses a read.
+
+Each .docx paragraph's ``anchored`` places each object anchored to it, which Word draws apart
+from the text (``reader.Anchored``; "Anchored" in the reader's docstring), in order: ``offset``
+(where its anchor stands in ``text``), ``kind`` (``picture`` or ``shape``, holding no text;
+``text-box``, or ``shapes`` for a group or canvas, holding text) and ``read`` (whether its own
+text is read: always false yet). An object's text is in no paragraph; the certificate counts it.
 
 A read::
 
@@ -78,7 +84,9 @@ the page layout when it prints, so its value is never in ``text`` and never know
 ``certificate`` is the independent conservation check's account of the read
 (``label_docx.certify``): how many characters the source's text holds, how many the output
 holds, and how many were set aside and why (field code, page numbers, page breaks, hidden
-whitespace, floating objects), with the parts holding text the reader does not read. The check found
+whitespace, ``floatingObjects``: every object anchored to a paragraph, one each; and of those,
+``unreadObjects``, the ones holding text, with ``unreadObjectCharacters``, their text's
+characters in every branch), with the parts holding text the reader does not read. The check found
 every character of the output in the source, in order, and every source character in the output or
 set aside; a read it cannot account for is refused as ``uncertified``.
 
@@ -97,7 +105,8 @@ caller names the view it takes. ``changes`` lists each change as stored: ``part`
 ``format-row``, ``format-cell``, ``format-section``), ``id``, ``author`` and ``date`` (null where
 absent).
 Each view is certified as a read is; ``certificate.views`` is the check's account of the views
-themselves (``certify_tracked``).
+themselves (``certify_tracked``). A document with a change inside a drawing, whose views are
+read, is refused (``tracked-change``): the change is listed but in neither view's text.
 
 A refusal::
 
@@ -120,13 +129,14 @@ from label_docx.reader import (
     Paragraph,
     Story,
     Table,
+    changed_drawing,
     read_document,
     tracked,
 )
 
 # The version of the shape above, and of the check that certifies it: versions.lock.json ties
 # it to both files (tests/test_locks.py).
-FORMAT_VERSION = "label-docx-json/1.17.0"
+FORMAT_VERSION = "label-docx-json/1.18.0"
 
 type Json = str | int | bool | list[Json] | dict[str, Json] | None
 
@@ -182,10 +192,13 @@ def paragraphs(items: list[Paragraph]) -> list[Json]:
 
 
 def docx_paragraphs(items: list[Paragraph]) -> list[Json]:
-    """A .docx's paragraphs as JSON, in document order, each with its ``pictures``."""
+    """A .docx's paragraphs as JSON, in document order, each with ``pictures`` and ``anchored``."""
     return [
         {
             **paragraph(item),
+            "anchored": [
+                {"kind": a.kind, "offset": a.offset, "read": a.read} for a in item.anchored
+            ],
             "pictures": [
                 {
                     "crop": None if p.crop is None else dict(zip("ltrb", p.crop, strict=True)),
@@ -323,6 +336,9 @@ def _tracked(data: bytes, envelope: dict[str, Json]) -> tuple[bytes, bool]:
                 texts[view] = content(read_document(view_data))
             except DocxRefusedError as refused:
                 raise DocxRefusedError(refused.code, f"{view} view: {refused.detail}") from refused
+        changed = changed_drawing(data)
+        if changed is not None:
+            raise DocxRefusedError("tracked-change", f"a change inside a drawing in {changed}")
     except DocxRefusedError as refused:
         envelope["refusal"] = {"code": refused.code, "detail": refused.detail}
         return canonical(envelope), False

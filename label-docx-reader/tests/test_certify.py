@@ -48,16 +48,26 @@ from label_docx.word import SUFFIXES, label_as_drawn
 from lock import MANIFESTS
 from test_headers_comments import with_parts
 from test_reader import (
+    _ITEM,
+    _NESTED,
     _NO_GRID,
+    _SOURCES,
     ALL_LOOKS,
     APPLIED,
+    COUNTED_INSIDE,
+    DOCVARIABLE_READS,
+    DOCVARIABLE_REFUSALS,
+    FLOATING_TEXT,
     HEADERS,
     IMAGE,
+    IN_BOX,
     LAST_LEFT_OUT,
     LINE,
+    LIST_STYLE,
     MEDIA,
     NO_LOOKS,
     NOT_ASKED,
+    NOT_SET_ASIDE,
     PICTURE_CASES,
     PLACED_CASES,
     SHAPE,
@@ -65,7 +75,10 @@ from test_reader import (
     WP,
     W,
     _alternate,
+    _declaring,
+    anchored,
     chunk,
+    document_xml,
     docx,
     exif,
     jpeg,
@@ -73,13 +86,16 @@ from test_reader import (
     picture,
     png,
     r,
+    read_settings,
     relationship,
     segment,
     t_style,
     t_table,
     tbl,
     tc,
+    variables,
     with_media,
+    with_settings,
 )
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
@@ -159,7 +175,9 @@ def test_every_result_the_readers_make_is_certified(path: Path) -> None:
     certificate = source.certify(value)
     if path.suffix == ".docx":
         source_count = sum(certificate["source"].values())
-        kept = certificate["output"]["characters"] + sum(certificate["setAside"].values())
+        aside = certificate["setAside"]
+        # unreadObjects counts again, of floatingObjects, the ones holding text (output.py).
+        kept = certificate["output"]["characters"] + sum(aside.values()) - aside["unreadObjects"]
         assert source_count == kept
     else:
         assert certificate["output"]["characters"] == (
@@ -426,6 +444,32 @@ def _change_a_picture(value: dict[str, Any], rng: random.Random) -> bool:
     return True
 
 
+def _change_anchored(value: dict[str, Any], rng: random.Random) -> bool:
+    # A floating object placed otherwise: its entry dropped, moved, of another kind or marked
+    # read, or one added where none is anchored.
+    if "sections" in value:
+        return False
+    placed = [p for p in _paragraphs(value) if p["anchored"]]
+    roll = rng.randrange(5) if placed else 4
+    if roll == 4:
+        paragraph = rng.choice(_paragraphs(value)) if _paragraphs(value) else None
+        if paragraph is None:
+            return False
+        paragraph["anchored"].append({"kind": "picture", "offset": 0, "read": False})
+        return True
+    entries = rng.choice(placed)["anchored"]
+    entry = rng.choice(entries)
+    if roll == 0:
+        entries.remove(entry)
+    elif roll == 1:
+        entry["offset"] += 1
+    elif roll == 2:
+        entry["kind"] = "shape" if entry["kind"] == "picture" else "picture"
+    else:
+        entry["read"] = True
+    return True
+
+
 def _change_title(value: dict[str, Any], rng: random.Random) -> bool:
     if "sections" not in value:
         return False
@@ -539,6 +583,7 @@ CHANGES: list[Change] = [
     _move_table_cell,
     _change_the_grid,
     _change_a_picture,
+    _change_anchored,
     _change_title,
     _hide_a_refusal,
     _change_a_mark,
@@ -1046,6 +1091,7 @@ def _value(*paragraphs: str | dict[str, Any], **notes: list[dict[str, Any]]) -> 
             "pages": [],
             "notes": [],
             "pictures": [],
+            "anchored": [],
             "table": None,
         }
         out.append(
@@ -1133,6 +1179,8 @@ def test_a_field_in_another_fields_code_is_code() -> None:
         "hiddenWhitespace": 0,
         "pageBreaks": 0,
         "pageNumbers": 0,
+        "unreadObjects": 0,
+        "unreadObjectCharacters": 0,
     }
 
 
@@ -1183,6 +1231,7 @@ def test_text_before_a_mark_in_the_same_run_stands_before_it() -> None:
                 "markHidden": False,
                 "numbering": None,
                 "pictures": [],
+                "anchored": [],
                 "style": None,
             }
         ],
@@ -1382,8 +1431,9 @@ def test_alternate_content_is_read_as_its_drawing_unless_a_branch_holds_text_or_
 ) -> None:
     data = docx(_p("<w:r>" + _alternate(SHAPE, fallback) + "</w:r>"))
     if fallback == LINE:
-        # Anchored: set aside, as Word's text shows it.
-        assert DocxSource(data).certify(_value(""))["setAside"]["floatingObjects"] == 1
+        # Anchored: set aside, as Word's text shows it, and placed.
+        placed = {"text": "", "anchored": [{"kind": "shape", "offset": 0, "read": False}]}
+        assert DocxSource(data).certify(_value(placed))["setAside"]["floatingObjects"] == 1
         return
     with pytest.raises(CertificationError):
         DocxSource(data)
@@ -1394,6 +1444,7 @@ def test_a_floating_drawing_is_set_aside_and_counted_and_one_in_line_is_one_char
     anchored = inline.replace("wp:inline", "wp:anchor")
     vml = f'<w:pict><v:shape {_VML} style="{{}}width:9pt"><v:imagedata/></v:shape></w:pict>'
     shape = _alternate(SHAPE.replace("wp:anchor", "wp:inline"), LINE)
+    placed = [{"kind": "picture", "offset": 1, "read": False}]
     for drawing, standing in (
         (inline, [_standing("no-part", 1)]),
         (anchored, None),
@@ -1402,7 +1453,11 @@ def test_a_floating_drawing_is_set_aside_and_counted_and_one_in_line_is_one_char
         (shape, [_standing("shape", 1, "shape")]),
     ):
         source = DocxSource(docx(_p(f"<w:r><w:t>a</w:t>{drawing}<w:t>b</w:t></w:r>")))
-        right = {"text": "a￼b", "pictures": standing} if standing else {"text": "ab"}
+        right = (
+            {"text": "a￼b", "pictures": standing}
+            if standing
+            else {"text": "ab", "anchored": placed}
+        )
         wrong = {"text": "ab"} if standing else {"text": "a￼b", "pictures": [_standing("vml", 1)]}
         assert source.certify(_value(right))["setAside"]["floatingObjects"] == (not standing)
         with pytest.raises(CertificationError):
@@ -1415,6 +1470,117 @@ def test_a_floating_drawing_is_set_aside_and_counted_and_one_in_line_is_one_char
     ):
         with pytest.raises(CertificationError):
             DocxSource(docx(_p(f"<w:r>{drawing}</w:r>")))
+
+
+@pytest.mark.parametrize("name", FLOATING_TEXT)
+def test_a_floating_object_holding_text_is_set_aside_whole_and_placed(name: str) -> None:
+    drawing, kind = FLOATING_TEXT[name]
+    data = docx(_p(f"<w:r><w:t>a</w:t>{drawing}<w:t>b</w:t></w:r>"))
+    value = _docx_value(data)
+    certificate = DocxSource(data).certify(value)
+    # Its text is set aside in every branch, Word's choice and the VML fallback, and the run
+    # content that is not text with it (a picture in the box): the object stands for one.
+    boxed = drawing.count("in the box") * len("in the box")
+    inner = 1 if name == "text-box-picture" else 0
+    assert certificate["source"]["textCharacters"] == len("ab") + boxed
+    assert certificate["source"]["elements"] == 1 + inner
+    assert certificate["setAside"]["floatingObjects"] == 1
+    assert certificate["setAside"]["unreadObjects"] == 1
+    assert certificate["setAside"]["unreadObjectCharacters"] == boxed + inner
+    placed = {"kind": kind, "offset": 1, "read": False}
+    for wrong in (
+        [],  # dropped
+        [{**placed, "offset": 2}],  # moved
+        [{**placed, "read": True}],  # marked read
+        [{**placed, "kind": "picture"}],  # another kind
+        [placed, placed],  # added
+    ):
+        changed = copy.deepcopy(value)
+        changed["paragraphs"][0]["anchored"] = wrong
+        with pytest.raises(CertificationError, match="floating objects"):
+            DocxSource(data).certify(changed)
+    # Its text put in the paragraph, where it is anchored or anywhere else.
+    for text in ("ain the boxb", "abin the box", "in the box"):
+        changed = copy.deepcopy(value)
+        changed["paragraphs"][0]["text"] = text
+        with pytest.raises(CertificationError, match="text is not the document's"):
+            DocxSource(data).certify(changed)
+
+
+@pytest.mark.parametrize("inside", COUNTED_INSIDE)
+def test_an_object_holding_what_is_counted_elsewhere_is_never_set_aside(inside: str) -> None:
+    # Refused as the walk meets it, whatever result is claimed: never set aside.
+    for name in ("text-box", "group", "vml-text-box"):
+        drawing = FLOATING_TEXT[name][0].replace(IN_BOX, COUNTED_INSIDE[inside])
+        with pytest.raises(CertificationError):
+            DocxSource(docx(_p(f"<w:r>{drawing}</w:r>"), LIST_STYLE))
+
+
+def test_an_object_in_line_in_a_field_or_under_a_listing_style_is_never_set_aside() -> None:
+    drawing = FLOATING_TEXT["vml-text-box"][0]
+    claimed = _value({"text": "", "anchored": [{"kind": "text-box", "offset": 0, "read": False}]})
+    defaults = '<w:docDefaults><w:pPrDefault><w:pPr><w:numPr><w:ilvl w:val="0"/></w:numPr>'
+    defaults += "</w:pPr></w:pPrDefault></w:docDefaults>"
+    in_table = drawing.replace(
+        IN_BOX,
+        f'<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr><w:tr><w:tc>{IN_BOX}</w:tc></w:tr>'
+        "</w:tbl>",
+    )
+    table_style = LIST_STYLE.replace('"paragraph" w:styleId="L"', '"table" w:styleId="T"')
+    simple = '<w:fldSimple w:instr=" HYPERLINK x "><w:r>{}</w:r></w:fldSimple>'
+    for body, styles in (
+        (_p(f"<w:r>{drawing.replace('position:absolute', 'margin-left:1pt')}</w:r>"), None),
+        (_p(f"<w:r>{drawing}</w:r>"), defaults),
+        (_p(f"<w:r>{in_table}</w:r>"), table_style),
+        (_p(simple.format(drawing)), None),
+        (_p(f"<w:r>{FLOATING_TEXT['text-box'][0].replace('wp:anchor', 'wp:inline')}</w:r>"), None),
+    ):
+        with pytest.raises(CertificationError):
+            DocxSource(docx(body, styles))
+    # The same table with no list there: set aside.
+    DocxSource(docx(_p(f"<w:r>{in_table}</w:r>"))).certify(claimed)
+    # A revision inside (the check reads each view of a tracked document, which holds none).
+    revised = drawing.replace(IN_BOX, '<w:p><w:ins w:id="1"><w:r><w:t>x</w:t></w:r></w:ins></w:p>')
+    with pytest.raises(CertificationError):
+        DocxSource(docx(_p(f"<w:r>{revised}</w:r>")))
+
+
+def test_a_text_box_the_check_cannot_decide_or_listing_by_default_is_never_set_aside() -> None:
+    from numbering_cases import abstract, lvl, num
+
+    box = FLOATING_TEXT["vml-text-box"][0]
+    listed = '<w:pPr><w:numPr><w:numId w:val="1"/></w:numPr></w:pPr>'
+    lists = abstract(1, lvl(0)) + num(1, 1)
+    table = "<w:tbl><w:tr><w:tc>" + IN_BOX + "</w:tc></w:tr></w:tbl>"
+    obj = '<w:r><w:object><o:OLEObject xmlns:o="urn:schemas-microsoft-com:office:office"/>'
+    for inside, styles, numbering in (
+        # A style based on one of another kind: refused while deciding, so never set aside.
+        (
+            p(r("<w:t>x</w:t>"), '<w:pStyle w:val="B"/>'),
+            '<w:style w:type="table" w:styleId="T"/>'
+            '<w:style w:type="paragraph" w:styleId="B"><w:basedOn w:val="T"/></w:style>',
+            None,
+        ),
+        # A list by the default paragraph style, or the default table style.
+        (
+            IN_BOX,
+            f'<w:style w:type="paragraph" w:default="1" w:styleId="N">{listed}</w:style>',
+            lists,
+        ),
+        (table, f'<w:style w:type="table" w:default="1" w:styleId="TT">{listed}</w:style>', None),
+        # An embedded object in the box's text.
+        (p(obj + "</w:object></w:r>"), None, None),
+    ):
+        body = _p(f"<w:r>{box.replace(IN_BOX, inside)}</w:r>")
+        with pytest.raises(CertificationError, match="a paragraph inside a paragraph"):
+            DocxSource(docx(body, styles, numbering=numbering))
+
+
+@pytest.mark.parametrize("name", NOT_SET_ASIDE)
+def test_a_text_box_not_set_aside_is_never_certified(name: str) -> None:
+    # Refused as the walk meets it, whatever result is claimed.
+    with pytest.raises(CertificationError):
+        DocxSource(docx(NOT_SET_ASIDE[name]))
 
 
 def test_paragraphs_in_block_containers_are_read_and_one_in_a_paragraph_is_not() -> None:
@@ -2322,6 +2488,7 @@ def _note(text: str, note: int = 1, **paragraph: Any) -> dict[str, Any]:
         "pages": [],
         "notes": [],
         "pictures": [],
+        "anchored": [],
         "table": None,
     }
     return {"id": note, "mark": str(note), "paragraphs": [{**shape, **base, **paragraph}]}
@@ -3461,24 +3628,46 @@ def test_a_view_holds_every_empty_element_of_a_paragraph() -> None:
     _held(*_views_of(_p(bookmark + "<w:r><w:t>a</w:t></w:r>"), (bookmark, "")))
 
 
-def test_a_view_holds_a_text_box_and_the_changes_in_it() -> None:
+def test_a_view_holds_a_text_box_as_stored_and_a_change_in_it_is_never_certified() -> None:
+    from label_docx.certify import certify_tracked
     from test_tracked import WHO, ins, t
 
     box = (
-        f"<w:r><w:pict><v:shape {_VML}><v:textbox><w:txbxContent>"
-        f"{_p(ins(t('in'), 2))}</w:txbxContent></v:textbox></v:shape></w:pict></w:r>"
+        f"<w:r><w:pict><v:shape {_VML}><v:textbox><w:txbxContent>{{}}</w:txbxContent>"
+        "</v:textbox></v:shape></w:pict></w:r>"
     )
-    source, views = _views_of(_p(box), (">in<", ">on<"))
-    # The box's own insertion, accepted, stays as its text.
-    kept = [
-        _with_part(
-            source,
-            "word/document.xml",
-            _part(v).decode().replace(f'<w:ins w:id="2" {WHO}>', "").replace("</w:ins>", ""),
-        )
-        for v in views
-    ]
-    _held(source, kept)
+    _held(*_views_of(_p(box.format(_p(t("in")))), (">in<", ">on<")))
+    # The box's own insertion, accepted: in neither view's text, only listed.
+    source, views = _views_of(_p(box.format(_p(ins(t("in"), 2)))))
+    accepted = _part(views[0]).decode().replace(f'<w:ins w:id="2" {WHO}>', "")
+    with pytest.raises(CertificationError, match="a revision inside a drawing"):
+        certify_tracked(source, {"accepted": _with_part(source, "word/document.xml", accepted)})
+
+
+def test_a_change_inside_a_drawing_is_never_certified_but_in_the_glossary() -> None:
+    from label_docx.certify import certify_tracked
+    from test_tracked import WHO, ins, t
+
+    # A DrawingML text box, as the VML one above.
+    box = FLOATING_TEXT["text-box-drawing"][0]
+    source, views = _views_of(_p(f"<w:r>{box.replace(IN_BOX, _p(ins(t('in'), 2)))}</w:r>"))
+    accepted = _part(views[0]).decode().replace(f'<w:ins w:id="2" {WHO}>', "")
+    with pytest.raises(CertificationError, match="a revision inside a drawing"):
+        certify_tracked(source, {"accepted": _with_part(source, "word/document.xml", accepted)})
+    # In the glossary, which no view reads, it is held as any other change.
+    inserted = ins(t("in"), 5)
+    glossary = (
+        f'<w:glossaryDocument xmlns:w="{W}"><w:docParts><w:docPart><w:docPartBody>'
+        f"{_p(f'<w:r>{box.replace(IN_BOX, _p(inserted))}</w:r>')}"
+        "</w:docPartBody></w:docPart></w:docParts></w:glossaryDocument>"
+    )
+    name = "word/glossary/document.xml"
+    source = _package(docx(_p("<w:r><w:t>a</w:t></w:r>")), name, glossary)
+    kept = _with_part(source, name, glossary.replace(inserted, t("in")))
+    certify_tracked(source, {"accepted": kept})
+    lost = _with_part(source, name, glossary.replace(inserted, ""))
+    with pytest.raises(CertificationError):
+        certify_tracked(source, {"accepted": lost})
 
 
 def test_a_view_holds_text_elements_by_their_namespace() -> None:
@@ -4165,3 +4354,162 @@ def test_a_part_name_twice_in_any_case_or_a_part_named_twice_is_never_certified(
     with pytest.raises(CertificationError, match=r"^two styles parts$"):
         DocxSource(twice)
     DocxSource(styled).certify(_value("x"))
+
+
+# The check's own reason for each DOCVARIABLE the reader refuses (tests/test_reader.py). One
+# that stores no result shows nothing the check holds.
+_VARIABLE_REASONS = {
+    "no-variable": "a DOCVARIABLE without one variable of its name",
+    "another-value": "a DOCVARIABLE showing other than its value",
+    "another-case": "a DOCVARIABLE without one variable of its name",
+    "two-ignoring-case": "a DOCVARIABLE without one variable of its name",
+    "no-value": "a DOCVARIABLE without one variable of its name",
+    "empty-result": "a DOCVARIABLE showing other than its value",
+    "hidden-result": "a DOCVARIABLE showing other than its value",
+    "another-switch": "a DOCVARIABLE field with a switch the check does not read",
+    "another-format": "a DOCVARIABLE field with a switch the check does not read",
+    "quoted-name": "a DOCVARIABLE field the check does not read",
+    "no-name": "a DOCVARIABLE field the check does not read",
+    "bare-code": "a DOCVARIABLE field the check does not read",
+    "format-switch-without-its-format": "a DOCVARIABLE field with a switch the check does not read",
+    "field-in-its-code": "a DOCVARIABLE with a field in its code",
+    "tab": "a DOCVARIABLE's result holding other than text",
+    "symbol": "a DOCVARIABLE's result holding other than text",
+    "note-mark": "a DOCVARIABLE's result holding other than text",
+    "field-in-its-result": "a field in a DOCVARIABLE's result",
+    "simple-field-in-its-result": "a field in a DOCVARIABLE's result",
+    "field-character-in-a-simple-result": "a DOCVARIABLE's result holding other than text",
+}
+_HELD = [case for case in DOCVARIABLE_REFUSALS if case[0] in _VARIABLE_REASONS]
+
+
+@pytest.mark.parametrize(
+    ("field", "name", "value"),
+    [case[1:4] for case in DOCVARIABLE_READS],
+    ids=[case[0] for case in DOCVARIABLE_READS],
+)
+def test_a_docvariable_showing_its_variables_value_is_certified(
+    field: str, name: str, value: str
+) -> None:
+    data = anchored(field, read_settings(name, value))
+    DocxSource(data).certify(_docx_value(data))
+
+
+@pytest.mark.parametrize(
+    ("name", "field", "settings"), [case[:3] for case in _HELD], ids=[case[0] for case in _HELD]
+)
+def test_a_docvariable_word_may_show_otherwise_is_never_certified(
+    name: str, field: str, settings: str
+) -> None:
+    # The check reads the settings' variables and holds each result to its own.
+    reason = _VARIABLE_REASONS[name]
+    with pytest.raises(CertificationError, match=f"^{re.escape(reason)}$"):
+        DocxSource(anchored(field, settings))
+    assert len(_HELD) == len(DOCVARIABLE_REFUSALS) - 1  # all but the one with no result
+
+
+def test_a_docvariable_with_a_field_first_in_its_code_is_never_certified() -> None:
+    # Before any of its own code: the field is in the code all the same.
+    first = (
+        _BEGIN
+        + _NESTED
+        + '<w:r><w:instrText xml:space="preserve"> DOCVARIABLE x </w:instrText></w:r>'
+        + _SEPARATE
+        + '<w:r><w:t xml:space="preserve"> </w:t></w:r>'
+        + _END
+    )
+    reason = "a DOCVARIABLE with a field in its code"
+    with pytest.raises(CertificationError, match=f"^{reason}$"):
+        DocxSource(anchored(first, variables(("x", " "))))
+
+
+def test_a_docvariable_result_past_its_paragraph_is_never_certified() -> None:
+    body = _p(
+        _BEGIN
+        + '<w:r><w:instrText xml:space="preserve"> DOCVARIABLE v </w:instrText></w:r>'
+        + _SEPARATE
+        + '<w:r><w:t xml:space="preserve"> </w:t></w:r>'
+    ) + _p(_END)
+    reason = "a paragraph ends inside a DOCVARIABLE's result"
+    with pytest.raises(CertificationError, match=f"^{reason}$"):
+        DocxSource(with_settings(body, variables(("v", " "))))
+
+
+def test_an_underline_without_a_value_is_no_mark_by_the_checks_own_rules() -> None:
+    # Word 16.113.3 for Mac, asked 2026-10-05 (tests/test_reader.py): a bare w:u sets nothing,
+    # so a character style's double underline shows through it, and alone it draws none.
+    styles = (
+        '<w:style w:type="character" w:styleId="UC"><w:rPr><w:u w:val="double"/></w:rPr></w:style>'
+    )
+    body = _p('<w:r><w:rPr><w:rStyle w:val="UC"/><w:u/></w:rPr><w:t>a</w:t></w:r>') + _p(
+        '<w:r><w:rPr><w:u w:color="FF0000"/></w:rPr><w:t>b</w:t></w:r>'
+    )
+    data = docx(body, styles=styles)
+    value = _docx_value(data)
+    DocxSource(data).certify(value)
+    for index, marks in ((0, []), (1, [{"end": 1, "kind": "underline", "start": 0}])):
+        changed = copy.deepcopy(value)
+        changed["paragraphs"][index]["marks"] = marks
+        with pytest.raises(CertificationError):
+            DocxSource(data).certify(changed)
+
+
+_DOCUMENT = "word/document.xml"
+_BODY = document_xml(p(r("<w:t>caf&#233;</w:t>"))).encode()
+_RELS = "word/_rels/document.xml.rels"
+_NO_RELATIONSHIPS = (
+    b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>'
+)
+
+
+@pytest.mark.parametrize(
+    ("data", "reason"),
+    [
+        (_declaring("us-ascii", _ITEM, _SOURCES), None),
+        (_declaring("ASCII", _DOCUMENT, _BODY), None),
+        (_declaring("UTF-8", _ITEM, "<b:Sources xmlns:b='x'>\u00e9</b:Sources>".encode()), None),
+        # A part the check reads as XML that is neither: not held, as the reader does not.
+        (_declaring("windows-1252", "word/vmlDrawing1.vml", b"<x/>"), None),
+        # A part not read: Python's XML parser refuses it first.
+        (_declaring("us-ascii", _ITEM, _SOURCES + b"<!-- \xc3\xa9 -->"), f"{_ITEM} cannot be read"),
+        (
+            _declaring("us-ascii", _DOCUMENT, _BODY + b"<!-- \xc3\xa9 -->"),
+            f"{_DOCUMENT} declares ascii",
+        ),
+        (_declaring("windows-1252", _ITEM, _SOURCES), f"{_ITEM} declares cp1252"),
+        (
+            _declaring("windows-1252", _ITEM, _SOURCES, before=b"\xef\xbb\xbf"),
+            f"{_ITEM} declares cp1252",
+        ),
+        (_declaring("windows-1252", _RELS, _NO_RELATIONSHIPS), f"{_RELS} declares cp1252"),
+        (
+            _declaring("x-none", _DOCUMENT, _BODY),
+            f"{_DOCUMENT} declares an encoding the check does not know",
+        ),
+        (
+            _declaring("\u00e9", _DOCUMENT, _BODY),
+            f"{_DOCUMENT} declares an encoding the check does not know",
+        ),
+    ],
+    ids=[
+        "ascii-over-ascii",
+        "ascii-document",
+        "utf-8",
+        "not-an-xml-part",
+        "ascii-over-another-byte",
+        "ascii-document-over-another-byte",
+        "another-encoding",
+        "another-encoding-after-a-byte-order-mark",
+        "another-encoding-in-relationships",
+        "an-unknown-encoding",
+        "a-name-past-ascii",
+    ],
+)
+def test_a_part_is_certified_only_in_utf8_or_ascii_over_ascii_bytes(
+    data: bytes, reason: str | None
+) -> None:
+    if reason is None:
+        DocxSource(data)
+    else:
+        with pytest.raises(CertificationError, match=f"^{re.escape(reason)}$"):
+            DocxSource(data)

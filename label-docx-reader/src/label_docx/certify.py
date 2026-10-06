@@ -14,7 +14,7 @@ those of field instructions, ``E`` the elements that stand for one character: ta
 picture...; ``O`` the output characters)::
 
     |T| + |I| + |E| = |O| + field code + page numbers + hidden whitespace + page breaks
-                        + floating objects
+                        + floating objects + unread objects' text
 
 and, stronger than the count, the sequence: paragraph by paragraph, the output text equals the
 tokens not set aside, in order, each mapped by a fixed table (a ``w:t`` character to itself, or
@@ -32,8 +32,12 @@ whitespace is left out, counted as ``hiddenWhitespace``; hidden text with charac
 never certified). The set-aside reasons are fixed too: a field's instruction (code, not shown),
 a page number (set by the layout; its place must be in ``pages``), a page or column break
 (layout), a picture or shape anchored to its paragraph (it floats apart from the text, and
-Word's text shows none; one in line is U+FFFC). The walk reads a closed list of elements and
-refuses any other, so no text is passed over unseen.
+Word's text shows none; one in line is U+FFFC), and a floating object holding text whose text
+nothing elsewhere counts or refers to (``_unread_kind``): set aside whole, its text in every
+branch of alternate content counted (``unreadObjects``, ``unreadObjectCharacters``). Each
+floating object must be placed where the check finds its anchor, of the kind it finds
+(``anchored``, never read). The walk reads a closed list of elements and refuses any other, so
+no text is passed over unseen.
 
 Its scope, and what it lists as not read, is stated in ``docs/conservation.md`` ("Scope").
 
@@ -79,6 +83,7 @@ leaves unchecked.
 
 from __future__ import annotations
 
+import codecs
 import hashlib
 import io
 import json
@@ -96,7 +101,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT, WINGDINGS_BULLETS
 
-CHECKER_VERSION = "conservation-check/1.16.0"
+CHECKER_VERSION = "conservation-check/1.18.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -109,6 +114,7 @@ _STANDS = {
 }
 _LAYOUT_CODES = {"PAGEREF", "PAGE", "NUMPAGES", "SECTIONPAGES"}
 _PAGE_FORMATS = {"MERGEFORMAT", "CHARFORMAT", "ARABIC"}
+_VARIABLE_FORMATS = {"MERGEFORMAT", "CHARFORMAT"}
 _NOTE_LAYOUT = {"separator", "continuationSeparator", "continuationNotice"}
 # Run children that hold no text and stand for none.
 _RUN_SILENT = {"rPr", "lastRenderedPageBreak"}
@@ -206,13 +212,17 @@ class _Ledger:
     hidden: int = 0
     page_breaks: int = 0
     floating: int = 0
+    # Floating objects holding text, set aside whole (``_unread_kind``), and the characters of
+    # their text elements and run elements, in every branch.
+    objects: int = 0
+    unread: int = 0
     symbol: int = 0
     output: int = 0
 
     def balanced(self) -> bool:
         source = self.text + self.instruction + self.elements
         kept = self.output + self.field_code + self.page_numbers + self.hidden + self.page_breaks
-        return source == kept + self.floating
+        return source == kept + self.floating + self.unread
 
 
 # --- .docx: the source's tokens -----------------------------------------------------------
@@ -457,7 +467,9 @@ class _Fonts:
 
         Toggles (bold, italic, capitals, small capitals, strike, double strike) by ``shown``.
         Superscript, subscript and underline: the nearest level that sets a value, the run
-        first. Each rule is Word's answer to a case in ``corpus/numbering-cases``.
+        first. Each rule is Word's answer to a case in ``corpus/numbering-cases``; that a ``w:u``
+        without a value sets none (no underline, the next level's shown through) is Word
+        16.113.3's for Mac, asked 2026-10-05.
         """
         chains = self.chains(own, paragraph_style, table_style, in_table, conditional)
         kinds = {kind for name, kind in _CHECKED_TOGGLES.items() if self.shown(own, chains, name)}
@@ -614,6 +626,108 @@ def _in_line(drawing: ET.Element) -> bool:
     return False
 
 
+_VML = "urn:schemas-microsoft-com:vml"
+_PICTURE = "http://schemas.openxmlformats.org/drawingml/2006/picture"
+_SHAPE = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+# A floating object holding text, by the graphic its anchor draws: a text box, or shapes.
+_HOLDING = {
+    _SHAPE: "text-box",
+    "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup": "shapes",
+    "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas": "shapes",
+}
+# What in such an object Word refers to or counts elsewhere (and any revision, ``_REVISIONS``).
+_REFERRED = frozenset(
+    {
+        *("fldChar", "instrText", "fldSimple", "bookmarkStart", "bookmarkEnd", "numPr", "sectPr"),
+        *("commentRangeStart", "commentRangeEnd", "commentReference", "annotationRef"),
+        *_NOTE_MARKS,
+    }
+)
+
+
+def _unread_kind(drawing: ET.Element, fonts: _Fonts) -> str | None:
+    """The kind of a floating object whose text the walk sets aside unread, else None.
+
+    One that holds a text box (``w:txbxContent``) and floats: a DrawingML drawing whose one frame
+    is ``wp:anchor``, alone or the one ``wps``, ``wpg`` or ``wpc`` choice of alternate content
+    (Word draws the choice), of a shape (``text-box``), a group or a canvas (``shapes``); or VML
+    whose one shape or group (a ``shapetype`` aside) is positioned absolutely. And holding nothing
+    Word refers to or counts elsewhere: no field, note mark, bookmark, comment, section or
+    revision, no list item (``numPr``, or a style, a table style or the defaults that set one),
+    no content control Word shows from elsewhere, no WordArt or embedded object, no graphic but a
+    picture, a shape, a group or a canvas, and none of Word's own elements outside the text boxes
+    but the drawing and its fallback. Anything else is a token as before (``token``).
+    """
+    texts = [n for n in drawing.iter() if n.tag == _w("txbxContent")]
+    if not texts:
+        return None
+    shown = drawing
+    if _local(drawing.tag) == "AlternateContent":
+        choices = [c for c in drawing if _local(c.tag) == "Choice"]
+        if len(choices) != 1 or choices[0].get("Requires") not in ("wps", "wpg", "wpc"):
+            return None
+        if [c.tag for c in choices[0]] != [_w("drawing")]:
+            return None
+        shown = choices[0][0]
+    kind: str | None = None
+    if shown.tag == _w("drawing"):
+        if [c.tag for c in shown] != [f"{{{_WP}}}anchor"]:
+            return None
+        top = next((g for g in shown[0].iter() if _local(g.tag) == "graphicData"), None)
+        kind = None if top is None else _HOLDING.get(top.get("uri", ""))
+    elif shown.tag == _w("pict"):
+        drawn = [c for c in shown if c.tag != f"{{{_VML}}}shapetype"]
+        if len(drawn) == 1 and drawn[0].tag.startswith(f"{{{_VML}}}"):
+            position = _POSITION.search(drawn[0].get("style", ""))
+            if position is not None and position.group(1).strip().lower() == "absolute":
+                kind = "shapes" if _local(drawn[0].tag) == "group" else "text-box"
+    if kind is None:
+        return None
+    within = {id(n) for text in texts for n in text.iter()}
+    try:
+        for node in drawing.iter():
+            name = _local(node.tag)
+            ours = node.tag.startswith(f"{{{W}}}")
+            if node is drawing:
+                continue
+            if (
+                (ours and id(node) not in within and node.tag not in (_w("drawing"), _w("pict")))
+                or (ours and name in _REFERRED)
+                or node.tag in _REVISIONS
+                or name in ("textpath", "OLEObject")
+                or (name == "graphicData" and node.get("uri") not in (_PICTURE, *_HOLDING))
+            ):
+                return None
+            if node.tag == _w("sdt"):
+                _control(node)
+        styled = [t.find(f"{_w('tblPr')}/{_w('tblStyle')}") for t in drawing.iter(_w("tbl"))]
+        tables = [
+            i
+            for s in styled
+            for i in fonts.style_ids(None if s is None else s.get(_w("val")), "table")
+        ]
+        for paragraph in drawing.iter(_w("p")):
+            named = paragraph.find(f"{_w('pPr')}/{_w('pStyle')}")
+            ids = fonts.style_ids(None if named is None else named.get(_w("val")), "paragraph")
+            sources = [*(fonts.ppr.get(i) for i in [*ids, *tables]), fonts.doc_ppr]
+            if any(
+                n.find(_w("numId")) is not None or n.find(_w("ilvl")) is not None
+                for source in sources
+                if source is not None
+                for n in source.findall(_w("numPr"))
+            ):
+                return None
+    except CertificationError:
+        return None
+    return kind
+
+
+def _floating_kind(drawing: ET.Element) -> str:
+    """What a floating object without text is: ``shape`` (a ``wps`` graphic) or ``picture``."""
+    uris = {n.get("uri") for n in drawing.iter() if _local(n.tag) == "graphicData"}
+    return "shape" if _SHAPE in uris else "picture"
+
+
 def _bullet_reading(code: int) -> str:
     for low, reading in WINGDINGS_BULLETS.items():
         if code in (low, 0xF000 + low):
@@ -625,14 +739,24 @@ class _Story:
     """The tokens of one story (the body, a note, a header, a footer or a comment), by paragraph."""
 
     def __init__(
-        self, fonts: _Fonts, ledger: _Ledger, story: tuple[str, int] | None = None
+        self,
+        fonts: _Fonts,
+        ledger: _Ledger,
+        story: tuple[str, int] | None = None,
+        variables: list[tuple[str | None, str | None]] | None = None,
     ) -> None:
         self.fonts = fonts
         self.ledger = ledger
         self.story = story
         self.paragraphs: list[_Paragraph] = []
-        # Open complex fields: [in its instruction, its instruction so far, a page number].
+        # Open complex fields: [in its instruction, its instruction so far, a page number, a
+        # field in its instruction].
         self.fields: list[list[Any]] = []
+        # The settings' document variables (name, value), and the DOCVARIABLE result being read:
+        # the value it must show, the text it shows so far, and whether a complex field's end
+        # closes it (a simple field's result holds no field character).
+        self.variables = variables or []
+        self.variable: tuple[str, list[str], bool] | None = None
         self.layout = 0
         self.tables = 0
         # Every table met, in document order: its element, the cell it stands in, its rows and
@@ -714,7 +838,18 @@ class _Story:
     def paragraph(
         self, element: ET.Element, table: tuple[int, int, int] | None, table_style: str | None
     ) -> None:
-        if any(node.tag == _w("p") for node in element.iter() if node is not element):
+        # A floating object's text is set aside whole (``_unread_kind``), its paragraphs too.
+        unread = {
+            id(node)
+            for run in element.iter(_w("r"))
+            for drawing in run
+            if _local(drawing.tag) in ("drawing", "pict", "AlternateContent")
+            and _unread_kind(drawing, self.fonts) is not None
+            for node in drawing.iter()
+        }
+        if any(
+            n.tag == _w("p") and id(n) not in unread for n in element.iter() if n is not element
+        ):
             raise CertificationError("a paragraph inside a paragraph")
         properties = element.find(_w("pPr"))
         style = None if properties is None else properties.find(_w("pStyle"))
@@ -745,6 +880,8 @@ class _Story:
             # What follows would be code, or a page number, as the walk reads it: Word's reading
             # of a field's code or page number across a paragraph mark is not on record.
             raise CertificationError("a paragraph ends inside a field's code or page number")
+        if self.variable is not None:
+            raise CertificationError("a paragraph ends inside a DOCVARIABLE's result")
         self.paragraphs.append(here)
 
     def inline(self, element: ET.Element) -> None:
@@ -753,16 +890,20 @@ class _Story:
             if child.tag == _w("r"):
                 self.run(child)
             elif child.tag == _w("fldSimple"):
+                if self.variable is not None:
+                    raise CertificationError("a field in a DOCVARIABLE's result")
                 self.simple += 1
-                if (
-                    not self.in_instruction()
-                    and _page_field(child.get(_w("instr"), ""))
-                    and not self.layout
-                ):
+                instruction = child.get(_w("instr"), "")
+                value = None if self.in_instruction() else _docvariable(instruction, self.variables)
+                if not self.in_instruction() and _page_field(instruction) and not self.layout:
                     self.mark("page", None)
                     self.layout += 1
                     self.inline(child)
                     self.layout -= 1
+                elif value is not None:
+                    self.variable = (value, [], False)
+                    self.inline(child)
+                    self.close_variable()
                 else:
                     self.inline(child)
                 self.simple -= 1
@@ -818,6 +959,11 @@ class _Story:
             local = _local(child.tag)
             if local in _RUN_SILENT:
                 continue
+            if self.variable is not None and not (
+                (local == "t" and not symbol) or (local == "fldChar" and self.variable[2])
+            ):
+                # Updated, Word shows the variable's value in place of the whole result.
+                raise CertificationError("a DOCVARIABLE's result holding other than text")
             if local == "annotationRef":
                 # A comment's echo of its own mark, at the start of its text: no character.
                 if self.story is None or self.story[0] != "comment":
@@ -861,6 +1007,25 @@ class _Story:
                 if self.fields[-1][0]:
                     self.fields[-1][1].append(text)
                 continue
+            if (
+                local in ("drawing", "pict", "AlternateContent")
+                and not (self.fields or self.simple or self.layout)
+                and (boxed := _unread_kind(child, self.fonts)) is not None
+            ):
+                # Set aside whole: one token, and its text, every branch's, in the source.
+                characters = sum(len(n.text or "") for n in child.iter(_w("t")))
+                elements = sum(
+                    1 for r in child.iter(_w("r")) for c in r if _local(c.tag) in _STANDS
+                )
+                self.ledger.text += characters
+                self.ledger.elements += 1 + elements
+                self.ledger.floating += 1
+                self.ledger.objects += 1
+                self.ledger.unread += characters + elements
+                self.flush_run(shown, hidden, kinds)
+                shown = []
+                self.mark("anchored", boxed)
+                continue
             token = self.token(child, local, symbol)
             # One token for each character of a text element, one for any other element.
             length = len(child.text or "") if local == "t" else 1
@@ -877,6 +1042,9 @@ class _Story:
                 self.ledger.page_breaks += 1
             elif not token and local in ("drawing", "pict", "AlternateContent"):
                 self.ledger.floating += 1
+                self.flush_run(shown, hidden, kinds)
+                shown = []
+                self.mark("anchored", _floating_kind(child))
             else:
                 shown.append(token)
                 if local in ("drawing", "pict", "AlternateContent"):
@@ -961,21 +1129,40 @@ class _Story:
     def field(self, child: ET.Element) -> None:
         kind = child.get(_w("fldCharType"))
         if kind == "begin":
-            self.fields.append([True, [], False])
+            if self.variable is not None:
+                raise CertificationError("a field in a DOCVARIABLE's result")
+            if self.fields and self.fields[-1][0]:
+                self.fields[-1][3] = True
+            self.fields.append([True, [], False, False])
         elif kind == "separate" and self.fields and self.fields[-1][0]:
             entry = self.fields[-1]
             nested = any(e[0] for e in self.fields[:-1])
             entry[0] = False
-            if not nested and _page_field("".join(entry[1])) and not self.layout:
+            instruction = "".join(entry[1])
+            if not nested and _page_field(instruction) and not self.layout:
                 self.mark("page", None)
                 self.layout += 1
                 entry[2] = True
+            elif not nested and (value := _docvariable(instruction, self.variables)) is not None:
+                if entry[3]:
+                    raise CertificationError("a DOCVARIABLE with a field in its code")
+                self.variable = (value, [], True)
         elif kind == "end" and self.fields:
             entry = self.fields.pop()
             if entry[2]:
                 self.layout -= 1
+            self.close_variable()
         else:
             raise CertificationError(f"a field character {kind!r} out of place")
+
+    def close_variable(self) -> None:
+        """End the DOCVARIABLE result being read, if one is: it must show its variable's value."""
+        if self.variable is None:
+            return
+        value, shown, _ = self.variable
+        self.variable = None
+        if "".join(shown) != value:
+            raise CertificationError("a DOCVARIABLE showing other than its value")
 
     def flush_run(self, shown: list[str], hidden: bool | None, kinds: frozenset[str]) -> None:
         text = "".join(shown)
@@ -992,6 +1179,8 @@ class _Story:
                 raise CertificationError("hidden text with characters to show")
             self.ledger.hidden += len(text)
             return
+        if self.variable is not None:
+            self.variable[1].append(text)
         self.current.segments.append(_Segment(text=text, kinds=kinds))
 
 
@@ -1738,6 +1927,30 @@ def _control(sdt: ET.Element) -> None:
         raise CertificationError("an empty content control showing a placeholder")
 
 
+def _docvariable(instruction: str, variables: list[tuple[str | None, str | None]]) -> str | None:
+    r"""The value a DOCVARIABLE field must show, or None for another field.
+
+    Word shows its stored result, and once fields are updated its document variable's value, so
+    the two must agree: the name unquoted after the code, no switch but ``\*`` MERGEFORMAT or
+    CHARFORMAT, and one variable of that name in the settings, ignoring case, in the field's
+    case, with a value. Anything else is never certified.
+    """
+    words = instruction.split()
+    if not words or words[0].upper() != "DOCVARIABLE":
+        return None
+    if '"' in instruction or len(words) < 2 or words[1].startswith("\\"):
+        raise CertificationError("a DOCVARIABLE field the check does not read")
+    name, rest = words[1], words[2:]
+    while rest:
+        if rest[:1] != ["\\*"] or len(rest) < 2 or rest[1].upper() not in _VARIABLE_FORMATS:
+            raise CertificationError("a DOCVARIABLE field with a switch the check does not read")
+        rest = rest[2:]
+    same = [(n, v) for n, v in variables if n is not None and n.casefold() == name.casefold()]
+    if len(same) != 1 or same[0][0] != name or same[0][1] is None:
+        raise CertificationError("a DOCVARIABLE without one variable of its name")
+    return same[0][1]
+
+
 def _page_field(instruction: str) -> bool:
     r"""Whether a field is a page number; one with a switch Word has not answered is refused.
 
@@ -1770,6 +1983,7 @@ def _match(paragraph: _Paragraph, value: dict[str, Json], where: str) -> None:
     pages: list[int] = []
     notes: list[tuple[int, tuple[str, int]]] = []
     comments: list[tuple[int, int]] = []
+    anchored: list[dict[str, Json]] = []
     position = 0
     for segment in paragraph.segments:
         if segment.marker is None:
@@ -1779,10 +1993,14 @@ def _match(paragraph: _Paragraph, value: dict[str, Json], where: str) -> None:
             pages.append(position)
         elif segment.marker[0] == "comment":
             comments.append((position, segment.marker[1]))
+        elif segment.marker[0] == "anchored":
+            anchored.append({"kind": segment.marker[1], "offset": position, "read": False})
         else:
             notes.append((position, segment.marker[1]))
     if text != "".join(expected):
         raise CertificationError(f"{where}: the text is not the document's")
+    if value["anchored"] != anchored:
+        raise CertificationError(f"{where}: not the floating objects the document anchors there")
     # What each U+FFFC stands for, where it stands.
     places = [at for at, character in enumerate(text) if character == _OBJECT]
     if len(places) != len(paragraph.pictures) or value["pictures"] != [
@@ -2406,9 +2624,31 @@ def _raw_texts(data: bytes) -> list[tuple[str, str]]:
     return out
 
 
+# An XML declaration's encoding, read from the part's bytes.
+_ENCODING = re.compile(rb"""(?:\xef\xbb\xbf)?\s*<\?xml\s[^>]*?encoding\s*=\s*(["'])(.*?)\1""")
+
+
+def _utf8(name: str, data: bytes) -> None:
+    """Refuse a part whose declared encoding would read its bytes otherwise than UTF-8 does.
+
+    UTF-8 by any name Python gives it, or ASCII (UTF-8's first 128 characters) over bytes all
+    below 0x80; any other declaration, or one Python does not know, is never certified.
+    """
+    found = _ENCODING.match(data)
+    if found is None:
+        return
+    try:
+        codec = codecs.lookup(found.group(2).decode("ascii")).name
+    except (LookupError, UnicodeDecodeError) as error:
+        raise CertificationError(f"{name} declares an encoding the check does not know") from error
+    if not (codec == "utf-8" or (codec == "ascii" and data.isascii())):
+        raise CertificationError(f"{name} declares {codec}")
+
+
 def _parse(archive: zipfile.ZipFile, name: str) -> ET.Element:
     """A part parsed, its text read twice, by Python's XML parser and by ``_raw_texts``."""
     data = archive.read(name)
+    _utf8(name, data)
     root = ET.fromstring(data)
     for node in root.iter():
         if any(_local(key) in ("ProcessContent", "MustUnderstand") for key in node.attrib):
@@ -2453,6 +2693,11 @@ class DocxSource:
                 parse.get(related.get("theme", "")),
                 parse.get(related.get("fontTable", "")),
             )
+            settings_root = parse.get(related.get("settings", ""))
+            self.variables = [
+                (v.get(_w("name")), v.get(_w("val")))
+                for v in ([] if settings_root is None else settings_root.iter(_w("docVar")))
+            ]
             body = parse[main].find(_w("body"))
             if body is None:
                 raise CertificationError("no body")
@@ -2570,12 +2815,15 @@ class DocxSource:
                 if name in self.parts:
                     continue
                 try:
-                    root = ET.fromstring(archive.read(name))
+                    data = archive.read(name)
+                    root = ET.fromstring(data)
                 except (ET.ParseError, LookupError, ValueError) as error:
                     if not name.endswith(".xml"):
                         continue  # not XML: a picture, a font, an embedded object
                     # A part this check cannot read is text it cannot say is not there.
                     raise CertificationError(f"{name} cannot be read") from error
+                if name.endswith((".xml", ".rels")):
+                    _utf8(name, data)
                 if any(
                     rel.get("Type", "").endswith("/aFChunk")
                     for rel in root.iter(f"{{{_RELS}}}Relationship")
@@ -2609,7 +2857,7 @@ class DocxSource:
         ledger = _Ledger()
         for control in element.iter(_w("sdt")):
             _control(control)
-        walk = _Story(self.fonts, ledger, story)
+        walk = _Story(self.fonts, ledger, story, self.variables)
         walk.blocks(element, None, None)
         if walk.fields:
             raise CertificationError("a field still open where its story ends")
@@ -2818,6 +3066,8 @@ class DocxSource:
                 "floatingObjects": ledger.floating,
                 "pageBreaks": ledger.page_breaks,
                 "pageNumbers": ledger.page_numbers,
+                "unreadObjects": ledger.objects,
+                "unreadObjectCharacters": ledger.unread,
             },
             "symbolMapped": ledger.symbol,
             "marksChecked": sorted(CHECKED_MARKS),
@@ -3164,6 +3414,15 @@ def certify_tracked(source: bytes, views: dict[str, bytes]) -> dict[str, Json]:
                     if not dropped and not any(e.tag in _REVISIONS for e in source_root.iter()):
                         # Not the source's bytes (those are passed over above), yet nothing to undo.
                         raise CertificationError(f"{view} view: {name} is changed")
+                    if source_root.tag != _w("glossaryDocument") and any(
+                        e.tag in _REVISIONS
+                        for run in source_root.iter(_w("r"))
+                        for drawing in run
+                        if _local(drawing.tag) in ("drawing", "pict", "AlternateContent")
+                        for e in drawing.iter()
+                    ):
+                        # A floating object's text is in neither view, its change only listed.
+                        raise CertificationError(f"{view} view: a revision inside a drawing")
                     drops = _VIEW_DROPS[view]
                     expected, joins = _run_tokens(source_root, drops)
                     # Every paragraph's content and make, and everything outside paragraphs.

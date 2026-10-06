@@ -82,13 +82,37 @@ def _page_numbers(xml: str) -> list[tuple[int, int]]:
     return spans
 
 
-def _outside(spans: list[tuple[int, int]], position: int) -> bool:
-    return not any(a <= position < b for a, b in spans)
+# Drawings, shapes and their fallbacks: a floating object's text is set aside unread ("Anchored"
+# in the reader's docstring), and its run's formatting is not drawn on it.
+_OBJECT = re.compile(r"<(/?)(?:w:drawing|w:pict|w:object|mc:AlternateContent)\b[^>]*?(/?)>")
+
+
+def _aside(xml: str) -> list[tuple[int, int]]:
+    """Page numbers and objects (one still open at the end runs to it)."""
+    spans = _page_numbers(xml)
+    depth = start = 0
+    for tag in _OBJECT.finditer(xml):
+        if tag.group(2):
+            continue
+        if not tag.group(1):
+            start = tag.start() if depth == 0 else start
+            depth += 1
+        elif depth:
+            depth -= 1
+            if depth == 0:
+                spans.append((start, tag.end()))
+    return spans + ([(start, len(xml))] if depth else [])
+
+
+def _outside(spans: list[tuple[int, int]], start: int, end: int | None = None) -> bool:
+    """Whether ``xml[start:end]`` (or the position ``start``) meets none of ``spans``."""
+    stop = start + 1 if end is None else end
+    return not any(a < stop and start < b for a, b in spans)
 
 
 def _visible_texts(xml: str) -> list[re.Match[str]]:
-    """Text runs a reader of the page sees, page numbers aside."""
-    aside = _page_numbers(xml)
+    """Text runs a reader of the page sees, page numbers and objects aside."""
+    aside = _aside(xml)
     return [
         m
         for m in _TEXT.finditer(xml)
@@ -153,11 +177,13 @@ def delete_paragraph(xml: str, rng: random.Random) -> str | None:
 
 def _with_property(xml: str, rng: random.Random, prop: str, absent: str) -> str | None:
     """A run with text gains ``prop`` in its run properties, where ``absent`` is not there."""
-    aside = _page_numbers(xml)
+    aside = _aside(xml)
     runs = [
         m
         for m in _RUN.finditer(xml)
-        if _visible_texts(m.group(0)) and absent not in m.group(0) and _outside(aside, m.start())
+        if _visible_texts(m.group(0))
+        and absent not in m.group(0)
+        and _outside(aside, m.start(), m.end())
     ]
     match = _pick(runs, rng)
     if match is None:
@@ -179,12 +205,16 @@ def _flip(xml: str, rng: random.Random, tag: str) -> str | None:
     # Word writes both <w:b/> and <w:b /> (and never matches <w:bCs/> here).
     setting = re.compile(rf'<w:{tag}(?:\s+w:val="(\w+)")?\s*/>')
     styled = bool(setting.search(_STYLES["xml"]))
-    aside = _page_numbers(xml)
+    aside = _aside(xml)
     runs = []
     for m in _RUN.finditer(xml):
         properties = re.search(r"<w:rPr>.*?</w:rPr>", m.group(0), re.S)
         direct = setting.search(properties.group(0)) if properties else None
-        if _visible_texts(m.group(0)) and _outside(aside, m.start()) and (direct or not styled):
+        if (
+            _visible_texts(m.group(0))
+            and _outside(aside, m.start(), m.end())
+            and (direct or not styled)
+        ):
             runs.append(m)
     match = _pick(runs, rng)
     if match is None:

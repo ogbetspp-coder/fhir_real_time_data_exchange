@@ -22,8 +22,8 @@ What a paragraph carries:
   hold it), or alternate content whose choice is a DrawingML picture or shape (``wps``: a line,
   a box) and which holds no text. A DrawingML shape outside alternate content, and a VML shape,
   are refused. One anchored to the paragraph (floating) is not in the text: Word's text shows
-  none, and the check counts it (``floatingObjects``). What each U+FFFC stands for is in
-  ``pictures``; see "Pictures" below.
+  none; it is placed in ``anchored``, and the check counts it (``floatingObjects``). What each
+  U+FFFC stands for is in ``pictures``; see "Pictures" below.
 - ``marks``: ranges of ``text`` whose appearance changes what a reader sees or means, set on the
   run, its styles or the document defaults (``Mark`` lists the kinds): bold, italic, superscript,
   subscript, raised or lowered text, capitals and small capitals, single and double strike-through,
@@ -53,6 +53,9 @@ What a paragraph carries:
 - ``notes``: the footnote and endnote marks in the paragraph (``NoteReference``): where each
   stands in ``text``, which note it refers to, and the mark Word draws there. Like a list label,
   the mark is computed and never put into ``text``; see "Notes" below.
+- ``anchored``: each object anchored to the paragraph, which Word draws apart from its text
+  (``Anchored``), in order: where its anchor stands in ``text``, its kind, and whether its own
+  text is read (never, yet); see "Anchored" below.
 
 Styles. Run properties are looked up on the run, then its character style, its paragraph
 style, its table style (inside a table only) and the document defaults, each style with its
@@ -152,6 +155,29 @@ it larger than its pixels is for the caller: ``extent`` and ``pixels`` are both 
 are a pixel at 96 dpi). Only the image's headers are read, chunk by chunk with none kept, never
 its pixels; and the reader never refuses for a picture.
 
+Anchored. Word draws an object anchored to a paragraph apart from the text, and its text shows
+none of it [drawing-anchored-picture, drawing-anchored-shape, drawing-vml-floating-picture]. Each
+is placed in its paragraph's ``anchored`` at the offset in ``text`` where its run stands (one in
+a field's code or a page number is the code's or the number's, and is not placed), in the body,
+notes, headers, footers and comments: a picture (``picture``) or a shape (``shape``, a ``wps``
+choice) that holds no text, read as before; or one that holds text boxes, set aside unread: one
+shape (``text-box``) or a group or canvas of shapes, text boxes and pictures (``shapes``), in
+DrawingML (one ``wp:anchor``, alone or as alternate content's one ``wps``, ``wpg`` or ``wpc``
+choice, with its VML fallback) or in VML (one shape or group, a ``shapetype`` aside, positioned
+absolutely). Its text, in every branch, is in no paragraph, and the certificate counts it
+(``unreadObjects``, ``unreadObjectCharacters``). It is set aside only outside every field and
+where nothing in it is referred to or counted elsewhere: no field (SEQ among them, complex or
+simple), footnote or endnote mark, list item (``numPr``, or a paragraph style, a table style or
+the defaults that set one), bookmark, comment range or mark, section or tracked change (a document
+with a change inside a drawing is refused once its views are read, ``changed_drawing``), and no
+content control Word shows from
+elsewhere; of Word's own elements it holds the drawing, its fallback and text boxes' content
+alone; every graphic in it is a picture, a shape, a group or a canvas; and it holds no WordArt
+(``textpath``) or embedded object. Anything else holding text is refused as before. A STYLEREF,
+or a SEQ restarting at headings (``\s``), in a body that sets text aside is refused: whether Word
+finds a paragraph there is not on record. That Word's text shows nothing for a text box is held
+to its answer for a shape anchored there; Word has not been asked about a text box itself.
+
 Symbol fonts. A run whose effective ``ascii`` and ``hAnsi`` fonts (set directly, by a style, by the
 document defaults or through the theme) are both Symbol, by that exact name, with no complex-script
 or right-to-left property and no font hint other than ``default`` (which sends ambiguous characters
@@ -197,10 +223,18 @@ note, any of the four with a field in its own code or nested in another field's 
 that runs past its paragraph are refused. Any other field whose result would be shown (DATE, IF, a
 formula...) is refused, because Word recomputes it on display or print. The code is the first word
 of the instruction; a field nested in the instruction ahead of or inside that word makes the code
-unknown, and the field is refused. So are a field with no stored result (no ``separate``, as a form
-checkbox or a SYMBOL field, but a hidden SEQ; or an empty ``fldSimple``), a form field, a field
-marked for update, any field in a document whose settings ask Word to update fields on open, and
-field code outside an instruction.
+unknown, and the field is refused. So are a field with no stored result (no ``separate``, as a
+form checkbox or a SYMBOL field, but a hidden SEQ; or an empty ``fldSimple``), a form field, a
+field marked for update, any field in a document whose settings ask Word to update fields on open,
+and field code outside an instruction.
+
+DOCVARIABLE (Veeva Vault puts one at each heading) Word shows as stored until fields are updated,
+then as the settings' document variable (``w:docVar``) of its name. It is read where the two agree:
+its code is ``DOCVARIABLE`` and the name, unquoted, with no switch but ``\*`` MERGEFORMAT or
+CHARFORMAT and no field in it; the settings hold one variable of that name ignoring case, written
+in the field's case, with a value; and the stored result, as read, is that value (``w:val`` as XML
+reads it). Its result may hold only text read as stored: a tab, a break, a picture, a note or
+comment mark, a field or text in Symbol there is refused.
 
 List labels. Word draws "4.8", "b)" or a bullet before a numbered paragraph from the numbering part;
 the reader computes that label by Word's rules, each of which is Word's own answer to a case in
@@ -243,11 +277,11 @@ What it refuses (``DocxRefusedError.code``):
   or a list. Such a document has more than one text: ``tracked`` makes its two views, each read
   by these rules, and refuses what it cannot undo (see ``tracked``).
 - ``hidden-text``: hidden text other than whitespace (hidden whitespace is left out), or a hidden
-  note mark, comment mark or page number, hidden directly or at any level of the style hierarchy
-  (hiding is treated as a fact as soon as any level asserts it, unless the run itself says it is
-  visible); and a run with text or a paragraph mark hidden by some level where Word's toggle rule
-  (``_Properties.shown``: a nearer style turns it off, or two kinds of style cancel) shows it,
-  since what Word then shows is not on record.
+  note mark, comment mark, page number or anchored object, hidden directly or at any level of the
+  style hierarchy (hiding is treated as a fact as soon as any level asserts it, unless the run
+  itself says it is visible); and a run with text or a paragraph mark hidden by some level where
+  Word's toggle rule (``_Properties.shown``: a nearer style turns it off, or two kinds of style
+  cancel) shows it, since what Word then shows is not on record.
 - ``unmapped-symbol``: a Symbol-font code the table does not hold (or, in a Symbol run, a
   character above U+00FF outside U+F000 to U+F0FF), a ``w:sym`` without a hex code or in a font
   other than Symbol, or a Wingdings list bullet the table does not hold.
@@ -277,13 +311,15 @@ What it refuses (``DocxRefusedError.code``):
   in a note, header, footer or comment, or any field in a document set to update fields on open;
   a REF or STYLEREF with a ``\*`` format or over a page number, a bookmark REF, NOTEREF or PAGEREF
   may find otherwise (an id started or ended twice, an end before its start, a name shared
-  ignoring case), SEQ identifiers that differ only in case, and a field code with whitespace
+  ignoring case), SEQ identifiers that differ only in case, a field code with whitespace
   other than spaces and tabs (Word's word separators are not on record) or an invisible format
-  character (category Cf) outside quotes.
+  character (category Cf) outside quotes, a DOCVARIABLE not read as above, and a STYLEREF or a
+  SEQ restarting at headings in a body that sets a text box aside unread (see "Anchored").
 - ``stale-field``: a field marked for update, or a computed field (SEQ, STYLEREF, REF or
   NOTEREF) whose stored result is not what Word prints.
 - ``unsupported-element``: anything that can carry text and is not read above, and any element
-  the reader does not know: text boxes, a drawing that is not a picture (a chart, a shape
+  the reader does not know: text boxes but those set aside (see "Anchored"), a drawing that is
+  not a picture (a chart, a shape
   outside alternate content) or neither in line nor anchored, a hidden picture in line
   (``wp:docPr hidden``), a ``w:pict`` that is not one visible picture in line or positioned
   absolutely, alternate content that is not a picture or shape with no text, embedded objects and
@@ -309,7 +345,8 @@ What it refuses (``DocxRefusedError.code``):
   second, its Font object reports the first); right-to-left set by a style or the defaults (Word
   does not allow it there); a Word 2010 text fill (``w14:textFill``); a colour, highlight or theme
   colour the reader cannot resolve, or text faint over one colour that may be under it and not over
-  another; a run property read for a mark, size or layout, or any shading, without its ``w:val``; a
+  another; a run property read for a mark, size or layout, or any shading, without its ``w:val``
+  (but ``u``, which then sets nothing: Word draws no underline and shows the next level's); a
   highlight set by a style or the defaults; and layout that may clip or overdraw text: a row of
   exact height lower than its cell's lines (each its largest text or mark size), exact line spacing
   lower than the text, line spacing under 0.8 lines, a frame or floating table more than an inch
@@ -324,7 +361,8 @@ What it refuses (``DocxRefusedError.code``):
   only ending in its kind), a relationship Id repeated in one part's relationships, a part that
   cannot be read (bad checksum, truncated, encrypted), any part damaged, read or not, parts over
   ``MAX_PACKAGE_BYTES`` or ``MAX_ELEMENTS`` together, a part over ``MAX_PART_BYTES``, an XML part,
-  read or not, that is not well-formed, not UTF-8, declares another encoding or a DTD, or nests
+  read or not, that is not well-formed, not UTF-8, declares an encoding other than UTF-8 (or
+  US-ASCII, by any name Python reads as ASCII, with every byte below 0x80) or a DTD, or nests
   over ``MAX_DEPTH`` deep, no ``w:body``, a number (an id, a level, a start, a table look) that is
   not a number, a list level outside 0 to 8 in the numbering part, a style, list, list level, note
   or comment defined twice, a section naming two headers or footers of one type, a note referred
@@ -381,6 +419,7 @@ type takes the one before it. The glossary (building blocks) is not read.
 
 from __future__ import annotations
 
+import codecs
 import colorsys
 import hashlib
 import io
@@ -398,7 +437,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 # The version of the rules above; versions.lock.json ties it to this file (tests/test_locks.py).
-READER_VERSION = "docx-reader/1.28.0"
+READER_VERSION = "docx-reader/1.30.1"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -707,12 +746,25 @@ class Picture:
 
 
 @dataclass(frozen=True)
+class Anchored:
+    """An object anchored at ``text[offset]`` that floats apart from the text ("Anchored").
+
+    ``kind`` is ``picture``, ``shape``, ``text-box`` or ``shapes``; ``read`` is whether its own
+    text is read, which it never is yet.
+    """
+
+    offset: int
+    kind: str
+    read: bool = False
+
+
+@dataclass(frozen=True)
 class Paragraph:
     """One paragraph of the body or of a note, as the reader produced it.
 
     The module docstring describes ``text``, ``marks``, ``mark_hidden``, ``numbering``,
-    ``table``, ``notes`` and ``pictures``; ``style`` is the paragraph style id written on the
-    paragraph, if any.
+    ``table``, ``notes``, ``pictures`` and ``anchored``; ``style`` is the paragraph style id
+    written on the paragraph, if any.
     """
 
     text: str
@@ -728,6 +780,8 @@ class Paragraph:
     comments: tuple[CommentReference, ...] = ()
     # What each U+FFFC of ``text`` stands for, in order.
     pictures: tuple[Picture, ...] = ()
+    # Each object anchored in the paragraph, floating apart from its text, in order.
+    anchored: tuple[Anchored, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -852,6 +906,14 @@ class Document:
 # --- package -------------------------------------------------------------------------------
 
 
+def _ascii_codec(name: str) -> bool:
+    """Whether Python reads ``name`` as ASCII (us-ascii, ASCII, us_ascii, ANSI_X3.4-1968...)."""
+    try:
+        return codecs.lookup(name).name == "ascii"
+    except LookupError:
+        return False
+
+
 def _decode(name: str, data: bytes) -> bytes:
     if data.startswith((b"\xff\xfe", b"\xfe\xff")):
         raise DocxRefusedError("invalid-package", f"{name} is not UTF-8")
@@ -863,9 +925,11 @@ def _decode(name: str, data: bytes) -> bytes:
     if "<!doctype" in lowered or "<!entity" in lowered:
         raise DocxRefusedError("invalid-package", f"{name} declares a DTD")
     declared = re.match(r"\s*<\?xml[^>]*?encoding\s*=\s*[\"']([^\"']*)[\"']", text)
-    if declared is not None and declared.group(1).lower().replace("_", "-") not in (
-        "utf-8",
-        "utf8",
+    if (
+        declared is not None
+        and declared.group(1).lower().replace("_", "-") not in ("utf-8", "utf8")
+        # ASCII is UTF-8's first 128 characters: bytes all below 0x80 read alike either way.
+        and not (_ascii_codec(declared.group(1)) and max(data, default=0) < 0x80)
     ):
         # The parser would honour the declaration and decode the UTF-8 bytes as something else.
         raise DocxRefusedError("invalid-package", f"{name} declares {declared.group(1)}")
@@ -1134,6 +1198,8 @@ class _Styles:
     default_ppr: ET.Element | None = None
     # settings.xml asks Word to update every field when the document opens.
     update_fields: bool = False
+    # settings.xml's document variables (w:docVar), each name and value as stored.
+    variables: list[tuple[str | None, str | None]] = field(default_factory=list)
     defaults: dict[str, str] = field(default_factory=dict)
     theme_fonts: dict[str, str] = field(default_factory=dict)
     has_theme: bool = False
@@ -1566,12 +1632,16 @@ class _Properties:
 
         One without ``w:val`` is refused, as a malformed number is: ECMA-376 requires it on every
         property read this way (colour, vertAlign, highlight, position, shd, sz, spacing...),
-        and where it leaves it optional (``u``, ``w``) what Word draws without it is not on
-        record.
+        and where it leaves it optional (``w``) what Word draws without it is not on record.
+        ``u`` without it sets nothing: Word draws no underline for it and shows the next level's,
+        a character or paragraph style's single or double alike, with a ``w:color`` or without
+        (Word 16.113.3 for Mac, asked 2026-10-05).
         """
         for level in [self.direct, *self.inherited]:
             if level is not None and (found := level.find(_w(name))) is not None:
                 if found.get(_w("val")) is None:
+                    if name == "u":
+                        continue
                     raise DocxRefusedError("unsupported-formatting", f"w:{name} without w:val")
                 return found
         return None
@@ -1788,13 +1858,7 @@ def _vml_picture(element: ET.Element) -> str:
     holders = [n for n in element.iter() if any(_local(c.tag) == "imagedata" for c in n)]
     if len(holders) != 1 or "group" in locals_:
         raise DocxRefusedError("unsupported-element", "pict that is not one picture")
-    style = {
-        key.strip().lower(): value.strip().lower()
-        for key, _, value in (
-            part.partition(":") for part in holders[0].get("style", "").split(";")
-        )
-        if key.strip()
-    }
+    style = _css(holders[0])
     if style.get("visibility", "visible") != "visible":
         raise DocxRefusedError("unsupported-element", "pict that is hidden")
     position = style.get("position")
@@ -1844,6 +1908,127 @@ def _alternate(element: ET.Element) -> str:
     ):
         raise DocxRefusedError("unsupported-element", "AlternateContent that is not a drawing")
     return _placed(drawn[0])
+
+
+# A run's elements that draw something: a DrawingML drawing, a VML one, or alternate content.
+_DRAWN = {_w("drawing"), _w("pict"), _ALTERNATE}
+_VML = "urn:schemas-microsoft-com:vml"
+# A floating object holding text, by the graphic its anchor draws: one shape (a text box), or a
+# group or canvas of shapes, text boxes and pictures.
+_UNREAD_KINDS = {
+    _SHAPE_URI: "text-box",
+    "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup": "shapes",
+    "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas": "shapes",
+}
+# What, inside an object, is referred to or counted elsewhere: a field (SEQ among them), a note
+# mark, a bookmark, a comment, a list item, a section and a tracked change.
+_COUNTED = (
+    {
+        _w(name)
+        for name in (
+            "fldChar",
+            "instrText",
+            "fldSimple",
+            "bookmarkStart",
+            "bookmarkEnd",
+            "commentRangeStart",
+            "commentRangeEnd",
+            "commentReference",
+            "annotationRef",
+            "numPr",
+            "sectPr",
+            "moveFromRangeEnd",
+            "moveToRangeEnd",
+            "customXmlInsRangeEnd",
+            "customXmlDelRangeEnd",
+            "customXmlMoveFromRangeEnd",
+            "customXmlMoveToRangeEnd",
+        )
+    }
+    | _NOTE_REFERENCES
+    | _TRACKED
+)
+
+
+def _css(element: ET.Element) -> dict[str, str]:
+    """A VML element's ``style``, each property's name and value in lower case."""
+    return {
+        key.strip().lower(): value.strip().lower()
+        for key, _, value in (part.partition(":") for part in element.get("style", "").split(";"))
+        if key.strip()
+    }
+
+
+def _unread(element: ET.Element, styles: _Styles) -> str | None:
+    """The kind of a floating object holding text, which is set aside unread; else None.
+
+    Anchored to its paragraph (``wp:anchor``; in VML, one shape or group positioned absolutely)
+    and holding text boxes: one shape (``text-box``), or a group or canvas of shapes, text boxes
+    and pictures (``shapes``), alone or as alternate content's one ``wps``, ``wpg`` or ``wpc``
+    choice. Only where nothing in it, in any branch, is referred to or counted elsewhere
+    (``_COUNTED``; a list item also by its style, a table's style or the defaults) or shown from
+    elsewhere (a content control bound to data or showing its placeholder); of Word's own
+    elements it holds the drawing, its VML fallback and text boxes' content alone; and every
+    graphic is a picture, a shape, a group or a canvas. Anything else is read, or refused, as it
+    was before (``_drawing``, ``_vml_picture``, ``_alternate``).
+    """
+    nodes = list(element.iter())[1:]
+    boxes = [n for n in nodes if n.tag == _w("txbxContent")]
+    if not boxes:
+        return None
+    inside = {id(n) for box in boxes for n in box.iter()}
+    if any(
+        (n.tag.startswith(f"{{{W}}}") and id(n) not in inside and n.tag not in _DRAWN)
+        or n.tag in _COUNTED
+        or _local(n.tag) in ("textpath", "OLEObject")
+        or (_local(n.tag) == "graphicData" and n.get("uri") not in (PICTURE_URI, *_UNREAD_KINDS))
+        for n in nodes
+    ):
+        return None
+    try:
+        for control in element.iter(_w("sdt")):
+            _content_control(control)  # one bound to data shows text from elsewhere
+        named = [table.find(f"{_w('tblPr')}/{_w('tblStyle')}") for table in element.iter(_w("tbl"))]
+        tables = [
+            s.ppr
+            for found in named
+            for s in styles.resolve(None if found is None else found.get(_w("val")), "table")
+        ]
+        for paragraph in element.iter(_w("p")):
+            found = paragraph.find(f"{_w('pPr')}/{_w('pStyle')}")
+            style = None if found is None else found.get(_w("val"))
+            own = [s.ppr for s in styles.resolve(style, "paragraph")]
+            if _numbering([*own, *tables, styles.default_ppr]) is not None:
+                return None
+    except DocxRefusedError:
+        return None
+    drawn = element
+    if element.tag == _ALTERNATE:
+        choices = [c for c in element if c.tag == f"{{{MC}}}Choice"]
+        if len(choices) != 1 or choices[0].get("Requires") not in ("wps", "wpg", "wpc"):
+            return None
+        if [c.tag for c in choices[0]] != [_w("drawing")]:
+            return None
+        drawn = choices[0][0]
+    if drawn.tag == _w("drawing"):
+        if [c.tag for c in drawn] != [f"{{{WP}}}anchor"]:
+            return None
+        graphic = drawn[0].find(f"{{{A}}}graphic/{{{A}}}graphicData")
+        return None if graphic is None else _UNREAD_KINDS.get(graphic.get("uri", ""))
+    shapes = [c for c in drawn if c.tag != f"{{{_VML}}}shapetype"]
+    if len(shapes) != 1 or not shapes[0].tag.startswith(f"{{{_VML}}}"):
+        return None
+    if _css(shapes[0]).get("position") != "absolute":
+        return None
+    return "shapes" if shapes[0].tag == f"{{{_VML}}}group" else "text-box"
+
+
+def _floating(element: ET.Element) -> str:
+    """The kind of a floating object read as no character: ``shape`` (``wps``) or ``picture``."""
+    shape = any(
+        n.get("uri") == _SHAPE_URI for n in element.iter() if _local(n.tag) == "graphicData"
+    )
+    return "shape" if shape else "picture"
 
 
 # --- pictures ("Pictures" in the module docstring) ------------------------------------------
@@ -2243,6 +2428,11 @@ class _ParagraphReader:
         # of each open field's result if it is one of those, else None.
         self.computed: list[tuple[str, int, int]] = []
         self.results: list[int | None] = []
+        # DOCVARIABLE fields: the instruction and where the stored result stands; and the kind
+        # of field ("simple" or "complex") whose result is open, which may hold only text and,
+        # for a complex field, its end. One at most: a field in such a result is refused.
+        self.variables: list[tuple[str, int, int]] = []
+        self.in_variable: str | None = None
         # Where a page number stands, and how many layout fields' results are open: their text
         # is the page number when Word last laid the document out, not what it prints.
         self.pages: list[int] = []
@@ -2260,6 +2450,8 @@ class _ParagraphReader:
         # Each U+FFFC read into the text: where it stands, the element it stands for, and the
         # reasons its run gives (in a field's result, a border on the run).
         self.objects: list[tuple[int, ET.Element, frozenset[str]]] = []
+        # Each object anchored in the paragraph, floating apart from its text.
+        self.anchored: list[Anchored] = []
         # How many simple fields (fldSimple) hold what is being read.
         self.simple = 0
         self.marks: list[Mark] = []
@@ -2282,6 +2474,8 @@ class _ParagraphReader:
             if tag == _w("r"):
                 self.run(child)
             elif tag == _w("fldSimple"):
+                if self.in_variable:
+                    raise DocxRefusedError("computed-field", "a field in a DOCVARIABLE's result")
                 if self.styles.update_fields:
                     raise DocxRefusedError("computed-field", "the document updates fields on open")
                 if child.get(_w("dirty")) in ("1", "true", "on"):
@@ -2295,13 +2489,18 @@ class _ParagraphReader:
                     self.container(child)
                     self.layout -= 1
                     continue
+                variable = code == "DOCVARIABLE"
                 self.simple += 1
+                self.in_variable = "simple" if variable else None
                 self.container(child)
+                self.in_variable = None
                 self.simple -= 1
                 if self.length == before:
                     raise DocxRefusedError("field-without-result", "a simple field shows nothing")
                 if code in _COMPUTED_FIELDS:
                     self.computed.append((instruction, before, self.length))
+                elif variable:
+                    self.variables.append((instruction, before, self.length))
             elif tag == _w("bdo"):
                 # An override draws every character in one order ("10 mg" as "gm 01"), which
                 # no mark says; what Word draws is not on record.
@@ -2374,10 +2573,21 @@ class _ParagraphReader:
         # and its run's reasons: in a field's result (Word prints the field again, maybe with
         # another picture), or bordered (``w:bdr`` other than none, through the run's levels).
         objects: list[tuple[int, ET.Element, frozenset[str]]] = []
+        anchored: list[Anchored] = []
         border = properties.element("bdr")
         bordered = border is not None and border.get(_w("val")) not in ("nil", "none")
         for child in run:
             tag = child.tag
+            if self.in_variable and not (
+                tag in _RUN_SILENT
+                or (tag == _w("t") and not symbol)
+                or (tag == _w("fldChar") and self.in_variable == "complex")
+            ):
+                # Updated, the field shows its variable's value in place of all of it: only
+                # text as stored can be held to that value.
+                raise DocxRefusedError(
+                    "computed-field", "a DOCVARIABLE's result holding other than text"
+                )
             if tag == _w("commentReference"):
                 if self.story is not None and self.story[0] == "comment":
                     raise DocxRefusedError("unsupported-element", "a comment mark in a comment")
@@ -2414,6 +2624,17 @@ class _ParagraphReader:
                 _check_whitespace(child, text)
                 produced = _characters(text, symbol)
                 self.symbolic = self.symbolic or (symbol and bool(text))
+            elif tag in _DRAWN:
+                # A floating object holding text, outside any field, is set aside unread; any
+                # other drawing is read as before. Each that floats is placed where its run is.
+                outside = not (self.fields or self.carried or self.simple or self.layout)
+                kind = _unread(child, self.styles) if outside else None
+                produced = "" if kind else self._special(child)
+                if not produced and not self.in_instruction() and not self.layout:
+                    if hidden:
+                        # Whether Word draws an object anchored in a hidden run is not on record.
+                        raise DocxRefusedError("hidden-text", "a hidden anchored object")
+                    anchored.append(Anchored(here(), kind or _floating(child)))
             else:
                 produced = self._special(child)
             if produced == OBJECT and not self.in_instruction() and not self.layout:
@@ -2434,6 +2655,7 @@ class _ParagraphReader:
             raise DocxRefusedError("hidden-text", "a hidden page number")
         self.notes += references
         self.comments += comments
+        self.anchored += anchored
         if not text:
             return
         if hidden:
@@ -2502,6 +2724,8 @@ class _ParagraphReader:
             raise DocxRefusedError("stale-field", "a field marked for update")
         kind = child.get(_w("fldCharType"))
         if kind == "begin":
+            if self.in_variable:
+                raise DocxRefusedError("computed-field", "a field in a DOCVARIABLE's result")
             if self.styles.update_fields:
                 raise DocxRefusedError("computed-field", "the document updates fields on open")
             if self.fields and self.fields[-1]:
@@ -2518,8 +2742,10 @@ class _ParagraphReader:
             # computes and checks, or a page number.
             instruction = "".join(self.instructions[-1])
             code = self._shown(instruction, any(self.fields[:-1]), self.locked[-1], offset)
-            if code in _COMPUTED_FIELDS:
+            if code in _COMPUTED_FIELDS or code == "DOCVARIABLE":
                 self.results[-1] = offset
+                if code == "DOCVARIABLE":
+                    self.in_variable = "complex"
             elif code in _LAYOUT_FIELDS and not self.layout:
                 self.pages.append(offset)
                 self.layout += 1
@@ -2541,7 +2767,12 @@ class _ParagraphReader:
                 self.fields[-1] = False
             start = self.results.pop()
             if start is not None:
-                self.computed.append(("".join(self.instructions[-1]), start, offset))
+                instruction = "".join(self.instructions[-1])
+                if _code(instruction) == "DOCVARIABLE":
+                    self.in_variable = None
+                    self.variables.append((instruction, start, offset))
+                else:
+                    self.computed.append((instruction, start, offset))
             if self.layout_open.pop():
                 self.layout -= 1
             self.fields.pop()
@@ -2919,9 +3150,9 @@ def _check_field(instruction: str) -> str:
     "below", ``\#`` a picture's text and other formats words.
     """
     code = _code(instruction)
-    if code not in _STORED_FIELDS | _COMPUTED_FIELDS | _LAYOUT_FIELDS:
+    if code not in _STORED_FIELDS | _COMPUTED_FIELDS | _LAYOUT_FIELDS | {"DOCVARIABLE"}:
         raise DocxRefusedError("computed-field", f"a {code or 'blank'} field")
-    if code in _COMPUTED_FIELDS | _LAYOUT_FIELDS and "\x00" in instruction:
+    if code in _COMPUTED_FIELDS | _LAYOUT_FIELDS | {"DOCVARIABLE"} and "\x00" in instruction:
         raise DocxRefusedError("computed-field", f"a {code} field with a field in its code")
     if code in _LAYOUT_FIELDS:
         flags = {"h"} if code == "PAGEREF" else set()
@@ -2929,6 +3160,38 @@ def _check_field(instruction: str) -> str:
         if len(arguments) != (code == "PAGEREF") or switches.get("*", "ARABIC").upper() != "ARABIC":
             raise DocxRefusedError("computed-field", f"a {code} field the reader cannot place")
     return code
+
+
+def _variable(styles: _Styles, instruction: str) -> str:
+    r"""The value a DOCVARIABLE field shows once updated: its document variable's.
+
+    Word shows the stored result until fields are updated, then the settings' ``w:docVar`` of
+    the name. The code must be ``DOCVARIABLE`` and the name, unquoted, with no switch but
+    ``\*`` MERGEFORMAT or CHARFORMAT; the settings must hold one variable of that name
+    ignoring case (whether Word's lookup ignores case is not on record), written as the field
+    writes it, with a value.
+    """
+    words = instruction.split()
+    name, switches = (words[1], words[2:]) if len(words) > 1 else ("", [])
+    if (
+        '"' in instruction
+        or not name
+        or name.startswith("\\")
+        or len(switches) % 2
+        or any(
+            switches[i] != "\\*" or switches[i + 1].upper() not in _FORMATTING
+            for i in range(0, len(switches), 2)
+        )
+    ):
+        raise DocxRefusedError("computed-field", "a DOCVARIABLE field the reader cannot read")
+    found = [
+        (key, value)
+        for key, value in styles.variables
+        if key is not None and key.casefold() == name.casefold()
+    ]
+    if len(found) != 1 or found[0][0] != name or found[0][1] is None:
+        raise DocxRefusedError("computed-field", "a DOCVARIABLE without one variable of its name")
+    return found[0][1]
 
 
 def _check_whitespace(element: ET.Element, text: str) -> None:
@@ -3088,6 +3351,10 @@ def _paragraph(
         )
     if reader.layout:
         raise DocxRefusedError("unbalanced-field", "a page number runs past its paragraph")
+    text = "".join(reader.parts)
+    for instruction, start, end in reader.variables:
+        if text[start:end] != _variable(styles, instruction):
+            raise DocxRefusedError("computed-field", "a DOCVARIABLE showing other than its value")
     numbering = _numbering(levels)
     if numbering != _numbering([level for level in levels if level not in table_levels]):
         # A list, or its level, from the table style: what Word draws is not on record.
@@ -3111,7 +3378,7 @@ def _paragraph(
         fields_open=reader.carried + len(reader.fields),
     )
     return Paragraph(
-        text="".join(reader.parts),
+        text=text,
         style=style,
         numbering=numbering,
         table=table,
@@ -3126,6 +3393,7 @@ def _paragraph(
             pictures.read(element, offset, why | _clipped(levels, exact_row))
             for offset, element, why in reader.objects
         ),
+        anchored=tuple(reader.anchored),
     ), context
 
 
@@ -3896,10 +4164,15 @@ def _verify_fields(
     bookmarks = _bookmarks(contexts, loose)
     # Per SEQ identifier: its value, and the paragraph of its last field.
     counted: dict[str, tuple[int, int]] = {}
+    # Whether a STYLEREF, or a SEQ restarting at headings, finds a paragraph in a floating
+    # object's text, which is not read (``_unread``), is not on record.
+    unread = any(a.kind in ("text-box", "shapes") for p in paragraphs for a in p.anchored)
     for index, (paragraph, context) in enumerate(zip(paragraphs, contexts, strict=True)):
         for instruction, start, end in context.fields:
             tokens = _tokens(instruction)
             code = tokens[0].upper()
+            if unread and (code == "STYLEREF" or (code == "SEQ" and "\\S" in instruction.upper())):
+                raise DocxRefusedError("computed-field", f"a {code} beside text that is not read")
             if code == "PAGEREF":
                 # A bookmark REF could read; Word's print of one it cannot find is not on record.
                 (name,), _ = _switches(tokens[1:], set(), {"h"})
@@ -4677,6 +4950,10 @@ def read_document(data: bytes) -> Document:
         styles = _styles(*parts[:4])
         if parts[3] is not None:
             styles.update_fields = bool(_on(parts[3].find(_w("updateFields"))))
+            styles.variables = [
+                (v.get(_w("name")), v.get(_w("val")))
+                for v in parts[3].iterfind(f"{_w('docVars')}/{_w('docVar')}")
+            ]
         lists = _Lists(parts[4], styles)
         even = parts[3] is not None and bool(_on(parts[3].find(_w("evenAndOddHeaders"))))
         stories = _story_parts(package, mains[0], document, even)
@@ -4941,8 +5218,8 @@ def _check_accounted(document: ET.Element, runs: set[ET.Element]) -> None:
     stack = [document]
     while stack:
         element = stack.pop()
-        if element.tag == _ALTERNATE:
-            continue  # read whole, as one character (_alternate)
+        if element.tag in _DRAWN:
+            continue  # read whole, as one character or none (_drawing, _alternate...)
         if element.tag == _w("r") and element not in runs:
             raise DocxRefusedError("unread-content", "a run the reader did not reach")
         if element.tag != _w("r"):
@@ -5085,6 +5362,32 @@ def tracked(data: bytes) -> tuple[bytes, bytes, tuple[Change, ...]]:
                 archive.writestr(entry, part, zipfile.ZIP_DEFLATED)
         out.append(buffer.getvalue())
     return out[0], out[1], tuple(changes)
+
+
+def changed_drawing(data: bytes) -> str | None:
+    """The first part (but the glossary, which is not read) with a change inside a drawing.
+
+    Such a change is in neither view's text (a floating object's text is not read, see
+    "Anchored" in the module docstring) but is listed among the changes: a document whose views
+    are read is refused for it (``output``), as an object holding a change is when read.
+    """
+    package = _Package(data)
+    with package.zip:
+        for name in package.zip.namelist():
+            root = package.part(name) if name.endswith(".xml") else None
+            if (
+                root is not None
+                and root.tag != _w("glossaryDocument")
+                and any(
+                    node.tag in _TRACKED or node.tag in _MOVE_RANGES
+                    for run in root.iter(_w("r"))
+                    for drawn in run
+                    if drawn.tag in _DRAWN
+                    for node in drawn.iter()
+                )
+            ):
+                return name
+    return None
 
 
 def _drop_notes(sources: dict[str, tuple[ET.Element, bytes]], parts: dict[str, ET.Element]) -> None:
