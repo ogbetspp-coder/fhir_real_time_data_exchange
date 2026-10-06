@@ -6,10 +6,10 @@
   "reader": "epi-reader/1.3.4",
   "format": "label-epi-json/1.11.12",
   "inputs": {
-    "registrySha256": "bf23271b65acd23cadfd7907e54ca236d5c2958e275920edbc373c4a5d4fe4a2",
+    "registrySha256": "bbdd836bac2eec2e9fc1bd6f8881668f44a64c80603fa5d8b9feb6b8fafb306d",
     "mappingSha256": "2fc44a767ebd85985cc2f4dd83c10bc09f67bbc9dcb502d83baaccf4b4e5b749"
   },
-  "checker": "qrd-check/1.4.1",
+  "checker": "qrd-check/1.4.2",
   "template": {
     "family": "EMA QRD product-information template, centralised procedure",
     "version": "10.4",
@@ -18,7 +18,7 @@
     "document": "Summary of product characteristics",
     "language": "en"
   },
-  "registryVersion": "1.2.1",
+  "registryVersion": "1.2.2",
   "mappingVersion": "1.3.0",
   "document": {
     "title": "Nuvaxovid",

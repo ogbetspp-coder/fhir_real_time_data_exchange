@@ -1,6 +1,6 @@
 # ADR 0006: Importing a company's Word label into the canonical record
 
-- Status: Accepted (owner decisions of 2026-10-05); nothing here is built yet
+- Status: Accepted (owner decisions of 2026-10-05); P1 tables and P3 built (Progress, below)
 - Date: 2026-10-05
 - Related: ADR 0001, ADR 0002 (invariants 7, 8 and 11), ADR 0003, ADR 0005 (decisions 1–4,
   renderer gate), `docs/fidelity-normalization.md` §2, §5, §7, §8,
@@ -75,15 +75,18 @@ The record does not admit this today, for reasons this ADR has to answer rather 
 
 3. **The narrative builder, with closed lists.** Nothing is added, reordered or reworded.
    - **Text:** one `p` per paragraph.
-   - **Marks:** bold, italic, superscript and subscript become `b`, `i`, `sup` and `sub`. An
+   - **Marks:** bold, italic, superscript and subscript become `strong`, `em`, `sup` and `sub`
+     (amended 2026-10-05 from `b` and `i`: the EMA ePI style guide's elements; both pass the
+     validator). An
      underline is unwrapped where it cannot change the text (`zone_a.underline`) and refuses the
      section where it can.
    - **The template's own formatting:** shading and highlight are dropped only where the registry
      names them exactly. That is a list of one: the 4.8 reporting statement. Any other strike,
      faint text, highlight, shading or right-to-left text refuses the section.
-   - **Lists:** `ol` or `ul` only where the labels Word draws are exactly that list type's
-     sequence, from a closed list of bullet glyphs. A label such as "a)", which no HTML list
-     draws, refuses the section, and so does an empty numbered paragraph.
+   - **Lists:** `ul` for "•", and `ol` only for "1.", "2.", ... from one (amended 2026-10-05:
+     FHIR's narrative rule txt-1 allows no `start` or `type` on `ol`, and the official validator
+     with the EMA profiles refuses both, so any other numbering, "a)" or "3." included, refuses the
+     section), and so does an empty numbered paragraph.
    - **Pictures:** a picture is carried as a `data:` URI of its PNG or JPEG bytes (by signature)
      only if Word draws it uncropped and at no more than its own size. Any other picture, and any
      floating picture, shape, frame or floating table, refuses the section.
@@ -172,3 +175,31 @@ The record does not admit this today, for reasons this ADR has to answer rather 
    that shows where a person's one-time confirmation is needed.
 3. **Headings that differ from the template:** a remediation finding for the responsible label
    team to decide (decision 4).
+
+## Progress
+
+- **P1, tables** (2026-10-05): the reader reports each body table's grid (`docx-reader/1.27.0`,
+  `label-docx-json/1.16.0`), certified by the conservation check and held to Word's own saves.
+- **P3** (2026-10-05): `zone_a.word_epi` (`word-epi/1.0.0`) builds each section's narrative and
+  page text from the certified read by separate code (the page reads Word's grid row by row, the
+  narrative works out each merged cell's rows), under decision 3's closed lists, and refuses a
+  section on the first thing they do not list; it checks that the fidelity scanner reads the
+  narrative as the page. `zone_a.drawing` (`word-drawing/1.0.0`) is decision 1's drawing check:
+  Chrome draws each narrative, compared line by line and mark by mark with the read, which is what
+  Word draws, and a section it draws otherwise, or does not draw, is refused. A picture the reader
+  vouches for is carried as the `data:` URI of its exact bytes where Word draws it at no more than
+  its own size and in its own proportions within 2% (the EMA templates' black triangle is drawn
+  0.9% to 1.4% out of them); any other picture refuses its section. A document is refused whole where
+  Word draws what the read does not yet say: a floating picture or shape (the certificate's
+  count), and, by a conservative scan of the package until the reader reports them, a floating
+  table, a frame, a right-to-left table or a page break between two words. On five SmPCs Word
+  wrote from the pinned EMA ePIs (`zone-a/tests/fixtures/word-smpc/`), 147 of 160 sections are
+  carried, Chrome draws every one as read, and each reads as the EMA's own text but where the
+  fixtures' README says why not; the 13 refused are shading the narrative cannot carry and
+  underlines over "+" or "≥". An independent review found ten holes, each fixed and tested
+  (`zone-a/tests/test_word_epi.py`, "the independent review's cases").
+- **P1, pictures** (2026-10-05): each U+FFFC the reader writes says what it stands for (part,
+  SHA-256, type by signature, pixels, extent, crop, and a reason from a closed list where it cannot
+  be carried), certified; Word's own saves agree on every DrawingML picture of the corpus.
+- **Still to do:** in the reader (P1), floating tables, frames, right-to-left tables and page
+  breaks reported in place of the scan; P2, P4 and P5.
