@@ -34,7 +34,8 @@
     "implementation-check/1.1.2": "96f1667325408aeee1eecaef09ca9fe5b611d2ed9faa2a5700732c3fdacc956e"
   },
   "product": {
-    "product/1.0.0": "b6f1973ec1eb760f11fd254f6b3c950da944e5e50d35ab3e856ef55a071a4f6e"
+    "product/1.0.0": "b6f1973ec1eb760f11fd254f6b3c950da944e5e50d35ab3e856ef55a071a4f6e",
+    "product/1.0.1": "3dc2e85fdccd9bcfb1c56706cbaa182a2858add3110cc6745de44a8366c63fa8"
   },
   "qrd-check": {
     "qrd-check/1.2.0": "731151adfff83d6948e3269d090099b214af594e8ffee153a7621acf4fe920b2",
