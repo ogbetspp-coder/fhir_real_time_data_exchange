@@ -923,25 +923,93 @@ def test_a_row_of_exact_height_is_refused() -> None:
     assert refused.value.code == "row-height"
 
 
-def test_character_scaling_with_a_picture_refuses_the_document() -> None:
-    def package(document: str) -> bytes:
-        out = io.BytesIO()
-        with zipfile.ZipFile(out, "w") as target:
-            target.writestr(
-                "word/document.xml",
-                f'<w:document xmlns:w="{W}"><w:body>{document}</w:body></w:document>',
-            )
-        return out.getvalue()
+def _package(document: str, **parts: str) -> bytes:
+    """A package of a body and other ``word/`` parts (name: root element and its content)."""
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as target:
+        target.writestr(
+            "word/document.xml",
+            f'<w:document xmlns:w="{W}"><w:body>{document}</w:body></w:document>',
+        )
+        for name, xml in parts.items():
+            target.writestr(f"word/{name}.xml", xml)
+    return out.getvalue()
 
+
+def _part(root: str, content: str) -> str:
+    return f'<w:{root} xmlns:w="{W}">{content}</w:{root}>'
+
+
+def test_character_scaling_that_may_stretch_a_picture_refuses_the_document() -> None:
     picture = "<w:p><w:r><w:drawing/></w:r></w:p>"
     scaled = '<w:p><w:r><w:rPr><w:w w:val="150"/></w:rPr><w:t>x</w:t></w:r></w:p>'
     unscaled = '<w:p><w:r><w:rPr><w:w w:val="100"/></w:rPr><w:t>x</w:t></w:r></w:p>'
-    assert certified.layout(package(picture + scaled)) == ("character-scale",)
-    assert certified.layout(package(picture + unscaled)) == ()
-    assert certified.layout(package(scaled)) == ()
+    stretched = '<w:p><w:r><w:rPr><w:w w:val="150"/></w:rPr><w:drawing/></w:r></w:p>'
+    assert certified.layout(_package(stretched)) == ("character-scale",)
+    # Scaling a run holding no picture, or a list label, stretches none.
+    assert certified.layout(_package(picture + scaled)) == ()
+    assert certified.layout(_package(picture + unscaled)) == ()
+    assert certified.layout(_package(scaled)) == ()
+    label = _part(
+        "numbering",
+        '<w:abstractNum><w:lvl><w:rPr><w:w w:val="90"/></w:rPr></w:lvl></w:abstractNum>',
+    )
+    assert certified.layout(_package(picture, numbering=label)) == ()
+    # In a style, it may reach the picture's run.
+    style = _part("styles", '<w:style w:styleId="S"><w:rPr><w:w w:val="90"/></w:rPr></w:style>')
+    assert certified.layout(_package(picture, styles=style)) == ("character-scale",)
 
 
-def test_the_scoreboard_counts_without_saying_anything(tmp_path: Path) -> None:
+def test_a_frame_counts_where_it_can_reach_the_bodys_text() -> None:
+    frame = '<w:framePr w:w="2000" w:hAnchor="page"/>'
+
+    def styles(*definitions: str) -> str:
+        return _part("styles", "".join(definitions))
+
+    def paragraph_style(key: str, inner: str = "", default: bool = False) -> str:
+        marked = ' w:default="1"' if default else ""
+        return f'<w:style w:type="paragraph"{marked} w:styleId="{key}">{inner}</w:style>'
+
+    framed = paragraph_style("Envelope", f"<w:pPr>{frame}</w:pPr>")
+    based = paragraph_style("Child", '<w:basedOn w:val="Envelope"/>')
+    plain = "<w:p><w:r><w:t>x</w:t></w:r></w:p>"
+    styled = '<w:p><w:pPr><w:pStyle w:val="{}"/></w:pPr><w:r><w:t>x</w:t></w:r></w:p>'
+    # In a style no body paragraph uses (Word's built-in envelope address): nothing.
+    assert certified.layout(_package(plain, styles=styles(framed))) == ()
+    # Used, directly, through basedOn, or as the default paragraph style; on a paragraph, in the
+    # defaults or in a table style: a frame.
+    for document, definitions in (
+        (styled.format("Envelope"), styles(framed)),
+        (styled.format("Child"), styles(framed, based)),
+        (plain, styles(paragraph_style("Normal", f"<w:pPr>{frame}</w:pPr>", default=True))),
+        (f"<w:p><w:pPr>{frame}</w:pPr></w:p>", styles()),
+        (
+            plain,
+            styles(
+                f"<w:docDefaults><w:pPrDefault><w:pPr>{frame}</w:pPr></w:pPrDefault></w:docDefaults>"
+            ),
+        ),
+        (plain, styles(f'<w:style w:type="table" w:styleId="T"><w:pPr>{frame}</w:pPr></w:style>')),
+    ):
+        assert certified.layout(_package(document, styles=definitions)) == ("frame",)
+    # Word's page-number frame in a footer stays on its own line there; any other does not.
+    number = (
+        '<w:framePr w:wrap="around" w:vAnchor="text" w:hAnchor="margin" w:xAlign="center" w:y="1"/>'
+    )
+    footer = "<w:p><w:pPr>{}</w:pPr><w:r><w:t>1</w:t></w:r></w:p>"
+    assert certified.layout(_package(plain, footer1=_part("ftr", footer.format(number)))) == ()
+    for other in (
+        number.replace('w:y="1"', 'w:y="-2000"'),
+        number.replace('w:vAnchor="text"', 'w:vAnchor="page"'),
+        number.replace("/>", ' w:h="3000"/>'),
+        number.replace("/>", ' w:yAlign="top"/>'),
+    ):
+        assert certified.layout(_package(plain, footer1=_part("ftr", footer.format(other)))) == (
+            "frame",
+        )
+
+
+def _scoreboard() -> Any:
     spec = importlib.util.spec_from_file_location(
         "scoreboard", Path(__file__).parents[1] / "scripts" / "scoreboard.py"
     )
@@ -949,6 +1017,32 @@ def test_the_scoreboard_counts_without_saying_anything(tmp_path: Path) -> None:
     assert spec.loader is not None
     script = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(script)
+    return script
+
+
+def test_the_scoreboard_measures_a_tracked_label_only_by_the_view_asked_for(tmp_path: Path) -> None:
+    name = next(n for n in OUTCOMES if "brukinsa" not in n)
+    inserted = '<w:p><w:ins w:id="9000" w:author="A" w:date="2026-01-01T00:00:00Z"><w:r>'
+    inserted += "<w:t>x</w:t></w:r></w:ins></w:p>"
+    folder = tmp_path / "labels"
+    folder.mkdir()
+    (folder / f"{name}.docx").write_bytes(
+        _rewritten(
+            name, lambda x: x[: x.rindex("<w:sectPr")] + inserted + x[x.rindex("<w:sectPr") :]
+        )
+    )
+    script, out = _scoreboard(), tmp_path / "board.json"
+    assert script.main([str(folder), "--no-drawing", "--out", str(out)]) == 0
+    (entry,) = json.loads(out.read_text("utf-8"))["files"]
+    assert (entry["outcome"], entry["code"]) == ("reader-refused", "tracked-change")
+    for view in ("accepted", "original"):
+        assert script.main([str(folder), "--no-drawing", "--view", view, "--out", str(out)]) == 0
+        (entry,) = json.loads(out.read_text("utf-8"))["files"]
+        assert (entry["outcome"], entry["view"]) == ("built", view)
+
+
+def test_the_scoreboard_counts_without_saying_anything(tmp_path: Path) -> None:
+    script = _scoreboard()
     out = tmp_path / "board.json"
     keys = REPOSITORY / "labels" / "ema-epi" / "sources"
     assert script.main([str(FIXTURES), "--keys", str(keys), "--no-drawing", "--out", str(out)]) == 0

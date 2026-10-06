@@ -300,6 +300,7 @@
       0,
       1
     ],
+    "symbol-east-asian-slot.docx": [],
     "table-style-attr-off-val-on.docx": [],
     "table-style-attr-vs-val-row.docx": [],
     "table-style-band-vs-col-on.docx": [],
@@ -668,6 +669,7 @@
       "1.\t",
       "2.\t"
     ],
+    "symbol-east-asian-slot.docx": [],
     "table-style-attr-off-val-on.docx": [],
     "table-style-attr-vs-val-row.docx": [],
     "table-style-band-vs-col-on.docx": [],
@@ -2828,6 +2830,15 @@
         false
       ],
       "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "symbol-east-asian-slot.docx": {
+      "": [],
+      "0": [
         false,
         false,
         false,
@@ -7450,6 +7461,7 @@
       null,
       null
     ],
+    "symbol-east-asian-slot.docx": [],
     "table-style-attr-off-val-on.docx": [],
     "table-style-attr-vs-val-row.docx": [],
     "table-style-band-vs-col-on.docx": [],
@@ -7897,6 +7909,7 @@
     "start-override-restart.docx": true,
     "style-tied-deeper-level.docx": true,
     "style-tied-level-zero.docx": true,
+    "symbol-east-asian-slot.docx": true,
     "table-style-attr-off-val-on.docx": true,
     "table-style-attr-vs-val-row.docx": true,
     "table-style-band-vs-col-on.docx": true,
@@ -8052,6 +8065,7 @@
     "start-override-restart.docx": "00d5a7e5d691662c597f023d491b903fba6cdd3b9ef2e6f1844ecddaa791cd07",
     "style-tied-deeper-level.docx": "73f18d5ea4c000816683ea221ec26d49664f6119af4def1308ff3c79f34adf33",
     "style-tied-level-zero.docx": "11653d3f9bc4b19e5deac3399388b666050afa5c12e47424e37a13ae1ed8fece",
+    "symbol-east-asian-slot.docx": "51f3bea5f7fa6dbf823487d69ac948779d9f5e36e7a19a2668f3a57a50827471",
     "table-style-attr-off-val-on.docx": "f285d6fd4c1f9ca6f53a014e6c6441557ae333a368c51b239751adb61d8428d3",
     "table-style-attr-vs-val-row.docx": "5a98c09d4dd75a57930b221e7f20858991ea7db038a0cde6fb0bd154f72ab4c5",
     "table-style-band-vs-col-on.docx": "f37c8ba4b179aef8acc718314e2811354ec4d0c516c849fbcae8cc9b820350b6",
@@ -8596,6 +8610,9 @@
     "style-tied-level-zero.docx": [
       "styled",
       "styled"
+    ],
+    "symbol-east-asian-slot.docx": [
+      "abc 123 \u00b1\u00b5\u00d7\u00b0 \u03b1\u03b4\u03bc \u2264\u2265 \u2013\u2019\u201c\u201d \u2192\u2122"
     ],
     "table-style-attr-off-val-on.docx": [
       "r0c0",
@@ -9370,5 +9387,5 @@
       "item 3"
     ]
   },
-  "verifier": "word-verifier/1.0.5"
+  "verifier": "word-verifier/1.0.6"
 }

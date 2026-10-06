@@ -501,6 +501,12 @@
       "bytes": 4575
     },
     {
+      "name": "Symbol in the East Asian font slot alone: whether Word draws Latin, Greek and math text there in the Latin fonts, as stored, or in Symbol.",
+      "file": "symbol-east-asian-slot.docx",
+      "sha256": "51f3bea5f7fa6dbf823487d69ac948779d9f5e36e7a19a2668f3a57a50827471",
+      "bytes": 2799
+    },
+    {
       "name": "A text box anchored to the paragraph, holding text: Word's text leaves its text out.",
       "file": "drawing-anchored-text-box.docx",
       "sha256": "e1abd86463e0b31f3b4f47fc7b30d23d4dcb072188dd72c29b671c959230a563",

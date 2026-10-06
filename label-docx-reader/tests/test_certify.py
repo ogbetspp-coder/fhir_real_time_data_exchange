@@ -816,6 +816,73 @@ def test_symbol_in_only_some_slots_or_outside_the_table_is_never_certified() -> 
         DocxSource(docx(unmapped))
 
 
+def test_symbol_in_the_east_asian_slot_alone_certifies_other_text_as_stored() -> None:
+    east = '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="Symbol" w:cs="Arial"/>'
+    data = docx(
+        _p(f'<w:r><w:rPr>{east}</w:rPr><w:t xml:space="preserve">a \u00b1\u03b1</w:t></w:r>')
+    )
+    source, value = DocxSource(data), _docx_value(data)
+    assert value["paragraphs"][0]["text"] == "a \u00b1\u03b1"
+    source.certify(value)
+    # Read through the Symbol table instead: never certified.
+    value["paragraphs"][0]["text"] = "\u03b1 \u00b1\u03b1"
+    with pytest.raises(CertificationError):
+        source.certify(value)
+    # East Asian text, which Word draws in the East Asian slot's Symbol: never certified.
+    with pytest.raises(CertificationError, match="East Asian"):
+        DocxSource(docx(_p(f"<w:r><w:rPr>{east}</w:rPr><w:t>\u4e00</w:t></w:r>")))
+
+
+def test_symbol_in_the_east_asian_slot_is_held_at_the_ranges_edges_and_only_alone() -> None:
+    from numbering_cases import abstract, lvl, num
+    from test_reader import li
+
+    east = '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="Symbol" w:cs="Arial"/>'
+
+    def run(text: str, fonts: str = east) -> bytes:
+        return docx(_p(f"<w:r><w:rPr>{fonts}</w:rPr><w:t>{text}</w:t></w:r>"))
+
+    # Each edge of the ranges Word may draw there: Hangul Jamo, and from CJK Radicals
+    # Supplement on; just outside them, as stored.
+    for code in (0x1100, 0x11FF, 0x2E80):
+        with pytest.raises(CertificationError, match="East Asian text"):
+            DocxSource(run(chr(code)))
+    for code in (0x10FF, 0x1200):
+        DocxSource(run(chr(code))).certify(_value(chr(code)))
+    # Complex script, right to left or a hint: Symbol for only some characters.
+    for fonts in (east + "<w:cs/>", east + "<w:rtl/>", east.replace("/>", ' w:hint="eastAsia"/>')):
+        with pytest.raises(CertificationError, match="for only some characters"):
+            DocxSource(run("a", fonts))
+    # Through the theme's East Asian font.
+    themed = docx(
+        _p(
+            '<w:r><w:rPr><w:rFonts w:eastAsiaTheme="minorEastAsia"/></w:rPr><w:t>\u4e00</w:t></w:r>'
+        ),
+        minor_font="Calibri",
+    )
+    minor = '<a:ea typeface="Symbol"/>'
+    themed = _with_part(themed, "word/theme/theme1.xml", _FULL_THEME.format(major="", minor=minor))
+    with pytest.raises(CertificationError, match="East Asian text"):
+        DocxSource(themed)
+    # A list label with Symbol there: not on record, never certified.
+    label = lvl(0, "decimal", "%1.", '<w:rPr><w:rFonts w:eastAsia="Symbol"/></w:rPr>')
+    with pytest.raises(CertificationError, match="East Asian slot"):
+        DocxSource(docx(li(1), numbering=abstract(1, label) + num(1, 1)))
+
+
+def test_a_picture_bullet_no_level_names_is_certified() -> None:
+    from numbering_cases import abstract, lvl, num
+    from test_reader import li
+
+    written = (
+        f'<w:numPicBullet w:numPicBulletId="0"><mc:AlternateContent xmlns:mc="{_MC}">'
+        '<mc:Choice Requires="v"><w:pict/></mc:Choice><mc:Fallback><w:drawing/></mc:Fallback>'
+        "</mc:AlternateContent></w:numPicBullet>"
+    )
+    data = docx(li(1), numbering=written + abstract(1, lvl(0)) + num(1, 1))
+    DocxSource(data).certify(_docx_value(data))
+
+
 def test_hidden_whitespace_is_left_out_and_counted_and_nothing_else() -> None:
     body = _p(
         '<w:r><w:t xml:space="preserve">a</w:t></w:r>'
@@ -1755,8 +1822,13 @@ def test_theme_fonts_by_slot_script_and_major_or_minor() -> None:
     for slot, theme, script in (("eastAsia", "minorEastAsia", "ea"), ("cs", "minorBidi", "cs")):
         attribute = "cstheme" if slot == "cs" else f"{slot}Theme"
         one = f'<w:rFonts w:{attribute}="{theme}"/>'
-        with pytest.raises(CertificationError):
-            DocxSource(_themed(one, minor=f'<a:{script} typeface="Symbol"/>'))
+        symbol_there = _themed(one, minor=f'<a:{script} typeface="Symbol"/>')
+        if slot == "cs":
+            with pytest.raises(CertificationError):
+                DocxSource(symbol_there)
+        else:
+            # Symbol in the East Asian slot alone: text that is not East Asian, as stored.
+            assert not _mapped(symbol_there)
         assert not _mapped(_themed(one, minor=f'<a:{script} typeface="Arial"/>'))
     with pytest.raises(CertificationError):
         DocxSource(_themed('<w:rFonts w:asciiTheme="minorHAnsi"/>'))
@@ -1879,9 +1951,13 @@ def test_the_composition_is_the_first_entry_and_other_narratives_are_listed() ->
 
 
 def test_east_asian_and_complex_script_fonts_set_directly_count() -> None:
-    for slot in ("eastAsia", "cs"):
-        with pytest.raises(CertificationError):
-            DocxSource(docx(_plain(run_properties=f'<w:rFonts w:{slot}="Symbol"/>')))
+    with pytest.raises(CertificationError):
+        DocxSource(docx(_plain(run_properties='<w:rFonts w:cs="Symbol"/>')))
+    # Symbol in the East Asian slot alone counts for East Asian text only.
+    east = '<w:rFonts w:eastAsia="Symbol"/>'
+    DocxSource(docx(_plain(run_properties=east)))
+    with pytest.raises(CertificationError, match="East Asian"):
+        DocxSource(docx(_p(f"<w:r><w:rPr>{east}</w:rPr><w:t>\u4e00</w:t></w:r>")))
 
 
 def test_a_style_without_an_id_is_not_a_default() -> None:

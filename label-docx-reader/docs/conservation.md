@@ -134,18 +134,21 @@ it holds every other value. Each grid row's `exactHeight` is the check's own rea
 ## Tracked changes
 
 A tracked document has two views, all changes accepted and all rejected, each certified as above
-against its own package. The views are held to the source by `certify_tracked`, again with its
-own walk: each run's content is in a view unless a change the view drops wraps it, and stays in
-its table cell; a paragraph joins the next exactly where the view drops its mark; a row the view
-drops goes whole, and a table whose every row it drops; a note goes exactly when the view drops
-every reference to it; no revision is left in any part; every other part is the source's byte for
-byte. In a part with revisions, everything else is the source's too, element by element: each
-run element in full with its run's properties and the elements around it, each paragraph's
-properties, attributes and place, and everything outside paragraphs (tables, sections, styles,
-note ids). Properties a change records are the current ones in the accepted view; the former
-ones the original takes are held to Word: for every case in `corpus/tracked-cases` the reader
-does not refuse, the reader reads its view exactly as it reads Word's own Accept All / Reject All
-file. It refuses 6 of the 39 (`tracked-change`), and their views are not compared.
+against its own package. The views are held to the source by `certify_tracked`, again with its own
+walk: each run's content is in a view unless a change the view drops wraps it, and stays in its
+table cell; a paragraph joins the next exactly where the view drops its mark (past a table the view
+drops whole, an empty paragraph only, the paragraph after it; a bookmark's end between the two after
+what is joined); a row the view drops goes whole, and a table whose every row it drops; a field's
+marks (begin, separator, end) are all kept or all dropped, and a field the view drops goes with
+every run inside it; a note goes exactly when the view drops every reference to it; no revision is
+left in any part; every other part is the source's byte for byte. In a part with revisions,
+everything else is the source's too, element by element: each run element in full with its run's
+properties and the elements around it, each paragraph's properties, attributes and place, and
+everything outside paragraphs (tables, sections, styles, note ids). Properties a change records are
+the current ones in the accepted view; the former ones the original takes are held to Word: for
+every case in `corpus/tracked-cases` the reader does not refuse, the reader reads its view exactly
+as it reads Word's own Accept All / Reject All file. It refuses 8 of the 50 (`tracked-change`), and
+their views are not compared.
 
 ## What is held to the applications instead
 

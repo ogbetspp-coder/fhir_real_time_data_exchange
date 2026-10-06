@@ -235,6 +235,72 @@
       "file": "row-inserted.docx",
       "sha256": "7c2045d0b39df4bdc9d817007f7014697cf827050d123756412696744e40f1a0",
       "bytes": 3708
+    },
+    {
+      "name": "A field inserted in pieces, each its own change: whether the original has none of it.",
+      "file": "field-inserted-apart.docx",
+      "sha256": "c36e4b475d0bb9c63f89be58db11463fe6ebaa2b7845f10375012905a50ace0d",
+      "bytes": 4026
+    },
+    {
+      "name": "A field deleted in pieces, each its own change: whether the accepted view has none of it.",
+      "file": "field-deleted-apart.docx",
+      "sha256": "1dbd732f6418f9b07f8ac48cfacec383e1870a5b8757f0bf8c1584dce0174695",
+      "bytes": 4044
+    },
+    {
+      "name": "A field inserted and deleted in pieces: in neither view.",
+      "file": "field-inserted-then-deleted-apart.docx",
+      "sha256": "8e9667116486fd9c470de46533e330d2b76756252ed76fbfefc4951dfa326548",
+      "bytes": 4409
+    },
+    {
+      "name": "A field inserted around code and text already there: what the original shows of them.",
+      "file": "field-wrapped-around-text.docx",
+      "sha256": "438a7db9a6e316e4b9d46d41315d74a79e9d17756ef37d45247b7fc5372a9d92",
+      "bytes": 4357
+    },
+    {
+      "name": "Only a field's end inserted: what the original, a field with no end, shows.",
+      "file": "field-end-inserted.docx",
+      "sha256": "863eb722fcb8dfb1dc6376fbfe05dfb852afcfc2382d0faa89b2660269ee3589",
+      "bytes": 3783
+    },
+    {
+      "name": "An empty paragraph and the table after it deleted: which paragraph the mark joins.",
+      "file": "mark-deleted-before-table-deleted-whole.docx",
+      "sha256": "f521ec274c50c7bbabf65077f7d8ea2906ffce3fe8e8201f2eb1afc2bc92d807",
+      "bytes": 3758
+    },
+    {
+      "name": "A paragraph's text and mark and the table after it deleted: what the next keeps.",
+      "file": "mark-and-text-deleted-before-table-deleted-whole.docx",
+      "sha256": "bfb55e1d63c9e0aff56f3b5b2bdb77e735011336315a4e756f5c3db2615a4a3f",
+      "bytes": 3962
+    },
+    {
+      "name": "A mark inserted after text, then a table inserted: what the original joins.",
+      "file": "mark-inserted-before-table-inserted-whole.docx",
+      "sha256": "b49c0dfd98e9541c9d41372341a4cde41f358d765c3ab51cf38b4a3cded29386",
+      "bytes": 3861
+    },
+    {
+      "name": "A deleted mark before a bookmark's end between paragraphs: where the end stands, joined.",
+      "file": "mark-deleted-before-bookmark-end.docx",
+      "sha256": "cee9770b66fa5fa1211f208b0ecce2768d91b8d822a0ed89766625cd1e029031",
+      "bytes": 3545
+    },
+    {
+      "name": "An inserted mark before a bookmark's end between paragraphs: the original joins them.",
+      "file": "mark-inserted-before-bookmark-end.docx",
+      "sha256": "d05cad45b060ee2a0a84e4389c579cff7f33b940cae9c2bab0cf07c91bc27600",
+      "bytes": 3617
+    },
+    {
+      "name": "An empty paragraph and a table after it inserted: the original has neither.",
+      "file": "mark-inserted-empty-before-table-inserted-whole.docx",
+      "sha256": "28f66837ecf90cf434c100393b3ab7fd2cbdbe39e2fb8418bc1b0f8b080d39df",
+      "bytes": 3805
     }
   ]
 }

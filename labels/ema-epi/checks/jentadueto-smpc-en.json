@@ -3,13 +3,13 @@
     "file": "jentadueto-smpc-en.json",
     "sha256": "544b2f24e69f410d3e792a80f3ee82c00ef60afcdf913526308e799db54a1ee4"
   },
-  "reader": "epi-reader/1.3.6",
-  "format": "label-epi-json/1.11.13",
+  "reader": "epi-reader/1.3.7",
+  "format": "label-epi-json/1.11.14",
   "inputs": {
-    "registrySha256": "2170139da4a8a7c31c1f75c605126b24f5ac7480c02fc0aec18221b72ece34d1",
+    "registrySha256": "88971cfd524d36016805cecb1ff1c643ac9fee0feefdd94d4ced758cdaf4eb10",
     "mappingSha256": "2fc44a767ebd85985cc2f4dd83c10bc09f67bbc9dcb502d83baaccf4b4e5b749"
   },
-  "checker": "qrd-check/1.4.4",
+  "checker": "qrd-check/1.4.5",
   "template": {
     "family": "EMA QRD product-information template, centralised procedure",
     "version": "10.4",
@@ -18,7 +18,7 @@
     "document": "Summary of product characteristics",
     "language": "en"
   },
-  "registryVersion": "1.2.4",
+  "registryVersion": "1.2.5",
   "mappingVersion": "1.3.0",
   "document": {
     "title": "Jentadueto",

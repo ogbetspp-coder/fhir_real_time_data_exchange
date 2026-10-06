@@ -19,6 +19,7 @@ import argparse
 import hashlib
 import json
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 from label_docx.word import word_version, word_views
@@ -75,6 +76,22 @@ def row(*cells: str, props: str = "") -> str:
     """A row of cells, each cell's paragraphs given."""
     inner = "".join(f"<w:tc>{c}</w:tc>" for c in cells)
     return f"<w:tr>{f'<w:trPr>{props}</w:trPr>' if props else ''}{inner}</w:tr>"
+
+
+BEGIN, SEPARATE, END = (
+    f'<w:r><w:fldChar w:fldCharType="{k}"/></w:r>' for k in ("begin", "separate", "end")
+)
+LINK = ' HYPERLINK "https://www.ema.europa.eu" '
+
+
+def code(text: str) -> str:
+    """A run of field code."""
+    return f'<w:r><w:instrText xml:space="preserve">{text}</w:instrText></w:r>'
+
+
+def apart(change: Callable[..., str], *runs: str) -> str:
+    """Each of ``runs`` in a change of its own, as Word writes changes made at different times."""
+    return "".join(change(run, key=20 + i) for i, run in enumerate(runs))
 
 
 LIST = abstract(1, lvl(0), lvl(1, fmt="lowerLetter", text="%2)")) + num(1, 1)
@@ -403,6 +420,102 @@ CASES: dict[str, Case] = {
         + f'<w:ins w:id="4" {WHO}/></w:trPr><w:tc><w:p>'
         + ins(words("new row"))
         + "</w:p></w:tc></w:tr></w:tbl>"
+        + para(words("after")),
+    ),
+    "field-inserted-apart": case(
+        "A field inserted in pieces, each its own change: whether the original has none of it.",
+        para(
+            words("See "),
+            apart(ins, BEGIN, code(LINK), SEPARATE, words("the site"), END),
+            words("."),
+        ),
+    ),
+    "field-deleted-apart": case(
+        "A field deleted in pieces, each its own change: whether the accepted view has none of it.",
+        para(
+            words("See "),
+            apart(dele, BEGIN, code(LINK), SEPARATE, words("the site"), END),
+            words("."),
+        ),
+    ),
+    "field-inserted-then-deleted-apart": case(
+        "A field inserted and deleted in pieces: in neither view.",
+        para(
+            words("See "),
+            apart(
+                lambda run, key: ins(dele(run, key=key + 20), key=key),
+                BEGIN,
+                code(LINK),
+                SEPARATE,
+                words("the site"),
+                END,
+            ),
+            words("."),
+        ),
+    ),
+    "field-wrapped-around-text": case(
+        "A field inserted around code and text already there: what the original shows of them.",
+        para(
+            words("See "),
+            ins(BEGIN, code(' HYPERLINK "'), key=20),
+            code("http"),
+            ins(code("s"), key=21),
+            code("://www.ema.europa.eu"),
+            ins(code('" '), SEPARATE, key=22),
+            words("www.ema"),
+            ins(words(".europa"), key=23),
+            words(".eu"),
+            ins(END, key=24),
+            words("."),
+        ),
+    ),
+    "field-end-inserted": case(
+        "Only a field's end inserted: what the original, a field with no end, shows.",
+        para(
+            words("See "),
+            BEGIN,
+            code(LINK),
+            SEPARATE,
+            words("the"),
+            ins(words(" site"), END, key=20),
+            words(" today."),
+        ),
+    ),
+    "mark-deleted-before-table-deleted-whole": case(
+        "An empty paragraph and the table after it deleted: which paragraph the mark joins.",
+        para(props=mark("del"))
+        + table(row(para(dele(words("gone"))), props=f'<w:del w:id="4" {WHO}/>'))
+        + para(words("after")),
+    ),
+    "mark-and-text-deleted-before-table-deleted-whole": case(
+        "A paragraph's text and mark and the table after it deleted: what the next keeps.",
+        para(dele(words("a heading")), props=f'<w:pStyle w:val="Heading1"/>{mark("del")}')
+        + table(row(para(dele(words("gone"))), props=f'<w:del w:id="4" {WHO}/>'))
+        + para(words("after"), props='<w:pStyle w:val="Quote"/>'),
+    ),
+    "mark-inserted-before-table-inserted-whole": case(
+        "A mark inserted after text, then a table inserted: what the original joins.",
+        para(words("text"), props=f'<w:pStyle w:val="Quote"/>{mark("ins")}')
+        + table(row(para(ins(words("new"))), props=f'<w:ins w:id="4" {WHO}/>'))
+        + para(words(" after"), props='<w:pStyle w:val="Heading1"/>'),
+    ),
+    "mark-deleted-before-bookmark-end": case(
+        "A deleted mark before a bookmark's end between paragraphs: where the end stands, joined.",
+        para('<w:bookmarkStart w:id="5" w:name="Mark"/>', words("a"), props=mark("del"))
+        + '<w:bookmarkEnd w:id="5"/>'
+        + para(words("b")),
+    ),
+    "mark-inserted-before-bookmark-end": case(
+        "An inserted mark before a bookmark's end between paragraphs: the original joins them.",
+        para('<w:bookmarkStart w:id="5" w:name="Mark"/>', words("a"), props=mark("ins"))
+        + '<w:bookmarkEnd w:id="5"/>'
+        + para(ins(words("b"))),
+    ),
+    "mark-inserted-empty-before-table-inserted-whole": case(
+        "An empty paragraph and a table after it inserted: the original has neither.",
+        para(words("before"))
+        + para(props=mark("ins"))
+        + table(row(para(ins(words("new"))), props=f'<w:ins w:id="4" {WHO}/>'))
         + para(words("after")),
     ),
 }

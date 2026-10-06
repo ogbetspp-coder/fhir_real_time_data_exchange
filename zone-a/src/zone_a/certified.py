@@ -36,6 +36,7 @@ from label_docx.reader import (
     Numbering,
     Paragraph,
     Picture,
+    W,
 )
 
 
@@ -119,16 +120,28 @@ _DRAWN_AS_TEXT: Final = frozenset({"t", "sym", "noBreakHyphen", "drawing", "pict
 def layout(data: bytes) -> tuple[str, ...]:
     """What Word draws in the package that the reader's text does not yet say, by name.
 
-    Not a reading: a scan of every XML part under ``word/`` for the elements of ``_LAYOUT`` (in
-    any style, header or part, used or not; a part that does not parse is ``unreadable-part``),
-    and for a page or column break with a drawn character right before and right after it in its
-    paragraph, where Word draws the two on different pages or columns and the text, which leaves
-    the break out, runs them together ("10" and "5 mg" read "105 mg"), and for character scaling
-    (``w:w``, anywhere) in a package with a picture, which may stretch the picture. Conservative by
-    design, until the reader reports these itself.
+    Not a reading: a scan of every XML part under ``word/`` for the elements of ``_LAYOUT`` (a
+    part that does not parse is ``unreadable-part``), for a page or column break with a drawn
+    character right before and right after it in its paragraph, where Word draws the two on
+    different pages or columns and the text, which leaves the break out, runs them together
+    ("10" and "5 mg" read "105 mg"), and for character scaling (``w:w``) that may stretch a
+    body picture. Conservative by design, until the reader reports these itself, but for what
+    cannot reach the body's text:
+
+    - a frame (``framePr``) in a paragraph style no body paragraph uses, through ``basedOn``
+      (one naming no style uses the default paragraph style); in a table style, the defaults or
+      a list level it counts, as in the body;
+    - Word's page-number frame in a header or footer, which stays on its own line there:
+      anchored to its text, of no height and no vertical alignment, at most 20 twips below it;
+    - character scaling in a list level (a label holds no picture) or on a body run holding no
+      picture; on a run holding one, in a style or the defaults, it counts.
     """
     found: set[str] = set()
     pictures = scaled = False
+    framed_styles: set[str] = set()
+    styles: dict[str, ET.Element] = {}
+    default_style: str | None = None
+    used: set[str | None] = set()
     with zipfile.ZipFile(io.BytesIO(data)) as package:
         for name in package.namelist():
             if not (name.startswith("word/") and name.endswith(".xml")):
@@ -138,21 +151,83 @@ def layout(data: bytes) -> tuple[str, ...]:
             except ET.ParseError:
                 found.add("unreadable-part")  # Word's own parts: none the reader read is so
                 continue
+            stem = name.removeprefix("word/").removesuffix(".xml").rstrip("0123456789")
             for element in root.iter():
                 local = element.tag.rsplit("}", 1)[-1]
-                if local in _LAYOUT:
+                if local == "framePr":
+                    if stem == "styles" or (stem in ("header", "footer") and _own_line(element)):
+                        continue  # a style's: counted below where the body uses it
+                    found.add("frame")
+                elif local in _LAYOUT:
                     found.add(_LAYOUT[local])
-                elif local in ("drawing", "pict"):
-                    pictures = True
-                elif local == "w" and any(
-                    k.endswith("}val") and v != "100" for k, v in element.attrib.items()
-                ):
-                    scaled = True
+                elif local == "w" and _scales(element) and stem != "numbering":
+                    # A run's own scaling counts only for a picture in that run.
+                    scaled = scaled or stem != "document" or _holds_picture(root, element)
                 elif local == "p" and _break_between_words(element):
                     found.add("page-break")
+            if stem == "document":
+                pictures = any(e.tag.rsplit("}", 1)[-1] in ("drawing", "pict") for e in root.iter())
+                for paragraph in root.iter(f"{{{W}}}p"):
+                    named = paragraph.find(f"{{{W}}}pPr/{{{W}}}pStyle")
+                    used.add(None if named is None else named.get(f"{{{W}}}val"))
+            elif stem == "styles":
+                for style in root.iter(f"{{{W}}}style"):
+                    key = style.get(f"{{{W}}}styleId", "")
+                    styles[key] = style
+                    kind, default = style.get(f"{{{W}}}type"), style.get(f"{{{W}}}default")
+                    if kind == "paragraph" and default in ("1", "true", "on"):
+                        default_style = key
+                    if next(style.iter(f"{{{W}}}framePr"), None) is not None:
+                        framed_styles.add(key)
+                        if kind != "paragraph":
+                            found.add("frame")  # a table style's: not traced to its tables
+                defaults = root.find(f"{{{W}}}docDefaults")
+                if (
+                    defaults is not None
+                    and next(defaults.iter(f"{{{W}}}framePr"), None) is not None
+                ):
+                    found.add("frame")
+    for start in {default_style if k is None else k for k in used}:
+        current: str | None = start
+        seen: set[str] = set()
+        while current is not None and current in styles and current not in seen:
+            if current in framed_styles:
+                found.add("frame")
+            seen.add(current)
+            based = styles[current].find(f"{{{W}}}basedOn")
+            current = None if based is None else based.get(f"{{{W}}}val")
     if pictures and scaled:
         found.add("character-scale")
     return tuple(sorted(found))
+
+
+def _scales(element: ET.Element) -> bool:
+    """Whether a ``w:w`` scales characters (any value but 100)."""
+    return any(k.endswith("}val") and v != "100" for k, v in element.attrib.items())
+
+
+def _holds_picture(root: ET.Element, scaling: ET.Element) -> bool:
+    """Whether the run whose properties hold ``scaling`` holds a picture, or it is no run's."""
+    for run in root.iter(f"{{{W}}}r"):
+        properties = run.find(f"{{{W}}}rPr")
+        if properties is not None and scaling in list(properties):
+            return any(c.tag.rsplit("}", 1)[-1] in ("drawing", "pict", "object") for c in run)
+    return True  # a paragraph mark's, or elsewhere: as before
+
+
+def _own_line(frame: ET.Element) -> bool:
+    """Whether a frame stays on its own line: Word's page-number frame in a header or footer.
+
+    Anchored to its text, of no height and no vertical alignment, at most 20 twips below it.
+    """
+    values = {k.rsplit("}", 1)[-1]: v for k, v in frame.attrib.items()}
+    y = values.get("y", "0")
+    return (
+        values.get("vAnchor") == "text"
+        and not {"h", "hRule", "yAlign"} & values.keys()
+        and y.isdigit()
+        and int(y) <= 20
+    )
 
 
 def _break_between_words(paragraph: ET.Element) -> bool:

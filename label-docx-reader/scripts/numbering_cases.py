@@ -1107,6 +1107,17 @@ CASES: dict[str, Case] = {
         para(words("a"), picture(2, anchored=True), words("b")),
         media=True,
     ),
+    "symbol-east-asian-slot": Case(
+        "Symbol in the East Asian font slot alone: whether Word draws Latin, Greek and math "
+        "text there in the Latin fonts, as stored, or in Symbol.",
+        "",
+        para(
+            '<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" '
+            'w:eastAsia="Symbol" w:cs="Times New Roman"/></w:rPr><w:t xml:space="preserve">'
+            "abc 123 \u00b1\u00b5\u00d7\u00b0 \u03b1\u03b4\u03bc \u2264\u2265 "
+            "\u2013\u2019\u201c\u201d \u2192\u2122</w:t></w:r>"
+        ),
+    ),
     "drawing-anchored-text-box": Case(
         "A text box anchored to the paragraph, holding text: Word's text leaves its text out.",
         "",

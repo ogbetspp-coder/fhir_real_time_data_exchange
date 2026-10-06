@@ -101,7 +101,7 @@ from zone_a.structure import line
 from zone_a.underline import underline_changes
 
 # The narrative builder's and the page serialiser's version: one, as they are one closed list.
-WORD_EPI_VERSION: Final = "word-epi/1.1.0"
+WORD_EPI_VERSION: Final = "word-epi/1.1.1"
 
 CARRIED: Final = {"bold": "strong", "italic": "em", "superscript": "sup", "subscript": "sub"}
 # Section 3 step 4's bullet glyphs: a list bullet in page text, removed at a line start.
