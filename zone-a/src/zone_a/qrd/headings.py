@@ -1,11 +1,12 @@
 """Recognise a QRD section heading in a line of label text, using the registry.
 
-A heading is recognised when the line, after runs of space, tab and no-break space are collapsed
-to one space and the ends are trimmed, equals one of the forms the registry allows for a
-section: the number as the template writes it ("4." for a first-level section, "4.1" for a
-second-level one), one space, and the title with each optional segment either present or
-absent. Case, punctuation and every other character must match exactly. Anything else is not
-a heading as far as this function is concerned; it never guesses.
+A heading is recognised when the line, after runs of space, tab and no-break space are collapsed to
+one space and the ends are trimmed, equals one of the forms the registry allows for a section: the
+number as the template writes it ("4." for a first-level section, "4.1" for a second-level one), one
+space, and the title with each optional segment either present or absent, and each "(S)" after a
+word in capitals kept, dropped or written "S" (the template's singular or plural). Case, punctuation
+and every other character must match exactly. Anything else is not a heading as far as this function
+is concerned; it never guesses.
 
 The registry is the SmPC's (Annex I). The labelling and the package leaflet reuse some of the
 same lines ("1. NAME OF THE MEDICINAL PRODUCT" is section 1 of the labelling too), so a caller
@@ -74,13 +75,31 @@ def _render(tokens: list[dict[str, Any]], choice: tuple[bool, ...]) -> str:
     return "".join(out)
 
 
+# "(S)" after a word in capitals: the template leaves singular or plural to the author, so
+# "NUMBER(S)", "NUMBER" and "NUMBERS" are each its wording (owner decision 2026-10-06, ADR 0006).
+_PLURAL = re.compile(r"(?<=[A-Z])\(S\)")
+
+
+def _plurals(line: str) -> list[str]:
+    """The line with each "(S)" kept, dropped, or written "S"; the template's own first."""
+    found = _PLURAL.search(line)
+    if found is None:
+        return [line]
+    head, tail = line[: found.start()], line[found.end() :]
+    return [head + mark + rest for mark in ("(S)", "", "S") for rest in _plurals(tail)]
+
+
 def forms(section: dict[str, Any]) -> dict[str, tuple[bool, ...]]:
-    """Every accepted heading line for a registry section, collapsed, with its segment flags."""
+    """Every accepted heading line for a registry section, collapsed, with its segment flags.
+
+    The first is the template's own wording, every optional segment present.
+    """
     title = section["title"]
     number = section["number"] + ("." if section["dotted"] else "")
     result: dict[str, tuple[bool, ...]] = {}
     for choice in itertools.product((True, False), repeat=_optional_count(title)):
-        result[collapse(f"{number} {_render(title, choice)}")] = choice
+        for line in _plurals(collapse(f"{number} {_render(title, choice)}")):
+            result.setdefault(line, choice)
     return result
 
 

@@ -8,7 +8,10 @@ added, reordered or reworded, and a person is never asked to fill a gap: what th
 carry exactly is refused, section by section.
 
 A section's text is the body paragraphs after its heading up to the next heading of any section,
-or the SmPC's end. The paragraphs before the root title (``ANNEX I``) are not in the SmPC.
+or the SmPC's end. The paragraphs before the root title (``ANNEX I``) are not in the SmPC. Of an
+Annex I holding several SmPCs (``zone_a.structure.smpcs``), each is built on its own: a later
+one's root section has the root title they share as its heading and its own paragraphs before
+its section 1 as its text.
 
 Two outputs, written by separate code from the same read, so that the fidelity check
 (``docs/fidelity-normalization.md``) compares two things, not one:
@@ -103,7 +106,7 @@ from zone_a.structure import line
 from zone_a.underline import underline_changes
 
 # The narrative builder's and the page serialiser's version: one, as they are one closed list.
-WORD_EPI_VERSION: Final = "word-epi/1.1.2"
+WORD_EPI_VERSION: Final = "word-epi/1.2.0"
 
 CARRIED: Final = {"bold": "strong", "italic": "em", "superscript": "sup", "subscript": "sub"}
 # Section 3 step 4's bullet glyphs: a list bullet in page text, removed at a line start.
@@ -697,6 +700,8 @@ def sections(
         raise RefusedError(body.layout[0], None, "Word draws it; the read does not yet say how")
     paragraphs = body.paragraphs
     end = len(paragraphs) if structured["end"] is None else structured["end"]
+    # One SmPC of several (zone_a.structure.smpcs) starts after the root title it shares.
+    start = structured.get("start", 0)
     headings = sorted(s["heading"] for s in structured["sections"] if s["heading"] is not None)
     if headings and headings[-1] >= end:
         raise ValueError("a heading outside the body's SmPC")
@@ -706,8 +711,8 @@ def sections(
         heading = section["heading"]
         if heading is None:
             continue
-        stop = next((h for h in headings if h > heading), end)
-        indices = range(heading + 1, stop)
+        stop = next((h for h in headings if h > max(heading, start - 1)), end)
+        indices = range(max(heading + 1, start), stop)
         entry: dict[str, Any] = {
             "key": section["key"],
             "parent": section["parent"],
@@ -720,7 +725,7 @@ def sections(
             "refusal": None,
         }
         try:
-            anchors = [(i, a.kind) for i in range(heading, stop) for a in paragraphs[i].anchored]
+            anchors = [(i, a.kind) for i in (heading, *indices) for a in paragraphs[i].anchored]
             if anchors:
                 raise RefusedError("anchored-object", *anchors[0])
             if paragraphs[heading].table is not None:

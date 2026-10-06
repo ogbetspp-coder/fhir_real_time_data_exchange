@@ -110,8 +110,9 @@ The record does not admit this today, for reasons this ADR has to answer rather 
 
    - **What the record keeps:** the root section keeps the preamble's text (the black-triangle
      statement, for instance), and named subsections are nested sections.
-   - **Refused for now:** note references and page numbers (as `zone_a.certified` does), tracked
-     changes and comments. A label submitted for an ePI carries one approved text.
+   - **Refused for now:** note references and page numbers (as `zone_a.certified` does), and
+     comments. A label submitted for an ePI carries one approved text: one with tracked changes
+     is taken only by the view a person names (owner decisions of 2026-10-06, 2).
 
 5. **A Type 1 graph whose metadata comes from the label, exactly, and is confirmed once per
    product.** The QRD template gives the product name, the marketing authorisation holder and
@@ -183,6 +184,17 @@ The record does not admit this today, for reasons this ADR has to answer rather 
    paragraph's text, outside a table and after no list label, is written as a space in the
    narrative and on the page (§7, `fidelity-norm/3.2.0`), as the EMA's own ePIs carry no tab. Any
    other tab is still refused: Word draws it as a jump to a tab stop.
+2. **A label with tracked changes:** imported only by the view a person names, every change
+   accepted or every one rejected (`zone_a.certified.read_body`, `epi_from_word.py --view`). The
+   result records the view and the number of changes; with no view named it is refused, as
+   before. This replaces "refused for now" for tracked changes in decision 4.
+3. **An Annex I holding several SmPCs:** each SmPC is its own ePI (`zone_a.structure.smpcs`). A
+   new SmPC starts at a section 1 heading after the first, or at the template's own statement
+   before section 1 where it stands between that heading and the last section 10. A boundary
+   the template's lines do not settle is for a person.
+4. **"(S)" in a template heading:** the template leaves singular or plural to the author, so
+   "NUMBER(S)", "NUMBER" and "NUMBERS" are each the template's wording for section 8
+   (`zone_a.qrd.headings`). The ePI carries the label's own wording, as decision 4 says.
 
 ## Progress
 
