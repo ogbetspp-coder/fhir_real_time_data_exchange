@@ -1,6 +1,7 @@
 """How a set of Word SmPCs fares, label by label: read, structured, carried, drawn, and agreeing.
 
-    uv run --frozen python scripts/scoreboard.py FOLDER [--keys KEYS] [--no-drawing] [--out FILE]
+    uv run --frozen python scripts/scoreboard.py FOLDER [--keys KEYS] [--no-drawing]
+        [--view accepted|original] [--out FILE]
 
 Each .docx in FOLDER is read with zone_a.certified, structured with zone_a.structure and built
 with zone_a.word_epi; where Chrome is installed and ``--no-drawing`` is not given, each carried
@@ -9,6 +10,10 @@ Bundle named as the .docx, ``NAME.json``), each carried section is compared with
 section of the same EMA code, as the label reader reads it, line by line (list labels and text,
 spaces collapsed); a key's sub-sections the template has no place for are read into their
 parent.
+
+A document with tracked changes is refused (ADR 0006: a label submitted carries one approved
+text). With ``--view``, it is measured by that view instead (``label_docx.reader.tracked``), so
+what a view chosen by a person would carry can be counted; the entry says so (``view``).
 
 Nothing a label says is printed or written: only codes, counts, keys and line numbers, so it can
 be run on documents that must not leave their environment. The result is JSON: one entry per
@@ -29,7 +34,7 @@ from typing import Any
 
 from label_docx import browser
 from label_docx.epi_output import read as read_epi
-from label_docx.reader import DocxRefusedError
+from label_docx.reader import DocxRefusedError, tracked
 
 from zone_a import drawing, word_epi
 from zone_a.canonical_json import canonical_json
@@ -78,14 +83,23 @@ def _key_lines(key: Mapping[str, Any], codes: set[str]) -> dict[str, list[str] |
     return out
 
 
-def score(path: Path, keys: Path | None, chrome: Path | None) -> dict[str, Any]:
+def score(
+    path: Path, keys: Path | None, chrome: Path | None, view: str | None = None
+) -> dict[str, Any]:
     """One label's entry (the module docstring)."""
     data = path.read_bytes()
     entry: dict[str, Any] = {"file": path.name, "sha256": hashlib.sha256(data).hexdigest()}
     try:
         body = read_body(data)
     except DocxRefusedError as refused:
-        return entry | {"outcome": "reader-refused", "code": refused.code}
+        if refused.code != "tracked-change" or view is None:
+            return entry | {"outcome": "reader-refused", "code": refused.code}
+        try:
+            accepted, original, _ = tracked(data)
+            body = read_body(accepted if view == "accepted" else original)
+        except DocxRefusedError as again:
+            return entry | {"outcome": "reader-refused", "code": again.code, "view": view}
+        entry["view"] = view
     registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
     mapping = json.loads(MAPPING.read_text(encoding="utf-8"))
     structured = structure(body.paragraphs, registry, mapping)
@@ -153,10 +167,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("folder", type=Path)
     parser.add_argument("--keys", type=Path, help="answer keys: EMA ePI Bundles named as the files")
     parser.add_argument("--no-drawing", action="store_true", help="do not ask Chrome")
+    parser.add_argument(
+        "--view", choices=("accepted", "original"), help="measure a tracked document by this view"
+    )
     parser.add_argument("--out", type=Path, help="write here instead of standard output")
     arguments = parser.parse_args(argv)
     chrome = None if arguments.no_drawing else browser.find_chrome()
-    entries = [score(p, arguments.keys, chrome) for p in sorted(arguments.folder.glob("*.docx"))]
+    entries = [
+        score(p, arguments.keys, chrome, arguments.view)
+        for p in sorted(arguments.folder.glob("*.docx"))
+    ]
     built = [e for e in entries if e["outcome"] == "built"]
     totals: dict[str, Any] = {
         "files": len(entries),

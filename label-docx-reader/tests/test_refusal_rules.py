@@ -11,7 +11,7 @@ import zipfile
 
 import pytest
 
-from label_docx import reader
+from label_docx import output, reader
 from label_docx.reader import DocxRefusedError, read_document
 from numbering_cases import abstract, lvl, num
 from test_headers_comments import header, reference, with_parts
@@ -387,16 +387,26 @@ def test_a_highlight_set_by_a_style_is_refused(styles: str, props: str, paragrap
 # --- numbering --------------------------------------------------------------------------
 
 
-def test_a_picture_bullet_is_refused() -> None:
-    picture = (
-        '<w:numPicBullet w:numPicBulletId="0"><w:pict/></w:numPicBullet>'
-        + abstract(1, lvl(0, "bullet", "", '<w:lvlPicBulletId w:val="0"/>' + SYMBOL_BULLET))
-        + num(1, 1)
+def test_a_picture_bullet_is_refused_and_one_no_level_names_is_set_aside() -> None:
+    mc = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+    # As Word writes one: a VML picture, a DrawingML one for later readers.
+    written = (
+        f'<w:numPicBullet w:numPicBulletId="0"><mc:AlternateContent xmlns:mc="{mc}">'
+        '<mc:Choice Requires="v"><w:pict/></mc:Choice><mc:Fallback><w:drawing/></mc:Fallback>'
+        "</mc:AlternateContent></w:numPicBullet>"
     )
-    assert _refusal(docx(li(1), numbering=picture)) == (
-        "unsupported-numbering",
-        "lvlPicBulletId in a list level",
-    )
+    named = abstract(1, lvl(0, "bullet", "", '<w:lvlPicBulletId w:val="0"/>' + SYMBOL_BULLET))
+    for definition in ('<w:numPicBullet w:numPicBulletId="0"><w:pict/></w:numPicBullet>', written):
+        assert _refusal(docx(li(1), numbering=definition + named + num(1, 1))) == (
+            "unsupported-numbering",
+            "lvlPicBulletId in a list level",
+        )
+    # Defined and named by no level, as labels made from a template keep one: nothing draws it.
+    plain = abstract(1, lvl(0, "bullet", "", SYMBOL_BULLET)) + num(1, 1)
+    unnamed = docx(li(1), numbering=written + plain)
+    (item,) = read_document(unnamed).body
+    assert item.numbering is not None
+    assert output.read(unnamed)[1]
 
 
 def test_a_symbol_bullet_under_conditional_table_fonts_is_refused() -> None:

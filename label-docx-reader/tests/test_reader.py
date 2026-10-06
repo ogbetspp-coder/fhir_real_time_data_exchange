@@ -164,6 +164,31 @@ def test_symbol_font_glyphs_become_their_unicode_characters() -> None:
         + r("<w:t>C</w:t>")
     )
     assert text_of(body) == ["(\u22651/10) 25\u00b0C"]
+    # Adobe's symbol.txt (Unicode MAPPINGS/VENDORS/ADOBE): asteriskmath, tau, similar, arrowboth,
+    # arrowup, dotmath, as product-information texts use them (footnote marks, a time constant,
+    # an approximation, a range, an increase, a product of units).
+    codes = ("2A", "74", "7E", "AB", "AD", "D7")
+    symbols = "".join(r(f'<w:sym w:font="Symbol" w:char="F0{c}"/>') for c in codes)
+    assert text_of(p(symbols)) == ["\u2217\u03c4\u223c\u2194\u2191\u22c5"]
+
+
+def test_symbol_in_the_east_asian_slot_alone_leaves_other_text_as_stored() -> None:
+    # Word draws text that is not East Asian in the Latin fonts (numbering-cases,
+    # symbol-east-asian-slot); East Asian text it would draw in Symbol is refused.
+    east = '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="Symbol" w:cs="Arial"/>'
+    stored = "a \u00b1\u00b5\u00d7 \u03b1\u03b4 \u2264\u2265 \u2013 \u2192"
+    body = p(r(f'<w:t xml:space="preserve">{stored}</w:t>', east))
+    assert text_of(body) == [stored]
+    assert served(docx(body))[1]
+    assert refusal(p(r("<w:t>\u4e00</w:t>", east))) == "symbol-font"
+    # A font hint, complex script or Symbol in another slot too: refused as before.
+    for fonts in (
+        east.replace("/>", ' w:hint="eastAsia"/>'),
+        east.replace('w:cs="Arial"', 'w:cs="Symbol"'),
+        east.replace('w:hAnsi="Arial"', 'w:hAnsi="Symbol"'),
+    ):
+        assert refusal(p(r("<w:t>a</w:t>", fonts))) == "symbol-font"
+    assert refusal(p(r("<w:t>a</w:t>", east + "<w:rtl/>"))) == "symbol-font"
 
 
 def test_private_use_character_in_a_symbol_run_is_mapped() -> None:
@@ -360,7 +385,11 @@ def test_a_drawing_with_text_or_that_is_not_a_picture_is_refused(drawing: str) -
     assert refusal(p(r(drawing))) == "unsupported-element"
 
 
-@pytest.mark.parametrize("data", [b"not a zip", docx(p(r("<w:t>x</w:t>")), doctype=True)])
+# Named, not by their bytes: a package's bytes hold the time it was made, which pytest-xdist's
+# workers would then collect as different tests.
+@pytest.mark.parametrize(
+    "data", [b"not a zip", docx(p(r("<w:t>x</w:t>")), doctype=True)], ids=["not-a-zip", "doctype"]
+)
 def test_invalid_packages_are_refused(data: bytes) -> None:
     with pytest.raises(DocxRefusedError) as caught:
         read_docx(data)
@@ -503,7 +532,8 @@ def test_a_symbol_font_set_by_style_or_theme_is_applied() -> None:
             r("<w:t>\u00fc</w:t>", '<w:rFonts w:ascii="Wingdings" w:hAnsi="Wingdings"/>'),
             "symbol-font",
         ),
-        (r("<w:t>b</w:t>", '<w:rFonts w:eastAsia="Symbol"/>'), "symbol-font"),
+        # Symbol in the East Asian slot alone: East Asian text there.
+        (r("<w:t>\u4e00</w:t>", '<w:rFonts w:eastAsia="Symbol"/>'), "symbol-font"),
         (r('<w:sym w:font="Symbol" w:char="ZZ"/>'), "unmapped-symbol"),
         (r("<w:t>\U000f00b3</w:t>"), "private-use-character"),
     ],
@@ -2793,6 +2823,7 @@ def test_a_word_97_2003_document_under_a_docx_name_is_refused() -> None:
 @pytest.mark.parametrize(
     "data",
     [b"junk before" + docx(p(r("<w:t>x</w:t>"))), docx(p(r("<w:t>x</w:t>"))) + b"junk after"],
+    ids=["junk-before", "junk-after"],
 )
 def test_a_zip_archive_that_is_not_the_whole_file_is_refused(data: bytes) -> None:
     # zipfile itself would read both.
@@ -2938,7 +2969,7 @@ def test_a_table_in_a_note_is_read() -> None:
 
 
 @pytest.mark.parametrize(
-    "character", ["\u03b4", "\u2264", "\u2022", "\u2265", "\u2212", "\u223c", "\u00b5", "\u00d7"]
+    "character", ["\u03b4", "\u2264", "\u2022", "\u2265", "\u2212", "\u223c", "\u00b5"]
 )
 def test_unicode_text_set_in_the_symbol_font_is_refused(character: str) -> None:
     # PDF converters write Unicode characters in runs set in Symbol, as pdf2docx does for the HL7
@@ -2950,6 +2981,12 @@ def test_unicode_text_set_in_the_symbol_font_is_refused(character: str) -> None:
     with pytest.raises(DocxRefusedError) as caught:
         read_docx(docx(p(r(f"<w:t>{character}</w:t>", SYMBOL))))
     assert caught.value.code == "unmapped-symbol"
+
+
+def test_a_multiplication_sign_set_in_the_symbol_font_is_the_dot_word_draws() -> None:
+    # Below U+0100 a Symbol run's character is a Symbol code: U+00D7 is dotmath, the dot Word
+    # 16.113.3 drew for it (the test above), read as Word draws it, not as the text says.
+    assert text_of(p(r("<w:t>\u00d7</w:t>", SYMBOL))) == ["\u22c5"]
 
 
 # --- cross-references (docx-reader/1.9.0) ------------------------------------------------------

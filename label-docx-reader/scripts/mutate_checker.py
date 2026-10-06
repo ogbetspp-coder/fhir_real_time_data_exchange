@@ -117,6 +117,7 @@ _HELD_CONTROLS = (
     "every content control of the part, a text box's too, is held to _control before the walk "
     "(DocxSource._part), so none met here refuses"
 )
+_EMPTY_MARKERS = "a paragraph mark's change markers are empty: dropping one drops no content"
 EQUIVALENT: dict[tuple[str, str, str, int], str] = {
     ("_raw_texts", _GUARD, "compare:0", 1): _ATTRIBUTES,
     ("_raw_texts", _GUARD, "str:'&'", 0): _ATTRIBUTES,
@@ -150,10 +151,16 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
     ("_run_tokens.walk", "continue", "statement", 0): _WALK_AGAIN,
     (
         "_run_tokens.walk",
+        'or (child.tag in dropping and element.tag != _w("rPr"))',
+        "str:'rPr'",
+        0,
+    ): _EMPTY_MARKERS,
+    (
+        "_field_runs.collect",
         'gone = dropped or (child.tag in dropping and element.tag != _w("rPr"))',
         "str:'rPr'",
         0,
-    ): "a paragraph mark's change markers are empty: dropping one drops no content",
+    ): _EMPTY_MARKERS,
     ("_run_tokens.table", "index, tables = tables, tables + 1", "binop", 0): _TABLE_STEP,
     ("_run_tokens.table", "index, tables = tables, tables + 1", "int:1", 0): _TABLE_STEP,
     ("_raw_texts", "found = _TAG.match(text, less + 1)", "int:1", 0): (
@@ -382,8 +389,32 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
         "a change (ins, del, moveFrom, moveTo) is a revision outside _SAME_AS and no cell "
         "change: the test after it passes over it too"
     ),
-    ("_run_tokens.walk", "continue", "statement", 3): (
+    ("_run_tokens.walk", "continue", "statement", 4): (
         "the element has no children: walking it reads nothing"
+    ),
+    ("_run_tokens.walk", "continue", "statement", 2): (
+        "a bookmark's end has no children: walking it once carried reads nothing"
+    ),
+    (
+        "_canon.add",
+        "joining = False  # after a paragraph whose mark the view drops, its bookmark ends aside",
+        "bool",
+        0,
+    ): (
+        "a bookmark's end that opens its parent opens it in the view too, nothing being joined "
+        "before it: left out of both alike, the two still agree"
+    ),
+    ("_Story.__init__", "self.east_asian_symbol = False", "bool", 0): (
+        "every run sets it before its tokens are read (run), and only a run's tokens read it"
+    ),
+    ("<module>", "_EAST_ASIAN = ((0x1100, 0x11FF), (0x2E80, 0x10FFFF))", "int:1114111", 0): (
+        "no code point is above U+10FFFF, and U+10FFFF is a noncharacter never certified (Cn)"
+    ),
+    ("_field_runs", "inside = found[begin + 1 : end]", "binop", 0): (
+        "what stands before a begin in found is the run holding it, which the view drops with it"
+    ),
+    ("_field_runs", "any(b < begin < e for b, _, e in fields)", "compare:1", 0): (
+        "places in found are distinct: no other field ends where this one begins"
     ),
     ("_agree", "and all(_agree(a, b) for a, b in zip(expected, found, strict=True))", "bool", 0): (
         _STRICT

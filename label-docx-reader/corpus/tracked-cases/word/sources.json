@@ -626,6 +626,182 @@
       "file": "list-definition-changed.original.docx",
       "sha256": "315096e677c200ea35f5ae200b70a77c8b9133d8dfaf0f9fe9887daf1b70dfd2",
       "bytes": 13117
+    },
+    {
+      "case": "field-inserted-apart.docx",
+      "caseSha256": "c36e4b475d0bb9c63f89be58db11463fe6ebaa2b7845f10375012905a50ace0d",
+      "view": "accepted",
+      "file": "field-inserted-apart.accepted.docx",
+      "sha256": "3209afe3d0f586504a51bab64ff95b238b575dcc5b23a5fdb096da80a63ae5ad",
+      "bytes": 13085
+    },
+    {
+      "case": "field-inserted-apart.docx",
+      "caseSha256": "c36e4b475d0bb9c63f89be58db11463fe6ebaa2b7845f10375012905a50ace0d",
+      "view": "original",
+      "file": "field-inserted-apart.original.docx",
+      "sha256": "1aeb6384aa0dd78e03882e1de8cd227296151416c7b095a0e88c10deba8145d3",
+      "bytes": 13014
+    },
+    {
+      "case": "field-deleted-apart.docx",
+      "caseSha256": "1dbd732f6418f9b07f8ac48cfacec383e1870a5b8757f0bf8c1584dce0174695",
+      "view": "accepted",
+      "file": "field-deleted-apart.accepted.docx",
+      "sha256": "8aae47731ac36a1c6ac49dfe3fbf3902160dddfc751258a017a8a226f74c41eb",
+      "bytes": 13014
+    },
+    {
+      "case": "field-deleted-apart.docx",
+      "caseSha256": "1dbd732f6418f9b07f8ac48cfacec383e1870a5b8757f0bf8c1584dce0174695",
+      "view": "original",
+      "file": "field-deleted-apart.original.docx",
+      "sha256": "3e92e5590e9203166443b01b0039b122dafdcc29b61cc020cd544357c2357277",
+      "bytes": 13091
+    },
+    {
+      "case": "field-inserted-then-deleted-apart.docx",
+      "caseSha256": "8e9667116486fd9c470de46533e330d2b76756252ed76fbfefc4951dfa326548",
+      "view": "accepted",
+      "file": "field-inserted-then-deleted-apart.accepted.docx",
+      "sha256": "6e305b0be7ba0a052f70281945e5e02a3b269aa8dcc04e65320f1d1b4aec51f2",
+      "bytes": 13015
+    },
+    {
+      "case": "field-inserted-then-deleted-apart.docx",
+      "caseSha256": "8e9667116486fd9c470de46533e330d2b76756252ed76fbfefc4951dfa326548",
+      "view": "original",
+      "file": "field-inserted-then-deleted-apart.original.docx",
+      "sha256": "6a7f3c0b42e39f0655da86d1b0cb61f7473f61b4bfa8c0e0451819c6471fd02d",
+      "bytes": 13016
+    },
+    {
+      "case": "field-wrapped-around-text.docx",
+      "caseSha256": "438a7db9a6e316e4b9d46d41315d74a79e9d17756ef37d45247b7fc5372a9d92",
+      "view": "accepted",
+      "file": "field-wrapped-around-text.accepted.docx",
+      "sha256": "8b380635af48a1276f4c74e1b6647ad437b2d30f837a864b17c17f1dcfa6a201",
+      "bytes": 13099
+    },
+    {
+      "case": "field-wrapped-around-text.docx",
+      "caseSha256": "438a7db9a6e316e4b9d46d41315d74a79e9d17756ef37d45247b7fc5372a9d92",
+      "view": "original",
+      "file": "field-wrapped-around-text.original.docx",
+      "sha256": "6e6be4a384871fbcf313e1dbc4c6e59c2f567a726ec7b533277e155ddc9aa203",
+      "bytes": 13015
+    },
+    {
+      "case": "field-end-inserted.docx",
+      "caseSha256": "863eb722fcb8dfb1dc6376fbfe05dfb852afcfc2382d0faa89b2660269ee3589",
+      "view": "accepted",
+      "file": "field-end-inserted.accepted.docx",
+      "sha256": "fded2b5118a79a069aac57fc8ffaa6076bf8c49a0c4091dec75761b03bbd44f6",
+      "bytes": 13097
+    },
+    {
+      "case": "field-end-inserted.docx",
+      "caseSha256": "863eb722fcb8dfb1dc6376fbfe05dfb852afcfc2382d0faa89b2660269ee3589",
+      "view": "original",
+      "file": "field-end-inserted.original.docx",
+      "sha256": "da7075e83c932906a61d038db7719a3c33158c13746ceb4d8d19aa99768ff395",
+      "bytes": 13021
+    },
+    {
+      "case": "mark-deleted-before-table-deleted-whole.docx",
+      "caseSha256": "f521ec274c50c7bbabf65077f7d8ea2906ffce3fe8e8201f2eb1afc2bc92d807",
+      "view": "accepted",
+      "file": "mark-deleted-before-table-deleted-whole.accepted.docx",
+      "sha256": "00c3a8a7669255e85042f4580e2b387bd7f5979fe59185b6e871a9b410c188b7",
+      "bytes": 12991
+    },
+    {
+      "case": "mark-deleted-before-table-deleted-whole.docx",
+      "caseSha256": "f521ec274c50c7bbabf65077f7d8ea2906ffce3fe8e8201f2eb1afc2bc92d807",
+      "view": "original",
+      "file": "mark-deleted-before-table-deleted-whole.original.docx",
+      "sha256": "3c947207fadbdbe296a1acd03eb27c5c5d471d6e5479bde71da89f32dc3e1c18",
+      "bytes": 13191
+    },
+    {
+      "case": "mark-and-text-deleted-before-table-deleted-whole.docx",
+      "caseSha256": "bfb55e1d63c9e0aff56f3b5b2bdb77e735011336315a4e756f5c3db2615a4a3f",
+      "view": "accepted",
+      "file": "mark-and-text-deleted-before-table-deleted-whole.accepted.docx",
+      "sha256": "611e95692c33ebc2d45a019486d64ef41ca797dbe4f3b9094297754b86c00029",
+      "bytes": 13008
+    },
+    {
+      "case": "mark-and-text-deleted-before-table-deleted-whole.docx",
+      "caseSha256": "bfb55e1d63c9e0aff56f3b5b2bdb77e735011336315a4e756f5c3db2615a4a3f",
+      "view": "original",
+      "file": "mark-and-text-deleted-before-table-deleted-whole.original.docx",
+      "sha256": "57fe30bc887d1100b9a1f8674bf97a99f6e2cb61d57fc54df213fd7869505fd5",
+      "bytes": 13238
+    },
+    {
+      "case": "mark-inserted-before-table-inserted-whole.docx",
+      "caseSha256": "b49c0dfd98e9541c9d41372341a4cde41f358d765c3ab51cf38b4a3cded29386",
+      "view": "accepted",
+      "file": "mark-inserted-before-table-inserted-whole.accepted.docx",
+      "sha256": "1885117d6186b2dacc79b0d05eabe074b2e166aa02f370d9e87bf3ee331fd786",
+      "bytes": 13254
+    },
+    {
+      "case": "mark-inserted-before-table-inserted-whole.docx",
+      "caseSha256": "b49c0dfd98e9541c9d41372341a4cde41f358d765c3ab51cf38b4a3cded29386",
+      "view": "original",
+      "file": "mark-inserted-before-table-inserted-whole.original.docx",
+      "sha256": "19acaba792693ee9276b8ac91954d60b1e994c127290c6d7c44c65e021a6f98e",
+      "bytes": 13268
+    },
+    {
+      "case": "mark-deleted-before-bookmark-end.docx",
+      "caseSha256": "cee9770b66fa5fa1211f208b0ecce2768d91b8d822a0ed89766625cd1e029031",
+      "view": "accepted",
+      "file": "mark-deleted-before-bookmark-end.accepted.docx",
+      "sha256": "40e065039ba79514cd5c27801cd513622880414868732d8fafba3af07884fa58",
+      "bytes": 13030
+    },
+    {
+      "case": "mark-deleted-before-bookmark-end.docx",
+      "caseSha256": "cee9770b66fa5fa1211f208b0ecce2768d91b8d822a0ed89766625cd1e029031",
+      "view": "original",
+      "file": "mark-deleted-before-bookmark-end.original.docx",
+      "sha256": "0bac327c855e205954ebbec8336008b1445a999787be68b97d51af3d34663d12",
+      "bytes": 13039
+    },
+    {
+      "case": "mark-inserted-before-bookmark-end.docx",
+      "caseSha256": "d05cad45b060ee2a0a84e4389c579cff7f33b940cae9c2bab0cf07c91bc27600",
+      "view": "accepted",
+      "file": "mark-inserted-before-bookmark-end.accepted.docx",
+      "sha256": "b96dfcc533a510ef10a22a0ab998f8764cb4da8269ec35b065ee27af6a2c731c",
+      "bytes": 13038
+    },
+    {
+      "case": "mark-inserted-before-bookmark-end.docx",
+      "caseSha256": "d05cad45b060ee2a0a84e4389c579cff7f33b940cae9c2bab0cf07c91bc27600",
+      "view": "original",
+      "file": "mark-inserted-before-bookmark-end.original.docx",
+      "sha256": "20c84cc10f04193a5df6ac5ba1ac6419694c314e71571c0cd27edd0ed948f70a",
+      "bytes": 13017
+    },
+    {
+      "case": "mark-inserted-empty-before-table-inserted-whole.docx",
+      "caseSha256": "28f66837ecf90cf434c100393b3ab7fd2cbdbe39e2fb8418bc1b0f8b080d39df",
+      "view": "accepted",
+      "file": "mark-inserted-empty-before-table-inserted-whole.accepted.docx",
+      "sha256": "7a9c371196ef19cd02abb8171d79e45bcaafbd46fde71c7e3ff539da7996ab90",
+      "bytes": 13221
+    },
+    {
+      "case": "mark-inserted-empty-before-table-inserted-whole.docx",
+      "caseSha256": "28f66837ecf90cf434c100393b3ab7fd2cbdbe39e2fb8418bc1b0f8b080d39df",
+      "view": "original",
+      "file": "mark-inserted-empty-before-table-inserted-whole.original.docx",
+      "sha256": "5d9f7bdfbe0b6cb5b896f870ae1c87bcbac0a9338a0385be0f0b8fa49df758af",
+      "bytes": 13008
     }
   ]
 }

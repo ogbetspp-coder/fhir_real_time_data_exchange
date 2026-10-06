@@ -89,7 +89,7 @@ from another web page.
 
 ```json
 {"certificate": {…}, "comments": [], "endnotes": [], "footers": [], "footnotes": [],
- "format": "label-docx-json/1.18.0", "headers": [],
+ "format": "label-docx-json/1.18.1", "headers": [],
  "paragraphs": [{"anchored": [{"kind": "text-box", "offset": 2, "read": false}],
    "comments": [], "markHidden": false,
    "marks": [{"end": 5, "kind": "superscript", "start": 4}], "notes": [], "numbering": null,
@@ -97,7 +97,7 @@ from another web page.
      "offset": 8, "part": "word/media/image1.png", "pixels": [8, 8], "reason": null,
      "sha256": "…", "type": "png"}],
    "style": "Heading2", "table": [0, 1, 0], "text": "x 109/l \ufffc"}],
- "reader": "docx-reader/1.30.1", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
+ "reader": "docx-reader/1.31.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
  "tables": [{"grid": {"columns": 2, "rows": [
    {"after": 0, "before": 0, "cells": [{"column": 0, "merge": null, "span": 2}],
     "exactHeight": false},
@@ -160,7 +160,7 @@ Every key: the docstrings of [`output.py`](src/label_docx/output.py) and
 | ------------------------------------------------------------- | ------------------------------------------ |
 | Each rule reads exactly or refuses                            | `test_reader.py`, `test_epi.py`, `test_tracked.py` |
 | Labels, notes, fields, text, headers, footers, bold, italic, caps and strike are what Word shows | Word's recorded answers (`test_word_oracle.py`) |
-| Tracked views are Word's Accept All / Reject All (33 of 39 cases; 6 refused) | Word's own files (`test_tracked.py`) |
+| Tracked views are Word's Accept All / Reject All (42 of 50 cases; 8 refused) | Word's own files (`test_tracked.py`) |
 | ePI sections are what Chrome shows                            | Chrome's recorded answers (`test_browser_oracle.py`) |
 | Every result read is certified; seeded changes to each corpus result read are caught | `test_certify.py` |
 | Each fault put into the checker is caught by its tests, or recorded as unable to change a result | the mutation record (`test_checker_mutants.py`): 3,420 of 3,514 faults killed, 94 recorded as unable to change a result, none unexplained |

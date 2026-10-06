@@ -183,8 +183,11 @@ document defaults or through the theme) are both Symbol, by that exact name, wit
 or right-to-left property and no font hint other than ``default`` (which sends ambiguous characters
 to the ``hAnsi`` font, Symbol here), has every character mapped through ``SYMBOL_FONT``; a
 character the table does not hold is refused. ``<w:sym>`` in the Symbol font is mapped the same
-way. Any other run with Symbol in one of its four font slots is refused, because Word picks the
-font per character and the reader cannot be sure which characters it draws in Symbol. A dingbat
+way. A run with Symbol in its East Asian slot alone, and none of those, is read as stored: Word
+draws text that is not East Asian in the Latin fonts (``corpus/numbering-cases``,
+symbol-east-asian-slot), and East Asian text in it is refused. Any other run with Symbol in one of
+its four font slots is refused, because Word picks the font per character and the reader cannot be
+sure which characters it draws in Symbol. A dingbat
 font (Wingdings, Webdings, Zapf Dingbats, Marlett, MT Extra, Monotype Sorts), another spelling of
 Symbol ("SymbolMT", "symbol", "Bookshelf Symbol 7": Word's answer is not on record), or any font
 the document's font table declares symbol-encoded (charset 02, or the symbol code page in
@@ -286,8 +289,8 @@ What it refuses (``DocxRefusedError.code``):
   character above U+00FF outside U+F000 to U+F0FF), a ``w:sym`` without a hex code or in a font
   other than Symbol, or a Wingdings list bullet the table does not hold.
 - ``symbol-font``: text or a list label in a dingbat or symbol-encoded font, Symbol in only some
-  of the font slots or under a table style's conditional fonts, or a theme font with no theme
-  part or not in it.
+  of the font slots (but the East Asian slot alone, where only East Asian text is refused) or
+  under a table style's conditional fonts, or a theme font with no theme part or not in it.
 - ``private-use-character``: a private-use code point outside a Symbol-font run.
 - ``format-character``: in ``<w:t>``, an invisible formatting character (category Cf: zero-width
   characters, bidirectional controls, a soft hyphen, which Word writes as ``w:softHyphen``), any
@@ -317,28 +320,27 @@ What it refuses (``DocxRefusedError.code``):
   SEQ restarting at headings in a body that sets a text box aside unread (see "Anchored").
 - ``stale-field``: a field marked for update, or a computed field (SEQ, STYLEREF, REF or
   NOTEREF) whose stored result is not what Word prints.
-- ``unsupported-element``: anything that can carry text and is not read above, and any element
-  the reader does not know: text boxes but those set aside (see "Anchored"), a drawing that is
-  not a picture (a chart, a shape
-  outside alternate content) or neither in line nor anchored, a hidden picture in line
-  (``wp:docPr hidden``), a ``w:pict`` that is not one visible picture in line or positioned
-  absolutely, alternate content that is not a picture or shape with no text, embedded objects and
-  ActiveX controls, math, ``altChunk``, form fields, a run or paragraph property in a namespace
-  that is neither WordprocessingML nor one of Word's extensions (w14 on), alternate content in
-  the styles, theme, font table, settings or lists (but a list level's own child), content
-  marked for markup compatibility processing (``mc:ProcessContent``, ``mc:MustUnderstand``) in
-  any part, content controls bound to data (in any namespace), an empty content control naming a
-  placeholder building block or saying it shows its placeholder (``showingPlcHdr``; Word shows
-  the placeholder, not in the content; one with neither shows nothing, as read),
-  a note or comment mark in a field code, a note mark outside the body, a note's echo of its mark
-  outside that note, a comment mark in a comment, a comment's echo of its mark outside it, a note
-  of a type other than normal (separators aside), conditional table formatting whose effect on
-  the text or a list label is not on record (see "Styles"), text, whitespace, a list
-  label, or a note, comment or page mark in a vertically merged-away cell (Word draws none of it
-  and does not count the label; a horizontally merged one is read as its own cell, as Word shows
-  it), a bidirectional override (``bdo``) or an embedding (``dir``) of no direction, a style
-  reference that names a style of another kind, and a ``basedOn`` that does (but a paragraph
-  style's on a character style).
+- ``unsupported-element``: anything that can carry text and is not read above, and any element the
+  reader does not know: text boxes but those set aside (see "Anchored"), a drawing that is not a
+  picture (a chart, a shape outside alternate content) or neither in line nor anchored, a hidden
+  picture in line (``wp:docPr hidden``), a ``w:pict`` that is not one visible picture in line or
+  positioned absolutely, alternate content that is not a picture or shape with no text, embedded
+  objects and ActiveX controls, math, ``altChunk``, form fields, a run or paragraph property in a
+  namespace that is neither WordprocessingML nor one of Word's extensions (w14 on), alternate
+  content in the styles, theme, font table, settings or lists (but a list level's own child, and a
+  picture bullet's definition, refused only where a level names it), content marked for markup
+  compatibility processing (``mc:ProcessContent``, ``mc:MustUnderstand``) in any part, content
+  controls bound to data (in any namespace), an empty content control naming a placeholder building
+  block or saying it shows its placeholder (``showingPlcHdr``; Word shows the placeholder, not in
+  the content; one with neither shows nothing, as read), a note or comment mark in a field code, a
+  note mark outside the body, a note's echo of its mark outside that note, a comment mark in a
+  comment, a comment's echo of its mark outside it, a note of a type other than normal (separators
+  aside), conditional table formatting whose effect on the text or a list label is not on record
+  (see "Styles"), text, whitespace, a list label, or a note, comment or page mark in a vertically
+  merged-away cell (Word draws none of it and does not count the label; a horizontally merged one is
+  read as its own cell, as Word shows it), a bidirectional override (``bdo``) or an embedding
+  (``dir``) of no direction, a style reference that names a style of another kind, and a ``basedOn``
+  that does (but a paragraph style's on a character style).
 - ``unsupported-formatting``: formatting or layout whose effect on what is shown is not on
   record: complex script (right-to-left or ``cs`` in force, a ``dir`` embedding, or Hebrew, Arabic,
   Indic, Thai... characters) whose ``b`` and ``bCs``, or ``i`` and ``iCs``, differ (Word draws the
@@ -437,7 +439,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 # The version of the rules above; versions.lock.json ties it to this file (tests/test_locks.py).
-READER_VERSION = "docx-reader/1.30.1"
+READER_VERSION = "docx-reader/1.31.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -483,6 +485,7 @@ SYMBOL_FONT: dict[int, str] = {
     0x26: "&",
     0x28: "(",
     0x29: ")",
+    0x2A: "\u2217",  # ASTERISK OPERATOR
     0x2B: "+",
     0x2C: ",",
     0x2D: "\u2212",  # MINUS SIGN
@@ -503,11 +506,15 @@ SYMBOL_FONT: dict[int, str] = {
     0x64: "\u03b4",  # GREEK SMALL LETTER DELTA
     0x67: "\u03b3",  # GREEK SMALL LETTER GAMMA
     0x6D: "\u03bc",  # GREEK SMALL LETTER MU; symbol.txt also gives U+00B5 MICRO SIGN
+    0x74: "\u03c4",  # GREEK SMALL LETTER TAU
     0x7B: "{",
     0x7C: "|",
     0x7D: "}",
+    0x7E: "\u223c",  # TILDE OPERATOR
     0xA3: "\u2264",  # LESS-THAN OR EQUAL TO
     0xA5: "\u221e",  # INFINITY
+    0xAB: "\u2194",  # LEFT RIGHT ARROW
+    0xAD: "\u2191",  # UPWARDS ARROW
     0xAE: "\u2192",  # RIGHTWARDS ARROW
     0xB0: "\u00b0",  # DEGREE SIGN
     0xB1: "\u00b1",  # PLUS-MINUS SIGN
@@ -516,6 +523,7 @@ SYMBOL_FONT: dict[int, str] = {
     0xB7: "\u2022",  # BULLET
     0xB9: "\u2260",  # NOT EQUAL TO
     0xBB: "\u2248",  # ALMOST EQUAL TO
+    0xD7: "\u22c5",  # DOT OPERATOR
 }
 
 # Wingdings list bullets as ISO/IEC JTC1/SC2/WG2 N4384 maps them to Unicode (its normative
@@ -1693,15 +1701,49 @@ def _font_kind(styles: _Styles, name: str | None) -> str:
     return _font_class(name)
 
 
-def _in_symbol(styles: _Styles, properties: _Properties, table_style: str | None) -> bool:
-    """Whether every character with these properties is drawn in Symbol; refused if unsure."""
-    kinds = {
+def _font_kinds(styles: _Styles, properties: _Properties) -> dict[str, str]:
+    """The kind of font in each of a run's four font slots."""
+    return {
         slot: _font_kind(styles, properties.font(slot))
         for slot in ("ascii", "hAnsi", "eastAsia", "cs")
     }
+
+
+def _symbol_east_asian(styles: _Styles, properties: _Properties) -> bool:
+    """Whether Symbol is in the East Asian slot alone, and nothing sends other text there.
+
+    With no font hint, no complex script and no right to left, Word draws text that is not
+    East Asian in the Latin fonts (corpus/numbering-cases, symbol-east-asian-slot): the run is
+    read as stored, and East Asian text in it, which Word would draw in Symbol, is refused
+    (``_east_asian``).
+    """
+    kinds = _font_kinds(styles, properties)
+    return (
+        kinds["eastAsia"] == "symbol"
+        and "symbol" not in (kinds["ascii"], kinds["hAnsi"], kinds["cs"])
+        and not properties.toggle("cs")
+        and not properties.toggle("rtl")
+        and properties.value("rFonts", "hint") in (None, "default")
+    )
+
+
+def _east_asian(code: int) -> bool:
+    """Whether Word may draw the character in the East Asian font with no hint.
+
+    Hangul Jamo, and everything from CJK Radicals Supplement up (ECMA-376 Part 1, 17.3.2.26),
+    taken broadly: what is left is never drawn there.
+    """
+    return 0x1100 <= code <= 0x11FF or code >= 0x2E80
+
+
+def _in_symbol(styles: _Styles, properties: _Properties, table_style: str | None) -> bool:
+    """Whether every character with these properties is drawn in Symbol; refused if unsure."""
+    kinds = _font_kinds(styles, properties)
     if "dingbat" in kinds.values() or "wingdings" in kinds.values():
         raise DocxRefusedError("symbol-font", "a run in a dingbat or symbol-encoded font")
     symbol = "symbol" in kinds.values()
+    if symbol and _symbol_east_asian(styles, properties):
+        return False
     if symbol and (
         kinds["ascii"] != "symbol"
         or kinds["hAnsi"] != "symbol"
@@ -2544,6 +2586,7 @@ class _ParagraphReader:
             self.styles, rpr, self.paragraph_style, self.table_style, None, self.conditional
         )
         symbol = _in_symbol(self.styles, properties, self.table_style)
+        east_asian_symbol = not symbol and _symbol_east_asian(self.styles, properties)
         # The same without the conditional parts: their fonts, sizes, colours and spacing are not
         # on record (Word answered bold, italic, capitals and strike), so the reader reads only
         # what they cannot change.
@@ -2622,6 +2665,8 @@ class _ParagraphReader:
             if tag == _w("t"):
                 text = child.text or ""
                 _check_whitespace(child, text)
+                if east_asian_symbol and any(_east_asian(ord(c)) for c in text):
+                    raise DocxRefusedError("symbol-font", "East Asian text in the Symbol font")
                 produced = _characters(text, symbol)
                 self.symbolic = self.symbolic or (symbol and bool(text))
             elif tag in _DRAWN:
@@ -4936,12 +4981,16 @@ def read_document(data: bytes) -> Document:
         for definitions in parts[:5]:
             # Alternate content in the styles, theme, fonts, settings or lists: Word applies one
             # branch, which the reader would not. Only a list level's own child is left to the
-            # level, which a paragraph cannot draw (``_level``).
+            # level, which a paragraph cannot draw (``_level``), and a picture bullet's
+            # definition, which only a level naming it draws (``lvlPicBulletId``, refused there).
             if definitions is None:
                 continue
             levels = set(definitions.iter(_w("lvl")))
+            pictures = {e for b in definitions.iterfind(_w("numPicBullet")) for e in b.iter()}
             if any(
-                element not in levels and any(c.tag == _ALTERNATE for c in element)
+                element not in levels
+                and element not in pictures
+                and any(c.tag == _ALTERNATE for c in element)
                 for element in definitions.iter()
             ):
                 raise DocxRefusedError(
@@ -5285,23 +5334,30 @@ def tracked(data: bytes) -> tuple[bytes, bytes, tuple[Change, ...]]:
 
     - A run change is kept (its runs stand in its place; a deletion's ``delText`` is ``t``
       again) or dropped whole; a move's range markers go.
+    - A field is kept whole, or every mark of it (begin, separator, end) dropped, in one change
+      or several; then it goes with all it holds, what its changes would keep too (``_fields``).
     - A paragraph mark a view drops joins the paragraph to the next one in document order (past
-      a table, its first paragraph), which keeps its own properties. A section so joined takes
-      the next section's properties (recorded for two bare sections only).
+      a table, its first paragraph; past a table the view drops whole, the paragraph after it),
+      which keeps its own properties; a bookmark's end between the two stands after what is
+      joined. A section so joined takes the next section's properties
+      (recorded for two bare sections only).
     - A row the view drops goes whole, and a table whose every row it drops; a footnote or
       endnote whose reference it drops goes with it.
     - Changed run, paragraph, table, row, cell, section and style properties are the current
       ones in the accepted view and the stored former ones in the original.
 
-    Refused (``tracked-change``): a change holding part of a field (Word drops the whole field
-    result), a dropped mark at the end of a table cell (Word dissolves the table) or of the
-    document, ending a section with headers or footers or whose note settings or first page
-    differ from the next section's, or before a table whose row holding the paragraph it joins,
-    at any depth, the view drops (Word cannot accept it), a join into an empty table or anything
-    but a paragraph
+    Refused (``tracked-change``): a view keeping some marks of a field and dropping others (a
+    separator dropped makes the result code; an end dropped leaves a field open), a field dropped
+    whole holding what its changes keep where it stands in another, holds a field kept or runs past
+    its paragraph, a paragraph keeping text whose mark a view drops before a table it drops whole
+    (Word moves the text into the table and leaves its rows' changes), a dropped mark at
+    the end of a table cell (Word dissolves the table) or of the document, ending a section with
+    headers or footers or whose note settings or first page differ from the next section's, or
+    before a table the view keeps a row of whose row holding the paragraph it joins, at any depth,
+    the view drops (Word cannot accept it), a join into an empty table or anything but a paragraph
     or table, a change to a list definition (Word's Reject All rewrites the styles instead), a
-    change without its former properties, a content control a view empties (Word shows
-    placeholder spaces), and a view with any revision left (cells inserted, deleted or merged).
+    change without its former properties, a content control a view empties (Word shows placeholder
+    spaces), and a view with any revision left (cells inserted, deleted or merged).
 
     The changes are listed in the order stored; a run formatting change a split run holds twice
     (equal to the paragraph's last one, former properties and all) is listed once.
@@ -5338,6 +5394,7 @@ def tracked(data: bytes) -> tuple[bytes, bytes, tuple[Change, ...]]:
                 changes.append(change)
             for view, parts in written.items():
                 copy = deepcopy(root)
+                _fields(copy, view)
                 _view(copy, view, _revised(copy))
                 left = next((e for e in copy.iter() if e.tag in _TRACKED), None)
                 if left is not None:
@@ -5508,9 +5565,13 @@ def _view(element: ET.Element, view: str, revised: set[ET.Element]) -> None:
     keep = {_w(name) for name in _VIEW_KEEPS[view]}
     drop = {_w(name) for name in _CHANGES} - keep
     runs = element.tag == _w("sdtContent") and _runs_in(element)
-    for here, following in itertools.pairwise(element):
+    source = list(element)
+    for index, here in enumerate(source):
         mark = here.find(f"{_w('pPr')}/{_w('rPr')}") if here.tag == _w("p") else None
-        if following.tag != _w("tbl") or mark is None or not any(c.tag in drop for c in mark):
+        if mark is None or not any(c.tag in drop for c in mark):
+            continue
+        following = next((c for c in source[index + 1 :] if c.tag != _w("bookmarkEnd")), None)
+        if following is None or following.tag != _w("tbl"):
             continue
         # The rows on the way to the paragraph the mark joins (``_first_paragraph``), at any
         # depth: those before it in document order are the rows that hold it.
@@ -5520,7 +5581,18 @@ def _view(element: ET.Element, view: str, revised: set[ET.Element]) -> None:
                 break
             if node.tag == _w("tr"):
                 rows.append(node)
-        if any(c.tag in drop for row in rows for c in row.findall(f"{_w('trPr')}/*")):
+        gone = [_row_dropped(c, drop) for c in following if c.tag not in _TABLE_OWN]
+        if all(gone):
+            if _chain_holds(source, index, drop):
+                # Word moves what the paragraph keeps into the table and leaves its rows'
+                # changes (mark-inserted-before-table-inserted-whole): no view of Word's.
+                raise DocxRefusedError(
+                    "tracked-change", "a paragraph with text joins a table the view drops"
+                )
+            # The empty paragraph goes with the table, as if neither were there
+            # (mark-deleted-before-table-deleted-whole and its kin).
+            continue
+        if any(_row_dropped(row, drop) for row in rows):
             # Word's Accept All leaves such a mark: it cannot join a row it removes
             # (corpus/tracked-cases, mark-deleted-before-table-first-row-deleted); in a nested
             # table its answer is not on record.
@@ -5529,8 +5601,6 @@ def _view(element: ET.Element, view: str, revised: set[ET.Element]) -> None:
     for child in element:
         if child.tag in _MOVE_RANGES:
             continue
-        if element.tag in _RUN_HOLDERS and child.tag in keep | drop:
-            _whole_fields(child)
         if element.tag in _RUN_HOLDERS and child.tag in drop:
             continue
         row = child.find(_w("trPr")) if child.tag == _w("tr") else None
@@ -5592,23 +5662,115 @@ def _runs_in(element: ET.Element) -> bool:
     return next(element.iter(_w("r")), None) is not None
 
 
-def _whole_fields(change: ET.Element) -> None:
-    """Refuse a change that holds part of a field: its begin, separator or end alone.
+def _row_dropped(row: ET.Element, drop: set[str]) -> bool:
+    """Whether ``row`` is a row the view drops (not a row, or one it keeps, is not)."""
+    return row.tag == _w("tr") and any(c.tag in drop for c in row.findall(f"{_w('trPr')}/*"))
 
-    Word accepts a deleted separator by removing the field's result with it (corpus/
-    tracked-cases), not by what the change holds; only whole fields are taken or left.
+
+def _chain_holds(children: list[ET.Element], index: int, drop: set[str]) -> bool:
+    """Whether what joins at ``children[index]`` holds anything the view keeps.
+
+    The paragraphs joined into it, those before it whose marks the view drops too, and the
+    bookmark ends between them and after it: any run content, or any element with none.
     """
-    depth = 0
-    for node in change.iter(_w("fldChar")):
-        kind = node.get(_w("fldCharType"))
-        if kind == "begin":
-            depth += 1
-        elif depth == 0 or kind not in ("separate", "end"):
-            raise DocxRefusedError("tracked-change", f"a change holds part of a field ({kind})")
-        elif kind == "end":
-            depth -= 1
-    if depth:
-        raise DocxRefusedError("tracked-change", "a change holds part of a field (begin)")
+    last = index
+    while last + 1 < len(children) and children[last + 1].tag == _w("bookmarkEnd"):
+        last += 1
+    # The first paragraph of the chain: bookmark ends before it are not carried.
+    first = at = index
+    while at > 0:
+        at -= 1
+        before = children[at]
+        if before.tag == _w("bookmarkEnd"):
+            continue
+        mark = before.find(f"{_w('pPr')}/{_w('rPr')}") if before.tag == _w("p") else None
+        if mark is None or not any(c.tag in drop for c in mark):
+            break
+        first = at
+
+    def holds(element: ET.Element, dropped: bool) -> bool:
+        for child in element:
+            gone = dropped or (element.tag in _RUN_HOLDERS and child.tag in drop)
+            if gone or child.tag == _w("pPr"):
+                continue
+            if child.tag == _w("r"):
+                found = any(c.tag != _w("rPr") for c in child)
+            elif not len(child):
+                found = child.tag not in _TRACKED | _MOVE_RANGES
+            else:
+                found = holds(child, gone)
+            if found:
+                return True
+        return False
+
+    return any(c.tag == _w("bookmarkEnd") or holds(c, False) for c in children[first : last + 1])
+
+
+# A table's own children that are not rows.
+_TABLE_OWN = {_w("tblPr"), _w("tblGrid")}
+
+
+def _fields(root: ET.Element, view: str) -> None:
+    """Hold each field to the view, changed in place: kept whole, or dropped whole.
+
+    A field whose every mark (begin, separator, end) the view keeps is kept, its changes applied
+    as any others. One whose every mark it drops, in one change or several (corpus/tracked-cases,
+    field-inserted-apart), goes with all it holds: Word drops a field inserted around code and
+    text already there, code, text and all (field-wrapped-around-text). What its changes would
+    keep inside it is put in a change the view drops; where that field stands in another, holds
+    a field the view keeps or ends past its paragraph, what Word does is not on record, and it
+    is refused. A field the view keeps in part is refused too: a separator dropped makes the
+    result code (field-separator-deleted); an end dropped leaves the field open
+    (field-end-inserted).
+    """
+    drop = {_w(name) for name in _CHANGES if name not in _VIEW_KEEPS[view]}
+    dropping = _w("ins" if view == "original" else "del")
+    # Each open field: whether the view drops each of its marks, the paragraph of its begin,
+    # whether it stands in another field, and each run with content the view keeps inside it,
+    # with the element holding it.
+    fields: list[
+        tuple[list[bool], ET.Element | None, bool, list[tuple[ET.Element, ET.Element]]]
+    ] = []
+
+    def walk(element: ET.Element, dropped: bool, paragraph: ET.Element | None) -> None:
+        for child in element:
+            gone = dropped or (element.tag in _RUN_HOLDERS and child.tag in drop)
+            if child.tag == _w("fldChar"):
+                kind = child.get(_w("fldCharType"))
+                if kind == "begin":
+                    fields.append(([gone], paragraph, bool(fields), []))
+                elif fields and kind in ("separate", "end"):
+                    marks, start, nested, kept = fields[-1]
+                    marks.append(gone)
+                    if any(marks) and not all(marks):
+                        raise DocxRefusedError("tracked-change", "a change holds part of a field")
+                    if kind == "end":
+                        fields.pop()
+                        if all(marks) and kept:
+                            _drop_with_field(kept, nested or paragraph is not start, dropping)
+                continue  # anything else the reader refuses
+            if child.tag == _w("r") and not gone and any(c.tag != _w("rPr") for c in child):
+                for field in fields:
+                    field[3].append((element, child))
+            walk(child, gone, child if child.tag == _w("p") else paragraph)
+
+    walk(root, False, None)
+
+
+def _drop_with_field(
+    kept: list[tuple[ET.Element, ET.Element]], unsure: bool, dropping: str
+) -> None:
+    """Put each run in a change the view drops, as its field goes; refused where unsure."""
+    if unsure or any(c.tag == _w("fldChar") for _, run in kept for c in run):
+        raise DocxRefusedError(
+            "tracked-change", "a field dropped whole in another, past its paragraph or with one"
+        )
+    for holder, run in kept:
+        at = list(holder).index(run)
+        change = ET.Element(dropping)
+        holder.remove(run)
+        change.append(run)
+        holder.insert(at, change)
 
 
 def _join(element: ET.Element, drop: set[str]) -> None:
@@ -5618,20 +5780,27 @@ def _join(element: ET.Element, drop: set[str]) -> None:
     paragraph (Word's answer, corpus/tracked-cases). A paragraph that ends a section joins the
     next section's first paragraph and the section ends there no more, unless the section has
     headers or footers of its own; one at the end of a table cell or of the document is refused.
+    A bookmark's end between the two stands after what is joined (mark-deleted-before-bookmark-end).
     """
     children = list(element)
     out: list[ET.Element] = []
+    # What the paragraph being joined carries to the next, and whether one is being joined (an
+    # empty paragraph carries nothing).
     carried: list[ET.Element] = []
+    joining = False
     for index, child in enumerate(children):
-        if carried:
+        if joining and child.tag == _w("bookmarkEnd"):
+            carried.append(child)
+            continue
+        if joining:
             target = _first_paragraph(child)
             properties = target.find(_w("pPr"))
             at = 1 if properties is not None and target[0] is properties else 0
             target[at:at] = carried
-            carried = []
+            carried, joining = [], False
         mark = child.find(f"{_w('pPr')}/{_w('rPr')}") if child.tag == _w("p") else None
         if mark is not None and any(c.tag in drop for c in mark):
-            following = children[index + 1] if index + 1 < len(children) else None
+            following = next((c for c in children[index + 1 :] if c.tag != _w("bookmarkEnd")), None)
             if following is None or following.tag not in (_w("p"), _w("tbl")):
                 raise DocxRefusedError(
                     "tracked-change", "a paragraph mark joins what is not a paragraph"
@@ -5652,7 +5821,7 @@ def _join(element: ET.Element, drop: set[str]) -> None:
                 raise DocxRefusedError(
                     "tracked-change", "a section ends between sections that differ"
                 )
-            carried = [c for c in child if c.tag != _w("pPr")]
+            carried, joining = [c for c in child if c.tag != _w("pPr")], True
             continue
         out.append(child)
     element[:] = out

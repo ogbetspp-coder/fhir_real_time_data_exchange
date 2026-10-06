@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import json
+import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -303,7 +304,7 @@ def test_the_check_holds_each_view_to_the_source_on_its_own() -> None:
     source = docx(p(t("a"), mark("ins")) + p(t("b") + dele("c") + ins(t("d"))))
     accepted, original, _ = tracked(source)
     assert certify_tracked(source, {"accepted": accepted, "original": original}) == {
-        "checker": "conservation-check/1.18.0",
+        "checker": "conservation-check/1.19.0",
         "accepted": {"characters": 3, "elements": 0, "paragraphsJoined": 0},
         "original": {"characters": 3, "elements": 0, "paragraphsJoined": 1},
     }
@@ -348,15 +349,212 @@ def test_the_check_holds_each_view_to_the_source_on_its_own() -> None:
         )
 
 
+BEGIN, SEPARATE, END = (
+    r(f'<w:fldChar w:fldCharType="{k}"/>') for k in ("begin", "separate", "end")
+)
+
+
+def code(text: str) -> str:
+    return r(f'<w:instrText xml:space="preserve">{text}</w:instrText>')
+
+
+def _runs(view: bytes) -> list[tuple[str, str]]:
+    """Each text and code element of a view's body, in order: (its name, its text)."""
+    with zipfile.ZipFile(io.BytesIO(view)) as package:
+        root = ET.fromstring(package.read("word/document.xml"))
+    names = {f"{{{W}}}t": "t", f"{{{W}}}instrText": "instrText"}
+    return [(names[e.tag], e.text or "") for e in root.iter() if e.tag in names]
+
+
+def test_a_field_is_kept_whole_or_every_mark_of_it_dropped() -> None:
+    link = code(' HYPERLINK "https://x" ')
+    # In pieces, each its own change: gone whole from the original (field-inserted-apart).
+    apart = "".join(ins(x, key) for key, x in enumerate((BEGIN, link, SEPARATE, t("site"), END)))
+    assert views(docx(p(t("See ") + apart))) == {
+        "accepted": [("See site", None)],
+        "original": [("See ", None)],
+    }
+    # Its marks inserted around code and text already there: Word's original has none of it,
+    # code, text and all (field-wrapped-around-text).
+    wrapped = ins(BEGIN, 5) + code(" x.eu") + ins(SEPARATE, 6) + t(" x") + ins(END, 7)
+    accepted, original, _ = tracked(docx(p(t("See ") + wrapped + t("."))))
+    assert _runs(original) == [("t", "See "), ("t", ".")]
+    assert _runs(accepted) == [("t", "See "), ("instrText", " x.eu"), ("t", " x"), ("t", ".")]
+    # In another field, past its paragraph, or holding a field the view keeps: not on record.
+    inner = ins(BEGIN, 5) + code("y") + ins(END, 6)
+    kept_field = BEGIN + code(" PAGE ") + SEPARATE + t("1") + END
+    for body in (
+        p(BEGIN + code(' HYPERLINK "') + inner + code('" ') + SEPARATE + t("site") + END),
+        p(ins(BEGIN, 5) + code(" x ") + ins(SEPARATE, 6) + t("a")) + p(t("b") + ins(END, 7)),
+        p(ins(BEGIN, 5) + code(" x ") + ins(SEPARATE, 6) + kept_field + ins(END, 7)),
+    ):
+        with pytest.raises(DocxRefusedError, match="a field dropped whole"):
+            tracked(docx(body))
+    # A view that keeps some marks of a field and drops others is refused: Word's answer for
+    # each is not one rule (field-separator-deleted, field-end-inserted).
+    value = code(" DOCPROPERTY Title ")
+    for body in (
+        BEGIN + value + ins(SEPARATE) + t("v") + END,
+        BEGIN + value + SEPARATE + t("v") + ins(END),
+        ins(BEGIN) + value + SEPARATE + t("v") + END,
+    ):
+        with pytest.raises(DocxRefusedError, match="part of a field"):
+            tracked(docx(p(body)))
+
+
+def test_a_mark_before_a_table_the_view_drops_whole_joins_the_paragraph_after_it() -> None:
+    def table(*rows: str) -> str:
+        return f"<w:tbl><w:tblPr/><w:tblGrid><w:gridCol/></w:tblGrid>{''.join(rows)}</w:tbl>"
+
+    gone = f'<w:tr><w:trPr><w:del w:id="4" {WHO}/></w:trPr><w:tc>{p(dele("x"))}</w:tc></w:tr>'
+    kept = f"<w:tr><w:tc>{p(t('y'))}</w:tc></w:tr>"
+    body = p(dele("heading"), mark("del")) + table(gone) + p(t("after"))
+    assert views(docx(body)) == {
+        "accepted": [("after", None)],
+        "original": [("heading", None), ("x", None), ("after", None)],
+    }
+    # A table the view keeps a row of: Word leaves the mark, a revision still (refused).
+    with pytest.raises(DocxRefusedError, match="joins a row the view drops"):
+        tracked(docx(p(t("a"), mark("del")) + table(gone, kept) + p(t("after"))))
+    # A paragraph keeping text: Word moves it into the table and leaves the rows' changes
+    # (mark-inserted-before-table-inserted-whole).
+    with pytest.raises(DocxRefusedError, match="with text joins a table"):
+        tracked(docx(p(t("a"), mark("del")) + table(gone) + p(t("after"))))
+
+
+def test_a_bookmark_end_between_joined_paragraphs_stands_after_what_is_joined() -> None:
+    start, end = '<w:bookmarkStart w:id="5" w:name="B"/>', '<w:bookmarkEnd w:id="5"/>'
+    data = docx(p(start + t("a"), mark("del")) + end + p(t("b")))
+    accepted, original, _ = tracked(data)
+    assert views(data) == {"accepted": [("ab", None)], "original": [("a", None), ("b", None)]}
+    with zipfile.ZipFile(io.BytesIO(accepted)) as package:
+        body = ET.fromstring(package.read("word/document.xml")).find(f"{{{W}}}body")
+    assert body is not None
+    (joined,) = body.findall(f"{{{W}}}p")
+    assert [c.tag.rsplit("}", 1)[1] for c in joined] == ["bookmarkStart", "r", "bookmarkEnd", "r"]
+    certify_tracked(data, {"accepted": accepted, "original": original})
+    # Left between paragraphs, or put before what is joined: never certified.
+    part = "word/document.xml"
+    for tampered in (
+        _rewrite(accepted, part, lambda x: x.replace('<ns0:bookmarkEnd ns0:id="5" />', "")),
+        _rewrite(
+            accepted,
+            part,
+            lambda x: x.replace('<ns0:bookmarkEnd ns0:id="5" />', "").replace(
+                '<ns0:bookmarkStart ns0:id="5" ns0:name="B" />',
+                '<ns0:bookmarkStart ns0:id="5" ns0:name="B" /><ns0:bookmarkEnd ns0:id="5" />',
+            ),
+        ),
+    ):
+        with pytest.raises(CertificationError):
+            certify_tracked(data, {"accepted": tampered})
+
+
+def test_what_joins_before_a_table_gone_whole_is_the_whole_chain_and_its_bookmark_ends() -> None:
+    def table(*rows: str) -> str:
+        return f"<w:tbl><w:tblPr/><w:tblGrid><w:gridCol/></w:tblGrid>{''.join(rows)}</w:tbl>"
+
+    gone = table(
+        f'<w:tr><w:trPr><w:del w:id="4" {WHO}/></w:trPr><w:tc>{p(dele("x"))}</w:tc></w:tr>'
+    )
+    end = '<w:bookmarkEnd w:id="5"/>'
+    start = '<w:bookmarkStart w:id="5" w:name="B"/>'
+    # An empty paragraph joined to the next carries a bookmark's end after it there.
+    data = docx(p(start, mark("del")) + end + p(t("b")))
+    accepted, original, _ = tracked(data)
+    certify_tracked(data, {"accepted": accepted, "original": original})
+    # A bookmark's end before the chain is not joined: the empty paragraph goes with the table.
+    data = docx(p(start + t("a")) + end + p("", mark("del")) + gone + p(t("after")))
+    accepted, original, _ = tracked(data)
+    certify_tracked(data, {"accepted": accepted, "original": original})
+    # Text joined through an empty paragraph, or a bookmark's end, meets the table: refused.
+    for body in (
+        p(t("a"), mark("del")) + p("", mark("del")) + gone + p(t("after")),
+        p("", mark("del")) + end + gone + p(t("after")),
+    ):
+        with pytest.raises(DocxRefusedError, match="with text joins a table"):
+            tracked(docx(body))
+        empty = docx(p("", mark("del")) + gone + p(t("after")))
+        with pytest.raises(CertificationError, match="content meets a table dropped"):
+            certify_tracked(docx(body), {"accepted": tracked(empty)[0]})
+
+
+def test_the_check_refuses_a_field_dropped_whole_whose_content_is_not_on_record() -> None:
+    inner = ins(BEGIN, 5) + code("y") + ins(END, 6)
+    kept_field = BEGIN + code(" PAGE ") + SEPARATE + t("1") + END
+    any_view = tracked(docx(p(t("a") + ins(t("b")))))[1]
+    for body in (
+        # In another field; holding a field the view keeps; past its paragraph.
+        p(BEGIN + code(' HYPERLINK "') + inner + code('" ') + SEPARATE + t("site") + END),
+        p(ins(BEGIN, 5) + code(" x ") + ins(SEPARATE, 6) + kept_field + ins(END, 7)),
+        p(ins(BEGIN, 5) + code(" x ") + ins(SEPARATE, 6) + t("a")) + p(t("b") + ins(END, 7)),
+    ):
+        with pytest.raises(CertificationError, match="content is not on record"):
+            certify_tracked(docx(body), {"original": any_view})
+    # Past its paragraph, keeping nothing (an empty run aside): every view held as it is.
+    empty = "<w:r><w:rPr><w:b/></w:rPr></w:r>"
+    across = docx(
+        p(ins(BEGIN, 5) + ins(code(" x "), 8) + ins(SEPARATE, 6) + empty)
+        + p(ins(t("v"), 9) + ins(END, 7))
+    )
+    accepted, original, _ = tracked(across)
+    certify_tracked(across, {"accepted": accepted, "original": original})
+    # A bookmark's end opening the body, joined to nothing: outside the paragraphs, as stored.
+    opening = docx('<w:bookmarkEnd w:id="5"/>' + p(t("a") + ins(t("b"))))
+    accepted, original, _ = tracked(opening)
+    certify_tracked(opening, {"accepted": accepted, "original": original})
+
+
+def test_the_check_holds_a_field_dropped_whole_and_a_table_gone_whole() -> None:
+    wrapped = docx(
+        p(t("See ") + ins(BEGIN, 5) + code("x.eu") + ins(SEPARATE, 6) + t("x") + ins(END, 7))
+    )
+    accepted, original, _ = tracked(wrapped)
+    certify_tracked(wrapped, {"accepted": accepted, "original": original})
+    body = "word/document.xml"
+    kept = '<ns0:r><ns0:t xml:space="preserve">x</ns0:t></ns0:r>'
+    for tampered in (
+        # What its changes keep, kept in the original: its result, or its code made text.
+        _rewrite(original, body, lambda x: x.replace("</ns0:p>", kept + "</ns0:p>")),
+        _rewrite(
+            original,
+            body,
+            lambda x: x.replace("</ns0:p>", kept.replace("x<", "x.eu<") + "</ns0:p>"),
+        ),
+    ):
+        with pytest.raises(CertificationError):
+            certify_tracked(wrapped, {"original": tampered})
+    # A view keeping part of a field is never certified.
+    split = docx(p(BEGIN + code(" DOCPROPERTY T ") + ins(SEPARATE) + t("v") + END))
+    whole = docx(p(BEGIN + code(" DOCPROPERTY T ") + SEPARATE + ins(t("v")) + END))
+    with pytest.raises(CertificationError, match="part of a field"):
+        certify_tracked(split, {"original": tracked(whole)[1]})
+    # An empty paragraph joined past a table gone whole goes with it: placed anywhere else,
+    # never certified; one keeping text, never.
+    gone = f'<w:tr><w:trPr><w:del w:id="4" {WHO}/></w:trPr><w:tc>{p(dele("x"))}</w:tc></w:tr>'
+    table = f"<w:tbl><w:tblPr/><w:tblGrid><w:gridCol/></w:tblGrid>{gone}</w:tbl>"
+    joined = docx(p(dele("a"), mark("del")) + table + p(t("b")) + p(t("c")))
+    accepted, _, _ = tracked(joined)
+    certify_tracked(joined, {"accepted": accepted})
+    apart = _rewrite(accepted, body, lambda x: x.replace("<ns0:body>", "<ns0:body><ns0:p />"))
+    with pytest.raises(CertificationError):
+        certify_tracked(joined, {"accepted": apart})
+    holding = docx(p(t("a"), mark("del")) + table + p(t("b")) + p(t("c")))
+    with pytest.raises(CertificationError, match="content meets a table dropped"):
+        certify_tracked(holding, {"accepted": accepted})
+
+
 CASES = Path(__file__).resolve().parents[1] / "corpus" / "tracked-cases"
 # The cases the reader refuses: what it cannot undo exactly (Word's views are on record).
 REFUSED = {
     "content-control-emptied",  # Word shows placeholder spaces the document does not hold
-    "field-separator-deleted",  # Word drops the whole field result
+    "field-end-inserted",  # the original keeps a field's begin and drops its end
+    "field-separator-deleted",  # the view keeps a field's begin and end and drops its separator
     "list-definition-changed",  # Word's Reject All rewrites the styles instead
     "mark-deleted-before-table-first-row-deleted",  # Word cannot accept it
     "mark-deleted-last-in-body",  # Word cannot accept it
     "mark-deleted-last-in-cell",  # Word dissolves the table
+    "mark-inserted-before-table-inserted-whole",  # Word moves the text in, leaving a revision
 }
 
 
@@ -420,7 +618,7 @@ def test_the_check_counts_what_each_view_holds_and_only_the_revised_parts() -> N
     source = _with_part(docx(body, footnotes=note), "word/media/image1.png", b"\x89PNG\r\n")
     accepted, original, _ = tracked(source)
     assert certify_tracked(source, {"accepted": accepted, "original": original}) == {
-        "checker": "conservation-check/1.18.0",
+        "checker": "conservation-check/1.19.0",
         "accepted": {"characters": 5, "elements": 2, "paragraphsJoined": 0},
         "original": {"characters": 4, "elements": 1, "paragraphsJoined": 0},
     }

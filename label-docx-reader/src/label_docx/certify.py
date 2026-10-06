@@ -48,13 +48,16 @@ collapsible whitespace drawn as at most one space (as CSS lays it out), ``br`` a
 
 A document with tracked changes is read as two views, every change accepted and every one
 rejected, each a package of its own that the reader reads and this check certifies as above.
-The views themselves are held to the source by ``certify_tracked``, again with its own walk: in
-each part with revisions, every run's content is kept or dropped by the change around it, in
-order, in the same table cell, and a paragraph is joined to the next exactly where the view
-drops its mark; a row the view drops goes, and a table whose every row it drops; no revision is
-left in any part, and every other part is the source's, byte for byte. In a part with revisions,
-everything outside the changes is the source's too, element by element (``_canon``). The former
-formatting the original view takes from a change is held to Word (``corpus/tracked-cases``).
+The views themselves are held to the source by ``certify_tracked``, again with its own walk: in each
+part with revisions, every run's content is kept or dropped by the change around it, in order, in
+the same table cell, and a paragraph is joined to the next exactly where the view drops its mark
+(past a table it drops whole, an empty paragraph only, to the paragraph after it; a bookmark's end
+between the two after what is joined); a row the view drops goes, and a table whose every row it
+drops; a field's marks are all kept or all dropped, and a field the view drops goes with every run
+inside it (``_field_runs``, its own reading of Word's rule); no revision is left in any part, and
+every other part is the source's, byte for byte. In a part with revisions, everything outside the
+changes is the source's too, element by element (``_canon``). The former formatting the original
+view takes from a change is held to Word (``corpus/tracked-cases``).
 
 Beyond the text, the check works out on its own, by Word's rules written apart from the
 reader's, the key marks (``CHECKED_MARKS``), every list label and every note mark; the result's
@@ -76,7 +79,7 @@ text is drawn in;
 complex script (right-to-left, ``cs``, ``bdo``/``dir``, or Hebrew, Arabic, Indic... text) whose
 ``b`` and ``bCs``, or ``i`` and ``iCs``, differ; text hidden by some level and shown by Word's
 toggle rule; and anything in a cell merged into the one above. It shares no code with the
-reader, only two tables: the Symbol table (``SYMBOL_FONT``, 49 codes) and the Wingdings bullets
+reader, only two tables: the Symbol table (``SYMBOL_FONT``, 55 codes) and the Wingdings bullets
 (``WINGDINGS_BULLETS``). See ``docs/conservation.md`` ("Why it is independent") for what that
 leaves unchecked.
 """
@@ -101,7 +104,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT, WINGDINGS_BULLETS
 
-CHECKER_VERSION = "conservation-check/1.18.0"
+CHECKER_VERSION = "conservation-check/1.19.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -529,6 +532,8 @@ class _Fonts:
         Word picks a font per character from the four slots, so a symbol font counts only where
         it is in both Latin slots (``ascii``, ``hAnsi``) and nothing sends a character to
         another slot: complex script, right to left, or a font hint other than ``default``.
+        Symbol in the East Asian slot alone, with none of those, is ``east-asian-symbol``: the
+        text Word draws there (``_EAST_ASIAN``) is never certified, and the rest is as stored.
         """
         families = {slot: self.family(self.font(levels, slot)) for slot in _THEME_SLOT}
         named = set(families.values()) - {"text"}
@@ -538,6 +543,13 @@ class _Fonts:
             return "text"
         family = min(named)  # the one family named
         hints = [level.find(_w("rFonts")) for level in levels]
+        if (
+            family == "symbol"
+            and [slot for slot, kind in families.items() if kind == "symbol"] == ["eastAsia"]
+            and not any(_on(level.find(_w(name))) for level in levels for name in ("cs", "rtl"))
+            and all(h is None or h.get(_w("hint"), "default") == "default" for h in hints)
+        ):
+            return "east-asian-symbol"
         if (
             families["ascii"] != family
             or families["hAnsi"] != family
@@ -554,6 +566,11 @@ class _Fonts:
         if direct is not None:
             return direct
         return any(_on(level.find(_w(name))) for level in levels)
+
+
+# What Word may draw in the East Asian font when no hint says otherwise: Hangul Jamo, and all
+# from CJK Radicals Supplement on, every plane above too (ECMA-376 Part 1, 17.3.2.26, broadly).
+_EAST_ASIAN = ((0x1100, 0x11FF), (0x2E80, 0x10FFFF))
 
 
 def _drawn_complex(character: str) -> bool:
@@ -767,6 +784,8 @@ class _Story:
         # emphasis settings (b and bCs, i and iCs) differ where it is drawn as complex script.
         self.bidi = 0
         self.unsure: tuple[bool, bool] = (False, False)
+        # Whether the run read has Symbol in its East Asian slot alone (``_Fonts.drawn``).
+        self.east_asian_symbol = False
         # The table style's parts Word applies to the cell being read (``_Applied``).
         self.conditional: tuple[ET.Element, ...] = ()
         # How many simple fields, and rows of exact height, hold what is being read.
@@ -940,6 +959,7 @@ class _Story:
             # In a right-to-left container Word may draw the characters in another font.
             raise CertificationError(f"text in {family} drawn as complex script")
         symbol = family == "symbol"
+        self.east_asian_symbol = family == "east-asian-symbol"
         hidden: bool | None = self.fonts.hidden(levels, own)
         chains = self.fonts.chains(own, here.style, here.table_style, in_table, here.conditional)
         if hidden and not self.fonts.shown(own, chains, "vanish"):
@@ -1068,6 +1088,10 @@ class _Story:
                 # Spaces at an edge an XML consumer may drop: what Word shows is not certain.
                 raise CertificationError("spaces at the edge of a text element not preserved")
             self.ledger.text += len(text)
+            if self.east_asian_symbol and any(
+                low <= ord(c) <= high for c in text for low, high in _EAST_ASIAN
+            ):
+                raise CertificationError("East Asian text with Symbol in its slot")
             if symbol:
                 mapped = _symbol_reading(text)
                 self.ledger.symbol += sum(1 for a, b in zip(text, mapped, strict=True) if a != b)
@@ -2428,6 +2452,8 @@ class _Numbering:
         # A bullet in the Symbol font: through the table, as the label's fonts say.
         label_levels = mark_levels if look.rpr is None else [look.rpr, *mark_levels]
         family = self.fonts.drawn(label_levels)
+        if family == "east-asian-symbol":
+            raise CertificationError("a list label with Symbol in its East Asian slot")
         if family == "symbol":
             out = _symbol_reading(out)
         elif family == "wingdings":
@@ -2681,11 +2707,19 @@ class DocxSource:
             parse = {name: _parse(archive, name) for name in {main, *related.values()}}
             for kind in ("styles", "theme", "numbering"):
                 root = parse.get(related.get(kind, ""))
+                # A picture bullet's definition: drawn only through a level that names it, and
+                # a label drawn as a picture is never certified (``label``).
+                bullets = (
+                    [] if root is None else [n for n in root if _local(n.tag) == "numPicBullet"]
+                )
+                aside = {id(n) for bullet in bullets for n in bullet.iter()}
                 for node in [] if root is None else root.iter():
                     # Alternate content Word resolves, which this check does not; a list level's
                     # own is the level's, never drawn.
-                    if _local(node.tag) != "lvl" and any(
-                        _local(c.tag) == "AlternateContent" for c in node
+                    if (
+                        _local(node.tag) != "lvl"
+                        and id(node) not in aside
+                        and any(_local(c.tag) == "AlternateContent" for c in node)
                     ):
                         raise CertificationError(f"alternate content in the {kind}")
             self.fonts = _Fonts(
@@ -3231,8 +3265,13 @@ def _canon(element: ET.Element, drops: tuple[str, ...], outside: bool = False) -
     children: list[Json] = []
 
     def add(parent: ET.Element) -> None:
+        joining = False  # after a paragraph whose mark the view drops, its bookmark ends aside
         for child in parent:
             local = _local(child.tag)
+            if outside and joining and child.tag == _w("bookmarkEnd"):
+                continue  # in the view, after what is joined (``_run_tokens``)
+            mark = child.find(f"{_w('pPr')}/{_w('rPr')}") if child.tag == _w("p") else None
+            joining = mark is not None and any(c.tag in dropping for c in mark)
             if child.tag in dropping or (outside and child.tag == _w("p")):
                 continue
             if outside and child.tag == _w("tr") and _row_gone(child, dropping):
@@ -3274,8 +3313,10 @@ def _run_tokens(
     elements it stands in, its attributes and its properties (``_canon``).
     """
     dropping = {_w(d) for d in drops}
+    with_field = _field_runs(root, dropping)
     paragraphs: list[tuple[_Place, list[tuple[Json, ...]], Json]] = []
     carried: list[tuple[Json, ...]] = []
+    joining = False  # a paragraph is being joined to the next (an empty one carries nothing)
     joins = tables = 0
 
     def signature(element: ET.Element) -> Json:
@@ -3286,11 +3327,14 @@ def _run_tokens(
     ) -> None:
         nonlocal tables
         rows = list(_within(element, _w("tr")))
-        if carried and rows and _row_gone(rows[0], dropping):
-            raise CertificationError("a joined paragraph meets a row the view drops")
         kept = [row for row in rows if not _row_gone(row, dropping)]
         if rows and not kept:
-            return
+            if carried:
+                # Word moves it into the table, leaving the rows' changes: no view of Word's.
+                raise CertificationError("a joined paragraph's content meets a table dropped")
+            return  # gone whole: an empty joined paragraph goes on to the paragraph after it
+        if joining and rows and _row_gone(rows[0], dropping):
+            raise CertificationError("a joined paragraph meets a row the view drops")
         index, tables = tables, tables + 1
         for r, row in enumerate(kept):
             for c, cell in enumerate(_within(row, _w("tc"))):
@@ -3305,16 +3349,16 @@ def _run_tokens(
         chain: Json,
         inline: bool,
     ) -> None:
-        nonlocal carried, joins
+        nonlocal carried, joining, joins
         for child in element:
             local = _local(child.tag)
             if child.tag == _w("p"):
                 own: list[tuple[Json, ...]] = carried
-                carried = []
+                carried, joining = [], False
                 walk(child, dropped, own, place, (), True)
                 mark = child.find(f"{_w('pPr')}/{_w('rPr')}")
                 if mark is not None and any(c.tag in dropping for c in mark):
-                    carried = own
+                    carried, joining = own, True
                     joins += 1
                 else:
                     properties = child.find(_w("pPr"))
@@ -3328,8 +3372,12 @@ def _run_tokens(
             if child.tag == _w("tbl") and place is None:
                 table(child, dropped, mine, chain)
                 continue
+            if joining and not inline and child.tag == _w("bookmarkEnd") and not len(child):
+                # Between a paragraph joined and the next: in the view, after what is joined.
+                carried.append((None, "", [], ((), None, _canon(child, drops))))
+                continue
             if child.tag == _w("tr") and _row_gone(child, dropping):
-                if carried:
+                if joining:
                     raise CertificationError("a joined paragraph meets a row the view drops")
                 continue  # a row of a nested table the view drops goes whole too
             if element.tag == _w("r"):
@@ -3349,14 +3397,71 @@ def _run_tokens(
             if inline and not len(child) and not dropped and child.tag not in _REVISIONS:
                 mine.append((None, "", [], (chain, None, _canon(child, drops))))
                 continue
-            gone = dropped or (child.tag in dropping and element.tag != _w("rPr"))
+            gone = (
+                dropped
+                or (child.tag in dropping and element.tag != _w("rPr"))
+                or child in with_field
+            )
             inner = chain if child.tag in _CHANGES else (*chain, signature(child))
             walk(child, gone, mine, place, inner, inline)
 
     walk(root, False, [], None, (), False)
-    if carried:
+    if joining:
         raise CertificationError("a joined paragraph has no paragraph after it")
     return paragraphs, joins
+
+
+def _field_runs(root: ET.Element, dropping: set[str]) -> set[ET.Element]:
+    """The runs a view drops with their field; ``CertificationError`` for a field kept in part.
+
+    By its own reading of Word's rule (not the reader's): a view keeps every mark of a field
+    (begin, separator, end) or drops every one, and a field it drops goes with every run inside
+    it, those its changes keep too, where it stands in no other field, holds none the view
+    keeps and ends in the paragraph it begins in. Anything else is never certified.
+    """
+    found: list[tuple[ET.Element, bool, ET.Element | None]] = []
+
+    def collect(element: ET.Element, dropped: bool, paragraph: ET.Element | None) -> None:
+        for child in element:
+            gone = dropped or (child.tag in dropping and element.tag != _w("rPr"))
+            if child.tag in (_w("fldChar"), _w("r")):
+                found.append((child, gone, paragraph))
+            collect(child, gone, child if child.tag == _w("p") else paragraph)
+
+    collect(root, False, None)
+    # Each field as the places of its begin, its separator (or none) and its end in ``found``.
+    fields: list[tuple[int, int | None, int]] = []
+    opened: list[tuple[int, list[int]]] = []  # each open field's begin, and its separator
+    for at, (node, _, _) in enumerate(found):
+        kind = node.get(_w("fldCharType")) if node.tag == _w("fldChar") else None
+        if kind == "begin":
+            opened.append((at, []))
+        elif kind == "separate" and opened and not opened[-1][1]:
+            opened[-1][1].append(at)
+        elif kind == "end" and opened:
+            start, separators = opened.pop()
+            fields.append((start, separators[0] if separators else None, at))
+    out: set[ET.Element] = set()
+    for begin, separator, end in fields:
+        fates = {found[at][1] for at in (begin, separator, end) if at is not None}
+        if len(fates) > 1:
+            raise CertificationError("a view keeps part of a field")
+        inside = found[begin + 1 : end]
+        kept = [
+            node
+            for node, gone, _ in inside
+            if node.tag == _w("r") and not gone and any(_local(c.tag) != "rPr" for c in node)
+        ]
+        if fates != {True} or not kept:
+            continue
+        if (
+            any(b < begin < e for b, _, e in fields)
+            or found[begin][2] is not found[end][2]
+            or any(node.tag == _w("fldChar") and not gone for node, gone, _ in inside)
+        ):
+            raise CertificationError("a view drops a field whose content is not on record")
+        out.update(kept)
+    return out
 
 
 def _within(element: ET.Element, tag: str) -> Iterator[ET.Element]:
