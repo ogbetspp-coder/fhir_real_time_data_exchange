@@ -114,6 +114,13 @@ jobs:
       - name: Validate the fixture, the authority import and fhir/generated against the official HL7 validator
         run: npm run validate:official
 
+      # On the validator and packages the step above checked and cached: the EMA profile's section
+      # slots against the mapping (test/official/profile-slots.test.ts), and the StructureMap twin,
+      # compiled again from its FML and run on the validator's engine against src/fhir/transform.ts
+      # on every fixture and the pinned EMA ePIs (test/official/structuremap-twin.test.ts).
+      - name: Check the profile's slots and run the StructureMap twin against the crosswalk
+        run: npm run test:official
+
       # The deploy's inputs, made as the deploy's gate job makes them (scripts/gcp/deploy-inputs.sh):
       # the standards bootstrap imports, checked against fhir/standards.lock.json, and the synthetic
       # fixture, checked against its pin in fhir/deploy-inputs.lock.json. A change to the fixture's

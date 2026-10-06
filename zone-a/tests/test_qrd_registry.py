@@ -233,7 +233,8 @@ def test_every_numbered_heading_of_the_current_mapping_is_a_registry_heading() -
         for rule in _mapping_rules(MAPPING["root"])
         if rule["sourceKey"].count(".") in (1, 2) and rule["sourceKey"].split(".")[-1].isdigit()
     ]
-    assert len(numbered) == 28
+    # 1 to 10 and their subsections, 2.1 and 2.2, 11 and 12 (mapping 1.4.0).
+    assert len(numbered) == 32
     for rule in numbered:
         found = match_heading(rule["title"], TABLE)
         assert found is not None, rule["title"]
@@ -257,17 +258,32 @@ def test_the_mapping_names_the_optional_parts_of_6_5_and_6_6() -> None:
 
 
 def test_every_named_subsection_of_the_mapping_is_a_registry_subheading() -> None:
+    # A required named subsection is a subheading of its section as the template writes it; an
+    # optional one (mapping 1.4.0, from the EMA's profile) is one too, most of them marked
+    # optional ("<Pregnancy>"; Posology's "Paediatric population" is not marked). Two the profile
+    # places otherwise than the template: "Excipient(s) with known
+    # effect", a subsection of 2 in the profile, is an optional subheading of 2.2 in the template,
+    # and "Traceability" opens an optional statement of 4.4 in the template.
     sections = {section["key"]: section for section in REGISTRY["sections"]}
+    elsewhere = {"smpc.2.excipients": "smpc.2.2"}
+    named = 0
     for rule in _mapping_rules(MAPPING["root"]):
-        if rule["sourceKey"].split(".")[-1].isdigit() or rule["sourceKey"] == "smpc":
+        key = rule["sourceKey"]
+        if key.split(".")[-1].isdigit() or key == "smpc":
             continue
-        parent = sections[rule["sourceKey"].rsplit(".", 1)[0]]
-        subheadings = {
-            render(item["pattern"]).strip()
-            for item in parent["items"]
-            if item["kind"] == "subheading"
-        }
-        assert rule["title"] in subheadings, rule["sourceKey"]
+        named += 1
+        home = elsewhere.get(key, key)
+        while home not in sections:
+            home = home.rsplit(".", 1)[0]
+        items = [
+            (item["kind"], render(item["pattern"]).strip()) for item in sections[home]["items"]
+        ]
+        forms = {rule["title"]} if rule["required"] else {rule["title"], f"<{rule['title']}>"}
+        if rule["title"] == "Traceability":
+            assert any(k == "statement" and t.startswith("<Traceability\n") for k, t in items)
+        else:
+            assert any(k == "subheading" and t in forms for k, t in items), key
+    assert named == 26
 
 
 @pytest.mark.parametrize(

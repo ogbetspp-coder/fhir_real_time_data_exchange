@@ -34,6 +34,8 @@
     "standards:fetch": "node scripts/fhir/fetch-standards.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:official": "vitest run --config vitest.official.config.ts",
+    "map:compile": "node scripts/fhir/compile-map.mjs",
     "typecheck": "tsc --noEmit",
     "validate:official": "node scripts/ci/official-validate.mjs",
     "demo": "tsx scripts/dev/run-demo.ts",

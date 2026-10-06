@@ -2,12 +2,12 @@
   "resourceType": "CodeSystem",
   "id": "canonical-smpc-sections",
   "url": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "status": "active",
   "experimental": true,
   "name": "CanonicalSmpcSections",
   "title": "Canonical SmPC sections",
-  "description": "The canonical SmPC section keys of the mapping manifest (fhir/mappings/cap-smpc-en.json), each with its QRD heading, nested as the sections are. A key identifies a section of the canonical record; it is not a clinical concept.",
+  "description": "The canonical SmPC section keys of the mapping manifest (fhir/mappings/cap-smpc-en.json), each with its QRD heading, nested as the sections are, and the keys of the EMA profile's slots the crosswalk does not carry (the manifest's unmapped list, each with its reason). A key identifies a section of the canonical record; it is not a clinical concept.",
   "caseSensitive": true,
   "valueSet": "https://khs.dev/fhir/ValueSet/canonical-smpc-sections",
   "hierarchyMeaning": "part-of",
@@ -23,7 +23,21 @@
         },
         {
           "code": "smpc.2",
-          "display": "2. QUALITATIVE AND QUANTITATIVE COMPOSITION"
+          "display": "2. QUALITATIVE AND QUANTITATIVE COMPOSITION",
+          "concept": [
+            {
+              "code": "smpc.2.1",
+              "display": "2.1 General description"
+            },
+            {
+              "code": "smpc.2.2",
+              "display": "2.2 Qualitative and quantitative composition"
+            },
+            {
+              "code": "smpc.2.excipients",
+              "display": "Excipient(s) with known effect"
+            }
+          ]
         },
         {
           "code": "smpc.3",
@@ -43,11 +57,23 @@
               "concept": [
                 {
                   "code": "smpc.4.2.posology",
-                  "display": "Posology"
+                  "display": "Posology",
+                  "concept": [
+                    {
+                      "code": "smpc.4.2.posology.paediatric",
+                      "display": "Paediatric population"
+                    }
+                  ]
                 },
                 {
                   "code": "smpc.4.2.administration",
-                  "display": "Method of administration"
+                  "display": "Method of administration",
+                  "concept": [
+                    {
+                      "code": "smpc.4.2.administration.precautions",
+                      "display": "Precautions to be taken before handling or administering the medicinal product"
+                    }
+                  ]
                 }
               ]
             },
@@ -57,15 +83,45 @@
             },
             {
               "code": "smpc.4.4",
-              "display": "4.4 Special warnings and precautions for use"
+              "display": "4.4 Special warnings and precautions for use",
+              "concept": [
+                {
+                  "code": "smpc.4.4.traceability",
+                  "display": "Traceability"
+                },
+                {
+                  "code": "smpc.4.4.paediatric",
+                  "display": "Paediatric population"
+                }
+              ]
             },
             {
               "code": "smpc.4.5",
-              "display": "4.5 Interaction with other medicinal products and other forms of interaction"
+              "display": "4.5 Interaction with other medicinal products and other forms of interaction",
+              "concept": [
+                {
+                  "code": "smpc.4.5.paediatric",
+                  "display": "Paediatric population"
+                }
+              ]
             },
             {
               "code": "smpc.4.6",
-              "display": "4.6 Fertility, pregnancy and lactation"
+              "display": "4.6 Fertility, pregnancy and lactation",
+              "concept": [
+                {
+                  "code": "smpc.4.6.pregnancy",
+                  "display": "Pregnancy"
+                },
+                {
+                  "code": "smpc.4.6.breast-feeding",
+                  "display": "Breast-feeding"
+                },
+                {
+                  "code": "smpc.4.6.fertility",
+                  "display": "Fertility"
+                }
+              ]
             },
             {
               "code": "smpc.4.7",
@@ -76,6 +132,10 @@
               "display": "4.8 Undesirable effects",
               "concept": [
                 {
+                  "code": "smpc.4.8.paediatric",
+                  "display": "Paediatric population"
+                },
+                {
                   "code": "smpc.4.8.reporting",
                   "display": "Reporting of suspected adverse reactions"
                 }
@@ -83,7 +143,13 @@
             },
             {
               "code": "smpc.4.9",
-              "display": "4.9 Overdose"
+              "display": "4.9 Overdose",
+              "concept": [
+                {
+                  "code": "smpc.4.9.paediatric",
+                  "display": "Paediatric population"
+                }
+              ]
             }
           ]
         },
@@ -93,15 +159,65 @@
           "concept": [
             {
               "code": "smpc.5.1",
-              "display": "5.1 Pharmacodynamic properties"
+              "display": "5.1 Pharmacodynamic properties",
+              "concept": [
+                {
+                  "code": "smpc.5.1.mechanism",
+                  "display": "Mechanism of action"
+                },
+                {
+                  "code": "smpc.5.1.effects",
+                  "display": "Pharmacodynamic effects"
+                },
+                {
+                  "code": "smpc.5.1.efficacy",
+                  "display": "Clinical efficacy and safety"
+                },
+                {
+                  "code": "smpc.5.1.paediatric",
+                  "display": "Paediatric population"
+                }
+              ]
             },
             {
               "code": "smpc.5.2",
-              "display": "5.2 Pharmacokinetic properties"
+              "display": "5.2 Pharmacokinetic properties",
+              "concept": [
+                {
+                  "code": "smpc.5.2.absorption",
+                  "display": "Absorption"
+                },
+                {
+                  "code": "smpc.5.2.distribution",
+                  "display": "Distribution"
+                },
+                {
+                  "code": "smpc.5.2.biotransformation",
+                  "display": "Biotransformation"
+                },
+                {
+                  "code": "smpc.5.2.elimination",
+                  "display": "Elimination"
+                },
+                {
+                  "code": "smpc.5.2.linearity",
+                  "display": "Linearity/non-linearity"
+                },
+                {
+                  "code": "smpc.5.2.pk-pd",
+                  "display": "Pharmacokinetic/pharmacodynamic relationship(s)"
+                }
+              ]
             },
             {
               "code": "smpc.5.3",
-              "display": "5.3 Preclinical safety data"
+              "display": "5.3 Preclinical safety data",
+              "concept": [
+                {
+                  "code": "smpc.5.3.era",
+                  "display": "Environmental risk assessment (ERA)"
+                }
+              ]
             }
           ]
         },
@@ -131,7 +247,13 @@
             },
             {
               "code": "smpc.6.6",
-              "display": "6.6 Special precautions for disposal and other handling"
+              "display": "6.6 Special precautions for disposal and other handling",
+              "concept": [
+                {
+                  "code": "smpc.6.6.paediatric",
+                  "display": "Use in the paediatric population"
+                }
+              ]
             }
           ]
         },
@@ -150,8 +272,26 @@
         {
           "code": "smpc.10",
           "display": "10. DATE OF REVISION OF THE TEXT"
+        },
+        {
+          "code": "smpc.11",
+          "display": "11. DOSIMETRY"
+        },
+        {
+          "code": "smpc.12",
+          "display": "12. INSTRUCTIONS FOR PREPARATION OF RADIOPHARMACEUTICALS"
         }
       ]
+    },
+    {
+      "code": "smpc.custom.h4",
+      "display": "Custom subsection (level H4)",
+      "definition": "Not carried by the crosswalk (EMA code 200000044333): A custom subsection carries its author's own heading and may occur any number of times under one section (the profile's Blanksubsections slices, 0..*). The crosswalk carries the template's own sections only, each once and under the template's heading, so it refuses a section with this key."
+    },
+    {
+      "code": "smpc.custom.h5",
+      "display": "Custom subsection (level H5)",
+      "definition": "Not carried by the crosswalk (EMA code 200000044347): A custom subsection carries its author's own heading and may occur any number of times under one section (the profile's Blanksubsections slices, 0..*). The crosswalk carries the template's own sections only, each once and under the template's heading, so it refuses a section with this key."
     }
   ]
 }

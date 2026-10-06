@@ -27,6 +27,10 @@ export type SyntheticVersion = 1 | 2;
 export type SyntheticFixtureOptions = {
   product?: SyntheticProductId;
   version?: SyntheticVersion;
+  // Every optional section of the mapping as well (2.1, Pregnancy, 11. DOSIMETRY, ...). Off, the
+  // fixture has the mandatory sections only, as every fixture had before the optional ones were
+  // mapped (mapping 1.4.0).
+  optional?: boolean;
 };
 
 export type SyntheticSubmissionIdentity = {

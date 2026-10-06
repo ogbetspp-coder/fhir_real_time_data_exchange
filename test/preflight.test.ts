@@ -412,12 +412,16 @@ describe("the EMA preflight", () => {
         const root = rootSection(bundle);
         root.section = (root.section ?? []).slice(0, 3);
       },
+      // An optional section the source does not have (11, 12) is not missing.
       expected: () =>
-        (mapping.root.children ?? []).slice(3).map((rule) => ({
-          code: "required",
-          diagnostics: `Missing EMA section ${rule.targetCode}`,
-          expression: ["Composition.section[0].section"],
-        })),
+        (mapping.root.children ?? [])
+          .slice(3)
+          .filter((rule) => rule.required)
+          .map((rule) => ({
+            code: "required",
+            diagnostics: `Missing EMA section ${rule.targetCode}`,
+            expression: ["Composition.section[0].section"],
+          })),
     },
     {
       name: "a child section carrying the wrong code and title",

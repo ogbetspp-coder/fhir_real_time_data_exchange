@@ -425,6 +425,88 @@ describe("deterministic Type 2 to EMA conversion", () => {
     },
   );
 
+  it("maps every optional section of the template that the source has (mapping 1.4.0)", () => {
+    const source = createSyntheticType2Bundle(mapping, { optional: true });
+    const result = transformType2ToEma(source, mapping);
+    const flatten = (sections: CompositionSection[]): CompositionSection[] =>
+      sections.flatMap((section) => [section, ...flatten(section.section ?? [])]);
+    const target = flatten(composition(result.documentBundle).section);
+
+    expect(target).toHaveLength(59);
+    expect(result.mappingDecisions).toHaveLength(59);
+    expect(findSection(composition(source).section, "smpc.4.6.pregnancy").text).toBeDefined();
+    expect(target.map((section) => section.code.coding?.[0]?.code)).toContain("200000029812");
+    expect(
+      hasValidationErrors(validateEmaPreflight(result.list, result.documentBundle, mapping)),
+    ).toBe(false);
+  });
+
+  it("names in each decision the target path of the section it wrote, optional rules or not", () => {
+    for (const options of [{}, { optional: true }]) {
+      const result = transformType2ToEma(createSyntheticType2Bundle(mapping, options), mapping);
+      const root = composition(result.documentBundle);
+      for (const decision of result.mappingDecisions) {
+        // "Composition.section[0].section[3]..." walked from the Composition.
+        const steps = [...decision.targetPath.matchAll(/section\[(\d+)\]/g)].map((match) =>
+          Number(match[1]),
+        );
+        let sections = root.section;
+        let found: CompositionSection | undefined;
+        for (const step of steps) {
+          found = sections[step];
+          sections = found?.section ?? [];
+        }
+        expect([decision.sourceKey, found?.code.coding?.[0]?.code]).toEqual([
+          decision.sourceKey,
+          decision.targetCode,
+        ]);
+      }
+    }
+  });
+
+  it("fails closed when an optional section is there without narrative", () => {
+    const source = createSyntheticType2Bundle(mapping, { optional: true });
+    delete findSection(composition(source).section, "smpc.4.6.pregnancy").text;
+    findSection(composition(source).section, "smpc.11").text = {
+      status: "generated",
+      div: div("<p>&nbsp;</p>"),
+    };
+
+    expect(transformIssues(source)).toEqual([
+      "Source section smpc.4.6.pregnancy has no narrative",
+      "Source section smpc.11 has unreadable narrative",
+    ]);
+  });
+
+  it("requires narrative of a section none of whose child rules has a subsection there", () => {
+    // 4.6 with no Pregnancy, Breast-feeding or Fertility subsection is a leaf in this source.
+    const leaf = createSyntheticType2Bundle(mapping);
+    delete findSection(composition(leaf).section, "smpc.4.6").text;
+    expect(transformIssues(leaf)).toEqual(["Mandatory source section smpc.4.6 has no narrative"]);
+
+    // Over its subsections it may be a bare heading, as 4.2 is.
+    const heading = createSyntheticType2Bundle(mapping, { optional: true });
+    delete findSection(composition(heading).section, "smpc.4.6").text;
+    expect(() => transformType2ToEma(heading, mapping)).not.toThrow();
+  });
+
+  it("fails closed on a section coded with a slot the mapping leaves unmapped", () => {
+    const source = createSyntheticType2Bundle(mapping);
+    const warnings = findSection(composition(source).section, "smpc.4.4");
+    warnings.section = [
+      {
+        title: "Lactic acidosis",
+        code: { coding: [{ system: mapping.sourceCodeSystem, code: "smpc.custom.h4" }] },
+        text: { status: "generated", div: NARRATIVE },
+      },
+    ];
+
+    expect(mapping.unmapped?.map(({ sourceKey }) => sourceKey)).toContain("smpc.custom.h4");
+    expect(transformIssues(source)).toEqual([
+      "Unmapped source section smpc.custom.h4 at Composition.section[0].section[3].section[3].section[0]",
+    ]);
+  });
+
   it("fails closed on a mapping whose rules share a sourceKey or a targetCode", () => {
     // The loader refuses such a manifest; the transform refuses one built in memory too.
     const source = createSyntheticType2Bundle(mapping);

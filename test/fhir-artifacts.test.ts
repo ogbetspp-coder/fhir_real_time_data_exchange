@@ -12,15 +12,15 @@ import { SMOKE_PRODUCT_ID } from "../src/fixtures/synthetic-products.js";
 import { stableUuid } from "../src/lib/hash.js";
 
 // The published ConceptMap and StructureMap (fhir/generated/, from
-// scripts/fhir/generate-artifacts.ts) describe the crosswalk; src/fhir/transform.ts executes it.
-// The official validator checks their form in CI (scripts/ci/emit-validation-set.ts); this holds
-// what they say to what the transform does. The StructureMap once said the document identifier
-// was copied, while the transform mints a new one.
+// scripts/fhir/generate-artifacts.ts). The StructureMap is the crosswalk's executed twin, compiled
+// from fhir/maps/ by the pinned validator: test/official/structuremap-twin.test.ts runs it against
+// src/fhir/transform.ts in CI. This holds what it says, offline, to what the transform does. An
+// earlier StructureMap said the document identifier was copied, while the transform mints one.
 
 type Parameter = { valueString?: string; valueId?: string };
 type Target = {
-  context: string;
-  element: string;
+  context?: string;
+  element?: string;
   variable?: string;
   transform?: string;
   parameter?: Parameter[];
@@ -28,17 +28,20 @@ type Target = {
 type Rule = {
   name: string;
   documentation?: string;
-  source: { context: string; element: string; variable: string }[];
-  target: Target[];
+  source: { context: string; element?: string; variable?: string; check?: string }[];
+  target?: Target[];
+  rule?: Rule[];
 };
-type StructureMap = { group: { typeMode?: string; rule: Rule[] }[] };
+type Group = { name: string; documentation?: string; typeMode?: string; rule: Rule[] };
+type StructureMap = { version: string; group: Group[] };
 type ConceptMap = {
+  url: string;
   sourceScopeCanonical?: string;
   targetScopeCanonical?: string;
   group: {
     source: string;
     target: string;
-    element: { code: string; target: { code: string }[] }[];
+    element: { code: string; target?: { code: string }[] }[];
   }[];
 };
 
@@ -56,28 +59,60 @@ beforeAll(async () => {
   conceptMap = artifact("ConceptMap-canonical-to-ema-cap-smpc-en.json") as ConceptMap;
 });
 
+function rules(within: Rule[]): Rule[] {
+  return within.flatMap((each) => [each, ...rules(each.rule ?? [])]);
+}
+
 function rule(name: string): Rule {
-  const found = structureMap.group
-    .flatMap((group) => group.rule)
-    .find((each) => each.name === name);
+  const found = rules(structureMap.group.flatMap((group) => group.rule)).find(
+    (each) => each.name === name,
+  );
   if (found === undefined) throw new Error(`StructureMap has no rule ${name}`);
   return found;
 }
 
+function bundleDocumentation(): string {
+  return structureMap.group[0]?.documentation ?? "";
+}
+
 describe("the published StructureMap", () => {
+  it("is the map the pinned validator compiled from fhir/maps, at the mapping's version", () => {
+    const compiled = JSON.parse(
+      readFileSync("fhir/maps/StructureMap-type2-to-ema-cap-smpc-en.json", "utf8"),
+    ) as unknown;
+    expect(structureMap).toEqual(compiled);
+    expect(structureMap.version).toBe(mapping.mappingVersion);
+  });
+
+  it("translates every section code through the published ConceptMap", () => {
+    const translations = rules(structureMap.group.flatMap((group) => group.rule))
+      .flatMap((each) => each.target ?? [])
+      .filter((target) => target.transform === "translate");
+    expect(translations.length).toBeGreaterThan(0);
+    for (const target of translations) {
+      expect(target.parameter?.[1]?.valueString).toBe(conceptMap.url);
+    }
+  });
+
   it("says of the document identifier what the transform does: a new system and a derived value", () => {
     const source = createSyntheticType2Bundle(mapping, { product: SMOKE_PRODUCT_ID });
     const { documentBundle } = transformType2ToEma(source, mapping);
     const sourceIdentifier = source.identifier as { value: string };
     const targetIdentifier = documentBundle.identifier as { system: string; value: string };
 
-    const derive = rule("deriveDocumentIdentifier");
-    const system = derive.target.find((target) => target.element === "system");
+    const system = rule("identifierSystem").target?.find((target) => target.element === "system");
     expect(system?.parameter?.[0]?.valueString).toBe(targetIdentifier.system);
-    // No target copies the source identifier's value, and the value it names is the one minted.
-    expect(derive.target.some((target) => target.element === "value")).toBe(false);
+    // No rule sets an identifier's value: the value is the one the implementation mints.
+    const all = rules(structureMap.group.flatMap((group) => group.rule));
+    expect(
+      all.some((each) =>
+        (each.target ?? []).some(
+          (target) => target.context === "identifier" && target.element === "value",
+        ),
+      ),
+    ).toBe(false);
     expect(targetIdentifier.value).not.toBe(sourceIdentifier.value);
-    const namespace = /namespace "([^"]+)"/.exec(derive.documentation ?? "")?.[1];
+    const namespace = /namespace "([^"]+)"/.exec(bundleDocumentation())?.[1];
     expect(namespace).toBeDefined();
     expect(targetIdentifier.value).toBe(stableUuid(namespace ?? "", sourceIdentifier.value));
     expect(documentBundle.id).toBe(targetIdentifier.value);
@@ -86,7 +121,7 @@ describe("the published StructureMap", () => {
   // The documented algorithm, carried out here from the text alone rather than through
   // stableUuid, so a change to either the code or the text that parts them fails.
   it("documents a derivation that, carried out independently, gives the transform's value", () => {
-    const documentation = rule("deriveDocumentIdentifier").documentation ?? "";
+    const documentation = bundleDocumentation();
     const namespace = /namespace "([^"]+)"/.exec(documentation)?.[1] ?? "";
     for (const step of [
       `the SHA-256 of the UTF-8 string "${namespace}:" followed by the value, in lowercase hex`,
@@ -156,10 +191,10 @@ describe("the published ConceptMap", () => {
   });
 });
 
-type Concept = { code: string; display: string; concept?: Concept[] };
+type Concept = { code: string; display: string; definition?: string; concept?: Concept[] };
 
 describe("the canonical section code system", () => {
-  it("is the mapping's section tree: every key, its heading, nested as the sections are", () => {
+  it("is the mapping's section tree and its unmapped slots, each key with its heading", () => {
     const codeSystem = artifact("CodeSystem-canonical-smpc-sections.json") as {
       url: string;
       version: string;
@@ -178,7 +213,49 @@ describe("the canonical section code system", () => {
       content: "complete",
       caseSensitive: true,
     });
-    expect(codeSystem.concept).toEqual([tree(mapping.root)]);
+    const unmapped = mapping.unmapped ?? [];
+    expect(unmapped.length).toBeGreaterThan(0);
+    expect(codeSystem.concept).toEqual([
+      tree(mapping.root),
+      ...unmapped.map((slot) => ({
+        code: slot.sourceKey,
+        display: slot.title,
+        definition: `Not carried by the crosswalk (EMA code ${slot.targetCode}): ${slot.reason}`,
+      })),
+    ]);
+  });
+});
+
+describe("the published ConceptMap's elements", () => {
+  it("maps every rule equivalent to its EMA code and every unmapped slot to nothing", () => {
+    type Element = {
+      code: string;
+      noMap?: boolean;
+      target?: { code: string; relationship: string }[];
+    };
+    const elements = conceptMap.group[0]?.element as Element[];
+    const flatten = (rule: SectionRule): SectionRule[] => [
+      rule,
+      ...(rule.children ?? []).flatMap(flatten),
+    ];
+    expect(elements).toEqual([
+      ...flatten(mapping.root).map((rule) => ({
+        code: rule.sourceKey,
+        display: rule.title,
+        target: [
+          {
+            code: rule.targetCode,
+            display: rule.display ?? rule.title,
+            relationship: "equivalent",
+          },
+        ],
+      })),
+      ...(mapping.unmapped ?? []).map((slot) => ({
+        code: slot.sourceKey,
+        display: slot.title,
+        noMap: true,
+      })),
+    ]);
   });
 });
 

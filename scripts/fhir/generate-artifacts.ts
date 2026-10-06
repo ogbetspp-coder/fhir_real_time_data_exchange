@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { crc32 } from "node:zlib";
 
@@ -9,15 +9,11 @@ import {
   APPROVAL_CONTENT_EXTENSION_URL,
   APPROVER_ROLE_SYSTEM,
 } from "../../src/fhir/provenance.js";
-import {
-  EMA_DOCUMENT_ID_NAMESPACE,
-  EMA_DOCUMENT_IDENTIFIER_SYSTEM,
-} from "../../src/fhir/transform.js";
 
 // The repository's own FHIR definitions, and the package that carries them to the official
-// validator. The ConceptMap and the StructureMap are descriptive, not executed:
-// src/fhir/transform.ts is the crosswalk, and test/fhir-artifacts.test.ts holds the StructureMap's
-// rules to what the transform does. The code systems, value sets and extension define every
+// validator. src/fhir/transform.ts is the crosswalk; the StructureMap is its executed twin
+// (fhir/maps/), which runs through the ConceptMap, and test/official/structuremap-twin.test.ts
+// holds the two to the same output. The code systems, value sets and extension define every
 // https://khs.dev/fhir/ system and extension the pipeline writes (identifier systems need no
 // definition). Every resource is checked by the official HL7 validator in CI
 // (scripts/ci/emit-validation-set.ts), and the package is loaded by it there and in the sidecar
@@ -36,7 +32,7 @@ await mkdir(output, { recursive: true });
 const mapping = await loadEmaMapping();
 
 const PACKAGE_NAME = "dev.khs.fhir.epi";
-const PACKAGE_VERSION = "0.1.0";
+const PACKAGE_VERSION = "0.2.0";
 const PACKAGE_FILE = `${PACKAGE_NAME}.tgz`;
 const CANONICAL = "https://khs.dev/fhir";
 
@@ -44,7 +40,7 @@ function flatten(rule: SectionRule): SectionRule[] {
   return [rule, ...(rule.children ?? []).flatMap(flatten)];
 }
 
-type Concept = { code: string; display: string; concept?: Concept[] };
+type Concept = { code: string; display: string; definition?: string; concept?: Concept[] };
 
 const valueSetUrl = (system: string): string => system.replace("/CodeSystem/", "/ValueSet/");
 
@@ -101,8 +97,15 @@ const terminology = [
     mapping.mappingVersion,
     "CanonicalSmpcSections",
     "Canonical SmPC sections",
-    "The canonical SmPC section keys of the mapping manifest (fhir/mappings/cap-smpc-en.json), each with its QRD heading, nested as the sections are. A key identifies a section of the canonical record; it is not a clinical concept.",
-    [sectionConcept(mapping.root)],
+    "The canonical SmPC section keys of the mapping manifest (fhir/mappings/cap-smpc-en.json), each with its QRD heading, nested as the sections are, and the keys of the EMA profile's slots the crosswalk does not carry (the manifest's unmapped list, each with its reason). A key identifies a section of the canonical record; it is not a clinical concept.",
+    [
+      sectionConcept(mapping.root),
+      ...(mapping.unmapped ?? []).map((slot) => ({
+        code: slot.sourceKey,
+        display: slot.title,
+        definition: `Not carried by the crosswalk (EMA code ${slot.targetCode}): ${slot.reason}`,
+      })),
+    ],
     "part-of",
   ),
   ...codeSystem(
@@ -192,7 +195,7 @@ const conceptMap = {
   status: "active",
   experimental: true,
   description:
-    "Deterministic terminology map. It maps section identifiers only and does not generate or alter regulated narrative.",
+    "Deterministic terminology map. It maps section identifiers only and does not generate or alter regulated narrative. Every section slot of the EMA profile EUQRD-CAP-template-new-SmPC-en has a key here: each of the template's own sections maps equivalent to its EMA code, and a slot the crosswalk does not carry is noMap, its reason in the source code system's definition of the key.",
   // A scope is a value set: R5 types it canonical(ValueSet), and the validator resolves a uri
   // scope as well and refuses a code system there. The source's is the value set of every
   // canonical section key, above; the target's is the EMA IG's SmPC section-code value set, the
@@ -203,88 +206,39 @@ const conceptMap = {
     {
       source: mapping.sourceCodeSystem,
       target: mapping.targetCodeSystem,
-      element: flatten(mapping.root).map((rule) => ({
-        code: rule.sourceKey,
-        display: rule.title,
-        target: [
-          {
-            code: rule.targetCode,
-            display: rule.display ?? rule.title,
-            relationship: "equivalent",
-          },
-        ],
-      })),
+      element: [
+        ...flatten(mapping.root).map((rule) => ({
+          code: rule.sourceKey,
+          display: rule.title,
+          target: [
+            {
+              code: rule.targetCode,
+              display: rule.display ?? rule.title,
+              relationship: "equivalent",
+            },
+          ],
+        })),
+        ...(mapping.unmapped ?? []).map((slot) => ({
+          code: slot.sourceKey,
+          display: slot.title,
+          noMap: true,
+        })),
+      ],
     },
   ],
 };
 
-const structureMap = {
-  resourceType: "StructureMap",
-  id: "type2-to-ema-cap-smpc-en",
-  url: "https://khs.dev/fhir/StructureMap/type2-to-ema-cap-smpc-en",
-  version: mapping.mappingVersion,
-  name: "Type2ToEmaCapSmpcEnglish",
-  title: "HL7 Global ePI Type 2 to EMA CAP SmPC English",
-  status: "active",
-  experimental: true,
-  description:
-    "Non-normative summary of two Bundle-level rules; it is not executed. The reviewed TypeScript implementation (src/fhir/transform.ts) executes the complete fail-closed mapping and records field-level evidence.",
-  structure: [
-    {
-      url: "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Bundle-uv-epi",
-      mode: "source",
-      alias: "Type2Bundle",
-    },
-    {
-      url: mapping.profiles.bundle,
-      mode: "target",
-      alias: "EmaBundle",
-    },
-  ],
-  group: [
-    {
-      name: "Type2BundleToEmaBundle",
-      input: [
-        { name: "src", mode: "source", type: "Type2Bundle" },
-        { name: "tgt", mode: "target", type: "EmaBundle" },
-      ],
-      rule: [
-        {
-          name: "deriveDocumentIdentifier",
-          documentation: `The target identifier is not the source's: its system is ${EMA_DOCUMENT_IDENTIFIER_SYSTEM} and its value is derived from the source Bundle.identifier.value and is also the target Bundle's id (src/lib/hash.ts stableUuid, namespace "${EMA_DOCUMENT_ID_NAMESPACE}"): take the SHA-256 of the UTF-8 string "${EMA_DOCUMENT_ID_NAMESPACE}:" followed by the value, in lowercase hex; keep its first 32 hex digits; set the 13th digit to 5 and the 17th digit to a; and write the 32 digits as a UUID, in groups of 8-4-4-4-12 joined by hyphens. The FHIR mapping language has no transform for that derivation, so this rule sets the system and leaves the value to the implementation.`,
-          source: [{ context: "src", element: "identifier", variable: "identifier" }],
-          target: [
-            {
-              context: "tgt",
-              element: "identifier",
-              variable: "targetIdentifier",
-              transform: "create",
-              parameter: [{ valueString: "Identifier" }],
-            },
-            {
-              context: "targetIdentifier",
-              element: "system",
-              transform: "copy",
-              parameter: [{ valueString: EMA_DOCUMENT_IDENTIFIER_SYSTEM }],
-            },
-          ],
-        },
-        {
-          name: "copyDocumentTimestamp",
-          source: [{ context: "src", element: "timestamp", variable: "timestamp" }],
-          target: [
-            {
-              context: "tgt",
-              element: "timestamp",
-              transform: "copy",
-              parameter: [{ valueId: "timestamp" }],
-            },
-          ],
-        },
-      ],
-    },
-  ],
-};
+// The StructureMap twin as the pinned validator compiled it from fhir/maps/ (scripts/fhir/
+// compile-map.mjs, which needs Java; CI's Official validation job compiles it again and fails on
+// any difference). Copied as it is, once its version is the mapping's.
+const structureMap = JSON.parse(
+  await readFile(path.resolve("fhir/maps/StructureMap-type2-to-ema-cap-smpc-en.json"), "utf8"),
+) as Record<string, unknown>;
+if (structureMap.version !== mapping.mappingVersion) {
+  throw new Error(
+    `fhir/maps/StructureMap-type2-to-ema-cap-smpc-en.json is at version ${String(structureMap.version)}, the mapping at ${mapping.mappingVersion}: run node scripts/fhir/compile-map.mjs`,
+  );
+}
 
 const resources: Record<string, unknown>[] = [
   ...terminology,

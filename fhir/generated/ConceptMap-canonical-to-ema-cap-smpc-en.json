@@ -2,12 +2,12 @@
   "resourceType": "ConceptMap",
   "id": "canonical-to-ema-cap-smpc-en",
   "url": "https://khs.dev/fhir/ConceptMap/canonical-to-ema-cap-smpc-en",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "name": "CanonicalToEmaCapSmpcEnglish",
   "title": "Canonical SmPC sections to EMA CAP SmPC English QRD sections",
   "status": "active",
   "experimental": true,
-  "description": "Deterministic terminology map. It maps section identifiers only and does not generate or alter regulated narrative.",
+  "description": "Deterministic terminology map. It maps section identifiers only and does not generate or alter regulated narrative. Every section slot of the EMA profile EUQRD-CAP-template-new-SmPC-en has a key here: each of the template's own sections maps equivalent to its EMA code, and a slot the crosswalk does not carry is noMap, its reason in the source code system's definition of the key.",
   "sourceScopeCanonical": "https://khs.dev/fhir/ValueSet/canonical-smpc-sections",
   "targetScopeCanonical": "http://ema.europa.eu/fhir/ValueSet/EUepismpcqrdcodesVs",
   "group": [
@@ -44,6 +44,39 @@
             {
               "code": "200000029793",
               "display": "2. QUALITATIVE AND QUANTITATIVE COMPOSITION",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.2.1",
+          "display": "2.1 General description",
+          "target": [
+            {
+              "code": "200000029794",
+              "display": "2.1 General description",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.2.2",
+          "display": "2.2 Qualitative and quantitative composition",
+          "target": [
+            {
+              "code": "200000029795",
+              "display": "2.2 Qualitative and quantitative composition",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.2.excipients",
+          "display": "Excipient(s) with known effect",
+          "target": [
+            {
+              "code": "200000029796",
+              "display": "Excipient(s) with known effect",
               "relationship": "equivalent"
             }
           ]
@@ -104,12 +137,34 @@
           ]
         },
         {
+          "code": "smpc.4.2.posology.paediatric",
+          "display": "Paediatric population",
+          "target": [
+            {
+              "code": "200000029802",
+              "display": "Paediatric population",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
           "code": "smpc.4.2.administration",
           "display": "Method of administration",
           "target": [
             {
               "code": "200000029803",
               "display": "Method of administration",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4.2.administration.precautions",
+          "display": "Precautions to be taken before handling or administering the medicinal product",
+          "target": [
+            {
+              "code": "200000029804",
+              "display": "Precautions to be taken before handling or administering the medicinal product",
               "relationship": "equivalent"
             }
           ]
@@ -137,6 +192,28 @@
           ]
         },
         {
+          "code": "smpc.4.4.traceability",
+          "display": "Traceability",
+          "target": [
+            {
+              "code": "200000029807",
+              "display": "Traceability",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4.4.paediatric",
+          "display": "Paediatric population",
+          "target": [
+            {
+              "code": "200000029808",
+              "display": "Paediatric population",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
           "code": "smpc.4.5",
           "display": "4.5 Interaction with other medicinal products and other forms of interaction",
           "target": [
@@ -148,12 +225,56 @@
           ]
         },
         {
+          "code": "smpc.4.5.paediatric",
+          "display": "Paediatric population",
+          "target": [
+            {
+              "code": "200000029810",
+              "display": "Paediatric population",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
           "code": "smpc.4.6",
           "display": "4.6 Fertility, pregnancy and lactation",
           "target": [
             {
               "code": "200000029811",
               "display": "4.6 Fertility, pregnancy and lactation",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4.6.pregnancy",
+          "display": "Pregnancy",
+          "target": [
+            {
+              "code": "200000029812",
+              "display": "Pregnancy",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4.6.breast-feeding",
+          "display": "Breast-feeding",
+          "target": [
+            {
+              "code": "200000029813",
+              "display": "Breast-feeding",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4.6.fertility",
+          "display": "Fertility",
+          "target": [
+            {
+              "code": "200000029814",
+              "display": "Fertility",
               "relationship": "equivalent"
             }
           ]
@@ -181,6 +302,17 @@
           ]
         },
         {
+          "code": "smpc.4.8.paediatric",
+          "display": "Paediatric population",
+          "target": [
+            {
+              "code": "200000029817",
+              "display": "Paediatric population",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
           "code": "smpc.4.8.reporting",
           "display": "Reporting of suspected adverse reactions",
           "target": [
@@ -198,6 +330,17 @@
             {
               "code": "200000029819",
               "display": "4.9 Overdose",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4.9.paediatric",
+          "display": "Paediatric population",
+          "target": [
+            {
+              "code": "200000029820",
+              "display": "Paediatric population",
               "relationship": "equivalent"
             }
           ]
@@ -225,6 +368,50 @@
           ]
         },
         {
+          "code": "smpc.5.1.mechanism",
+          "display": "Mechanism of action",
+          "target": [
+            {
+              "code": "200000029823",
+              "display": "Mechanism of action",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.5.1.effects",
+          "display": "Pharmacodynamic effects",
+          "target": [
+            {
+              "code": "200000029824",
+              "display": "Pharmacodynamic effects",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.5.1.efficacy",
+          "display": "Clinical efficacy and safety",
+          "target": [
+            {
+              "code": "200000029825",
+              "display": "Clinical efficacy and safety",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.5.1.paediatric",
+          "display": "Paediatric population",
+          "target": [
+            {
+              "code": "200000029826",
+              "display": "Paediatric population",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
           "code": "smpc.5.2",
           "display": "5.2 Pharmacokinetic properties",
           "target": [
@@ -236,12 +423,89 @@
           ]
         },
         {
+          "code": "smpc.5.2.absorption",
+          "display": "Absorption",
+          "target": [
+            {
+              "code": "200000029828",
+              "display": "Absorption",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.5.2.distribution",
+          "display": "Distribution",
+          "target": [
+            {
+              "code": "200000029829",
+              "display": "Distribution",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.5.2.biotransformation",
+          "display": "Biotransformation",
+          "target": [
+            {
+              "code": "200000029830",
+              "display": "Biotransformation",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.5.2.elimination",
+          "display": "Elimination",
+          "target": [
+            {
+              "code": "200000029831",
+              "display": "Elimination",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.5.2.linearity",
+          "display": "Linearity/non-linearity",
+          "target": [
+            {
+              "code": "200000029832",
+              "display": "Linearity/non-linearity",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.5.2.pk-pd",
+          "display": "Pharmacokinetic/pharmacodynamic relationship(s)",
+          "target": [
+            {
+              "code": "200000029833",
+              "display": "Pharmacokinetic/pharmacodynamic relationship(s)",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
           "code": "smpc.5.3",
           "display": "5.3 Preclinical safety data",
           "target": [
             {
               "code": "200000029834",
               "display": "5.3 Preclinical safety data",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.5.3.era",
+          "display": "Environmental risk assessment (ERA)",
+          "target": [
+            {
+              "code": "200000029835",
+              "display": "Environmental risk assessment (ERA)",
               "relationship": "equivalent"
             }
           ]
@@ -324,6 +588,17 @@
           ]
         },
         {
+          "code": "smpc.6.6.paediatric",
+          "display": "Use in the paediatric population",
+          "target": [
+            {
+              "code": "200000029843",
+              "display": "Use in the paediatric population",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
           "code": "smpc.7",
           "display": "7. MARKETING AUTHORISATION HOLDER",
           "target": [
@@ -366,6 +641,38 @@
               "relationship": "equivalent"
             }
           ]
+        },
+        {
+          "code": "smpc.11",
+          "display": "11. DOSIMETRY",
+          "target": [
+            {
+              "code": "200000029848",
+              "display": "11. DOSIMETRY",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.12",
+          "display": "12. INSTRUCTIONS FOR PREPARATION OF RADIOPHARMACEUTICALS",
+          "target": [
+            {
+              "code": "200000029849",
+              "display": "12. INSTRUCTIONS FOR PREPARATION OF RADIOPHARMACEUTICALS",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.custom.h4",
+          "display": "Custom subsection (level H4)",
+          "noMap": true
+        },
+        {
+          "code": "smpc.custom.h5",
+          "display": "Custom subsection (level H5)",
+          "noMap": true
         }
       ]
     }

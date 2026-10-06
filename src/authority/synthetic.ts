@@ -36,8 +36,12 @@ type Section = {
   section?: Section[];
 };
 
+// The mandatory sections only, as the publication had before the optional ones were mapped
+// (mapping 1.4.0).
 function section(rule: SectionRule, product: SyntheticProduct): Section {
-  const children = (rule.children ?? []).map((child) => section(child, product));
+  const children = (rule.children ?? [])
+    .filter((child) => child.required)
+    .map((child) => section(child, product));
   return {
     id: rule.sourceKey,
     title: rule.title,

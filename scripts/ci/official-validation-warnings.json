@@ -376,5 +376,17 @@
     "location": "StructureDefinition.differential.element[3].type[0].code",
     "message": "The value provided ('string') was not found in the value set 'Element Definition Types' (http://hl7.org/fhir/ValueSet/elementdefinition-types|5.0.0), and a code should come from this value set unless it has no suitable code (note that the validator cannot judge what is suitable)  (error message = Cannot invoke \"String.equals(Object)\" because \"system\" is null), validating against Base FHIR Standard",
     "reason": "A defect of validator 6.10.4 under -tx n/a (its own null system, quoted): string is a FHIR type and in elementdefinition-types."
+  },
+  {
+    "file": "StructureMap-type2-to-ema-cap-smpc-en.json",
+    "location": "StructureMap.group[2].rule[0].rule[0].rule[0].target[0]",
+    "message": "Transform translate not checked yet",
+    "reason": "The validator's StructureMap checker does not check this transform; test/official/structuremap-twin.test.ts executes it on every fixture against the crosswalk."
+  },
+  {
+    "file": "StructureMap-type2-to-ema-cap-smpc-en.json",
+    "location": "StructureMap.group[2].rule[0].rule[0].rule[0].target[2]",
+    "message": "Transform c not checked yet",
+    "reason": "The validator's StructureMap checker does not check this transform; test/official/structuremap-twin.test.ts executes it on every fixture against the crosswalk."
   }
 ]
