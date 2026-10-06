@@ -1,7 +1,7 @@
 """An SmPC's ePI sections from its Word file: each section's narrative and page, or why not.
 
     uv run --frozen python scripts/epi_from_word.py LABEL.docx \
-        [--assign KEY=PARAGRAPH ...] [--no-drawing] [--out FILE]
+        [--view accepted|original] [--assign KEY=PARAGRAPH ...] [--no-drawing] [--out FILE]
 
 The label is read with zone_a.certified, structured with zone_a.structure (``--assign`` as in
 scripts/structure_label.py) and built with zone_a.word_epi; where Chrome is installed and
@@ -12,7 +12,12 @@ FILE, or to standard output, with the file's SHA-256 and every version that deci
 the reader refuses, or one with something Word draws the read does not yet say (``Body.layout``),
 gives its refusal; a section anchoring a floating object is refused alone; a structure a person must
 still confirm gives the structure alone (``ready`` false), with ``product``, what the label says
-it is for (zone_a.product). See ADR 0006.
+it is for (zone_a.product). A label with tracked changes is built only from the view a person
+names with ``--view`` (every change accepted, or every one rejected), which the result records
+with the number of changes (``tracked``); without one it is refused. An Annex I holding several
+SmPCs gives each its own result, in ``smpcs`` (its ``span`` of paragraphs, its structure, product
+and sections; ``--assign`` goes to the SmPC holding the paragraph), or the reason a person must
+settle where one ends (zone_a.structure.smpcs). See ADR 0006.
 """
 
 from __future__ import annotations
@@ -29,8 +34,8 @@ from label_docx.reader import DocxRefusedError
 
 from zone_a import drawing, product, word_epi
 from zone_a.canonical_json import canonical_json
-from zone_a.certified import read_body
-from zone_a.structure import structure
+from zone_a.certified import VIEWS, Body, read_body
+from zone_a.structure import smpcs, structure
 
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = ROOT / "qrd" / "registry" / "cap-smpc-en-10.4.json"
@@ -44,7 +49,9 @@ def _assignment(text: str) -> tuple[str, int]:
     return key, int(at)
 
 
-def build(data: bytes, assignments: dict[str, int], chrome: Path | None) -> dict[str, Any]:
+def build(
+    data: bytes, assignments: dict[str, int], chrome: Path | None, view: str | None = None
+) -> dict[str, Any]:
     """The result for one label (the module docstring)."""
     result: dict[str, Any] = {
         "source": {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()},
@@ -52,25 +59,57 @@ def build(data: bytes, assignments: dict[str, int], chrome: Path | None) -> dict
         "format": output.FORMAT_VERSION,
     }
     try:
-        body = read_body(data)
+        body = read_body(data, view)
     except DocxRefusedError as refused:
         return result | {"refusal": {"code": refused.code, "detail": refused.detail}}
+    if body.view is not None:
+        result["tracked"] = {"view": body.view, "changes": body.changes}
     registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
     mapping = json.loads(MAPPING.read_text(encoding="utf-8"))
-    structured = structure(body.paragraphs, registry, mapping, assignments)
-    result["structure"] = structured
+    parts, why = smpcs(body.paragraphs, registry, mapping)
+    if why is not None:
+        # Several SmPCs whose boundary the template's own lines do not settle: for a person.
+        return result | {"smpcs": {"ready": False, "reason": why}}
+    if len(parts) == 1:
+        return result | _smpc(body, registry, mapping, assignments, None, chrome)
+    result["smpcs"] = [
+        {"span": [start, end]}
+        | _smpc(
+            body,
+            registry,
+            mapping,
+            {key: at for key, at in assignments.items() if start <= at < end},
+            (start, end, shared),
+            chrome,
+        )
+        for start, end, shared in parts
+    ]
+    return result
+
+
+def _smpc(
+    body: Body,
+    registry: dict[str, Any],
+    mapping: dict[str, Any],
+    assignments: dict[str, int],
+    part: tuple[int, int, int | None] | None,
+    chrome: Path | None,
+) -> dict[str, Any]:
+    """One SmPC's structure, who it is for, and its ePI sections once the structure is ready."""
+    structured = structure(body.paragraphs, registry, mapping, assignments, part)
+    out: dict[str, Any] = {"structure": structured}
     # Who it is for, from its sections 1, 7 and 8, for a person to confirm (zone_a.product).
-    result["product"] = product.propose(body.paragraphs, structured)
+    out["product"] = product.propose(body.paragraphs, structured)
     if not structured["ready"]:
-        return result
+        return out
     try:
         built = word_epi.sections(body, structured, registry)
     except word_epi.RefusedError as refused:
-        return result | {"refusal": {"code": refused.code, "detail": refused.detail}}
+        return out | {"refusal": {"code": refused.code, "detail": refused.detail}}
     verdict = None if chrome is None else drawing.check(body, built, chrome)
-    result["epi"] = drawing.refuse(built, verdict)
-    result["drawing"] = verdict
-    return result
+    out["epi"] = drawing.refuse(built, verdict)
+    out["drawing"] = verdict
+    return out
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -81,13 +120,16 @@ def main(argv: list[str] | None = None) -> int:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("label", type=Path, help="the SmPC (.docx)")
+    parser.add_argument(
+        "--view", choices=VIEWS, help="for a label with tracked changes, the view to build"
+    )
     parser.add_argument("--assign", type=_assignment, action="append", default=[])
     parser.add_argument("--no-drawing", action="store_true", help="do not ask Chrome")
     parser.add_argument("--out", type=Path, help="write here instead of standard output")
     arguments = parser.parse_args(argv)
     chrome = None if arguments.no_drawing else browser.find_chrome()
     try:
-        result = build(arguments.label.read_bytes(), dict(arguments.assign), chrome)
+        result = build(arguments.label.read_bytes(), dict(arguments.assign), chrome, arguments.view)
     except ValueError as problem:
         parser.error(str(problem))
     text = canonical_json(result) + "\n"

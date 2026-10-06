@@ -278,6 +278,9 @@ def test_every_named_subsection_of_the_mapping_is_a_registry_subheading() -> Non
         ("5.1 \tPharmacodynamic properties", "smpc.5.1"),
         ("1. NAME OF THE MEDICINAL PRODUCT", "smpc.1"),
         ("8. MARKETING AUTHORISATION NUMBER(S)", "smpc.8"),
+        # The template's "(S)" leaves singular or plural to the author (owner decision 2026-10-06).
+        ("8. MARKETING AUTHORISATION NUMBER", "smpc.8"),
+        ("8. MARKETING AUTHORISATION NUMBERS", "smpc.8"),
         ("11. DOSIMETRY", "smpc.11"),
         ("6.6 Special precautions for disposal", "smpc.6.6"),
     ],
@@ -297,6 +300,9 @@ def test_headings_are_recognised(line: str, key: str) -> None:
         "4.10 Something",
         "Therapeutic indications",
         "6.5 Nature and contents of container and special equipment",
+        "8. MARKETING AUTHORISATION NUMBER(s)",
+        "8. MARKETING AUTHORISATION NUMBERs",
+        "8. MARKETING AUTHORISATION NUMBER (S)",
     ],
 )
 def test_near_misses_are_not_headings(line: str) -> None:

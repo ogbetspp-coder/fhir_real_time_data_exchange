@@ -44,16 +44,18 @@ was found, a paragraph outside the read, or a paragraph that is already a headin
 
 from __future__ import annotations
 
+import itertools
 import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
 from label_docx.reader import Paragraph
 
+from zone_a.qrd.check import is_statement
 from zone_a.qrd.headings import collapse, forms, index, match_heading
 from zone_a.qrd.registry import SMPC_END
 
-STRUCTURE_VERSION = "smpc-structure/1.0.7"
+STRUCTURE_VERSION = "smpc-structure/1.1.0"
 
 _NUMBER = re.compile(r"^(\d+(?:\.\d+)?)\.?\s+\S")
 _HEADING_STYLE = re.compile(r"Heading", re.IGNORECASE)
@@ -152,13 +154,88 @@ def _nodes(registry: dict[str, Any], mapping: Mapping[str, Any]) -> list[dict[st
     return out
 
 
+def _statement_text(tokens: list[dict[str, Any]]) -> str:
+    """A statement's text with every optional segment present, its pictures and guidance out."""
+    out: list[str] = []
+    for token in tokens:
+        if token["kind"] == "text":
+            out.append(str(token["value"]).replace("\ufffc", " "))
+        elif token["kind"] == "optional":
+            out.append(_statement_text(token["value"]))
+        elif token["kind"] != "guidance":
+            raise ValueError(f"a statement before section 1 holds a {token['kind']}")
+    return "".join(out)
+
+
+def smpcs(
+    paragraphs: Sequence[Paragraph], registry: dict[str, Any], mapping: Mapping[str, Any]
+) -> tuple[list[tuple[int, int, int | None]], str | None]:
+    """Each SmPC of an Annex I that holds several, as ``structure``'s ``part``; or why not.
+
+    An Annex I holds one SmPC per presentation where the label has several: the root title once,
+    then sections 1 to 10 again for each (owner decision 2026-10-06: each is its own ePI). A new
+    SmPC starts at a section 1 heading after the first, or before it where the template's own
+    statement before section 1 (the black triangle's, its pictures aside) stands between it and
+    the last section 10 heading. What lies between that heading and the start must be section
+    10's: at most one paragraph holding no picture (its date), then at most the template's
+    closing statement (``documentStatements``, matched whole). Anything else, or a section 1
+    with no section 10 before it, is for a person: ``([], reason)``. One SmPC is
+    ``([(0, end, None)], None)``.
+    """
+    table = index(registry)
+    end = next((i for i, p in enumerate(paragraphs) if line(p) == collapse(SMPC_END)), None)
+    stop = len(paragraphs) if end is None else end
+    keys = [(i, hit.key) for i in range(stop) if (hit := match_heading(line(paragraphs[i]), table))]
+    ones = [i for i, key in keys if key == "smpc.1"]
+    if len(ones) < 2:
+        return [(0, stop, None)], None
+    root_title = collapse(mapping["root"]["title"])
+    roots = [i for i in range(ones[0]) if line(paragraphs[i]) == root_title]
+    if len(roots) != 1:
+        return [], "no one root title before the first section 1"
+    statements = {s["placement"]: s["pattern"] for s in registry["documentStatements"]}
+    opening = collapse(_statement_text(statements["before-section-1"]))
+    starts = [0]
+    for before, heading in itertools.pairwise(ones):
+        tens = [i for i, key in keys if key == "smpc.10" and before < i < heading]
+        if not tens:
+            return [], f"no section 10 before the section 1 at paragraph {heading}"
+        gap = [i for i in range(tens[-1] + 1, heading) if paragraphs[i].text.strip()]
+        first = next(
+            (i for i in gap if collapse(paragraphs[i].text.replace("\ufffc", " ")) == opening),
+            heading,
+        )
+        ten = [i for i in gap if i < first]
+        closing = [i for i in ten if is_statement(statements["end-of-document"], paragraphs[i])]
+        dated = [i for i in ten if i not in closing]
+        if (
+            len(dated) > 1
+            or len(closing) > 1
+            or (dated and closing and dated[0] > closing[0])
+            or any(paragraphs[i].pictures or paragraphs[i].anchored for i in dated)
+        ):
+            return [], f"section 10 before paragraph {heading} holds what is not its own"
+        starts.append(first)
+    stops = [*starts[1:], stop]
+    return [
+        (start, end_, None if n == 0 else roots[0])
+        for n, (start, end_) in enumerate(zip(starts, stops, strict=True))
+    ], None
+
+
 def structure(
     paragraphs: Sequence[Paragraph],
     registry: dict[str, Any],
     mapping: Mapping[str, Any],
     assignments: Mapping[str, int] | None = None,
+    part: tuple[int, int, int | None] | None = None,
 ) -> dict[str, Any]:
-    """The SmPC's sections in the read paragraphs, as JSON values (the module docstring)."""
+    """The SmPC's sections in the read paragraphs, as JSON values (the module docstring).
+
+    ``part`` is one SmPC of an Annex I holding several (``smpcs``): its paragraphs from ``start``
+    to ``stop``, and the root title it shares with the first, which stands before it, or None for
+    the first.
+    """
     nodes = _nodes(registry, mapping)
     by_key = {n["key"]: n for n in nodes}
     order = {n["key"]: i for i, n in enumerate(nodes)}
@@ -171,7 +248,13 @@ def structure(
     candidates: dict[str, list[dict[str, Any]]] = {}
     current: str | None = None  # the numbered section the scan is in
     end = next((i for i, p in enumerate(paragraphs) if line(p) == collapse(SMPC_END)), None)
-    for i, paragraph in enumerate(paragraphs[:end]):
+    start, shared = 0, None
+    if part is not None:
+        start, end, shared = part
+    if shared is not None:
+        found.append((shared, nodes[0]["key"], "found"))
+    for i in range(start, len(paragraphs) if end is None else end):
+        paragraph = paragraphs[i]
         text = line(paragraph)
         if not text:
             continue
@@ -199,7 +282,7 @@ def structure(
     for key, at in (assignments or {}).items():
         if key not in by_key:
             raise ValueError(f"no section {key} in the template")
-        if not 0 <= at < (len(paragraphs) if end is None else end):
+        if not start <= at < (len(paragraphs) if end is None else end):
             raise ValueError(f"no paragraph {at} in the SmPC")
         if at in headings:
             raise ValueError(f"paragraph {at} is already a heading")
@@ -220,9 +303,11 @@ def structure(
 
     texts: dict[str, list[int]] = {n["key"]: [] for n in nodes}
     preamble: list[int] = []
-    owner: str | None = None
+    owner: str | None
     marks = {i: key for i, key, _ in found}
-    for i, paragraph in enumerate(paragraphs[:end]):
+    owner = None if shared is None else nodes[0]["key"]
+    for i in range(start, len(paragraphs) if end is None else end):
+        paragraph = paragraphs[i]
         if i in marks:
             owner = marks[i]
             continue
@@ -269,6 +354,7 @@ def structure(
         "registryVersion": registry["registryVersion"],
         "mappingVersion": mapping["mappingVersion"],
         "preamble": preamble,
+        "start": start,
         "end": end,
         "sections": sections,
         "summary": counts,

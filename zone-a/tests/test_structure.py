@@ -13,11 +13,12 @@ from typing import Any
 
 import pytest
 from label_docx import word
-from label_docx.reader import Mark, Numbering, Paragraph
+from label_docx.reader import Anchored, Mark, Numbering, Paragraph
 
-from zone_a.certified import read_docx
+from zone_a import word_epi
+from zone_a.certified import Body, read_docx
 from zone_a.qrd.headings import forms
-from zone_a.structure import capitals, line, structure
+from zone_a.structure import capitals, line, smpcs, structure
 
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = json.loads((ROOT / "qrd" / "registry" / "cap-smpc-en-10.4.json").read_text("utf-8"))
@@ -223,3 +224,70 @@ def test_capitals_are_the_word_oracles_capitals() -> None:
     """Held equal, character by character, to the copy the label reader holds to Word's answers."""
     sample = "".join(chr(c) for c in range(0x20, 0x2200) if chr(c).isprintable())
     assert capitals(sample) == word._word_capitals(sample)
+
+
+# The template's statements around an SmPC, as a label writes them.
+TRIANGLE = (
+    "\ufffc This medicinal product is subject to additional monitoring. This will allow quick "
+    "identification of new safety information. Healthcare professionals are asked to report any "
+    "suspected adverse reactions. See section 4.8 for how to report adverse reactions."
+)
+CLOSING = (
+    "Detailed information on this medicinal product is available on the website of the European "
+    "Medicines Agency https://www.ema.europa.eu."
+)
+
+
+def test_an_annex_holding_several_smpcs_is_one_structure_each() -> None:
+    # Owner decision 2026-10-06: each SmPC of an Annex I is its own ePI.
+    second = _skeleton()[2:]  # sections 1 to 10 again, under the same root title
+    paragraphs = [*_skeleton(), _p(CLOSING), _p(TRIANGLE), *second, _p("ANNEX II"), _p("x")]
+    triangle = paragraphs.index(next(p for p in paragraphs if p.text == TRIANGLE))
+    annex = len(paragraphs) - 2
+    parts, why = smpcs(paragraphs, REGISTRY, MAPPING)
+    assert (parts, why) == ([(0, triangle, None), (triangle, annex, 1)], None)
+    first, later = (structure(paragraphs, REGISTRY, MAPPING, None, part) for part in parts)
+    assert first["ready"]
+    assert later["ready"]
+    assert (first["start"], first["end"], later["start"], later["end"]) == (
+        0,
+        triangle,
+        triangle,
+        annex,
+    )
+    # Section 10 keeps its date and the closing statement; the triangle opens the next SmPC,
+    # whose root section is headed by the root title they share.
+    assert _by_key(first)["smpc.10"]["paragraphs"] == [triangle - 2, triangle - 1]
+    assert (_by_key(later)["smpc"]["heading"], _by_key(later)["smpc"]["paragraphs"]) == (
+        1,
+        [triangle],
+    )
+    assert _by_key(later)["smpc.1"]["heading"] == triangle + 1
+    # Built, each SmPC's sections hold its own paragraphs only.
+    built = word_epi.sections(Body(tuple(paragraphs), ()), later, REGISTRY)
+    spans = {s["key"]: s["paragraphs"] for s in built["sections"]}
+    assert spans["smpc"] == [triangle, triangle + 1]
+    assert all(triangle <= a <= b <= annex for a, b in spans.values())
+    # With no triangle, the next SmPC starts at its section 1 heading.
+    plain = [*_skeleton(), *second]
+    assert smpcs(plain, REGISTRY, MAPPING)[0][1][0] == len(_skeleton())
+    # One SmPC is one part, as before.
+    assert smpcs(_skeleton(), REGISTRY, MAPPING) == ([(0, len(_skeleton()), None)], None)
+
+
+def test_where_one_smpc_ends_is_for_a_person_unless_the_template_settles_it() -> None:
+    second = _skeleton()[2:]
+    pictured = Paragraph("2026", None, None, None, anchored=(Anchored(0, "picture"),))
+    without_ten = [p for p in _skeleton() if not line(p).startswith("10.")][:-1]
+    for paragraphs, why in (
+        # Two paragraphs after section 10's heading that the template does not name.
+        ([*_skeleton(), _p("Something else."), *second], "holds what is not its own"),
+        # A date that holds a picture may be the next SmPC's triangle.
+        ([*_skeleton()[:-1], pictured, *second], "holds what is not its own"),
+        # No section 10 between two section 1 headings.
+        ([*without_ten, *second], "no section 10 before"),
+    ):
+        parts, reason = smpcs(paragraphs, REGISTRY, MAPPING)
+        assert parts == []
+        assert reason is not None
+        assert why in reason

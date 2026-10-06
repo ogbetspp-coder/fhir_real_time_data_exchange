@@ -1062,6 +1062,19 @@ def test_the_scoreboard_measures_a_tracked_label_only_by_the_view_asked_for(tmp_
         assert script.main([str(folder), "--no-drawing", "--view", view, "--out", str(out)]) == 0
         (entry,) = json.loads(out.read_text("utf-8"))["files"]
         assert (entry["outcome"], entry["view"]) == ("built", view)
+    # The import builds it only from the view a person names, and says which (ADR 0006).
+    spec = importlib.util.spec_from_file_location(
+        "epi_from_word", Path(__file__).parents[1] / "scripts" / "epi_from_word.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    importer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(importer)
+    data = (folder / f"{name}.docx").read_bytes()
+    assert importer.build(data, {}, None)["refusal"]["code"] == "tracked-change"
+    built = importer.build(data, {}, None, "accepted")
+    assert built["tracked"] == {"view": "accepted", "changes": 1}
+    assert built["epi"]["sections"]
 
 
 def test_the_scoreboard_counts_without_saying_anything(tmp_path: Path) -> None:

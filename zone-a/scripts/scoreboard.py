@@ -9,11 +9,13 @@ narrative is drawn (zone_a.drawing). With ``--keys``, a folder of answer keys (a
 Bundle named as the .docx, ``NAME.json``), each carried section is compared with the key's
 section of the same EMA code, as the label reader reads it, line by line (list labels and text,
 spaces collapsed); a key's sub-sections the template has no place for are read into their
-parent.
+parent. An Annex I holding several SmPCs (``zone_a.structure.smpcs``) is counted over them all
+(``smpcs``), each structured and built on its own; it has no answer key, and one whose boundary
+a person must settle needs a person (``smpc-boundary``).
 
-A document with tracked changes is refused (ADR 0006: a label submitted carries one approved
-text). With ``--view``, it is measured by that view instead (``label_docx.reader.tracked``), so
-what a view chosen by a person would carry can be counted; the entry says so (``view``).
+A document with tracked changes is refused unless a view is named; with ``--view`` it is
+measured by that view (``zone_a.certified.read_body``), as a person may import it (ADR 0006),
+and the entry says so (``view``).
 
 Nothing a label says is printed or written: only codes, counts, keys and line numbers, so it can
 be run on documents that must not leave their environment. The result is JSON: one entry per
@@ -34,12 +36,12 @@ from typing import Any
 
 from label_docx import browser
 from label_docx.epi_output import read as read_epi
-from label_docx.reader import DocxRefusedError, tracked
+from label_docx.reader import DocxRefusedError
 
 from zone_a import drawing, word_epi
 from zone_a.canonical_json import canonical_json
 from zone_a.certified import read_body
-from zone_a.structure import structure
+from zone_a.structure import smpcs, structure
 
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = ROOT / "qrd" / "registry" / "cap-smpc-en-10.4.json"
@@ -95,28 +97,42 @@ def score(
         if refused.code != "tracked-change" or view is None:
             return entry | {"outcome": "reader-refused", "code": refused.code}
         try:
-            accepted, original, _ = tracked(data)
-            body = read_body(accepted if view == "accepted" else original)
+            body = read_body(data, view)
         except DocxRefusedError as again:
             return entry | {"outcome": "reader-refused", "code": again.code, "view": view}
         entry["view"] = view
     registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
     mapping = json.loads(MAPPING.read_text(encoding="utf-8"))
-    structured = structure(body.paragraphs, registry, mapping)
-    entry["structure"] = {k: v for k, v in structured["summary"].items() if v}
-    if not structured["ready"]:
+    parts, why = smpcs(body.paragraphs, registry, mapping)
+    if why is not None:
+        return entry | {"outcome": "needs-a-person", "sections": ["smpc-boundary"]}
+    # One SmPC as before; several, each structured and built on its own, counted together.
+    several = len(parts) > 1
+    structures = [
+        structure(body.paragraphs, registry, mapping, None, part if several else None)
+        for part in parts
+    ]
+    summary = sum((Counter(s["summary"]) for s in structures), Counter[str]())
+    entry["structure"] = {k: v for k, v in summary.items() if v}
+    if several:
+        entry["smpcs"] = len(parts)
+    if not all(s["ready"] for s in structures):
         needs = [
             s["key"]
+            for structured in structures
             for s in structured["sections"]
             if s["status"] in ("missing", "duplicate", "order", "no-code")
         ]
         return entry | {"outcome": "needs-a-person", "sections": needs}
-    try:
-        built = word_epi.sections(body, structured, registry)
-    except word_epi.RefusedError as refused:
-        return entry | {"outcome": "document-refused", "code": refused.code}
-    if chrome is not None:
-        built = drawing.refuse(built, drawing.check(body, built, chrome))
+    built: dict[str, Any] = {"sections": []}
+    for structured in structures:
+        try:
+            one = word_epi.sections(body, structured, registry)
+        except word_epi.RefusedError as refused:
+            return entry | {"outcome": "document-refused", "code": refused.code}
+        if chrome is not None:
+            one = drawing.refuse(one, drawing.check(body, one, chrome))
+        built["sections"] += one["sections"]
     carried = [s for s in built["sections"] if s["refusal"] is None]
     entry["outcome"] = "built"
     entry["sections"] = len(built["sections"])
@@ -125,7 +141,7 @@ def score(
         Counter(s["refusal"]["code"] for s in built["sections"] if s["refusal"])
     )
     entry["drawn"] = chrome is not None
-    key_path = None if keys is None else keys / f"{path.stem}.json"
+    key_path = None if keys is None or several else keys / f"{path.stem}.json"
     if key_path is not None and key_path.exists():
         key = json.loads(read_epi(key_path.read_bytes())[0])
         theirs = _key_lines(key, {s["code"] for s in built["sections"]})

@@ -9,7 +9,8 @@ character, or a refusal. A result the check cannot account for is refused there
 is checked is what was certified.
 
 A .docx with tracked changes reads to two texts, every change accepted and every change rejected,
-with no default between them; Zone A takes neither and refuses it (``tracked-change``). Nothing in
+with no default between them; Zone A takes the one a person names (``read_body``'s ``view``) and
+refuses it when none is named (``tracked-change``). Nothing in
 Zone A reads a footnote's or endnote's text, so a body that refers to one is refused
 (``note-reference``); nor a page number's, which the text leaves out (``page-number``).
 """
@@ -37,6 +38,7 @@ from label_docx.reader import (
     Paragraph,
     Picture,
     W,
+    tracked,
 )
 
 
@@ -104,6 +106,10 @@ class Body:
     tables: tuple[dict[str, Any], ...]
     layout: tuple[str, ...] = field(default=())
     images: dict[str, bytes] = field(default_factory=dict)
+    # For a document with tracked changes, the view a person chose ("accepted", every change
+    # accepted, or "original", every one rejected) and how many changes the document holds.
+    view: str | None = None
+    changes: int = 0
 
 
 # Elements whose drawing the read does not yet report (ADR 0006 P1), by local name, and what each
@@ -250,24 +256,46 @@ def _break_between_words(paragraph: ET.Element) -> bool:
     )
 
 
-def read_body(data: bytes) -> Body:
+VIEWS: Final = ("accepted", "original")
+
+
+def read_body(data: bytes, view: str | None = None) -> Body:
     """The body of a .docx, as the reader certified it.
 
-    A footnote or endnote's text is in the reader's result but not in these paragraphs, and
-    nothing here reads it, so a body that refers to one is refused rather than read without it;
-    so is a body with a page number (PAGE, PAGEREF...), whose digits the text leaves out.
+    A document with tracked changes has two texts, each certified: every change accepted and
+    every change rejected. It is read only by the ``view`` a person names (owner decision
+    2026-10-06, ADR 0006), which the body records with the number of changes; with none it is
+    refused. A footnote or endnote's text is in the reader's result but not in these paragraphs,
+    and nothing here reads it, so a body that refers to one is refused rather than read without
+    it; so is a body with a page number (PAGE, PAGEREF...), whose digits the text leaves out.
 
     Raises:
         DocxRefusedError: The reader refused the document (``uncertified`` among the codes), it
-            has tracked changes, or its body refers to a footnote or endnote or holds a page
-            number.
+            has tracked changes and no view is named, or its body refers to a footnote or endnote
+            or holds a page number.
+        ValueError: A view is named that is not one of ``VIEWS``, or for a document with one
+            text.
     """
+    if view is not None and view not in VIEWS:
+        raise ValueError(f"no view {view!r}: {' or '.join(VIEWS)}")
     result, was_read = read_docx_json(data)
     value = json.loads(result)
     if not was_read:
         raise DocxRefusedError(value["refusal"]["code"], value["refusal"]["detail"])
+    changes = 0
     if "tracked" in value:
-        raise DocxRefusedError("tracked-change", "two texts (changes accepted, rejected)")
+        if view is None:
+            raise DocxRefusedError(
+                "tracked-change", "two texts (changes accepted, rejected): a person names one"
+            )
+        changes = len(value["tracked"]["changes"])
+        value = value["tracked"][view]
+        accepted, original, _ = tracked(data)
+        drawn = accepted if view == "accepted" else original
+    elif view is not None:
+        raise ValueError("a view of a document with no tracked changes")
+    else:
+        drawn = data
     if any(paragraph["notes"] for paragraph in value["paragraphs"]):
         raise DocxRefusedError("note-reference", "a footnote or endnote, whose text is not read")
     if any(paragraph["pages"] for paragraph in value["paragraphs"]):
@@ -285,7 +313,12 @@ def read_body(data: bytes) -> Body:
                         raise DocxRefusedError("uncertified", f"{picture.part} is not as certified")
                     images[hashlib.sha256(image).hexdigest()] = image
     return Body(
-        paragraphs=paragraphs, tables=tuple(value["tables"]), layout=layout(data), images=images
+        paragraphs=paragraphs,
+        tables=tuple(value["tables"]),
+        layout=layout(drawn),
+        images=images,
+        view=view,
+        changes=changes,
     )
 
 

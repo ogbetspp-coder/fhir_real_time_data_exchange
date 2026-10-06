@@ -101,11 +101,23 @@ def test_a_refusal_is_the_readers() -> None:
     assert epi.value.code == "invalid-bundle"
 
 
-def test_a_tracked_document_is_refused() -> None:
-    # Two texts, every change accepted and every change rejected; Zone A takes neither.
+def test_a_tracked_document_is_read_only_by_the_view_a_person_names() -> None:
+    # Two texts, every change accepted and every change rejected: with no view named, neither.
     data = (
-        ROOT / "label-docx-reader" / "corpus" / "tracked-cases" / "format-bold.docx"
+        ROOT / "label-docx-reader" / "corpus" / "tracked-cases" / "text-inserted-deleted.docx"
     ).read_bytes()
     with pytest.raises(DocxRefusedError) as refused:
         certified.read_docx(data)
     assert refused.value.code == "tracked-change"
+    # Named, each view is its own certified text, and the body says which and how many changes.
+    for view, text in (("accepted", "Store below 30 °C."), ("original", "Store below 25 °C.")):
+        body = certified.read_body(data, view)
+        assert ([p.text for p in body.paragraphs], body.view, body.changes) == ([text], view, 2)
+    with pytest.raises(ValueError, match="no view"):
+        certified.read_body(data, "latest")
+    plain = (
+        ROOT / "label-docx-reader" / "corpus" / "numbering-cases" / "two-definitions.docx"
+    ).read_bytes()
+    with pytest.raises(ValueError, match="no tracked changes"):
+        certified.read_body(plain, "accepted")
+    assert certified.read_body(plain).view is None
