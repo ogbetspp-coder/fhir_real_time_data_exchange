@@ -180,6 +180,13 @@ describe("the Cloud Build configuration", () => {
     );
   });
 
+  it("expects the validator image to run the command Dockerfile.validator declares", () => {
+    const script = readFileSync("scripts/ci/build-images.sh", "utf8");
+    const expected = /^expect_config ema-flow\/validator:ci validator '(\[.*\])'$/m.exec(script);
+    const declared = /^CMD (\[.*\])$/m.exec(readFileSync("Dockerfile.validator", "utf8"));
+    expect(JSON.parse(expected?.[1] ?? "null")).toEqual(JSON.parse(declared?.[1] ?? "[]"));
+  });
+
   // One judgement of the validator's offline start, in CI and in the image build (audit B08's
   // offlineStartVerdict), not a copy of it.
   it("judges the validator's offline start with the script Cloud Build runs", () => {

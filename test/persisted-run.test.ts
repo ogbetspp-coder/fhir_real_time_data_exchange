@@ -3,6 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { loadConfig, type AppConfig } from "../src/config.js";
 import { loadEmaMapping, type EmaMapping } from "../src/fhir/mapping.js";
+import { PROVENANCE_PROFILE } from "../src/fhir/provenance.js";
 import { transformType2ToEma } from "../src/fhir/transform.js";
 import type { FhirBundle, FhirResource, OperationOutcome } from "../src/fhir/types.js";
 import { createSyntheticType2Bundle } from "../src/fixtures/synthetic.js";
@@ -326,12 +327,16 @@ describe("a persisted run's commit order", () => {
     });
     expect(state.objects.get("persist-transaction")).toEqual(sent);
     expect(state.objects.get("signed-manifest")).toEqual(result.evidence);
-    // The approval Provenance travels in the same transaction, after it was signed for.
-    expect(
-      (sent as PersistTransaction).entry.some(
-        ({ resource }) => resource.resourceType === "Provenance",
-      ),
-    ).toBe(true);
+    // The approval Provenance travels in the same transaction, after it was signed for, as the
+    // official validator saw it, against base R5; $validate is not asked about it (the store has
+    // no definition of its extension or code systems).
+    const persisted = (sent as PersistTransaction).entry.find(
+      ({ resource }) => resource.resourceType === "Provenance",
+    )?.resource;
+    expect(persisted).toBeDefined();
+    expect(state.official.at(-1)).toEqual({ resource: persisted, profiles: [PROVENANCE_PROFILE] });
+    expect(state.cloud.some(({ resource }) => resource.resourceType === "Provenance")).toBe(false);
+    expect(result.evidence.manifest.validation.profiles.at(-1)).toBe(PROVENANCE_PROFILE);
     expect(state.objects.get("commit")).toEqual({
       runId: RUN_ID,
       manifestHash: result.evidence.manifestHash,

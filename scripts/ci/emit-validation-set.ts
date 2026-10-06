@@ -4,11 +4,14 @@ import path from "node:path";
 import { loadEmaMapping } from "../../src/fhir/mapping.js";
 import { importPublication } from "../../src/authority/import.js";
 import { syntheticPublication } from "../../src/authority/synthetic.js";
+import type { CanonicalSubmission } from "../../src/contracts/index.js";
+import type { FidelityReport } from "../../src/fidelity/index.js";
 import {
   hasValidationErrors,
   validateCanonicalPreflight,
   validateEmaPreflight,
 } from "../../src/fhir/preflight.js";
+import { toProvenanceResource } from "../../src/fhir/provenance.js";
 import { transformType2ToEma } from "../../src/fhir/transform.js";
 import type { FhirBundle, FhirResource } from "../../src/fhir/types.js";
 import { officialValidationTargets } from "../../src/pipeline.js";
@@ -31,12 +34,18 @@ import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 // A second case is an authority import's Type 1 record (docs/design/authority-import-contract.md,
 // D12): the synthetic publication as the importer makes it, and its EMA output.
 //
-// A third is the published interoperability artifacts, fhir/generated/ (the ConceptMap and the
-// StructureMap), as committed, against the base R5 definitions only: no profile applies to them.
+// Each case ends with the Provenance a document run persists with it, built by
+// toProvenanceResource from the committed contract fixtures (test/fixtures/contracts/): the drawn,
+// attested submission for the first case, the authority import for the second, each pointing at
+// its case's EMA Bundle and Composition.
+//
+// A third is the repository's own definitions, fhir/generated/ (the code systems, value sets,
+// extension, ConceptMap and StructureMap the package carries), as committed, against the base R5
+// definitions only: no profile applies to them.
 //
 // Each case's resources and profiles are the pipeline's own (officialValidationTargets in
 // src/pipeline.ts), so a resource or a profile the worker adds is validated here too. The set is
-// ten files: four per case, and the two artifacts.
+// five files per case, and the definitions.
 //
 // usage: tsx scripts/ci/emit-validation-set.ts OUTPUT_DIR
 
@@ -55,7 +64,22 @@ const mapping = await loadEmaMapping();
 
 type SetEntry = { file: string; resource: FhirResource; profiles: string[] };
 
-// The resources a run of `source` sends to the validator, after the preflights the worker runs.
+const fixture = async <T>(name: string): Promise<T> =>
+  JSON.parse(await readFile(path.resolve("test/fixtures/contracts", name), "utf8")) as T;
+const provenanceFixtures = {
+  type2: {
+    submission: await fixture<CanonicalSubmission>("canonical-submission.json"),
+    report: await fixture<FidelityReport>("fidelity-report.json"),
+  },
+  type1: {
+    submission: await fixture<CanonicalSubmission>("canonical-submission-type1.json"),
+    report: await fixture<FidelityReport>("fidelity-report-type1.json"),
+    fetchedAt: "2026-09-24T12:00:00Z",
+  },
+};
+
+// The resources a document run of `source` sends to the validator, after the preflights the
+// worker runs.
 function caseOf(source: FhirBundle, graphType: "type1" | "type2", suffix: string): SetEntry[] {
   const sourcePreflight = validateCanonicalPreflight(source, graphType);
   if (hasValidationErrors(sourcePreflight)) {
@@ -70,11 +94,19 @@ function caseOf(source: FhirBundle, graphType: "type1" | "type2", suffix: string
       `EMA structural preflight failed (${emaPreflight.issue.length} issues); the worker would refuse this transform before official validation`,
     );
   }
-  return officialValidationTargets(source, target, mapping).map(({ name, resource, profiles }) => ({
-    file: name === "source" ? `source-${graphType}.json` : `${name}${suffix}.json`,
-    resource,
-    profiles,
-  }));
+  const { submission, report, ...fetched } = provenanceFixtures[graphType];
+  const provenance = toProvenanceResource(submission, report, {
+    bundleId: target.documentBundle.id ?? "",
+    compositionId: target.documentBundle.entry[0]?.resource.id ?? "",
+    ...fetched,
+  });
+  return officialValidationTargets(source, target, mapping, provenance).map(
+    ({ name, resource, profiles }) => ({
+      file: name === "source" ? `source-${graphType}.json` : `${name}${suffix}.json`,
+      resource,
+      profiles,
+    }),
+  );
 }
 
 const publication = syntheticPublication(mapping);

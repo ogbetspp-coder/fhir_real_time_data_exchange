@@ -1,0 +1,19 @@
+{
+  "resourceType": "ValueSet",
+  "id": "approver-role",
+  "url": "https://khs.dev/fhir/ValueSet/approver-role",
+  "version": "0.1.0",
+  "status": "active",
+  "experimental": true,
+  "name": "ApproverRoleAll",
+  "title": "Approver role: all codes",
+  "description": "Every code of https://khs.dev/fhir/CodeSystem/approver-role.",
+  "compose": {
+    "include": [
+      {
+        "system": "https://khs.dev/fhir/CodeSystem/approver-role",
+        "version": "0.1.0"
+      }
+    ]
+  }
+}

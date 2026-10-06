@@ -8,6 +8,7 @@
   "status": "active",
   "experimental": true,
   "description": "Deterministic terminology map. It maps section identifiers only and does not generate or alter regulated narrative.",
+  "sourceScopeCanonical": "https://khs.dev/fhir/ValueSet/canonical-smpc-sections",
   "targetScopeCanonical": "http://ema.europa.eu/fhir/ValueSet/EUepismpcqrdcodesVs",
   "group": [
     {

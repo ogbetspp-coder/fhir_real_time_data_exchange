@@ -11,3 +11,9 @@ export function checksummedDownloads(
   declared: Map<string, string>,
   name: string,
 ): Download[];
+export type Copy = { file: string; path: string; sha256: string };
+export function checksummedCopies(
+  lines: readonly string[],
+  declared: Map<string, string>,
+  name: string,
+): Copy[];

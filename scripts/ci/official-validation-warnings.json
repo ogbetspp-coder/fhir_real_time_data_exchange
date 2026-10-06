@@ -1,0 +1,380 @@
+[
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[1].resource/*Organization/synthetic-pharma*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "Best practice only: the synthetic fixture writes no Resource.text."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[2].resource/*MedicinalProductDefinition/synthetic-smoketest*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "Best practice only: the synthetic fixture writes no Resource.text."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[2].resource/*MedicinalProductDefinition/synthetic-smoketest*/.type.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[2].resource/*MedicinalProductDefinition/synthetic-smoketest*/.domain.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[2].resource/*MedicinalProductDefinition/synthetic-smoketest*/.status.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[3].resource/*RegulatedAuthorization/synthetic-smoketest-authorization*/.status.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[4].resource/*PackagedProductDefinition/synthetic-smoketest-package*/.packaging.type.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[4].resource/*PackagedProductDefinition/synthetic-smoketest-package*/.packaging.type.coding[0]",
+    "message": "Constraint failed: cod-1: 'A Coding SHOULD NOT have a display unless a code is also present.  Computation on Coding.display alone is generally unsafe.  Consider using CodeableConcept.text' (defined in http://hl7.org/fhir/StructureDefinition/Coding), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture's coding has a display and no code (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[5].resource/*ManufacturedItemDefinition/synthetic-smoketest-tablet*/.manufacturedDoseForm.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[5].resource/*ManufacturedItemDefinition/synthetic-smoketest-tablet*/.manufacturedDoseForm.coding[0]",
+    "message": "Constraint failed: cod-1: 'A Coding SHOULD NOT have a display unless a code is also present.  Computation on Coding.display alone is generally unsafe.  Consider using CodeableConcept.text' (defined in http://hl7.org/fhir/StructureDefinition/Coding), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture's coding has a display and no code (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[5].resource/*ManufacturedItemDefinition/synthetic-smoketest-tablet*/.unitOfPresentation.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[5].resource/*ManufacturedItemDefinition/synthetic-smoketest-tablet*/.unitOfPresentation.coding[0]",
+    "message": "Constraint failed: cod-1: 'A Coding SHOULD NOT have a display unless a code is also present.  Computation on Coding.display alone is generally unsafe.  Consider using CodeableConcept.text' (defined in http://hl7.org/fhir/StructureDefinition/Coding), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture's coding has a display and no code (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[6].resource/*AdministrableProductDefinition/synthetic-smoketest-administrable*/.administrableDoseForm.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[6].resource/*AdministrableProductDefinition/synthetic-smoketest-administrable*/.administrableDoseForm.coding[0]",
+    "message": "Constraint failed: cod-1: 'A Coding SHOULD NOT have a display unless a code is also present.  Computation on Coding.display alone is generally unsafe.  Consider using CodeableConcept.text' (defined in http://hl7.org/fhir/StructureDefinition/Coding), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture's coding has a display and no code (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[6].resource/*AdministrableProductDefinition/synthetic-smoketest-administrable*/.routeOfAdministration[0].code.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[6].resource/*AdministrableProductDefinition/synthetic-smoketest-administrable*/.routeOfAdministration[0].code.coding[0]",
+    "message": "Constraint failed: cod-1: 'A Coding SHOULD NOT have a display unless a code is also present.  Computation on Coding.display alone is generally unsafe.  Consider using CodeableConcept.text' (defined in http://hl7.org/fhir/StructureDefinition/Coding), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture's coding has a display and no code (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[7].resource/*Ingredient/synthetic-smoketest-active-ingredient*/.role.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[7].resource/*Ingredient/synthetic-smoketest-active-ingredient*/.role.coding[0]",
+    "message": "Constraint failed: cod-1: 'A Coding SHOULD NOT have a display unless a code is also present.  Computation on Coding.display alone is generally unsafe.  Consider using CodeableConcept.text' (defined in http://hl7.org/fhir/StructureDefinition/Coding), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture's coding has a display and no code (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[7].resource/*Ingredient/synthetic-smoketest-active-ingredient*/.substance.strength[0].presentation.ofType(Ratio).numerator",
+    "message": "Unable to validate code 'mg' in system 'http://unitsofmeasure.org' because the validator is running without terminology services, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The validator runs with -tx n/a (no terminology server, by design), so it cannot check a UCUM code; mg is valid UCUM."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[8].resource/*SubstanceDefinition/synthetic-smoketest-substance*/.status.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "source-type2.json",
+    "location": "Bundle.entry[8].resource/*SubstanceDefinition/synthetic-smoketest-substance*/.name[0].status.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "source-type1.json",
+    "location": "Bundle.entry[0].resource/*Composition/15c21790-073c-51c6-a661-0d81603382f2*/.type.coding[0].system",
+    "message": "A definition for CodeSystem 'https://spor.ema.europa.eu/v1/lists/100000155531/terms/' could not be found, so the code cannot be validated, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The import keeps Composition.type in the SPOR URL form the EMA publishes; the pinned EMA package defines list 100000155531 only as http://ema.europa.eu/fhir/CodeSystem/100000155531."
+  },
+  {
+    "file": "source-type1.json",
+    "location": "Bundle.entry[1].resource/*MedicinalProductDefinition/740682b7-befb-5347-a72b-c36223c105ba*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "Best practice only: the authority importer writes no Resource.text."
+  },
+  {
+    "file": "source-type1.json",
+    "location": "Bundle.entry[2].resource/*Organization/186ae94e-312a-5b04-ab9f-f6a4d8f09d27*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "Best practice only: the authority importer writes no Resource.text."
+  },
+  {
+    "file": "ema-list.json",
+    "location": "List",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against European Medicines Regulatory Network (EMRN) Electronic Product Information (ePI) Implementation Guide v1.0.0",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-list-type1.json",
+    "location": "List",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against European Medicines Regulatory Network (EMRN) Electronic Product Information (ePI) Implementation Guide v1.0.0",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[0].resource/*Composition/7e446c20-c2a9-51bb-ac6a-37c7bae14cad*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[1].resource/*Organization/b6f095c9-36d2-5b41-accc-a6221b4164ba*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Base FHIR Standard",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[2].resource/*MedicinalProductDefinition/111d688e-14a3-5fe3-a035-0d9925043563*/.type.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Base FHIR Standard",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[2].resource/*MedicinalProductDefinition/111d688e-14a3-5fe3-a035-0d9925043563*/.domain.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Base FHIR Standard",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[2].resource/*MedicinalProductDefinition/111d688e-14a3-5fe3-a035-0d9925043563*/.status.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Base FHIR Standard",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[2].resource/*MedicinalProductDefinition/111d688e-14a3-5fe3-a035-0d9925043563*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Base FHIR Standard",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[3].resource/*RegulatedAuthorization/4c6952a0-2ba5-54b5-aa5d-e77c75289ce1*/.status.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[3].resource/*RegulatedAuthorization/4c6952a0-2ba5-54b5-aa5d-e77c75289ce1*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[4].resource/*PackagedProductDefinition/3afc8b0e-93bb-5e3d-a9f0-31c778d03dd6*/.packaging.type.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[4].resource/*PackagedProductDefinition/3afc8b0e-93bb-5e3d-a9f0-31c778d03dd6*/.packaging.type.coding[0]",
+    "message": "Constraint failed: cod-1: 'A Coding SHOULD NOT have a display unless a code is also present.  Computation on Coding.display alone is generally unsafe.  Consider using CodeableConcept.text' (defined in http://hl7.org/fhir/StructureDefinition/Coding), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture's coding has a display and no code (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[4].resource/*PackagedProductDefinition/3afc8b0e-93bb-5e3d-a9f0-31c778d03dd6*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[5].resource/*ManufacturedItemDefinition/7a9ea1d3-1f5c-5a8e-a40a-199b9d5ad0a6*/.manufacturedDoseForm.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Base FHIR Standard",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[5].resource/*ManufacturedItemDefinition/7a9ea1d3-1f5c-5a8e-a40a-199b9d5ad0a6*/.manufacturedDoseForm.coding[0]",
+    "message": "Constraint failed: cod-1: 'A Coding SHOULD NOT have a display unless a code is also present.  Computation on Coding.display alone is generally unsafe.  Consider using CodeableConcept.text' (defined in http://hl7.org/fhir/StructureDefinition/Coding), validating against Base FHIR Standard",
+    "reason": "The synthetic fixture's coding has a display and no code (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[5].resource/*ManufacturedItemDefinition/7a9ea1d3-1f5c-5a8e-a40a-199b9d5ad0a6*/.unitOfPresentation.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Base FHIR Standard",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[5].resource/*ManufacturedItemDefinition/7a9ea1d3-1f5c-5a8e-a40a-199b9d5ad0a6*/.unitOfPresentation.coding[0]",
+    "message": "Constraint failed: cod-1: 'A Coding SHOULD NOT have a display unless a code is also present.  Computation on Coding.display alone is generally unsafe.  Consider using CodeableConcept.text' (defined in http://hl7.org/fhir/StructureDefinition/Coding), validating against Base FHIR Standard",
+    "reason": "The synthetic fixture's coding has a display and no code (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[5].resource/*ManufacturedItemDefinition/7a9ea1d3-1f5c-5a8e-a40a-199b9d5ad0a6*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Base FHIR Standard",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[6].resource/*AdministrableProductDefinition/7a916360-ddb5-5561-a68f-e31e0bde0aea*/.administrableDoseForm.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[6].resource/*AdministrableProductDefinition/7a916360-ddb5-5561-a68f-e31e0bde0aea*/.administrableDoseForm.coding[0]",
+    "message": "Constraint failed: cod-1: 'A Coding SHOULD NOT have a display unless a code is also present.  Computation on Coding.display alone is generally unsafe.  Consider using CodeableConcept.text' (defined in http://hl7.org/fhir/StructureDefinition/Coding), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture's coding has a display and no code (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[6].resource/*AdministrableProductDefinition/7a916360-ddb5-5561-a68f-e31e0bde0aea*/.routeOfAdministration[0].code.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[6].resource/*AdministrableProductDefinition/7a916360-ddb5-5561-a68f-e31e0bde0aea*/.routeOfAdministration[0].code.coding[0]",
+    "message": "Constraint failed: cod-1: 'A Coding SHOULD NOT have a display unless a code is also present.  Computation on Coding.display alone is generally unsafe.  Consider using CodeableConcept.text' (defined in http://hl7.org/fhir/StructureDefinition/Coding), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture's coding has a display and no code (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[6].resource/*AdministrableProductDefinition/7a916360-ddb5-5561-a68f-e31e0bde0aea*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[7].resource/*Ingredient/0956a02f-cbfa-516f-a498-d45981d25126*/.role.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[7].resource/*Ingredient/0956a02f-cbfa-516f-a498-d45981d25126*/.role.coding[0]",
+    "message": "Constraint failed: cod-1: 'A Coding SHOULD NOT have a display unless a code is also present.  Computation on Coding.display alone is generally unsafe.  Consider using CodeableConcept.text' (defined in http://hl7.org/fhir/StructureDefinition/Coding), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The synthetic fixture's coding has a display and no code (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[7].resource/*Ingredient/0956a02f-cbfa-516f-a498-d45981d25126*/.substance.strength[0].presentation.ofType(Ratio).numerator",
+    "message": "Unable to validate code 'mg' in system 'http://unitsofmeasure.org' because the validator is running without terminology services, validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "The validator runs with -tx n/a (no terminology server, by design), so it cannot check a UCUM code; mg is valid UCUM."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[7].resource/*Ingredient/0956a02f-cbfa-516f-a498-d45981d25126*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[8].resource/*SubstanceDefinition/31826b39-b880-5bb6-af02-185004292784*/.status.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Base FHIR Standard",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[8].resource/*SubstanceDefinition/31826b39-b880-5bb6-af02-185004292784*/.name[0].status.coding[0]",
+    "message": "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided, validating against Base FHIR Standard",
+    "reason": "The synthetic fixture codes this element with no system (src/fixtures/synthetic.ts), and the transform copies it unchanged: a fixture defect, not the mapping's."
+  },
+  {
+    "file": "ema-bundle.json",
+    "location": "Bundle.entry[8].resource/*SubstanceDefinition/31826b39-b880-5bb6-af02-185004292784*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Base FHIR Standard",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-bundle-type1.json",
+    "location": "Bundle.entry[0].resource/*Composition/0b3baaa9-fae5-5d9e-a76e-caf6c727c5ad*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-bundle-type1.json",
+    "location": "Bundle.entry[1].resource/*MedicinalProductDefinition/78f9f425-fd23-5c1a-a906-a04ec3ca3be6*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Base FHIR Standard",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-bundle-type1.json",
+    "location": "Bundle.entry[2].resource/*Organization/579333d7-e40b-564c-a787-7e3a7fa6bfbd*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Base FHIR Standard",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-bundle-type1.json",
+    "location": "Bundle.entry[3].resource/*RegulatedAuthorization/dddd04e4-3845-5fdc-a921-54608076977f*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-composition.json",
+    "location": "Composition",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against European Medicines Regulatory Network (EMRN) Electronic Product Information (ePI) Implementation Guide v1.0.0",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-composition-type1.json",
+    "location": "Composition",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against European Medicines Regulatory Network (EMRN) Electronic Product Information (ePI) Implementation Guide v1.0.0",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "provenance.json",
+    "location": "Provenance",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Base FHIR Standard",
+    "reason": "Best practice only: the Provenance carries hashes, identifiers and codes, and no narrative, by design (src/fhir/provenance.ts)."
+  },
+  {
+    "file": "provenance-type1.json",
+    "location": "Provenance",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Base FHIR Standard",
+    "reason": "Best practice only: the Provenance carries hashes, identifiers and codes, and no narrative, by design (src/fhir/provenance.ts)."
+  },
+  {
+    "file": "StructureDefinition-ext-approval-content-sha256.json",
+    "location": "StructureDefinition.differential.element[3].type[0].code",
+    "message": "The value provided ('string') was not found in the value set 'Element Definition Types' (http://hl7.org/fhir/ValueSet/elementdefinition-types|5.0.0), and a code should come from this value set unless it has no suitable code (note that the validator cannot judge what is suitable)  (error message = Cannot invoke \"String.equals(Object)\" because \"system\" is null), validating against Base FHIR Standard",
+    "reason": "A defect of validator 6.10.4 under -tx n/a (its own null system, quoted): string is a FHIR type and in elementdefinition-types."
+  }
+]

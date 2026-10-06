@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -14,6 +15,9 @@ import {
   packageSummary,
   readPackageLock,
   readSidecarPins,
+  readWarningAllowlist,
+  validatorWarnings,
+  warningVerdict,
 } from "../../scripts/ci/validator-pins.mjs";
 
 // The official validator is hermetic (docs/foundations.md, C9): every package it uses is pinned
@@ -75,16 +79,23 @@ describe("the validator sidecar as built", () => {
 describe("the sidecar and the standards lock", () => {
   const pins = readSidecarPins("Dockerfile.validator");
   const lock = JSON.parse(readFileSync("fhir/standards.lock.json", "utf8")) as {
-    artifacts: { name: string; package?: string; version?: string; url: string; sha256: string }[];
+    artifacts: {
+      name: string;
+      package?: string;
+      version?: string;
+      url?: string;
+      path?: string;
+      sha256: string;
+    }[];
   };
 
-  it("download every package the lock pins, from the same URL, with the same SHA-256", () => {
+  it("take every package the lock pins, from the same URL or path, with the same SHA-256", () => {
     const fromLock = lock.artifacts
       .filter((artifact) => artifact.package !== undefined)
-      .map(({ url, sha256 }) => ({ url, sha256 }));
+      .map(({ url, path: file, sha256 }) => ({ url, path: file, sha256 }));
     const fromSidecar = pins.artefacts
       .filter(({ file }) => file !== "validator_cli.jar")
-      .map(({ url, sha256 }) => ({ url, sha256 }));
+      .map(({ url, path: file, sha256 }) => ({ url, path: file, sha256 }));
     expect(fromSidecar).toHaveLength(fromLock.length);
     expect(new Set(fromSidecar.map((pin) => JSON.stringify(pin)))).toEqual(
       new Set(fromLock.map((pin) => JSON.stringify(pin))),
@@ -96,6 +107,20 @@ describe("the sidecar and the standards lock", () => {
     const locked = lock.artifacts.find(({ name }) => name === "HL7 FHIR Validator CLI");
     expect(jar).toEqual({ file: "validator_cli.jar", url: locked?.url, sha256: locked?.sha256 });
     expect(pins.version).toBe(locked?.version);
+  });
+
+  // The repository's own package is copied from the build context, not downloaded, and its pin is
+  // the committed file's SHA-256 (npm run artifacts:check holds the file to its generator).
+  it("load the repository's own package at the bytes committed", () => {
+    const own = pins.artefacts.find(({ file }) => file === "khs-epi-package.tgz");
+    expect(own?.path).toBe("fhir/generated/dev.khs.fhir.epi.tgz");
+    expect(own?.url).toBeUndefined();
+    const bytes = readFileSync(own?.path ?? "");
+    expect(createHash("sha256").update(bytes).digest("hex")).toBe(own?.sha256);
+    expect(pins.packages.at(-1)).toBe("khs-epi-package.tgz");
+    expect(dockerfile).toMatch(
+      /^COPY fhir\/generated\/dev\.khs\.fhir\.epi\.tgz \/opt\/fhir\/khs-epi-package\.tgz\nRUN echo "\$\{KHS_EPI_SHA256\} {2}khs-epi-package\.tgz" \| sha256sum --check -$/m,
+    );
   });
 
   // HL7's unversioned URL serves whichever release is current; the STU1 path does not move.
@@ -285,6 +310,8 @@ describe("the local validator helper", () => {
     for (const flag of ["-jurisdiction uv", "-locale en-US", "-no-http-access", "-tx n/a"]) {
       expect(helper).toContain(flag);
     }
+    const loaded = [...helper.matchAll(/-ig "\$\{CACHE\}\/(\S+)"/g)].map((match) => match[1]);
+    expect(loaded).toEqual(readSidecarPins("Dockerfile.validator").packages);
   });
 });
 
@@ -321,6 +348,47 @@ describe("the image build", () => {
     expect(builds).toHaveLength(3);
     expect(labels).toHaveLength(3);
     expect(readFileSync("scripts/gcp/deploy.sh", "utf8")).toContain("_REVISION=${SERVICE_VERSION}");
+  });
+});
+
+// The gate fails on a warning the reviewed allowlist does not name, and on an entry no warning
+// matched, so the list stays exactly what the validator says.
+describe("the warnings the gate accepts", () => {
+  it("are read without the line and column, which move with the JSON's layout", () => {
+    expect(
+      validatorWarnings([
+        "  Warning @ Provenance (line 1, col2): Constraint failed: dom-6: 'x' (Best Practice)",
+        "  Error @ Provenance (line 3, col4): not a warning",
+        "  Information @ Provenance: All OK",
+      ]),
+    ).toEqual([
+      { location: "Provenance", message: "Constraint failed: dom-6: 'x' (Best Practice)" },
+    ]);
+  });
+
+  it("fail when unlisted, and an entry is stale when no warning matches it", () => {
+    const a = { file: "a.json", location: "A", message: "m" };
+    const b = { file: "b.json", location: "B", message: "m" };
+    const listed = [
+      { ...a, reason: "r" },
+      { ...b, location: "C", reason: "r" },
+    ];
+    const { unlisted, stale } = warningVerdict([a, b], listed);
+    expect(unlisted).toEqual([b]);
+    expect(stale).toEqual([listed[1]]);
+  });
+
+  it("are a reviewed list with a reason for each entry, each once", () => {
+    const allowlist = readWarningAllowlist("scripts/ci/official-validation-warnings.json");
+    for (const entry of allowlist) expect(entry.reason.length).toBeGreaterThan(10);
+    const directory = mkdtempSync(path.join(tmpdir(), "warnings-"));
+    temporary.push(directory);
+    const file = path.join(directory, "allowlist.json");
+    const entry = { file: "a.json", location: "A", message: "m", reason: "accepted" };
+    writeFileSync(file, JSON.stringify([entry, entry]));
+    expect(() => readWarningAllowlist(file)).toThrow(/twice/);
+    writeFileSync(file, JSON.stringify([{ ...entry, reason: "" }]));
+    expect(() => readWarningAllowlist(file)).toThrow(/not \{/);
   });
 });
 

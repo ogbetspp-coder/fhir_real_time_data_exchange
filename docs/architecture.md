@@ -224,9 +224,14 @@ Validation is deliberately redundant:
    listed above; the EMA preflight then checks every target section's code and permitted title
    at its position;
 2. the official HL7 Java validator evaluates the pinned packages, FHIRPath, slicing, and
-   profile chain;
+   profile chain. It loads five packages with `-ig`: the four HL7 and EMA ones and the
+   repository's own, `dev.khs.fhir.epi` (`fhir/generated/`, built by
+   `scripts/fhir/generate-artifacts.ts`), which defines every `https://khs.dev/fhir/` code system
+   and extension the pipeline writes. Besides the source and the EMA List, Bundle and
+   Composition, it validates a `document` run's Provenance against base R5;
 3. Cloud Healthcare API `$validate?profile=` verifies each profile as deployed in the target
-   store; and
+   store. The Provenance is not sent there: the store's profile import takes the four HL7 and
+   EMA packages only, so the store has no definition of its extension or code systems; and
 4. a write is attempted only when all required outcomes contain no `fatal` or `error` issue.
 
 The target store does not enable implementation-guide enforcement globally. Cloud Healthcare

@@ -68,3 +68,28 @@ export function checksummedDownloads(lines, declared, name) {
   }
   return artefacts;
 }
+
+// Each file a RUN line checks with `echo "${SHA} <file>" | sha256sum --check` that a `COPY <source>
+// <destination>` put there from the build context, as { file, path, sha256 }: the repository's own
+// package, which is built and committed, not downloaded. Its ARG must be a SHA-256.
+const CHECK = /echo\s+"\$\{([A-Z0-9_]+)\}\s+(\S+)"\s+\|\s+sha256sum\s+--check/g;
+export function checksummedCopies(lines, declared, name) {
+  const copied = new Map();
+  for (const line of lines) {
+    const copy = /^\s*COPY\s+([^-\s]\S*)\s+(\S+)\s*$/.exec(line);
+    if (copy !== null) copied.set(copy[2].split("/").at(-1), copy[1]);
+  }
+  const artefacts = [];
+  for (const line of lines.filter((candidate) => /^\s*RUN\b/.test(candidate))) {
+    for (const [, checksumArg, file] of line.matchAll(CHECK)) {
+      const source = copied.get(file);
+      if (source === undefined) continue;
+      const sha256 = declared.get(checksumArg);
+      if (sha256 === undefined || !SHA256_HEX.test(sha256)) {
+        throw new Error(`${name}: ARG ${checksumArg} is missing or is not a SHA-256 hex digest`);
+      }
+      artefacts.push({ file, path: source, sha256 });
+    }
+  }
+  return artefacts;
+}

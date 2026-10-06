@@ -8,14 +8,15 @@ import { PackageRef, Sha256Hex } from "../contracts/common.js";
 // The FHIR packages a run is validated against, read from the two locks the worker image ships
 // (audit B07, S-4, and its review round 1, Low-1):
 //
-// - fhir/standards.lock.json: the packages the FHIR store's profile import (scripts/gcp/bootstrap.sh)
-//   imports and the official validator sidecar loads with -ig (Dockerfile.validator, held equal to
-//   it by test/ci/validator-pins.test.ts);
+// - fhir/standards.lock.json: the packages the official validator sidecar loads with -ig
+//   (Dockerfile.validator, held equal to it by test/ci/validator-pins.test.ts): the four the FHIR
+//   store's profile import (scripts/gcp/bootstrap.sh) also imports, and the repository's own
+//   (dev.khs.fhir.epi), which it does not;
 // - fhir/validator-packages.lock: the packages the validator resolves on its own and the sidecar
 //   installs into its package cache.
 //
-// Together they are every package the validator loads (twelve on 2026-09-28, the count its Package
-// Summary reports), and the run manifest names each by id#version with the SHA-256 its lock
+// Together they are every package the validator loads (thirteen on 2026-10-05, the count its
+// Package Summary reports), and the run manifest names each by id#version with the SHA-256 its lock
 // records, so a signed manifest names the standards that ran rather than a literal. Anything the
 // reader does not recognise fails the run rather than being half-read.
 
@@ -27,12 +28,19 @@ const LockSchema = z.strictObject({
   schemaVersion: z.literal("1.0.0"),
   artifacts: z
     .array(
-      z.looseObject({
-        name: z.string().min(1),
-        package: PackageRef.optional(),
-        url: z.url({ protocol: /^https$/ }),
-        sha256: Sha256Hex,
-      }),
+      z
+        .looseObject({
+          name: z.string().min(1),
+          package: PackageRef.optional(),
+          // Where it is downloaded from, or, for the repository's own package, where it is
+          // committed: one or the other.
+          url: z.url({ protocol: /^https$/ }).optional(),
+          path: z.string().min(1).optional(),
+          sha256: Sha256Hex,
+        })
+        .refine(({ url, path: file }) => (url === undefined) !== (file === undefined), {
+          message: "an artifact has a url or a path, not both",
+        }),
     )
     .min(1),
 });

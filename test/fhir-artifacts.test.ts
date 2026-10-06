@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { gunzipSync } from "node:zlib";
 
 import { beforeAll, describe, expect, it } from "vitest";
 
-import type { EmaMapping } from "../src/fhir/mapping.js";
+import type { EmaMapping, SectionRule } from "../src/fhir/mapping.js";
 import { loadEmaMapping } from "../src/fhir/mapping.js";
 import { transformType2ToEma } from "../src/fhir/transform.js";
 import { createSyntheticType2Bundle } from "../src/fixtures/synthetic.js";
@@ -148,6 +149,101 @@ describe("the published ConceptMap", () => {
     expect(conceptMap.targetScopeCanonical).toBe(
       "http://ema.europa.eu/fhir/ValueSet/EUepismpcqrdcodesVs",
     );
+    expect(conceptMap.sourceScopeCanonical).toBe(
+      "https://khs.dev/fhir/ValueSet/canonical-smpc-sections",
+    );
     expect(conceptMap.group.map(({ source, target }) => [source, target])).toEqual([systems]);
+  });
+});
+
+type Concept = { code: string; display: string; concept?: Concept[] };
+
+describe("the canonical section code system", () => {
+  it("is the mapping's section tree: every key, its heading, nested as the sections are", () => {
+    const codeSystem = artifact("CodeSystem-canonical-smpc-sections.json") as {
+      url: string;
+      version: string;
+      content: string;
+      caseSensitive: boolean;
+      concept: Concept[];
+    };
+    const tree = (rule: SectionRule): Concept => ({
+      code: rule.sourceKey,
+      display: rule.title,
+      ...(rule.children === undefined ? {} : { concept: rule.children.map(tree) }),
+    });
+    expect(codeSystem).toMatchObject({
+      url: mapping.sourceCodeSystem,
+      version: mapping.mappingVersion,
+      content: "complete",
+      caseSensitive: true,
+    });
+    expect(codeSystem.concept).toEqual([tree(mapping.root)]);
+  });
+});
+
+// The package the validator loads (Dockerfile.validator, a fifth -ig) is the committed resources
+// and nothing else, in an archive whose bytes depend on them alone: npm run artifacts:check
+// regenerates it and fails on any byte that differs.
+describe("the repository's own package", () => {
+  const gzip = readFileSync("fhir/generated/dev.khs.fhir.epi.tgz");
+  const tar = gunzipSync(gzip);
+  const members: { name: string; mode: string; owner: string; mtime: string; data: string }[] = [];
+  for (let at = 0; tar[at] !== 0;) {
+    const field = (start: number, length: number) =>
+      tar
+        .subarray(at + start, at + start + length)
+        .toString("latin1")
+        .replace(/\0.*$/s, "");
+    const size = Number.parseInt(field(124, 12), 8);
+    members.push({
+      name: field(0, 100),
+      mode: field(100, 8),
+      owner: `${field(108, 8)}:${field(116, 8)}:${field(265, 32)}:${field(297, 32)}`,
+      mtime: field(136, 12),
+      data: tar.subarray(at + 512, at + 512 + size).toString("utf8"),
+    });
+    at += 512 + Math.ceil(size / 512) * 512;
+  }
+
+  it("is gzip with no time and a fixed OS byte, and members sorted, owned by 0, at one time", () => {
+    expect([...gzip.subarray(0, 10)]).toEqual([0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 255]);
+    const names = members.map(({ name }) => name);
+    expect(names).toEqual([...names].sort());
+    for (const { mode, owner, mtime } of members) {
+      expect({ mode, owner, mtime }).toEqual({
+        mode: "0000644",
+        owner: "0000000:0000000::",
+        mtime: "03560116604",
+      });
+    }
+  });
+
+  it("holds package.json, its index and every committed resource, byte for byte", () => {
+    const resources = readdirSync("fhir/generated").filter((file) => file.endsWith(".json"));
+    expect(members.map(({ name }) => name).sort()).toEqual(
+      [
+        "package/.index.json",
+        "package/package.json",
+        ...resources.map((file) => `package/${file}`),
+      ].sort(),
+    );
+    for (const file of resources) {
+      expect(members.find(({ name }) => name === `package/${file}`)?.data).toBe(
+        readFileSync(`fhir/generated/${file}`, "utf8"),
+      );
+    }
+    const manifest = JSON.parse(
+      members.find(({ name }) => name === "package/package.json")?.data ?? "{}",
+    ) as Record<string, unknown>;
+    expect(manifest).toMatchObject({
+      name: "dev.khs.fhir.epi",
+      fhirVersions: ["5.0.0"],
+      dependencies: { "hl7.fhir.r5.core": "5.0.0" },
+    });
+    const index = JSON.parse(
+      members.find(({ name }) => name === "package/.index.json")?.data ?? "{}",
+    ) as { files: { filename: string }[] };
+    expect(index.files.map(({ filename }) => filename).sort()).toEqual([...resources].sort());
   });
 });

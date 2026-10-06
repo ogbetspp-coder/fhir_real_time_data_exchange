@@ -15,7 +15,7 @@ export const PARTICIPANT_TYPE_SYSTEM =
   "http://terminology.hl7.org/CodeSystem/provenance-participant-type";
 export const PARTICIPANT_TYPE_ASSEMBLER = "assembler";
 export const PARTICIPANT_TYPE_ATTESTER = "attester";
-const ACTIVITY_SYSTEM = "https://khs.dev/fhir/CodeSystem/provenance-activity";
+export const ACTIVITY_SYSTEM = "https://khs.dev/fhir/CodeSystem/provenance-activity";
 export const MODEL_IDENTIFIER_SYSTEM = "https://khs.dev/fhir/identifier/model";
 export const APPROVER_IDENTIFIER_SYSTEM = "https://khs.dev/fhir/identifier/approver";
 export const SOURCE_DOCUMENT_IDENTIFIER_SYSTEM =
@@ -24,6 +24,9 @@ export const FIDELITY_REPORT_IDENTIFIER_SYSTEM =
   "https://khs.dev/fhir/identifier/fidelity-report-sha256";
 export const APPROVAL_CONTENT_EXTENSION_URL =
   "https://khs.dev/fhir/StructureDefinition/ext-approval-content-sha256";
+// What the official validator checks the Provenance against: base R5. The extension and the code
+// systems above are defined in the repository's own package (scripts/fhir/generate-artifacts.ts).
+export const PROVENANCE_PROFILE = "http://hl7.org/fhir/StructureDefinition/Provenance";
 // The approver's regulatory role (contracts ApproverRole), carried on the attester agent's
 // `role` so a reader learns it from the resource rather than inferring it from the participant
 // type.

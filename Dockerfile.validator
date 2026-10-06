@@ -14,17 +14,22 @@
 # mirror serves that day (until B07 it ran apt-get update against the live archive).
 FROM eclipse-temurin:21-jre-noble@sha256:7739f0ffce786528961eea6bf46d9610ee968ac6127c9b2e93494757bdecce9f AS fetch
 
-# The validator and the four -ig packages. Each package's id#version and SHA-256 are also in
-# fhir/standards.lock.json, which the FHIR store's profile import and the worker's run manifest
-# read: test/ci/validator-pins.test.ts holds the two equal. The Global ePI package is HL7's
-# versioned STU1 URL, not the unversioned "current" one, which moves when HL7 publishes the next
-# release (audit B07, S-3; docs/validation/changes).
+# The validator and the five -ig packages: four downloaded, and the repository's own
+# (dev.khs.fhir.epi, the definitions of the systems and extension the pipeline writes) copied from
+# the build context, where it is committed as scripts/fhir/generate-artifacts.ts builds it, byte
+# for byte reproducibly. Each package's id#version and SHA-256 are also in
+# fhir/standards.lock.json, which the worker's run manifest reads; the FHIR store's profile import
+# takes the four downloaded ones from it, not the repository's own. test/ci/validator-pins.test.ts
+# holds the two equal. The Global ePI package is HL7's versioned STU1 URL, not the unversioned
+# "current" one, which moves when HL7 publishes the next release (audit B07, S-3;
+# docs/validation/changes).
 ARG VALIDATOR_VERSION=6.10.4
 ARG VALIDATOR_SHA256=1106b9d58f9e363e47bea7c4fc065841e5fc91fe9d062775c3bfdd212bd653cc
 ARG GLOBAL_EPI_SHA256=c997673388d2c53bd7dad43777a7589443e4d27f56a661a90aa0638bbce1cf3a
 ARG EMA_EPI_SHA256=19fb9fbf55c6bb3819c78d427acac1e3e5b96b50c1045d80e70c94f09566bd80
 ARG TERMINOLOGY_SHA256=c2ee6bccc9d0130d0a90db5967e7adbf9dd175df7a3351c531642c3dce102d10
 ARG EXTENSIONS_SHA256=f1039cac888d79ebd29878d7debe5e647ffe7ed962a9033da095258a03a06105
+ARG KHS_EPI_SHA256=368f98f10d82ef196ed97db4c1107513789e5dba9f7873c95fd647a47e2e35ff
 
 WORKDIR /opt/fhir
 RUN curl -fL \
@@ -47,8 +52,10 @@ RUN curl -fL \
       "https://packages2.fhir.org/packages/hl7.fhir.uv.extensions.r5/5.3.0" \
       -o extensions-package.tgz \
     && echo "${EXTENSIONS_SHA256}  extensions-package.tgz" | sha256sum --check -
+COPY fhir/generated/dev.khs.fhir.epi.tgz /opt/fhir/khs-epi-package.tgz
+RUN echo "${KHS_EPI_SHA256}  khs-epi-package.tgz" | sha256sum --check -
 
-# The packages the validator resolves on its own beyond the four -ig files, pinned by checksum in
+# The packages the validator resolves on its own beyond the five -ig files, pinned by checksum in
 # fhir/validator-packages.lock and installed into the package cache at build time. Without this
 # the sidecar downloaded all nine from the FHIR registry on every cold start, validated against
 # whatever the registry served that day, and could not start without it. Each tarball is verified
@@ -110,4 +117,4 @@ ENTRYPOINT ["java", "-Xms768m", "-Xmx1536m", "-Duser.home=/opt/fhir/home", "-Dja
 # validated can direct it to fetch URLs of the content's choosing, including internal addresses
 # such as Cloud Run's metadata server, and this sidecar validates content that arrives in
 # submissions.
-CMD ["server", "8090", "-allowNetworkAccess", "-version", "5.0.0", "-jurisdiction", "uv", "-locale", "en-US", "-ig", "/opt/fhir/terminology-package.tgz", "-ig", "/opt/fhir/extensions-package.tgz", "-ig", "/opt/fhir/global-epi-package.tgz", "-ig", "/opt/fhir/ema-epi-package.tgz", "-tx", "n/a", "-no-http-access"]
+CMD ["server", "8090", "-allowNetworkAccess", "-version", "5.0.0", "-jurisdiction", "uv", "-locale", "en-US", "-ig", "/opt/fhir/terminology-package.tgz", "-ig", "/opt/fhir/extensions-package.tgz", "-ig", "/opt/fhir/global-epi-package.tgz", "-ig", "/opt/fhir/ema-epi-package.tgz", "-ig", "/opt/fhir/khs-epi-package.tgz", "-tx", "n/a", "-no-http-access"]

@@ -14,3 +14,6 @@ labels/ema-epi/checks/** linguist-generated=true
 # converted (core.autocrlf, a checkout on Windows), so what is checked out is what was pinned.
 labels/ema-epi/sources/** linguist-vendored=true -text -diff
 labels/ema-epi/lists/** linguist-vendored=true -text -diff
+# The repository's own FHIR package, pinned by SHA-256 in Dockerfile.validator and
+# fhir/standards.lock.json: bytes, never end-of-line converted.
+fhir/generated/dev.khs.fhir.epi.tgz -text -diff

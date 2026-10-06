@@ -1,0 +1,24 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "approver-role",
+  "url": "https://khs.dev/fhir/CodeSystem/approver-role",
+  "version": "0.1.0",
+  "status": "active",
+  "experimental": true,
+  "name": "ApproverRole",
+  "title": "Approver role",
+  "description": "The regulatory role of the person who attested an approval (contracts ApproverRole).",
+  "caseSensitive": true,
+  "valueSet": "https://khs.dev/fhir/ValueSet/approver-role",
+  "content": "complete",
+  "concept": [
+    {
+      "code": "content-reviewer",
+      "display": "Content reviewer"
+    },
+    {
+      "code": "qa-reviewer",
+      "display": "QA reviewer"
+    }
+  ]
+}

@@ -22,7 +22,7 @@ import {
   validateEmaPreflight,
   validateCanonicalPreflight,
 } from "./fhir/preflight.js";
-import { toProvenanceResource } from "./fhir/provenance.js";
+import { PROVENANCE_PROFILE, toProvenanceResource } from "./fhir/provenance.js";
 import { sourceIdentifierValue, transformType2ToEma, type EmaPackage } from "./fhir/transform.js";
 import { mappingReference, type EmaMapping } from "./fhir/mapping.js";
 import type { FhirBundle, FhirResource, OperationOutcome } from "./fhir/types.js";
@@ -87,10 +87,14 @@ export type PipelineResult = {
 // What a run sends to the official HL7 validator and to the Cloud Healthcare API's $validate, each
 // resource with the profiles it is validated against, in the order they are sent: the source
 // against the Global ePI Bundle profile, then the EMA List, document Bundle and Composition against
-// the mapping's profiles. CI's "Official validation" job validates exactly this set
-// (scripts/ci/emit-validation-set.ts), so a resource or a profile added here reaches that gate too.
+// the mapping's profiles, and a document run's Provenance against base R5 with the repository's
+// own package defining its extension and code systems. The Provenance goes to the official
+// validator only: the store has no definition of them (its profile import takes the four HL7 and
+// EMA packages), so $validate is not asked about it. CI's "Official validation" job validates
+// exactly this set (scripts/ci/emit-validation-set.ts), so a resource or a profile added here
+// reaches that gate too.
 export type OfficialValidationTarget = {
-  name: "source" | "ema-list" | "ema-bundle" | "ema-composition";
+  name: "source" | "ema-list" | "ema-bundle" | "ema-composition" | "provenance";
   resource: FhirResource;
   profiles: string[];
 };
@@ -99,6 +103,7 @@ export function officialValidationTargets(
   source: FhirBundle,
   transformed: EmaPackage,
   mapping: EmaMapping,
+  provenance?: FhirResource,
 ): OfficialValidationTarget[] {
   const composition = transformed.documentBundle.entry[0]?.resource;
   if (composition === undefined) throw new Error("Transformed Composition is missing");
@@ -111,6 +116,9 @@ export function officialValidationTargets(
       profiles: [mapping.profiles.bundle],
     },
     { name: "ema-composition", resource: composition, profiles: mapping.profiles.composition },
+    ...(provenance === undefined
+      ? []
+      : [{ name: "provenance" as const, resource: provenance, profiles: [PROVENANCE_PROFILE] }]),
   ];
 }
 
@@ -348,7 +356,7 @@ export async function runPipeline(
     );
   }
 
-  const targets = officialValidationTargets(source, transformed, mapping);
+  const targets = officialValidationTargets(source, transformed, mapping, provenanceResource);
   const profiles = targets.flatMap((target) => target.profiles);
   // A dry run's manifest is `validated`; a persist-mode run's is `authorised`, signed before its
   // transaction and naming it. Only the ledger row, written after the commit, says `persisted`.
@@ -445,7 +453,7 @@ export async function runPipeline(
 
   // One request per resource and profile: $validate takes one profile at a time.
   const healthcare = new HealthcareApiClient(config);
-  for (const target of targets) {
+  for (const target of targets.filter(({ name }) => name !== "provenance")) {
     for (const profile of target.profiles) {
       cloudOutcomes.push(await healthcare.validate(target.resource, profile, runId));
     }
