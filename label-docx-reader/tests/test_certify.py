@@ -1545,6 +1545,37 @@ def test_an_object_in_line_in_a_field_or_under_a_listing_style_is_never_set_asid
         DocxSource(docx(_p(f"<w:r>{revised}</w:r>")))
 
 
+def test_a_text_box_the_check_cannot_decide_or_listing_by_default_is_never_set_aside() -> None:
+    from numbering_cases import abstract, lvl, num
+
+    box = FLOATING_TEXT["vml-text-box"][0]
+    listed = '<w:pPr><w:numPr><w:numId w:val="1"/></w:numPr></w:pPr>'
+    lists = abstract(1, lvl(0)) + num(1, 1)
+    table = "<w:tbl><w:tr><w:tc>" + IN_BOX + "</w:tc></w:tr></w:tbl>"
+    obj = '<w:r><w:object><o:OLEObject xmlns:o="urn:schemas-microsoft-com:office:office"/>'
+    for inside, styles, numbering in (
+        # A style based on one of another kind: refused while deciding, so never set aside.
+        (
+            p(r("<w:t>x</w:t>"), '<w:pStyle w:val="B"/>'),
+            '<w:style w:type="table" w:styleId="T"/>'
+            '<w:style w:type="paragraph" w:styleId="B"><w:basedOn w:val="T"/></w:style>',
+            None,
+        ),
+        # A list by the default paragraph style, or the default table style.
+        (
+            IN_BOX,
+            f'<w:style w:type="paragraph" w:default="1" w:styleId="N">{listed}</w:style>',
+            lists,
+        ),
+        (table, f'<w:style w:type="table" w:default="1" w:styleId="TT">{listed}</w:style>', None),
+        # An embedded object in the box's text.
+        (p(obj + "</w:object></w:r>"), None, None),
+    ):
+        body = _p(f"<w:r>{box.replace(IN_BOX, inside)}</w:r>")
+        with pytest.raises(CertificationError, match="a paragraph inside a paragraph"):
+            DocxSource(docx(body, styles, numbering=numbering))
+
+
 @pytest.mark.parametrize("name", NOT_SET_ASIDE)
 def test_a_text_box_not_set_aside_is_never_certified(name: str) -> None:
     # Refused as the walk meets it, whatever result is claimed.
