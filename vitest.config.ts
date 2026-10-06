@@ -18,6 +18,8 @@ export default defineConfig({
       "agent/**",
       "zone-a/**",
       "label-docx-reader/**",
+      // Need Java and the pinned validator: vitest.official.config.ts, npm run test:official.
+      "test/official/**",
     ],
     coverage: {
       provider: "v8",

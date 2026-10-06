@@ -216,13 +216,26 @@ def _paragraphs(*texts: str) -> tuple[Paragraph, ...]:
 
 
 def _tree(node: dict[str, Any], content: dict[str, tuple[Paragraph, ...]]) -> Section:
+    # Every required section, and an optional one (2.2, Pregnancy) only where content names it
+    # or a section under it.
+    def wanted(child: dict[str, Any]) -> bool:
+        key = child["sourceKey"]
+        return bool(child["required"]) or any(k == key or k.startswith(f"{key}.") for k in content)
+
     return Section(
         code=node["targetCode"],
         title=node["title"],
         paragraphs=content.get(node["sourceKey"], ()),
         refusal=None,
-        sections=tuple(_tree(child, content) for child in node.get("children", [])),
+        sections=tuple(_tree(c, content) for c in node.get("children", []) if wanted(c)),
     )
+
+
+def _without(key: str) -> dict[str, Any]:
+    """The mapping with the rule for ``key`` (a section of the root) left out."""
+    mapping: dict[str, Any] = json.loads(json.dumps(MAPPING))
+    mapping["root"]["children"] = [c for c in mapping["root"]["children"] if c["sourceKey"] != key]
+    return mapping
 
 
 def document(**content: tuple[Paragraph, ...]) -> Document:
@@ -1146,8 +1159,14 @@ def test_every_registry_item_gets_exactly_one_status() -> None:
 
 
 def test_an_item_with_nothing_to_check_it_against_says_why() -> None:
-    # Section 12 (radiopharmaceuticals) is optional and not in the mapping.
+    # Section 12 (radiopharmaceuticals) is optional: mapped since mapping 1.4.0 and absent here.
     assert _statement(check(document(), REGISTRY, MAPPING), "smpc.12#0") == {
+        "id": "smpc.12#0",
+        "status": "not-checked",
+        "reason": "section-absent",
+    }
+    # A section the mapping does not list.
+    assert _statement(check(document(), REGISTRY, _without("smpc.12")), "smpc.12#0") == {
         "id": "smpc.12#0",
         "status": "not-checked",
         "reason": "section-not-mapped",
@@ -1174,6 +1193,17 @@ def test_section_2s_standard_statements_are_checked_in_section_2() -> None:
     assert _deviation(result, statement)["differences"] == [
         {"change": "delete", "template": ".", "label": ""}
     ]
+
+
+def test_a_document_with_section_2_2_has_its_statements_checked_there() -> None:
+    statement = f"smpc.2.2#{_item_index('smpc.2.2', '<For the full list')}"
+    text = "For the full list of excipients, see section 6.1."
+    result = check(document(smpc_2_2=_paragraphs(text)), REGISTRY, MAPPING)
+    used = _statement(result, statement)
+    assert (used["status"], used["in"]) == ("used", "2.2 Qualitative and quantitative composition")
+    # In section 2's own text, it is not section 2.2's.
+    result = check(document(smpc_2=_paragraphs(text), smpc_2_2=()), REGISTRY, MAPPING)
+    assert status(result, statement) == "absent"
 
 
 def test_a_statement_of_alternatives_is_matched_alternative_by_alternative() -> None:

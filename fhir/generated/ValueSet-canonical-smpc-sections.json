@@ -2,7 +2,7 @@
   "resourceType": "ValueSet",
   "id": "canonical-smpc-sections",
   "url": "https://khs.dev/fhir/ValueSet/canonical-smpc-sections",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "status": "active",
   "experimental": true,
   "name": "CanonicalSmpcSectionsAll",
@@ -12,7 +12,7 @@
     "include": [
       {
         "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
-        "version": "1.3.0"
+        "version": "1.4.0"
       }
     ]
   }

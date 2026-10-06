@@ -1,7 +1,7 @@
 {
   "reportVersion": "1.0.0",
   "normalizationVersion": "fidelity-norm/3.3.0",
-  "extractedTextSha256": "be6babd3dd616ad172d0dcc5a9b1a699c0d5a7a4d2b26c71da6cdd8798abf4ba",
+  "extractedTextSha256": "a944724fb163d72cefb0cafe71955a200c7258dbf8d824d9bd31c2f7277de588",
   "narrativeBindingSha256": "dbc8cf153c23e248a34c79d2bb6176030b2b206646e92060ac9c7ce6e7b786dd",
   "status": "passed",
   "sections": [
@@ -241,5 +241,5 @@
     "coveredCodePoints": 2283,
     "uncoveredGaps": 0
   },
-  "reportHash": "55c2b68242fa148cfa88317663dc77cf931c77e958e3fe33356da50a211b1570"
+  "reportHash": "14c2479ad3f372df2bd345fe0cc6c0a28dfad138a467d501aced0d2126919f48"
 }

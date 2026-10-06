@@ -22,8 +22,12 @@ function sourceSection(
   mapping: EmaMapping,
   product: SyntheticProduct,
   version: SyntheticVersion,
+  options: SyntheticFixtureOptions,
 ): CompositionSection {
   const narrative = syntheticSectionDiv(product, rule.sourceKey, version);
+  const children = (rule.children ?? [])
+    .filter((child) => child.required || options.optional === true)
+    .map((child) => sourceSection(child, mapping, product, version, options));
   return {
     id: rule.sourceKey.replaceAll(".", "-"),
     title: rule.title,
@@ -37,9 +41,7 @@ function sourceSection(
       ],
     },
     text: { status: "generated", div: narrative },
-    ...(rule.children === undefined
-      ? {}
-      : { section: rule.children.map((child) => sourceSection(child, mapping, product, version)) }),
+    ...(children.length === 0 ? {} : { section: children }),
   };
 }
 
@@ -105,7 +107,7 @@ export function createSyntheticType2Bundle(
       },
     ],
     title: product.documentTitle,
-    section: [sourceSection(mapping.root, mapping, product, version)],
+    section: [sourceSection(mapping.root, mapping, product, version, options)],
   };
 
   // The graph must be connected the way the Global ePI Bundle profile expects: the validator

@@ -8,6 +8,7 @@ import {
   importPublication,
   sha256Bytes,
 } from "../../src/authority/import.js";
+import { EMA_SECTION_SYSTEM } from "../../src/authority/shape.js";
 import { emaShapedPublication, syntheticPublication } from "../../src/authority/synthetic.js";
 import { verifyDocumentSubmission, type ImportRequest } from "../../src/contracts/index.js";
 import { loadEmaMapping, type EmaMapping } from "../../src/fhir/mapping.js";
@@ -179,6 +180,51 @@ describe("the first check a publication fails", () => {
         }),
       ),
     ).toBe("titles: heading-not-permitted");
+  });
+
+  it("an optional section: imported where the template puts it, refused anywhere else", () => {
+    // 4.6 Fertility, pregnancy and lactation gains its optional Pregnancy and Fertility
+    // subsections (mapping 1.4.0); the record and the crosswalk carry them.
+    const subsection = (code: string, title: string): Json => ({
+      id: code,
+      title,
+      code: { coding: [{ system: EMA_SECTION_SYSTEM, code, display: title }] },
+      text: {
+        status: "generated",
+        div: `<div xmlns="http://www.w3.org/1999/xhtml"><p>Synthetic ${title.toLowerCase()} text; not for clinical use.</p></div>`,
+      },
+    });
+    const pregnancy = subsection("200000029812", "Pregnancy");
+    const fertility = subsection("200000029814", "Fertility");
+    const withUnder46 = (children: Json[]) =>
+      mutated(mapping, (document) => {
+        const [root] = sections(document) as [Json];
+        const clinical = (root.section as Json[])[3];
+        const fertilityPregnancy = (clinical?.section as Json[] | undefined)?.[5];
+        if (fertilityPregnancy === undefined) throw new Error("no section 4.6");
+        expect((fertilityPregnancy.code as { coding: Json[] }).coding[0]?.code).toBe(
+          "200000029811",
+        );
+        fertilityPregnancy.section = children;
+      });
+
+    const publication = withUnder46([pregnancy, fertility]);
+    expect(refusal(publication)).toBe("imported");
+    const { submission } = importPublication(publication.request, publication, mapping, RUN);
+    const ema = transformType2ToEma(submission.bundle as never, mapping);
+    expect(hasValidationErrors(validateEmaPreflight(ema.list, ema.documentBundle, mapping))).toBe(
+      false,
+    );
+    expect(ema.mappingDecisions.map(({ sourceKey }) => sourceKey)).toEqual(
+      expect.arrayContaining(["smpc.4.6.pregnancy", "smpc.4.6.fertility"]),
+    );
+
+    // Out of the template's order, twice, or where the template has no such section.
+    expect(refusal(withUnder46([fertility, pregnancy]))).toBe("tree: section-tree-differs");
+    expect(refusal(withUnder46([pregnancy, pregnancy]))).toBe("tree: section-tree-differs");
+    expect(
+      refusal(withUnder46([subsection("200000029835", "Environmental risk assessment (ERA)")])),
+    ).toBe("tree: section-tree-differs");
   });
 
   it("pictures, then the narrative", () => {

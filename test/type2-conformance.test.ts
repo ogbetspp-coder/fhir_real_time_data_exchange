@@ -163,8 +163,9 @@ describe("EMA terminology on the transformed document", () => {
   });
 
   it("gives every QRD section coding the code system's own display string", () => {
+    // The 59 sections of the EMA profile EUQRD-CAP-template-new-SmPC-en (mapping 1.4.0).
     const rules = flattenRules(mapping.root);
-    expect(rules).toHaveLength(32);
+    expect(rules).toHaveLength(59);
     expect(mapping.targetCodeSystem).toBe(terminology.qrdSections.system);
 
     // The manifest: every rule's effective display is the package's string for its code.
@@ -173,10 +174,14 @@ describe("EMA terminology on the transformed document", () => {
       expect([rule.targetCode, rule.display ?? rule.title]).toEqual([rule.targetCode, expected]);
     }
 
-    // The output: every target section carries exactly that coding.
-    const target = transformType2ToEma(createSyntheticType2Bundle(mapping), mapping);
+    // The output, of a source with every optional section too: every target section carries
+    // exactly that coding.
+    const target = transformType2ToEma(
+      createSyntheticType2Bundle(mapping, { optional: true }),
+      mapping,
+    );
     const sections = flattenSections(composition(target.documentBundle).section);
-    expect(sections).toHaveLength(32);
+    expect(sections).toHaveLength(59);
     for (const section of sections) {
       const coding = section.code.coding?.[0];
       expect(coding?.system).toBe(terminology.qrdSections.system);

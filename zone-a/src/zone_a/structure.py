@@ -10,7 +10,11 @@ Headings. A paragraph is a section's heading when its line, the list label Word 
 and its text, is one of the forms the registry allows for that section (``zone_a.qrd.headings``:
 spaces collapsed, everything else exact). The mapping's root title starts the SmPC, and a named
 subsection (Posology, Method of administration, Reporting of suspected adverse reactions) is a
-line that is exactly its title, inside the section it belongs to. Nothing else is a heading. A
+line that is exactly its title, inside the section it belongs to. Only the mapping's required
+named subsections are looked for: an optional one (Pregnancy, Paediatric population, Mechanism of
+action) stays text of the section it stands in, since a label may repeat its line inside a
+section (a "Mechanism of action" under each substance of a combination), and the EMA's own ePIs
+code it in some labels and not in others. Nothing else is a heading. A
 line that starts with a section's number but goes on otherwise ("4.4 Warnings and precautions")
 is a ``number`` candidate for that section, and a paragraph in a heading style that is no QRD
 heading is a ``style`` candidate in the section it stands in: both are shown to a person, and a
@@ -33,7 +37,8 @@ Sections. Each section of the template gets one status:
 - ``duplicate``: its heading was found more than once, for a person: its text is the paragraphs
   after each;
 - ``order``: its heading comes before a heading the template puts ahead of it, for a person;
-- ``no-code``: the mapping has no code for it (sections 11 and 12), so an ePI cannot place it.
+- ``no-code``: the mapping has no code for it, so an ePI cannot place it (none since mapping
+  1.4.0, which codes every section of the template; sections 11 and 12 before it).
 
 The structure is ``ready`` when every required section is mapped or assigned and none is
 ``duplicate``, ``order`` or ``no-code``: the point at which a person's review can turn it into an
@@ -55,7 +60,7 @@ from zone_a.qrd.check import is_statement
 from zone_a.qrd.headings import collapse, forms, index, match_heading
 from zone_a.qrd.registry import SMPC_END
 
-STRUCTURE_VERSION = "smpc-structure/1.1.1"
+STRUCTURE_VERSION = "smpc-structure/1.2.0"
 
 _NUMBER = re.compile(r"^(\d+(?:\.\d+)?)\.?\s+\S")
 _HEADING_STYLE = re.compile(r"Heading", re.IGNORECASE)
@@ -108,7 +113,9 @@ def _nodes(registry: dict[str, Any], mapping: Mapping[str, Any]) -> list[dict[st
     def visit(node: Mapping[str, Any], parent: str | None) -> None:
         codes[node["sourceKey"]] = dict(node)
         # A named subsection's key ends in a word (smpc.4.2.posology), a numbered one's in a number.
-        if parent is not None and not node["sourceKey"].rsplit(".", 1)[-1].isdigit():
+        # Only a required one is looked for (the module docstring).
+        word = not node["sourceKey"].rsplit(".", 1)[-1].isdigit()
+        if parent is not None and word and node.get("required", True):
             named.setdefault(parent, []).append(dict(node))
         for child in node.get("children", []):
             visit(child, node["sourceKey"])

@@ -51,6 +51,25 @@ describe("mapping manifest loader", () => {
     expect(flagged).toEqual(["smpc.4.8"]);
   });
 
+  it("rejects an unmapped slot that shares a key or a code with a rule", async () => {
+    const file = writeManifest((manifest) => {
+      Object.assign(manifest, {
+        unmapped: [
+          {
+            sourceKey: "smpc.4.3",
+            targetCode: "200000029805",
+            title: "4.3 Contraindications",
+            reason: "x",
+          },
+        ],
+      });
+    });
+
+    await expect(loadEmaMapping(file)).rejects.toThrow(
+      /Duplicate sourceKey smpc\.4\.3 in mapping manifest; Duplicate targetCode 200000029805/,
+    );
+  });
+
   it("rejects a narrative flag other than required", async () => {
     const file = writeManifest((manifest) => {
       Object.assign(rule(manifest.root, "smpc.4.8"), { narrative: "optional" });

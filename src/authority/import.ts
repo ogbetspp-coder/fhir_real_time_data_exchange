@@ -57,7 +57,7 @@ import {
 
 // The importer's version: part of the extractor's name in every submission it writes, and locked
 // to the hash of this directory's code and data and of its golden vectors (D10).
-export const IMPORTER_VERSION = "2.3.2";
+export const IMPORTER_VERSION = "2.4.0";
 export const IMPORTER_EXTRACTOR = `${AUTHORITY_IMPORTER_NAME}/${IMPORTER_VERSION}`;
 
 const AUTHORITY_IMPORT_IDENTIFIER_SYSTEM = "https://khs.dev/fhir/identifier/authority-import";
@@ -205,23 +205,28 @@ function checkBinding(document: EmaDocument, list: EmaList, request: ImportReque
 type Placed = { section: EmaSection; rule: SectionRule; path: string };
 
 // D4: the document's section tree is the mapping's, section for section, in order, each with
-// the rule's code (through the stated alias) and a heading the QRD template permits.
+// the rule's code (through the stated alias) and a heading the QRD template permits. A rule that
+// is not required may have no section (mapping 1.4.0: 2.1, Pregnancy, 11. DOSIMETRY, ...); every
+// other rule has exactly one, and every section has a rule.
 function placeSections(document: EmaDocument, mapping: EmaMapping): Placed[] {
   if (!(mapping.targetCodeSystemAliases ?? []).includes(EMA_SECTION_SYSTEM)) {
     refuse("tree", "section-code-system-not-aliased");
   }
   const placed: Placed[] = [];
   const walk = (sections: EmaSection[], rules: SectionRule[], base: string): void => {
-    if (sections.length !== rules.length) refuse("tree", "section-tree-differs");
-    sections.forEach((section, position) => {
-      const rule = rules[position];
-      if (section.code.coding[0].code !== rule?.targetCode) {
-        refuse("tree", "section-tree-differs");
+    let position = 0;
+    for (const rule of rules) {
+      const section = sections[position];
+      if (section?.code.coding[0].code !== rule.targetCode) {
+        if (rule.required) refuse("tree", "section-tree-differs");
+        continue;
       }
       const path = `${base}[${position}]`;
       placed.push({ section, rule, path });
       walk(section.section ?? [], rule.children ?? [], `${path}.section`);
-    });
+      position += 1;
+    }
+    if (position !== sections.length) refuse("tree", "section-tree-differs");
   };
   walk(document.entry[0].resource.section, [mapping.root], "Composition.section");
   for (const { section, rule } of placed) {

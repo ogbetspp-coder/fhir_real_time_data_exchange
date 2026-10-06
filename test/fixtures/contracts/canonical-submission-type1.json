@@ -871,8 +871,8 @@
       ],
       "extractedText": {
         "uri": "gs://synthetic-bucket/import.pages.json",
-        "sha256": "be6babd3dd616ad172d0dcc5a9b1a699c0d5a7a4d2b26c71da6cdd8798abf4ba",
-        "extractorVersion": "authority-import/2.3.2"
+        "sha256": "a944724fb163d72cefb0cafe71955a200c7258dbf8d824d9bd31c2f7277de588",
+        "extractorVersion": "authority-import/2.4.0"
       }
     },
     "extraction": {
@@ -880,12 +880,12 @@
       "serviceVersion": "test",
       "parser": {
         "name": "authority-import",
-        "version": "2.3.2"
+        "version": "2.4.0"
       },
       "terminologyService": {
         "name": "cap-smpc-en",
-        "version": "1.3.0",
-        "snapshotSha256": "d5eb76d1b8039f0396c5294e925ebfcfa53665e5aa7c9a16963a41d40092836e"
+        "version": "1.4.0",
+        "snapshotSha256": "86ca90fdd27f8235dddc640ba34bfdf0b38c66d3143945f280109f29b990d310"
       }
     },
     "sections": [
@@ -1425,7 +1425,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029791"
         }
       },
@@ -1461,7 +1461,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.1",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029792"
         }
       },
@@ -1497,7 +1497,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.2",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029793"
         }
       },
@@ -1533,7 +1533,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.3",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029797"
         }
       },
@@ -1569,7 +1569,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.4",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029798"
         }
       },
@@ -1605,7 +1605,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.4.1",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029799"
         }
       },
@@ -1641,7 +1641,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.4.2",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029800"
         }
       },
@@ -1677,7 +1677,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.4.2.posology",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029801"
         }
       },
@@ -1713,7 +1713,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.4.2.administration",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029803"
         }
       },
@@ -1749,7 +1749,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.4.3",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029805"
         }
       },
@@ -1785,7 +1785,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.4.4",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029806"
         }
       },
@@ -1821,7 +1821,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.4.5",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029809"
         }
       },
@@ -1857,7 +1857,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.4.6",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029811"
         }
       },
@@ -1893,7 +1893,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.4.7",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029815"
         }
       },
@@ -1929,7 +1929,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.4.8",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029816"
         }
       },
@@ -1965,7 +1965,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.4.8.reporting",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029818"
         }
       },
@@ -2001,7 +2001,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.4.9",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029819"
         }
       },
@@ -2037,7 +2037,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.5",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029821"
         }
       },
@@ -2073,7 +2073,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.5.1",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029822"
         }
       },
@@ -2109,7 +2109,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.5.2",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029827"
         }
       },
@@ -2145,7 +2145,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.5.3",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029834"
         }
       },
@@ -2181,7 +2181,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.6",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029836"
         }
       },
@@ -2217,7 +2217,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.6.1",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029837"
         }
       },
@@ -2253,7 +2253,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.6.2",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029838"
         }
       },
@@ -2289,7 +2289,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.6.3",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029839"
         }
       },
@@ -2325,7 +2325,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.6.4",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029840"
         }
       },
@@ -2361,7 +2361,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.6.5",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029841"
         }
       },
@@ -2397,7 +2397,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.6.6",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029842"
         }
       },
@@ -2433,7 +2433,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.7",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029844"
         }
       },
@@ -2469,7 +2469,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.8",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029845"
         }
       },
@@ -2505,7 +2505,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.9",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029846"
         }
       },
@@ -2541,7 +2541,7 @@
         "terminologyRef": {
           "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
           "code": "smpc.10",
-          "version": "1.3.0",
+          "version": "1.4.0",
           "lookupId": "mapping:200000029847"
         }
       },
@@ -2646,7 +2646,7 @@
       "sectionsChecked": 32,
       "sectionsMatched": 32,
       "narrativeBindingSha256": "dbc8cf153c23e248a34c79d2bb6176030b2b206646e92060ac9c7ce6e7b786dd",
-      "reportSha256": "55c2b68242fa148cfa88317663dc77cf931c77e958e3fe33356da50a211b1570",
+      "reportSha256": "14c2479ad3f372df2bd345fe0cc6c0a28dfad138a467d501aced0d2126919f48",
       "reportUri": "gs://synthetic-bucket/import.fidelity-report.json"
     }
   },
@@ -2665,6 +2665,6 @@
     },
     "requestedBy": "urn:requester:synthetic-01",
     "requestedAt": "2026-09-24T11:59:00Z",
-    "approvedContentSha256": "1d9019b50a064d9ef25511cc6860309c6073f976afe2da73a24a6946e3044685"
+    "approvedContentSha256": "f086d4adf8bc57a200cbce68aaaaf8351913b1a1d81f700f53400ed4d345c2bb"
   }
 }

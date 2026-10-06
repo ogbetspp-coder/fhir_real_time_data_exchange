@@ -177,9 +177,10 @@ drop from or rearrange:
   at the top level), or that comes before a sibling the manifest orders first;
 - a section carrying any element besides `id`, `title`, `code`, `text` and `section` (for
   example `entry`, `extension`, `emptyReason`, `author`, `focus`, `orderedBy` or `mode`);
-- a mandatory leaf section, or a section whose rule is marked `"narrative": "required"`
-  (4.8, whose own text sits above its reporting subsection), without narrative that the
-  scanner can read and that shows some text;
+- a mapped section without narrative that the scanner can read and that shows some text, unless
+  it is a bare heading over subsections the source has under it and its rule is not marked
+  `"narrative": "required"` (4.8, whose own text sits above its reporting subsection); an optional
+  section (mapping 1.4.0: 2.1, Pregnancy, 11. DOSIMETRY) is held to this when it is there;
 - a source Composition or Bundle whose `language` is missing or is not an English BCP 47 tag
   (`en`, optionally `-Latn`, optionally a region);
 - a source Bundle without `identifier.value`, and a reference in any entry that names no entry
@@ -202,15 +203,28 @@ builds its own record.
 
 Some things it still does without asking, by design: every mapped section takes a new id and, as its
 heading, the source's heading when the rule permits it (the rule's `title` or one of its
-`alternativeTitles`, the QRD template's forms without optional wording, mapping 1.3.0) and otherwise
+`alternativeTitles`, the QRD template's forms without optional wording, since mapping 1.3.0) and otherwise
 the rule's `title`; only the target coding is kept; the EMA List is titled by the product's name
 (the document's title only where the graph names no product) and carries the holder, regulatory
 agency and procedure number the graph states in their identifier systems, never a value it does not;
 Composition.language and Bundle.language are written as `en`; and a section without a source code
 and without narrative — an empty container — is dropped, title included. The `xml:lang` of a
-narrative `div` is not checked yet. The manifest loader rejects a manifest in which two rules share
-a `sourceKey` or a `targetCode`, and lineage names the mapping by the version the loaded manifest
-declares, the same `mappingVersion` the run manifest records.
+narrative `div` is not checked yet. The manifest loader rejects a manifest in which two rules, or a
+rule and an unmapped slot, share a `sourceKey` or a `targetCode`, and lineage names the mapping by
+the version the loaded manifest declares, the same `mappingVersion` the run manifest records.
+
+Since mapping 1.4.0 the manifest has a rule for each of the 59 sections of the EMA's profile
+`EUQRD-CAP-template-new-SmPC-en`, 27 of them optional, and names the profile's custom subsection
+slots (codes 200000044333 and 200000044347, 44 slots) as `unmapped`, with the reason: the crosswalk
+carries the template's own sections only, each once, so it refuses a section with their keys.
+`test/official/profile-slots.test.ts` reads the profile from the pinned EUePI package in CI and fails
+on any slot that is neither. The ConceptMap publishes the rules as `equivalent` and the unmapped
+slots as `noMap`.
+
+The StructureMap is the crosswalk's twin in the FHIR mapping language (`fhir/maps/`), compiled by the
+pinned validator and executed on its transform engine in CI against this crosswalk on every fixture
+(`test/official/structuremap-twin.test.ts`). It transforms; the ids, the reference rewrite and the
+refusals stay here (`docs/design/structuremap-twin.md`).
 
 ## Validation model
 

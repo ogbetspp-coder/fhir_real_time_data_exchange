@@ -22,9 +22,11 @@ are the operator interface.
   hierarchy.
 - A mechanical fidelity check of supplied narrative; clinical text is never generated or
   rewritten, and only an authority import may drop presentation (ADR 0005).
-- A descriptive `ConceptMap` and non-normative `StructureMap` (`src/fhir/transform.ts` executes
-  the crosswalk; the official validator checks both in CI), field-level decisions, input/output
-  hashes, validation `OperationOutcome`s, and KMS-signed run manifests.
+- A `ConceptMap` of every section slot of the EMA's CAP SmPC template profile, and a
+  `StructureMap` that is the crosswalk's executed twin (`src/fhir/transform.ts` executes the
+  crosswalk; CI runs the map on the official validator's engine against it on every fixture, and
+  validates both), field-level decisions, input/output hashes, validation `OperationOutcome`s, and
+  KMS-signed run manifests.
 - Validation by both the official HL7 validator and Healthcare API `$validate`.
 - Idempotent FHIR transaction writes only after all required validation gates pass.
 - Direct `ANALYTICS_V2` streaming from the validated R5 FHIR store to BigQuery. Google
@@ -592,10 +594,13 @@ All external packages, examples, and validator binaries are recorded in
 [fhir/standards.lock.json](fhir/standards.lock.json). Downloaded artifacts are checksum
 verified and excluded from git. The repository's own definitions (the `https://khs.dev/fhir/` code
 systems and value sets, the approval-content extension, the ConceptMap and the StructureMap) are a
-FHIR package, `dev.khs.fhir.epi#0.1.0`, that `npm run artifacts:generate` builds byte for byte
+FHIR package, `dev.khs.fhir.epi#0.2.0`, that `npm run artifacts:generate` builds byte for byte
 reproducibly into `fhir/generated/dev.khs.fhir.epi.tgz`. It is committed, pinned by SHA-256 in the
 lock and `Dockerfile.validator`, and loaded by the official validator as a fifth package; the FHIR
-store does not import it.
+store does not import it. The StructureMap is the crosswalk's executed twin: written in FML
+(`fhir/maps/`), compiled by the pinned validator (`npm run map:compile`, Java 21), and run against
+`src/fhir/transform.ts` on every fixture in CI (`npm run test:official`,
+[docs/design/structuremap-twin.md](docs/design/structuremap-twin.md)).
 
 The current normative validation targets are:
 

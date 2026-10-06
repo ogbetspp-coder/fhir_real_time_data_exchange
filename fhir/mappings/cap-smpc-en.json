@@ -1,5 +1,5 @@
 {
-  "mappingVersion": "1.3.0",
+  "mappingVersion": "1.4.0",
   "sourceCodeSystem": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
   "targetCodeSystem": "http://ema.europa.eu/fhir/CodeSystem/200000029659",
   "targetCodeSystemAliases": ["https://spor.ema.europa.eu/v1/lists/200000029659/terms/"],
@@ -29,7 +29,27 @@
         "sourceKey": "smpc.2",
         "targetCode": "200000029793",
         "title": "2. QUALITATIVE AND QUANTITATIVE COMPOSITION",
-        "required": true
+        "required": true,
+        "children": [
+          {
+            "sourceKey": "smpc.2.1",
+            "targetCode": "200000029794",
+            "title": "2.1 General description",
+            "required": false
+          },
+          {
+            "sourceKey": "smpc.2.2",
+            "targetCode": "200000029795",
+            "title": "2.2 Qualitative and quantitative composition",
+            "required": false
+          },
+          {
+            "sourceKey": "smpc.2.excipients",
+            "targetCode": "200000029796",
+            "title": "Excipient(s) with known effect",
+            "required": false
+          }
+        ]
       },
       {
         "sourceKey": "smpc.3",
@@ -59,13 +79,29 @@
                 "sourceKey": "smpc.4.2.posology",
                 "targetCode": "200000029801",
                 "title": "Posology",
-                "required": true
+                "required": true,
+                "children": [
+                  {
+                    "sourceKey": "smpc.4.2.posology.paediatric",
+                    "targetCode": "200000029802",
+                    "title": "Paediatric population",
+                    "required": false
+                  }
+                ]
               },
               {
                 "sourceKey": "smpc.4.2.administration",
                 "targetCode": "200000029803",
                 "title": "Method of administration",
-                "required": true
+                "required": true,
+                "children": [
+                  {
+                    "sourceKey": "smpc.4.2.administration.precautions",
+                    "targetCode": "200000029804",
+                    "title": "Precautions to be taken before handling or administering the medicinal product",
+                    "required": false
+                  }
+                ]
               }
             ]
           },
@@ -79,19 +115,61 @@
             "sourceKey": "smpc.4.4",
             "targetCode": "200000029806",
             "title": "4.4 Special warnings and precautions for use",
-            "required": true
+            "required": true,
+            "children": [
+              {
+                "sourceKey": "smpc.4.4.traceability",
+                "targetCode": "200000029807",
+                "title": "Traceability",
+                "required": false
+              },
+              {
+                "sourceKey": "smpc.4.4.paediatric",
+                "targetCode": "200000029808",
+                "title": "Paediatric population",
+                "required": false
+              }
+            ]
           },
           {
             "sourceKey": "smpc.4.5",
             "targetCode": "200000029809",
             "title": "4.5 Interaction with other medicinal products and other forms of interaction",
-            "required": true
+            "required": true,
+            "children": [
+              {
+                "sourceKey": "smpc.4.5.paediatric",
+                "targetCode": "200000029810",
+                "title": "Paediatric population",
+                "required": false
+              }
+            ]
           },
           {
             "sourceKey": "smpc.4.6",
             "targetCode": "200000029811",
             "title": "4.6 Fertility, pregnancy and lactation",
-            "required": true
+            "required": true,
+            "children": [
+              {
+                "sourceKey": "smpc.4.6.pregnancy",
+                "targetCode": "200000029812",
+                "title": "Pregnancy",
+                "required": false
+              },
+              {
+                "sourceKey": "smpc.4.6.breast-feeding",
+                "targetCode": "200000029813",
+                "title": "Breast-feeding",
+                "required": false
+              },
+              {
+                "sourceKey": "smpc.4.6.fertility",
+                "targetCode": "200000029814",
+                "title": "Fertility",
+                "required": false
+              }
+            ]
           },
           {
             "sourceKey": "smpc.4.7",
@@ -107,6 +185,12 @@
             "narrative": "required",
             "children": [
               {
+                "sourceKey": "smpc.4.8.paediatric",
+                "targetCode": "200000029817",
+                "title": "Paediatric population",
+                "required": false
+              },
+              {
                 "sourceKey": "smpc.4.8.reporting",
                 "targetCode": "200000029818",
                 "title": "Reporting of suspected adverse reactions",
@@ -118,7 +202,15 @@
             "sourceKey": "smpc.4.9",
             "targetCode": "200000029819",
             "title": "4.9 Overdose",
-            "required": true
+            "required": true,
+            "children": [
+              {
+                "sourceKey": "smpc.4.9.paediatric",
+                "targetCode": "200000029820",
+                "title": "Paediatric population",
+                "required": false
+              }
+            ]
           }
         ]
       },
@@ -132,19 +224,91 @@
             "sourceKey": "smpc.5.1",
             "targetCode": "200000029822",
             "title": "5.1 Pharmacodynamic properties",
-            "required": true
+            "required": true,
+            "children": [
+              {
+                "sourceKey": "smpc.5.1.mechanism",
+                "targetCode": "200000029823",
+                "title": "Mechanism of action",
+                "required": false
+              },
+              {
+                "sourceKey": "smpc.5.1.effects",
+                "targetCode": "200000029824",
+                "title": "Pharmacodynamic effects",
+                "required": false
+              },
+              {
+                "sourceKey": "smpc.5.1.efficacy",
+                "targetCode": "200000029825",
+                "title": "Clinical efficacy and safety",
+                "required": false
+              },
+              {
+                "sourceKey": "smpc.5.1.paediatric",
+                "targetCode": "200000029826",
+                "title": "Paediatric population",
+                "required": false
+              }
+            ]
           },
           {
             "sourceKey": "smpc.5.2",
             "targetCode": "200000029827",
             "title": "5.2 Pharmacokinetic properties",
-            "required": true
+            "required": true,
+            "children": [
+              {
+                "sourceKey": "smpc.5.2.absorption",
+                "targetCode": "200000029828",
+                "title": "Absorption",
+                "required": false
+              },
+              {
+                "sourceKey": "smpc.5.2.distribution",
+                "targetCode": "200000029829",
+                "title": "Distribution",
+                "required": false
+              },
+              {
+                "sourceKey": "smpc.5.2.biotransformation",
+                "targetCode": "200000029830",
+                "title": "Biotransformation",
+                "required": false
+              },
+              {
+                "sourceKey": "smpc.5.2.elimination",
+                "targetCode": "200000029831",
+                "title": "Elimination",
+                "required": false
+              },
+              {
+                "sourceKey": "smpc.5.2.linearity",
+                "targetCode": "200000029832",
+                "title": "Linearity/non-linearity",
+                "required": false
+              },
+              {
+                "sourceKey": "smpc.5.2.pk-pd",
+                "targetCode": "200000029833",
+                "title": "Pharmacokinetic/pharmacodynamic relationship(s)",
+                "required": false
+              }
+            ]
           },
           {
             "sourceKey": "smpc.5.3",
             "targetCode": "200000029834",
             "title": "5.3 Preclinical safety data",
-            "required": true
+            "required": true,
+            "children": [
+              {
+                "sourceKey": "smpc.5.3.era",
+                "targetCode": "200000029835",
+                "title": "Environmental risk assessment (ERA)",
+                "required": false
+              }
+            ]
           }
         ]
       },
@@ -192,7 +356,15 @@
             "title": "6.6 Special precautions for disposal and other handling",
             "alternativeTitles": ["6.6 Special precautions for disposal"],
             "display": "6.6 Special precautions for disposal [and other handling]",
-            "required": true
+            "required": true,
+            "children": [
+              {
+                "sourceKey": "smpc.6.6.paediatric",
+                "targetCode": "200000029843",
+                "title": "Use in the paediatric population",
+                "required": false
+              }
+            ]
           }
         ]
       },
@@ -219,7 +391,33 @@
         "targetCode": "200000029847",
         "title": "10. DATE OF REVISION OF THE TEXT",
         "required": true
+      },
+      {
+        "sourceKey": "smpc.11",
+        "targetCode": "200000029848",
+        "title": "11. DOSIMETRY",
+        "required": false
+      },
+      {
+        "sourceKey": "smpc.12",
+        "targetCode": "200000029849",
+        "title": "12. INSTRUCTIONS FOR PREPARATION OF RADIOPHARMACEUTICALS",
+        "required": false
       }
     ]
-  }
+  },
+  "unmapped": [
+    {
+      "sourceKey": "smpc.custom.h4",
+      "targetCode": "200000044333",
+      "title": "Custom subsection (level H4)",
+      "reason": "A custom subsection carries its author's own heading and may occur any number of times under one section (the profile's Blanksubsections slices, 0..*). The crosswalk carries the template's own sections only, each once and under the template's heading, so it refuses a section with this key."
+    },
+    {
+      "sourceKey": "smpc.custom.h5",
+      "targetCode": "200000044347",
+      "title": "Custom subsection (level H5)",
+      "reason": "A custom subsection carries its author's own heading and may occur any number of times under one section (the profile's Blanksubsections slices, 0..*). The crosswalk carries the template's own sections only, each once and under the template's heading, so it refuses a section with this key."
+    }
+  ]
 }

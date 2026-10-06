@@ -22,6 +22,16 @@ const SectionRuleSchema: z.ZodType<SectionRule> = z.lazy(() =>
   }),
 );
 
+// A slot of the EMA profile that no rule maps: its canonical key, the EMA code, a heading for the
+// key, and why the crosswalk does not carry it. The ConceptMap publishes it as noMap, and the
+// crosswalk refuses a source section with its key (no rule has it).
+const UnmappedSchema = z.object({
+  sourceKey: z.string().min(1),
+  targetCode: z.string().min(1),
+  title: z.string().min(1),
+  reason: z.string().min(1),
+});
+
 const MappingSchema = z.object({
   mappingVersion: z.string().min(1),
   sourceCodeSystem: z.url(),
@@ -35,6 +45,7 @@ const MappingSchema = z.object({
     composition: z.array(z.url()).min(1),
   }),
   root: SectionRuleSchema,
+  unmapped: z.array(UnmappedSchema).optional(),
 });
 
 export type SectionRule = {
@@ -65,14 +76,22 @@ export function permittedTitles(rule: SectionRule): string[] {
   return [rule.title, ...(rule.alternativeTitles ?? [])];
 }
 
-// Every sourceKey and every targetCode may appear once in the whole rule tree. A repeated
-// sourceKey would publish one source section under two headings; a repeated targetCode would
-// publish two source sections under one. Either is a manifest error, not a run-time choice.
-export function duplicateRuleIssues(root: SectionRule): string[] {
+// Every sourceKey and every targetCode may appear once in the whole rule tree and its unmapped
+// slots. A repeated sourceKey would publish one source section under two headings; a repeated
+// targetCode would publish two source sections under one; a key both mapped and unmapped would
+// say two things. Either is a manifest error, not a run-time choice.
+export function duplicateRuleIssues(
+  root: SectionRule,
+  unmapped: readonly { sourceKey: string; targetCode: string }[] = [],
+): string[] {
   const sourceKeys = new Set<string>();
   const targetCodes = new Set<string>();
   const issues: string[] = [];
-  const visit = (rule: SectionRule): void => {
+  const visit = (rule: {
+    sourceKey: string;
+    targetCode: string;
+    children?: SectionRule[] | undefined;
+  }): void => {
     if (sourceKeys.has(rule.sourceKey)) {
       issues.push(`Duplicate sourceKey ${rule.sourceKey} in mapping manifest`);
     }
@@ -84,6 +103,7 @@ export function duplicateRuleIssues(root: SectionRule): string[] {
     (rule.children ?? []).forEach(visit);
   };
   visit(root);
+  unmapped.forEach(visit);
   return issues;
 }
 
@@ -98,7 +118,7 @@ export async function loadEmaMapping(
 ): Promise<EmaMapping> {
   const content = await readFile(mappingPath, "utf8");
   const mapping = MappingSchema.parse(JSON.parse(content));
-  const duplicates = duplicateRuleIssues(mapping.root);
+  const duplicates = duplicateRuleIssues(mapping.root, mapping.unmapped);
   if (duplicates.length > 0) {
     throw new Error(`Mapping manifest ${mappingPath} is invalid: ${duplicates.join("; ")}`);
   }

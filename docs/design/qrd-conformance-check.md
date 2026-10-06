@@ -4,7 +4,7 @@
   `labels/ema-epi/sources.lock.json` (five)
 - Date: 2026-09-23; updated 2026-09-28 (`qrd-check/1.2.0`, `epi-reader/1.2.0`) and 2026-10-04
   (`qrd-check/1.3.0`, the label reader's `epi-reader/1.3.0`); the checks on record are of
-  `qrd-check/1.5.0` and `epi-reader/1.3.7` (`labels/ema-epi/checks/`)
+  `qrd-check/1.6.0`, `epi-reader/1.3.7` and mapping 1.4.0 (`labels/ema-epi/checks/`)
 - Related: `docs/design/qrd-registry.md` (the registry it checks against), `docs/roadmap.md`
   item 8, `AGENTS.md` (the scoped exception for authority-published ePI)
 
@@ -135,12 +135,12 @@ EMA writes "GFR < 60 mL/min" that way in Jentadueto.
 - **Every item has a status.** Each of the registry's 126 statements and subheadings has exactly
   one: `used`, `deviation`, `absent`, `not-checked` with a `reason` (`refused-part`,
   `section-absent`: its section is not in the document, `section-not-mapped`: the mapping has no
-  code for it, as for section 12, for radiopharmaceuticals) or `not-checkable` with a `reason`
-  (`too-little-text`, `unbalanced-brackets`: four Appendix I entries). An optional subsection the
-  mapping does not list is read as part of its section: the template files "For the full list of
-  excipients, see section 6.1." and "Excipient(s) with known effect" under the ATMP-only 2.2, but
-  they apply to section 2 of every product, so they are matched in section 2 (keeping their
-  `smpc.2.2#n` identifiers).
+  code for it, which since mapping 1.4.0 no section of the registry lacks) or `not-checkable`
+  with a `reason` (`too-little-text`, `unbalanced-brackets`: four Appendix I entries). An optional
+  subsection the document does not have is read as part of its section: the template files "For
+  the full list of excipients, see section 6.1." and "Excipient(s) with known effect" under the
+  ATMP-only 2.2, but they apply to section 2 of every product, so they are matched in section 2
+  (keeping their `smpc.2.2#n` identifiers). A document that has 2.2 has them checked there.
 
 `labels/ema-epi/checks/<product>.json` holds each result; `zone-a/scripts/check_labels.py`
 writes them and a test compares them with a fresh run, by digest (a difference is named by JSON
@@ -231,9 +231,9 @@ Every finding below was confirmed by reading the source div.
   negative margin on inline text or at a block's top or bottom, vertical padding on inline text, padding on it over a background, a border on it wider than a hairline, a height outside table parts and pictures, a line height or font outside the
   bounds above). Those are bounds, not a layout engine. What they do not catch is a stated residual of the check, listed in the reader's module docstring (a line height computed from a smaller font than the text it holds, a block overflowing its table cell, a list item drawn over its number, text at the bounds' edge, a combining mark on a space drawn as a stroke, text moved far to the right, off a printed page, text shifted by up to 6pt over the line above or below). ADR 0005's renderer cross-check, which draws each page and compares, is what secures the import.
 
-The mapping lacks three EMA codes that one pinned label uses (Jentadueto: Pregnancy,
-Breast-feeding and Fertility under 4.6); the check reports them as `unmapped-code`, for
-information.
+Mapping 1.4.0 has every section code of the EMA's CAP SmPC template profile, so no pinned label
+has an `unmapped-code` finding (Jentadueto had three before it: Pregnancy, Breast-feeding and
+Fertility under 4.6).
 
 ## Known limits
 

@@ -54,6 +54,13 @@ def _skeleton(*extra: tuple[int, Paragraph]) -> list[Paragraph]:
     return out
 
 
+def _rule(key: str) -> dict[str, Any]:
+    def visit(node: dict[str, Any]) -> list[dict[str, Any]]:
+        return [node, *(r for child in node.get("children", []) for r in visit(child))]
+
+    return next(rule for rule in visit(MAPPING["root"]) if rule["sourceKey"] == key)
+
+
 def _by_key(result: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {s["key"]: s for s in result["sections"]}
 
@@ -75,7 +82,15 @@ def test_a_label_that_follows_the_template_is_ready() -> None:
             visit(child)
 
     visit(MAPPING["root"])
-    assert {k: s["code"] for k, s in _by_key(result).items() if k in expected} == expected
+    found = _by_key(result)
+    assert {k: s["code"] for k, s in found.items()} == {k: expected[k] for k in found}
+    # Every key of the mapping is a section of the structure, but its optional named subsections,
+    # which are not looked for.
+    left_out = {k for k in expected if k not in found}
+    assert left_out == {
+        k for k in left_out if not k.split(".")[-1].isdigit() and not _rule(k)["required"]
+    }
+    assert len(left_out) == 23
 
 
 def test_every_paragraph_is_in_exactly_one_place() -> None:
@@ -143,8 +158,30 @@ def test_twice_or_out_of_order_is_for_a_person() -> None:
 def test_a_section_without_a_code_cannot_be_placed() -> None:
     paragraphs = _skeleton()
     paragraphs.append(_heading("smpc.11"))
+    # Mapping 1.4.0 codes section 11 (200000029848).
     result = structure(paragraphs, REGISTRY, MAPPING)
+    assert _by_key(result)["smpc.11"]["code"] == "200000029848"
+    assert (_by_key(result)["smpc.11"]["status"], result["ready"]) == ("mapped", True)
+    # A mapping without it cannot place it.
+    without = json.loads(json.dumps(MAPPING))
+    without["root"]["children"] = [
+        c for c in without["root"]["children"] if c["sourceKey"] != "smpc.11"
+    ]
+    result = structure(paragraphs, REGISTRY, without)
     assert (_by_key(result)["smpc.11"]["status"], result["ready"]) == ("no-code", False)
+
+
+def test_an_optional_named_subsection_stays_text_of_its_section() -> None:
+    # Pregnancy is the mapping's optional subsection of 4.6; its line is not looked for as a
+    # heading, so it and the text under it stay 4.6's.
+    paragraphs = _skeleton()
+    at = next(i for i, p in enumerate(paragraphs) if p.text.startswith("4.6 ")) + 1
+    paragraphs[at:at] = [_p("Pregnancy"), _p("Not for clinical use.")]
+    result = structure(paragraphs, REGISTRY, MAPPING)
+    keys = {s["key"] for s in result["sections"]}
+    assert "smpc.4.6.pregnancy" not in keys
+    assert {at, at + 1} <= set(_by_key(result)["smpc.4.6"]["paragraphs"])
+    assert result["ready"]
 
 
 def test_a_named_subsection_counts_only_inside_its_section() -> None:

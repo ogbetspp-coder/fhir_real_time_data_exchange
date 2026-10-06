@@ -29,8 +29,8 @@ const EMA_LIST_DISPLAY = "Combined File of all Documents";
 const QRD_TEMPLATE_EXTENSION =
   "http://ema.europa.eu/fhir/StructureDefinition/ext-epi-qrdtemplate-version";
 // The system of the EMA document Bundle's identifier, whose value is minted from the source's
-// (EMA_DOCUMENT_ID_NAMESPACE), never copied; the generated StructureMap describes the same rule
-// (scripts/fhir/generate-artifacts.ts).
+// (EMA_DOCUMENT_ID_NAMESPACE), never copied; the StructureMap twin documents the same derivation
+// (fhir/maps/type2-to-ema-cap-smpc-en.map), which it cannot carry out.
 export const EMA_DOCUMENT_IDENTIFIER_SYSTEM = "https://khs.dev/fhir/identifier/ema-document";
 export const EMA_DOCUMENT_ID_NAMESPACE = "ema-bundle";
 
@@ -287,15 +287,21 @@ function mapSection(
     );
   }
 
-  // A leaf must carry narrative. A section with child rules may be a bare heading over its
-  // subsections, unless its rule says the section carries text of its own above them.
+  // A section must carry narrative unless it is a bare heading over subsections the source has:
+  // a leaf always, a section whose child rules match no section under it (4.6 with no Pregnancy
+  // subsection) too, and one whose rule says it carries text of its own above its subsections.
+  // An optional section is held to this only when it is there.
   const childRules = rule.children ?? [];
-  if (rule.narrative === "required" || (rule.required && childRules.length === 0)) {
+  const hasSubsections = childRules.some((child) =>
+    (index.get(child.sourceKey) ?? []).some((section) => section.parent === match),
+  );
+  if (rule.narrative === "required" || !hasSubsections) {
     const narrative = readNarrative(match.section, false);
+    const which = rule.required ? "Mandatory source section" : "Source section";
     if (narrative === "absent") {
-      issues.push(`Mandatory source section ${rule.sourceKey} has no narrative`);
+      issues.push(`${which} ${rule.sourceKey} has no narrative`);
     } else if (narrative === "unreadable") {
-      issues.push(`Mandatory source section ${rule.sourceKey} has unreadable narrative`);
+      issues.push(`${which} ${rule.sourceKey} has unreadable narrative`);
     }
   }
 
@@ -315,19 +321,21 @@ function mapSection(
     }
   }
 
-  const children = childRules
-    .map((child, position) =>
-      mapSection(
-        child,
-        rule.sourceKey,
-        mapping,
-        index,
-        `${targetPath}.section[${position}]`,
-        decisions,
-        issues,
-      ),
-    )
-    .filter((child): child is CompositionSection => child !== undefined);
+  // Each child's target path is its position among the children mapped, not among the rules: an
+  // optional rule the source has no section for leaves no gap.
+  const children: CompositionSection[] = [];
+  for (const child of childRules) {
+    const target = mapSection(
+      child,
+      rule.sourceKey,
+      mapping,
+      index,
+      `${targetPath}.section[${children.length}]`,
+      decisions,
+      issues,
+    );
+    if (target !== undefined) children.push(target);
+  }
 
   const heading: unknown = (match.section as { title?: unknown }).title;
   const sourceTitle = typeof heading === "string" ? heading : undefined;
@@ -615,7 +623,7 @@ export function transformType2ToEma(
   const index = indexSections(sections);
   const decisions: MappingDecision[] = [];
   const issues: string[] = [
-    ...duplicateRuleIssues(mapping.root),
+    ...duplicateRuleIssues(mapping.root, mapping.unmapped),
     ...sourceLanguageIssues(sourceBundle, sourceComposition),
   ];
   const root = mapSection(

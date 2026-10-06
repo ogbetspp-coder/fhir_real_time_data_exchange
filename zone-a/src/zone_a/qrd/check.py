@@ -17,10 +17,12 @@ wording), ``order`` (mapped sections out of the template's order), ``duplicate-s
 Statements. The registry's items are matched against the text of the section they belong to: its
 own paragraphs and the titles and paragraphs of its subsections, except subsections that are
 registry sections themselves (4.1 under 4), which are checked on their own. A named subsection
-such as Posology belongs to its section's text, and so does an optional registry subsection the
-mapping does not list (2.1 and 2.2, for advanced therapies: the template files section 2's
-standard statements under 2.2, and they apply to every product). Label text and template text
-are both compared after runs of space, tab and no-break space are collapsed to one space.
+such as Posology belongs to its section's text. An optional registry subsection (2.1 and 2.2, for
+advanced therapies) is checked on its own where the document has it; where the document does not
+have it, or the mapping does not list it, its items are matched against its section's text (the
+template files section 2's standard statements under 2.2, and they apply to every product).
+Label text and template text are both compared after runs of space, tab and no-break space are
+collapsed to one space.
 Characters the reader marked struck through or faint (faint text includes text on a background
 it cannot be told from) are masked: no statement matches them. A subheading must be a line of
 its own, exactly, but for "(s)". In a pattern:
@@ -71,7 +73,8 @@ subheading that is absent is a ``missing-statement`` or ``missing-subheading`` f
 
 Every statement and subheading of the registry gets exactly one status. One with no text to be
 checked against is ``not-checked`` with the reason: ``section-absent`` (its section is not in the
-document) or ``section-not-mapped`` (the mapping has no code for its section, as for section 12).
+document) or ``section-not-mapped`` (the mapping has no code for its section; none since mapping
+1.4.0, which codes every section of the template, section 12 included).
 Sections the reader refused are ``refused-section`` findings. A statement not found in a section
 with a refused part is ``not-checked`` (``refused-part``), not ``absent``: it may be in the part
 that could not be read, and the checker never guesses around it. Defects the reader read through
@@ -105,7 +108,7 @@ from zone_a.underline import underline_changes
 # The version of the rules in this module and in headings.py, pattern.py and zone_a.underline.
 # A change to any of them changes its hash in versions.lock.json, and
 # tests/test_versions_lock.py then requires a new version here.
-CHECKER_VERSION = "qrd-check/1.5.1"
+CHECKER_VERSION = "qrd-check/1.6.0"
 SIMILARITY = 0.85
 MIN_LITERAL = 12
 FILL_LIMIT = 300
@@ -1409,16 +1412,16 @@ def check(document: Document, registry: dict[str, Any], mapping: dict[str, Any])
 
     for key, section_entry in sections_by_key.items():
         home, why = key, None
-        if key not in mapped:
-            parent = key.rsplit(".", 1)[0]
-            if section_entry["optional"] and key.count(".") == 2 and parent in mapped:
-                # An optional subsection the mapping does not list (2.1 and 2.2, for advanced
-                # therapies) is read as part of its section: the template files "For the full
-                # list of excipients, see section 6.1." under 2.2, and it applies to every
-                # product's section 2.
-                home = parent
-            else:
-                why = "section-not-mapped"
+        parent = key.rsplit(".", 1)[0]
+        # An optional subsection (2.1 and 2.2, for advanced therapies) that the document does not
+        # have, or that the mapping does not list, is read as part of its section: the template
+        # files "For the full list of excipients, see section 6.1." under 2.2, and it applies to
+        # every product's section 2.
+        subsection = section_entry["optional"] and key.count(".") == 2 and parent in mapped
+        if subsection and (key not in mapped or key not in found):
+            home = parent
+        elif key not in mapped:
+            why = "section-not-mapped"
         for number, item in enumerate(section_entry["items"]):
             if item["kind"] in ("statement", "subheading"):
                 add(f"{key}#{number}", item, home, home, why)

@@ -1,0 +1,116 @@
+/// url = 'https://khs.dev/fhir/StructureMap/type2-to-ema-cap-smpc-en'
+/// name = 'Type2ToEmaCapSmpcEnglish'
+/// title = 'HL7 Global ePI Type 2 to EMA CAP SmPC English'
+/// status = 'active'
+/// experimental = true
+/// description = 'The crosswalk of src/fhir/transform.ts in the FHIR mapping language, its executed differential twin: test/official/structuremap-twin.test.ts runs both on every fixture and fails on any difference. The map transforms; it does not mint ids or rewrite references (FML has no SHA-256 and no generic walk), and the refusals stay in TypeScript and validation. Where FML allows, it fails closed: a check refuses a source that is not a document, a first entry that is not a Composition, a section without exactly one canonical code, a code the map does not carry, a section without a canonical code that has narrative or subsections, and narrative without a div. docs/design/structuremap-twin.md says what it cannot express.'
+
+uses "http://hl7.org/fhir/StructureDefinition/Bundle" alias Type2Bundle as source
+uses "http://hl7.org/fhir/StructureDefinition/Bundle" alias EmaBundle as target
+uses "http://hl7.org/fhir/StructureDefinition/Composition" alias SourceComposition as source
+uses "http://hl7.org/fhir/StructureDefinition/Composition" alias EmaComposition as target
+
+// The document Bundle. FML has no SHA-256, so the map leaves to the implementation the ids it
+// mints. The target identifier's system is ema-document, and its value, also the Bundle's id, is
+// derived from the source Bundle.identifier.value (src/lib/hash.ts stableUuid, namespace "ema-bundle"):
+// take the SHA-256 of the UTF-8 string "ema-bundle:" followed by the value, in lowercase hex;
+// keep its first 32 hex digits;
+// set the 13th digit to 5 and the 17th digit to a;
+// and write the 32 digits as a UUID, in groups of 8-4-4-4-12 joined by hyphens.
+// Every entry's fullUrl and id, the Composition's identifier value and each section's id are
+// minted alike, and every Reference.reference is rewritten to the new fullUrls.
+group Type2BundleToEmaBundle(source src : Type2Bundle, target tgt : EmaBundle) {
+  src check (type = 'document') -> tgt.type = 'document' "document";
+  src -> tgt.meta as meta then {
+    src -> meta.profile = 'http://ema.europa.eu/fhir/StructureDefinition/EUEpiBundle' "bundleProfile";
+  } "bundleMeta";
+  src -> tgt.language = 'en' "bundleLanguage";
+  src -> tgt.identifier as identifier then {
+    src -> identifier.system = 'https://khs.dev/fhir/identifier/ema-document' "identifierSystem";
+  } "documentIdentifier";
+  src.timestamp as timestamp -> tgt.timestamp = timestamp "copyDocumentTimestamp";
+  // A check is evaluated on every entry before `first` picks one, so the first entry's type is
+  // checked on the Bundle.
+  src check ((entry.first().resource is Composition)) "compositionFirst";
+  src.entry first as entry -> tgt.entry as targetEntry then {
+    entry.resource : Composition as composition -> targetEntry.resource = create('Composition') as targetComposition then Composition(composition, targetComposition) "composition";
+  } "compositionEntry";
+  src.entry not_first as entry -> tgt.entry as targetEntry then {
+    entry.resource as resource -> targetEntry.resource = resource "copyResource";
+  } "otherEntries";
+}
+
+// The Composition: every element copied but those the EMA profiles fix (meta, language, the QRD
+// template version, identifier, type) and the sections, which are mapped.
+group Composition(source src : SourceComposition, target tgt : EmaComposition) {
+  src -> tgt.meta as meta then {
+    src -> meta.profile = 'http://ema.europa.eu/fhir/StructureDefinition/EUEpiComposition' "base";
+    src -> meta.profile = 'http://ema.europa.eu/fhir/StructureDefinition/EUEpiCompositionSmPC' "smpc";
+    src -> meta.profile = 'http://ema.europa.eu/fhir/StructureDefinition/EUEpiCompositionCAP' "cap";
+    src -> meta.profile = 'http://ema.europa.eu/fhir/StructureDefinition/EUQRD-CAP-template-new-SmPC-en' "template";
+  } "compositionMeta";
+  src -> tgt.language = 'en' "compositionLanguage";
+  src.text as v -> tgt.text = v "compositionText";
+  src.extension as v where (url != 'http://ema.europa.eu/fhir/StructureDefinition/ext-epi-qrdtemplate-version') -> tgt.extension = v "extension";
+  src -> tgt.extension as extension then {
+    src -> extension.url = 'http://ema.europa.eu/fhir/StructureDefinition/ext-epi-qrdtemplate-version' "qrdUrl";
+    src -> extension.value = create('string') as version then {
+      src -> version.value = '10.4' "qrdVersion";
+    } "qrdValue";
+  } "qrdTemplateVersion";
+  src.modifierExtension as v -> tgt.modifierExtension = v "modifierExtension";
+  src -> tgt.identifier as identifier then {
+    src -> identifier.system = 'https://khs.dev/fhir/identifier/ema-composition' "compositionIdentifierSystem";
+  } "compositionIdentifier";
+  src -> tgt.type as type then {
+    src -> type.coding as coding then {
+      src -> coding.system = 'http://ema.europa.eu/fhir/CodeSystem/100000155531' "typeSystem";
+      src -> coding.code = '100000155532' "typeCode";
+      src -> coding.display = 'Summary of Product Characteristics' "typeDisplay";
+    } "typeCoding";
+  } "documentType";
+  src.url as v -> tgt.url = v "url";
+  src.version as v -> tgt.version = v "version";
+  src.status as v -> tgt.status = v "status";
+  src.category as v -> tgt.category = v "category";
+  src.subject as v -> tgt.subject = v "subject";
+  src.encounter as v -> tgt.encounter = v "encounter";
+  src.date as v -> tgt.date = v "date";
+  src.useContext as v -> tgt.useContext = v "useContext";
+  src.author as v -> tgt.author = v "author";
+  src.name as v -> tgt.name = v "name";
+  src.title as v -> tgt.title = v "title";
+  src.note as v -> tgt.note = v "note";
+  src.attester as v -> tgt.attester = v "attester";
+  src.custodian as v -> tgt.custodian = v "custodian";
+  src.relatesTo as v -> tgt.relatesTo = v "relatesTo";
+  src.event as v -> tgt.event = v "event";
+  src.section as section where (code.coding.where(system = 'https://khs.dev/fhir/CodeSystem/canonical-smpc-sections').exists()) -> tgt.section as targetSection then Section(section, targetSection) "sections";
+  src.section as section where (code.coding.where(system = 'https://khs.dev/fhir/CodeSystem/canonical-smpc-sections').empty()) check (text.empty() and section.empty()) "emptyContainer";
+}
+
+// A section: its canonical key translated through the published ConceptMap, its heading, its
+// narrative copied as it is, its subsections mapped in their order. A section without a canonical
+// code is dropped when it is an empty container and refused otherwise.
+group Section(source src, target tgt) {
+  src.code as code check (coding.where(system = 'https://khs.dev/fhir/CodeSystem/canonical-smpc-sections').count() = 1) then {
+    code.coding as coding where (system = 'https://khs.dev/fhir/CodeSystem/canonical-smpc-sections') check (('smpc' | 'smpc.1' | 'smpc.2' | 'smpc.2.1' | 'smpc.2.2' | 'smpc.2.excipients' | 'smpc.3' | 'smpc.4' | 'smpc.4.1' | 'smpc.4.2' | 'smpc.4.2.posology' | 'smpc.4.2.posology.paediatric' | 'smpc.4.2.administration' | 'smpc.4.2.administration.precautions' | 'smpc.4.3' | 'smpc.4.4' | 'smpc.4.4.traceability' | 'smpc.4.4.paediatric' | 'smpc.4.5' | 'smpc.4.5.paediatric' | 'smpc.4.6' | 'smpc.4.6.pregnancy' | 'smpc.4.6.breast-feeding' | 'smpc.4.6.fertility' | 'smpc.4.7' | 'smpc.4.8' | 'smpc.4.8.paediatric' | 'smpc.4.8.reporting' | 'smpc.4.9' | 'smpc.4.9.paediatric' | 'smpc.5' | 'smpc.5.1' | 'smpc.5.1.mechanism' | 'smpc.5.1.effects' | 'smpc.5.1.efficacy' | 'smpc.5.1.paediatric' | 'smpc.5.2' | 'smpc.5.2.absorption' | 'smpc.5.2.distribution' | 'smpc.5.2.biotransformation' | 'smpc.5.2.elimination' | 'smpc.5.2.linearity' | 'smpc.5.2.pk-pd' | 'smpc.5.3' | 'smpc.5.3.era' | 'smpc.6' | 'smpc.6.1' | 'smpc.6.2' | 'smpc.6.3' | 'smpc.6.4' | 'smpc.6.5' | 'smpc.6.6' | 'smpc.6.6.paediatric' | 'smpc.7' | 'smpc.8' | 'smpc.9' | 'smpc.10' | 'smpc.11' | 'smpc.12') contains code) then {
+      // The EMA code through the published ConceptMap, and its display from the EMA's own value
+      // set of SmPC section codes (EUePI package). translate() throws on a noMap key.
+      coding -> translate(coding, 'https://khs.dev/fhir/ConceptMap/canonical-to-ema-cap-smpc-en', 'code') as emaCode, tgt.code as targetCode, targetCode.coding = c('http://ema.europa.eu/fhir/ValueSet/EUepismpcqrdcodesVs', emaCode) as emaCoding then {
+        // The heading is the EMA display, but for 6.5 and 6.6, whose displays bracket their
+        // optional wording: their heading is the source's when it is the template's shorter form,
+        // and the full form otherwise.
+        coding where ((code = 'smpc.6.5' or code = 'smpc.6.6').not()) -> tgt.title = (%emaCoding.display) "heading";
+        src.title as title where (%coding.code = 'smpc.6.5' and $this = '6.5 Nature and contents of container') -> tgt.title = title "shortHeading65";
+        src where (%coding.code = 'smpc.6.5' and title.where($this = '6.5 Nature and contents of container').empty()) -> tgt.title = '6.5 Nature and contents of container and special equipment for use, administration or implantation' "heading65";
+        src.title as title where (%coding.code = 'smpc.6.6' and $this = '6.6 Special precautions for disposal') -> tgt.title = title "shortHeading66";
+        src where (%coding.code = 'smpc.6.6' and title.where($this = '6.6 Special precautions for disposal').empty()) -> tgt.title = '6.6 Special precautions for disposal and other handling' "heading66";
+      } "code";
+    } "canonicalCode";
+  } "sectionCode";
+  src check (code.exists()) "sectionHasCode";
+  src.text as text check (div.exists()) -> tgt.text = text "narrative";
+  src.section as section where (code.coding.where(system = 'https://khs.dev/fhir/CodeSystem/canonical-smpc-sections').exists()) -> tgt.section as targetSection then Section(section, targetSection) "subsections";
+  src.section as section where (code.coding.where(system = 'https://khs.dev/fhir/CodeSystem/canonical-smpc-sections').empty()) check (text.empty() and section.empty()) "emptySubsection";
+}

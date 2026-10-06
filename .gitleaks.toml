@@ -32,3 +32,14 @@ targetRules = ["generic-api-key"]
 paths = ['''^test/ci/operator-arguments\.test\.ts$''']
 regexTarget = "secret"
 regexes = ['''^QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=$''']
+
+# fhir/mappings/cap-smpc-en.json: each rule's `sourceKey`, a canonical SmPC section key such as
+# `smpc.4.2.posology.paediatric` (mapping 1.4.0). generic-api-key takes a JSON key ending in "key"
+# with a long value for a credential; these values are dotted lower-case section names.
+[[allowlists]]
+description = "cap-smpc-en.json: canonical section keys under sourceKey"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^fhir/mappings/cap-smpc-en\.json$''']
+regexTarget = "secret"
+regexes = ['''^smpc(?:\.[0-9a-z-]+)+$''']
