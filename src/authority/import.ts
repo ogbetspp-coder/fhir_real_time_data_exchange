@@ -57,7 +57,7 @@ import {
 
 // The importer's version: part of the extractor's name in every submission it writes, and locked
 // to the hash of this directory's code and data and of its golden vectors (D10).
-export const IMPORTER_VERSION = "2.2.0";
+export const IMPORTER_VERSION = "2.3.0";
 export const IMPORTER_EXTRACTOR = `${AUTHORITY_IMPORTER_NAME}/${IMPORTER_VERSION}`;
 
 const AUTHORITY_IMPORT_IDENTIFIER_SYSTEM = "https://khs.dev/fhir/identifier/authority-import";
