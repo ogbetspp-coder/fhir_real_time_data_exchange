@@ -74,7 +74,13 @@ and every unchanged result is certified. These are samples, not every possible c
   default-ignorable code point; a content control bound to data, or empty while it names or
   shows a placeholder (one Word shows from its content is its content's text); a style, list,
   list definition or list level defined twice; a part name stored twice in any case, and a
-  related part (styles, lists, notes...) named twice.
+  related part (styles, lists, notes...) named twice; a DOCVARIABLE whose result is not the
+  value of the settings' variable of its name, as the check reads them (one variable of that
+  name ignoring case, in the field's case, with a value: Word shows the stored result, and that
+  value once fields are updated), whose code holds a quote, a field or a switch but
+  `\* MERGEFORMAT` or `CHARFORMAT`, or whose result holds anything but text outside Symbol or
+  runs past its paragraph; an XML part declaring an encoding other than UTF-8, or ASCII over a
+  byte from 0x80.
 
 Beyond the text, the check works out on its own, by Word's rules written apart from the reader's,
 the key marks (bold, italic, caps, small caps, strike, double strike, super- and subscript,

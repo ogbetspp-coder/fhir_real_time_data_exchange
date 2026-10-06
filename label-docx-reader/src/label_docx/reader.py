@@ -197,10 +197,18 @@ note, any of the four with a field in its own code or nested in another field's 
 that runs past its paragraph are refused. Any other field whose result would be shown (DATE, IF, a
 formula...) is refused, because Word recomputes it on display or print. The code is the first word
 of the instruction; a field nested in the instruction ahead of or inside that word makes the code
-unknown, and the field is refused. So are a field with no stored result (no ``separate``, as a form
-checkbox or a SYMBOL field, but a hidden SEQ; or an empty ``fldSimple``), a form field, a field
-marked for update, any field in a document whose settings ask Word to update fields on open, and
-field code outside an instruction.
+unknown, and the field is refused. So are a field with no stored result (no ``separate``, as a
+form checkbox or a SYMBOL field, but a hidden SEQ; or an empty ``fldSimple``), a form field, a
+field marked for update, any field in a document whose settings ask Word to update fields on open,
+and field code outside an instruction.
+
+DOCVARIABLE (Veeva Vault puts one at each heading) Word shows as stored until fields are updated,
+then as the settings' document variable (``w:docVar``) of its name. It is read where the two agree:
+its code is ``DOCVARIABLE`` and the name, unquoted, with no switch but ``\*`` MERGEFORMAT or
+CHARFORMAT and no field in it; the settings hold one variable of that name ignoring case, written
+in the field's case, with a value; and the stored result, as read, is that value (``w:val`` as XML
+reads it). Its result may hold only text read as stored: a tab, a break, a picture, a note or
+comment mark, a field or text in Symbol there is refused.
 
 List labels. Word draws "4.8", "b)" or a bullet before a numbered paragraph from the numbering part;
 the reader computes that label by Word's rules, each of which is Word's own answer to a case in
@@ -277,9 +285,9 @@ What it refuses (``DocxRefusedError.code``):
   in a note, header, footer or comment, or any field in a document set to update fields on open;
   a REF or STYLEREF with a ``\*`` format or over a page number, a bookmark REF, NOTEREF or PAGEREF
   may find otherwise (an id started or ended twice, an end before its start, a name shared
-  ignoring case), SEQ identifiers that differ only in case, and a field code with whitespace
+  ignoring case), SEQ identifiers that differ only in case, a field code with whitespace
   other than spaces and tabs (Word's word separators are not on record) or an invisible format
-  character (category Cf) outside quotes.
+  character (category Cf) outside quotes, and a DOCVARIABLE not read as above.
 - ``stale-field``: a field marked for update, or a computed field (SEQ, STYLEREF, REF or
   NOTEREF) whose stored result is not what Word prints.
 - ``unsupported-element``: anything that can carry text and is not read above, and any element
@@ -309,7 +317,8 @@ What it refuses (``DocxRefusedError.code``):
   second, its Font object reports the first); right-to-left set by a style or the defaults (Word
   does not allow it there); a Word 2010 text fill (``w14:textFill``); a colour, highlight or theme
   colour the reader cannot resolve, or text faint over one colour that may be under it and not over
-  another; a run property read for a mark, size or layout, or any shading, without its ``w:val``; a
+  another; a run property read for a mark, size or layout, or any shading, without its ``w:val``
+  (but ``u``, which then sets nothing: Word draws no underline and shows the next level's); a
   highlight set by a style or the defaults; and layout that may clip or overdraw text: a row of
   exact height lower than its cell's lines (each its largest text or mark size), exact line spacing
   lower than the text, line spacing under 0.8 lines, a frame or floating table more than an inch
@@ -324,7 +333,8 @@ What it refuses (``DocxRefusedError.code``):
   only ending in its kind), a relationship Id repeated in one part's relationships, a part that
   cannot be read (bad checksum, truncated, encrypted), any part damaged, read or not, parts over
   ``MAX_PACKAGE_BYTES`` or ``MAX_ELEMENTS`` together, a part over ``MAX_PART_BYTES``, an XML part,
-  read or not, that is not well-formed, not UTF-8, declares another encoding or a DTD, or nests
+  read or not, that is not well-formed, not UTF-8, declares an encoding other than UTF-8 (or
+  US-ASCII, by any name Python reads as ASCII, with every byte below 0x80) or a DTD, or nests
   over ``MAX_DEPTH`` deep, no ``w:body``, a number (an id, a level, a start, a table look) that is
   not a number, a list level outside 0 to 8 in the numbering part, a style, list, list level, note
   or comment defined twice, a section naming two headers or footers of one type, a note referred
@@ -381,6 +391,7 @@ type takes the one before it. The glossary (building blocks) is not read.
 
 from __future__ import annotations
 
+import codecs
 import colorsys
 import hashlib
 import io
@@ -398,7 +409,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 # The version of the rules above; versions.lock.json ties it to this file (tests/test_locks.py).
-READER_VERSION = "docx-reader/1.28.0"
+READER_VERSION = "docx-reader/1.29.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -852,6 +863,14 @@ class Document:
 # --- package -------------------------------------------------------------------------------
 
 
+def _ascii_codec(name: str) -> bool:
+    """Whether Python reads ``name`` as ASCII (us-ascii, ASCII, us_ascii, ANSI_X3.4-1968...)."""
+    try:
+        return codecs.lookup(name).name == "ascii"
+    except LookupError:
+        return False
+
+
 def _decode(name: str, data: bytes) -> bytes:
     if data.startswith((b"\xff\xfe", b"\xfe\xff")):
         raise DocxRefusedError("invalid-package", f"{name} is not UTF-8")
@@ -863,9 +882,11 @@ def _decode(name: str, data: bytes) -> bytes:
     if "<!doctype" in lowered or "<!entity" in lowered:
         raise DocxRefusedError("invalid-package", f"{name} declares a DTD")
     declared = re.match(r"\s*<\?xml[^>]*?encoding\s*=\s*[\"']([^\"']*)[\"']", text)
-    if declared is not None and declared.group(1).lower().replace("_", "-") not in (
-        "utf-8",
-        "utf8",
+    if (
+        declared is not None
+        and declared.group(1).lower().replace("_", "-") not in ("utf-8", "utf8")
+        # ASCII is UTF-8's first 128 characters: bytes all below 0x80 read alike either way.
+        and not (_ascii_codec(declared.group(1)) and max(data, default=0) < 0x80)
     ):
         # The parser would honour the declaration and decode the UTF-8 bytes as something else.
         raise DocxRefusedError("invalid-package", f"{name} declares {declared.group(1)}")
@@ -1134,6 +1155,8 @@ class _Styles:
     default_ppr: ET.Element | None = None
     # settings.xml asks Word to update every field when the document opens.
     update_fields: bool = False
+    # settings.xml's document variables (w:docVar), each name and value as stored.
+    variables: list[tuple[str | None, str | None]] = field(default_factory=list)
     defaults: dict[str, str] = field(default_factory=dict)
     theme_fonts: dict[str, str] = field(default_factory=dict)
     has_theme: bool = False
@@ -1566,12 +1589,16 @@ class _Properties:
 
         One without ``w:val`` is refused, as a malformed number is: ECMA-376 requires it on every
         property read this way (colour, vertAlign, highlight, position, shd, sz, spacing...),
-        and where it leaves it optional (``u``, ``w``) what Word draws without it is not on
-        record.
+        and where it leaves it optional (``w``) what Word draws without it is not on record.
+        ``u`` without it sets nothing: Word draws no underline for it and shows the next level's,
+        a character or paragraph style's single or double alike, with a ``w:color`` or without
+        (Word 16.113.3 for Mac, asked 2026-10-05).
         """
         for level in [self.direct, *self.inherited]:
             if level is not None and (found := level.find(_w(name))) is not None:
                 if found.get(_w("val")) is None:
+                    if name == "u":
+                        continue
                     raise DocxRefusedError("unsupported-formatting", f"w:{name} without w:val")
                 return found
         return None
@@ -2243,6 +2270,11 @@ class _ParagraphReader:
         # of each open field's result if it is one of those, else None.
         self.computed: list[tuple[str, int, int]] = []
         self.results: list[int | None] = []
+        # DOCVARIABLE fields: the instruction and where the stored result stands; and the kind
+        # of field ("simple" or "complex") whose result is open, which may hold only text and,
+        # for a complex field, its end. One at most: a field in such a result is refused.
+        self.variables: list[tuple[str, int, int]] = []
+        self.in_variable: str | None = None
         # Where a page number stands, and how many layout fields' results are open: their text
         # is the page number when Word last laid the document out, not what it prints.
         self.pages: list[int] = []
@@ -2282,6 +2314,8 @@ class _ParagraphReader:
             if tag == _w("r"):
                 self.run(child)
             elif tag == _w("fldSimple"):
+                if self.in_variable:
+                    raise DocxRefusedError("computed-field", "a field in a DOCVARIABLE's result")
                 if self.styles.update_fields:
                     raise DocxRefusedError("computed-field", "the document updates fields on open")
                 if child.get(_w("dirty")) in ("1", "true", "on"):
@@ -2295,13 +2329,18 @@ class _ParagraphReader:
                     self.container(child)
                     self.layout -= 1
                     continue
+                variable = code == "DOCVARIABLE"
                 self.simple += 1
+                self.in_variable = "simple" if variable else None
                 self.container(child)
+                self.in_variable = None
                 self.simple -= 1
                 if self.length == before:
                     raise DocxRefusedError("field-without-result", "a simple field shows nothing")
                 if code in _COMPUTED_FIELDS:
                     self.computed.append((instruction, before, self.length))
+                elif variable:
+                    self.variables.append((instruction, before, self.length))
             elif tag == _w("bdo"):
                 # An override draws every character in one order ("10 mg" as "gm 01"), which
                 # no mark says; what Word draws is not on record.
@@ -2378,6 +2417,16 @@ class _ParagraphReader:
         bordered = border is not None and border.get(_w("val")) not in ("nil", "none")
         for child in run:
             tag = child.tag
+            if self.in_variable and not (
+                tag in _RUN_SILENT
+                or (tag == _w("t") and not symbol)
+                or (tag == _w("fldChar") and self.in_variable == "complex")
+            ):
+                # Updated, the field shows its variable's value in place of all of it: only
+                # text as stored can be held to that value.
+                raise DocxRefusedError(
+                    "computed-field", "a DOCVARIABLE's result holding other than text"
+                )
             if tag == _w("commentReference"):
                 if self.story is not None and self.story[0] == "comment":
                     raise DocxRefusedError("unsupported-element", "a comment mark in a comment")
@@ -2502,6 +2551,8 @@ class _ParagraphReader:
             raise DocxRefusedError("stale-field", "a field marked for update")
         kind = child.get(_w("fldCharType"))
         if kind == "begin":
+            if self.in_variable:
+                raise DocxRefusedError("computed-field", "a field in a DOCVARIABLE's result")
             if self.styles.update_fields:
                 raise DocxRefusedError("computed-field", "the document updates fields on open")
             if self.fields and self.fields[-1]:
@@ -2518,8 +2569,10 @@ class _ParagraphReader:
             # computes and checks, or a page number.
             instruction = "".join(self.instructions[-1])
             code = self._shown(instruction, any(self.fields[:-1]), self.locked[-1], offset)
-            if code in _COMPUTED_FIELDS:
+            if code in _COMPUTED_FIELDS or code == "DOCVARIABLE":
                 self.results[-1] = offset
+                if code == "DOCVARIABLE":
+                    self.in_variable = "complex"
             elif code in _LAYOUT_FIELDS and not self.layout:
                 self.pages.append(offset)
                 self.layout += 1
@@ -2541,7 +2594,12 @@ class _ParagraphReader:
                 self.fields[-1] = False
             start = self.results.pop()
             if start is not None:
-                self.computed.append(("".join(self.instructions[-1]), start, offset))
+                instruction = "".join(self.instructions[-1])
+                if _code(instruction) == "DOCVARIABLE":
+                    self.in_variable = None
+                    self.variables.append((instruction, start, offset))
+                else:
+                    self.computed.append((instruction, start, offset))
             if self.layout_open.pop():
                 self.layout -= 1
             self.fields.pop()
@@ -2919,9 +2977,9 @@ def _check_field(instruction: str) -> str:
     "below", ``\#`` a picture's text and other formats words.
     """
     code = _code(instruction)
-    if code not in _STORED_FIELDS | _COMPUTED_FIELDS | _LAYOUT_FIELDS:
+    if code not in _STORED_FIELDS | _COMPUTED_FIELDS | _LAYOUT_FIELDS | {"DOCVARIABLE"}:
         raise DocxRefusedError("computed-field", f"a {code or 'blank'} field")
-    if code in _COMPUTED_FIELDS | _LAYOUT_FIELDS and "\x00" in instruction:
+    if code in _COMPUTED_FIELDS | _LAYOUT_FIELDS | {"DOCVARIABLE"} and "\x00" in instruction:
         raise DocxRefusedError("computed-field", f"a {code} field with a field in its code")
     if code in _LAYOUT_FIELDS:
         flags = {"h"} if code == "PAGEREF" else set()
@@ -2929,6 +2987,38 @@ def _check_field(instruction: str) -> str:
         if len(arguments) != (code == "PAGEREF") or switches.get("*", "ARABIC").upper() != "ARABIC":
             raise DocxRefusedError("computed-field", f"a {code} field the reader cannot place")
     return code
+
+
+def _variable(styles: _Styles, instruction: str) -> str:
+    r"""The value a DOCVARIABLE field shows once updated: its document variable's.
+
+    Word shows the stored result until fields are updated, then the settings' ``w:docVar`` of
+    the name. The code must be ``DOCVARIABLE`` and the name, unquoted, with no switch but
+    ``\*`` MERGEFORMAT or CHARFORMAT; the settings must hold one variable of that name
+    ignoring case (whether Word's lookup ignores case is not on record), written as the field
+    writes it, with a value.
+    """
+    words = instruction.split()
+    name, switches = (words[1], words[2:]) if len(words) > 1 else ("", [])
+    if (
+        '"' in instruction
+        or not name
+        or name.startswith("\\")
+        or len(switches) % 2
+        or any(
+            switches[i] != "\\*" or switches[i + 1].upper() not in _FORMATTING
+            for i in range(0, len(switches), 2)
+        )
+    ):
+        raise DocxRefusedError("computed-field", "a DOCVARIABLE field the reader cannot read")
+    found = [
+        (key, value)
+        for key, value in styles.variables
+        if key is not None and key.casefold() == name.casefold()
+    ]
+    if len(found) != 1 or found[0][0] != name or found[0][1] is None:
+        raise DocxRefusedError("computed-field", "a DOCVARIABLE without one variable of its name")
+    return found[0][1]
 
 
 def _check_whitespace(element: ET.Element, text: str) -> None:
@@ -3088,6 +3178,10 @@ def _paragraph(
         )
     if reader.layout:
         raise DocxRefusedError("unbalanced-field", "a page number runs past its paragraph")
+    text = "".join(reader.parts)
+    for instruction, start, end in reader.variables:
+        if text[start:end] != _variable(styles, instruction):
+            raise DocxRefusedError("computed-field", "a DOCVARIABLE showing other than its value")
     numbering = _numbering(levels)
     if numbering != _numbering([level for level in levels if level not in table_levels]):
         # A list, or its level, from the table style: what Word draws is not on record.
@@ -3111,7 +3205,7 @@ def _paragraph(
         fields_open=reader.carried + len(reader.fields),
     )
     return Paragraph(
-        text="".join(reader.parts),
+        text=text,
         style=style,
         numbering=numbering,
         table=table,
@@ -4677,6 +4771,10 @@ def read_document(data: bytes) -> Document:
         styles = _styles(*parts[:4])
         if parts[3] is not None:
             styles.update_fields = bool(_on(parts[3].find(_w("updateFields"))))
+            styles.variables = [
+                (v.get(_w("name")), v.get(_w("val")))
+                for v in parts[3].iterfind(f"{_w('docVars')}/{_w('docVar')}")
+            ]
         lists = _Lists(parts[4], styles)
         even = parts[3] is not None and bool(_on(parts[3].find(_w("evenAndOddHeaders"))))
         stories = _story_parts(package, mains[0], document, even)

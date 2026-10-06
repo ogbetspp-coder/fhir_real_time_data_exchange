@@ -48,9 +48,13 @@ from label_docx.word import SUFFIXES, label_as_drawn
 from lock import MANIFESTS
 from test_headers_comments import with_parts
 from test_reader import (
+    _ITEM,
     _NO_GRID,
+    _SOURCES,
     ALL_LOOKS,
     APPLIED,
+    DOCVARIABLE_READS,
+    DOCVARIABLE_REFUSALS,
     HEADERS,
     IMAGE,
     LAST_LEFT_OUT,
@@ -65,7 +69,10 @@ from test_reader import (
     WP,
     W,
     _alternate,
+    _declaring,
+    anchored,
     chunk,
+    document_xml,
     docx,
     exif,
     jpeg,
@@ -73,13 +80,16 @@ from test_reader import (
     picture,
     png,
     r,
+    read_settings,
     relationship,
     segment,
     t_style,
     t_table,
     tbl,
     tc,
+    variables,
     with_media,
+    with_settings,
 )
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
@@ -4165,3 +4175,147 @@ def test_a_part_name_twice_in_any_case_or_a_part_named_twice_is_never_certified(
     with pytest.raises(CertificationError, match=r"^two styles parts$"):
         DocxSource(twice)
     DocxSource(styled).certify(_value("x"))
+
+
+# The check's own reason for each DOCVARIABLE the reader refuses (tests/test_reader.py). One
+# that stores no result shows nothing the check holds.
+_VARIABLE_REASONS = {
+    "no-variable": "a DOCVARIABLE without one variable of its name",
+    "another-value": "a DOCVARIABLE showing other than its value",
+    "another-case": "a DOCVARIABLE without one variable of its name",
+    "two-ignoring-case": "a DOCVARIABLE without one variable of its name",
+    "no-value": "a DOCVARIABLE without one variable of its name",
+    "empty-result": "a DOCVARIABLE showing other than its value",
+    "hidden-result": "a DOCVARIABLE showing other than its value",
+    "another-switch": "a DOCVARIABLE field with a switch the check does not read",
+    "another-format": "a DOCVARIABLE field with a switch the check does not read",
+    "quoted-name": "a DOCVARIABLE field the check does not read",
+    "no-name": "a DOCVARIABLE field the check does not read",
+    "bare-code": "a DOCVARIABLE field the check does not read",
+    "format-switch-without-its-format": "a DOCVARIABLE field with a switch the check does not read",
+    "field-in-its-code": "a DOCVARIABLE with a field in its code",
+    "tab": "a DOCVARIABLE's result holding other than text",
+    "symbol": "a DOCVARIABLE's result holding other than text",
+    "note-mark": "a DOCVARIABLE's result holding other than text",
+    "field-in-its-result": "a field in a DOCVARIABLE's result",
+    "simple-field-in-its-result": "a field in a DOCVARIABLE's result",
+    "field-character-in-a-simple-result": "a DOCVARIABLE's result holding other than text",
+}
+_HELD = [case for case in DOCVARIABLE_REFUSALS if case[0] in _VARIABLE_REASONS]
+
+
+@pytest.mark.parametrize(
+    ("field", "name", "value"),
+    [case[1:4] for case in DOCVARIABLE_READS],
+    ids=[case[0] for case in DOCVARIABLE_READS],
+)
+def test_a_docvariable_showing_its_variables_value_is_certified(
+    field: str, name: str, value: str
+) -> None:
+    data = anchored(field, read_settings(name, value))
+    DocxSource(data).certify(_docx_value(data))
+
+
+@pytest.mark.parametrize(
+    ("name", "field", "settings"), [case[:3] for case in _HELD], ids=[case[0] for case in _HELD]
+)
+def test_a_docvariable_word_may_show_otherwise_is_never_certified(
+    name: str, field: str, settings: str
+) -> None:
+    # The check reads the settings' variables and holds each result to its own.
+    reason = _VARIABLE_REASONS[name]
+    with pytest.raises(CertificationError, match=f"^{re.escape(reason)}$"):
+        DocxSource(anchored(field, settings))
+    assert len(_HELD) == len(DOCVARIABLE_REFUSALS) - 1  # all but the one with no result
+
+
+def test_a_docvariable_result_past_its_paragraph_is_never_certified() -> None:
+    body = _p(
+        _BEGIN
+        + '<w:r><w:instrText xml:space="preserve"> DOCVARIABLE v </w:instrText></w:r>'
+        + _SEPARATE
+        + '<w:r><w:t xml:space="preserve"> </w:t></w:r>'
+    ) + _p(_END)
+    reason = "a paragraph ends inside a DOCVARIABLE's result"
+    with pytest.raises(CertificationError, match=f"^{reason}$"):
+        DocxSource(with_settings(body, variables(("v", " "))))
+
+
+def test_an_underline_without_a_value_is_no_mark_by_the_checks_own_rules() -> None:
+    # Word 16.113.3 for Mac, asked 2026-10-05 (tests/test_reader.py): a bare w:u sets nothing,
+    # so a character style's double underline shows through it, and alone it draws none.
+    styles = (
+        '<w:style w:type="character" w:styleId="UC"><w:rPr><w:u w:val="double"/></w:rPr></w:style>'
+    )
+    body = _p('<w:r><w:rPr><w:rStyle w:val="UC"/><w:u/></w:rPr><w:t>a</w:t></w:r>') + _p(
+        '<w:r><w:rPr><w:u w:color="FF0000"/></w:rPr><w:t>b</w:t></w:r>'
+    )
+    data = docx(body, styles=styles)
+    value = _docx_value(data)
+    DocxSource(data).certify(value)
+    for index, marks in ((0, []), (1, [{"end": 1, "kind": "underline", "start": 0}])):
+        changed = copy.deepcopy(value)
+        changed["paragraphs"][index]["marks"] = marks
+        with pytest.raises(CertificationError):
+            DocxSource(data).certify(changed)
+
+
+_DOCUMENT = "word/document.xml"
+_BODY = document_xml(p(r("<w:t>caf&#233;</w:t>"))).encode()
+_RELS = "word/_rels/document.xml.rels"
+_NO_RELATIONSHIPS = (
+    b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>'
+)
+
+
+@pytest.mark.parametrize(
+    ("data", "reason"),
+    [
+        (_declaring("us-ascii", _ITEM, _SOURCES), None),
+        (_declaring("ASCII", _DOCUMENT, _BODY), None),
+        (_declaring("UTF-8", _ITEM, "<b:Sources xmlns:b='x'>\u00e9</b:Sources>".encode()), None),
+        # A part the check reads as XML that is neither: not held, as the reader does not.
+        (_declaring("windows-1252", "word/vmlDrawing1.vml", b"<x/>"), None),
+        # A part not read: Python's XML parser refuses it first.
+        (_declaring("us-ascii", _ITEM, _SOURCES + b"<!-- \xc3\xa9 -->"), f"{_ITEM} cannot be read"),
+        (
+            _declaring("us-ascii", _DOCUMENT, _BODY + b"<!-- \xc3\xa9 -->"),
+            f"{_DOCUMENT} declares ascii",
+        ),
+        (_declaring("windows-1252", _ITEM, _SOURCES), f"{_ITEM} declares cp1252"),
+        (
+            _declaring("windows-1252", _ITEM, _SOURCES, before=b"\xef\xbb\xbf"),
+            f"{_ITEM} declares cp1252",
+        ),
+        (_declaring("windows-1252", _RELS, _NO_RELATIONSHIPS), f"{_RELS} declares cp1252"),
+        (
+            _declaring("x-none", _DOCUMENT, _BODY),
+            f"{_DOCUMENT} declares an encoding the check does not know",
+        ),
+        (
+            _declaring("\u00e9", _DOCUMENT, _BODY),
+            f"{_DOCUMENT} declares an encoding the check does not know",
+        ),
+    ],
+    ids=[
+        "ascii-over-ascii",
+        "ascii-document",
+        "utf-8",
+        "not-an-xml-part",
+        "ascii-over-another-byte",
+        "ascii-document-over-another-byte",
+        "another-encoding",
+        "another-encoding-after-a-byte-order-mark",
+        "another-encoding-in-relationships",
+        "an-unknown-encoding",
+        "a-name-past-ascii",
+    ],
+)
+def test_a_part_is_certified_only_in_utf8_or_ascii_over_ascii_bytes(
+    data: bytes, reason: str | None
+) -> None:
+    if reason is None:
+        DocxSource(data)
+    else:
+        with pytest.raises(CertificationError, match=f"^{re.escape(reason)}$"):
+            DocxSource(data)

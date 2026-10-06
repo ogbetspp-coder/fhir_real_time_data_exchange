@@ -3,10 +3,10 @@
     "file": "jentadueto-smpc-en.json",
     "sha256": "544b2f24e69f410d3e792a80f3ee82c00ef60afcdf913526308e799db54a1ee4"
   },
-  "reader": "epi-reader/1.3.3",
-  "format": "label-epi-json/1.11.11",
+  "reader": "epi-reader/1.3.4",
+  "format": "label-epi-json/1.11.12",
   "inputs": {
-    "registrySha256": "4d3225375fc021c07af806203f69032c94dec8c290e87f9dae22a07e588fa53b",
+    "registrySha256": "bf23271b65acd23cadfd7907e54ca236d5c2958e275920edbc373c4a5d4fe4a2",
     "mappingSha256": "2fc44a767ebd85985cc2f4dd83c10bc09f67bbc9dcb502d83baaccf4b4e5b749"
   },
   "checker": "qrd-check/1.4.1",

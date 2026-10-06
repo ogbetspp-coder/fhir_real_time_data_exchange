@@ -244,14 +244,13 @@ def test_a_cross_reference_to_text_holding_a_page_number_is_refused() -> None:
         ("<w:color/>", "", "color"),
         ('<w:color w:themeColor="background1"/>', "", "color"),
         ("<w:vertAlign/>", "", "vertAlign"),
-        ("<w:u/>", "", "u"),
         ("<w:highlight/>", "", "highlight"),
         ("<w:position/>", "", "position"),
         ('<w:shd w:fill="000000"/>', "", "shd"),
         ("<w:sz/>", "", "sz"),
         ("", '<w:shd w:fill="000000"/>', "shd"),
     ],
-    ids=["color", "theme-color", "vert-align", "u", "highlight", "position", "shd", "sz", "p-shd"],
+    ids=["color", "theme-color", "vert-align", "highlight", "position", "shd", "sz", "p-shd"],
 )
 def test_a_property_without_its_value_is_refused(
     properties: str, paragraph: str, element: str

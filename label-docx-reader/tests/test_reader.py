@@ -4411,3 +4411,424 @@ def test_a_based_on_table_style_whose_parts_set_no_mark_changes_nothing() -> Non
     marking = based.replace(shaded, "<w:rPr><w:i/></w:rPr>")
     styles = t_style(("firstRow", "<w:b/>"), base='<w:basedOn w:val="U"/>', extra=marking)
     assert refusal(t_table(), styles) == "unsupported-element"
+
+
+# --- what company-written labels hold (EMA product information, 2026-10-05) ---------------
+
+
+def with_settings(body: str, settings: str) -> bytes:
+    """A .docx of ``body`` whose settings part holds ``settings``."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as package:
+        package.writestr("[Content_Types].xml", CONTENT_TYPES)
+        package.writestr("_rels/.rels", ROOT_RELS.format(target="word/document.xml"))
+        package.writestr(
+            "word/_rels/document.xml.rels",
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            + RELATIONSHIP.format(kind="settings", target="settings.xml")
+            + "</Relationships>",
+        )
+        package.writestr("word/document.xml", document_xml(body))
+        package.writestr("word/settings.xml", f'<w:settings xmlns:w="{W}">{settings}</w:settings>')
+    return buffer.getvalue()
+
+
+def variables(*pairs: tuple[str, str]) -> str:
+    """Document variables (``w:docVar``), each a name and its value as XML writes it."""
+    held = "".join(f'<w:docVar w:name="{name}" w:val="{value}"/>' for name, value in pairs)
+    return f"<w:docVars>{held}</w:docVars>"
+
+
+# Veeva Vault's anchor at a heading: a DOCVARIABLE whose variable and stored result are a space.
+VAULT = "VAULT_ND_0f6b2c1e-7d4a-4c1b-9e2a-3b5c6d7e8f90"
+SPACE = r('<w:t xml:space="preserve"> </w:t>')
+
+
+def complex_field(instruction: str, result: str) -> str:
+    return (
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r(f'<w:instrText xml:space="preserve">{instruction}</w:instrText>')
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + result
+        + r('<w:fldChar w:fldCharType="end"/>')
+    )
+
+
+def simple_field(instruction: str, result: str) -> str:
+    return f'<w:fldSimple w:instr="{instruction}">{result}</w:fldSimple>'
+
+
+def anchored(field: str, settings: str) -> bytes:
+    return with_settings(p(r("<w:t>4.1</w:t>") + field + r("<w:t>b</w:t>")), settings)
+
+
+_LOWER = VAULT.replace("VAULT_ND_", "vault_nd_")
+
+
+# Each a DOCVARIABLE read: its name, the field, the variable's name and value as XML writes it,
+# and the text read. First every form EMA product-information files hold (2026-10-05), where
+# the variable's value and the stored result are one space; then the rule beyond them:
+# CHARFORMAT, no switch, a code in any case, a value as XML reads it, split over runs.
+DOCVARIABLE_READS: list[tuple[str, str, str, str, str]] = [
+    ("complex", complex_field(f" DOCVARIABLE {VAULT} \\* MERGEFORMAT ", SPACE), VAULT, " ", " "),
+    (
+        "complex-no-trailing-space",
+        complex_field(f" DOCVARIABLE {VAULT} \\* MERGEFORMAT", SPACE),
+        VAULT,
+        " ",
+        " ",
+    ),
+    (
+        "complex-no-spaces",
+        complex_field(f"DOCVARIABLE {VAULT} \\* MERGEFORMAT", SPACE),
+        VAULT,
+        " ",
+        " ",
+    ),
+    (
+        "complex-lower-case-name",
+        complex_field(f" DOCVARIABLE {_LOWER} \\* MERGEFORMAT ", SPACE),
+        _LOWER,
+        " ",
+        " ",
+    ),
+    ("simple", simple_field(f" DOCVARIABLE {VAULT} \\* MERGEFORMAT ", SPACE), VAULT, " ", " "),
+    (
+        "simple-no-trailing-space",
+        simple_field(f" DOCVARIABLE {VAULT} \\* MERGEFORMAT", SPACE),
+        VAULT,
+        " ",
+        " ",
+    ),
+    (
+        "simple-no-spaces",
+        simple_field(f"DOCVARIABLE {VAULT} \\* MERGEFORMAT", SPACE),
+        VAULT,
+        " ",
+        " ",
+    ),
+    (
+        "simple-lower-case-name",
+        simple_field(f" DOCVARIABLE {_LOWER} \\* MERGEFORMAT ", SPACE),
+        _LOWER,
+        " ",
+        " ",
+    ),
+    ("charformat", complex_field(f" docvariable {VAULT} \\* charformat ", SPACE), VAULT, " ", " "),
+    ("no-switch", complex_field(f" DOCVARIABLE {VAULT} ", SPACE), VAULT, " ", " "),
+    (
+        "escaped-value",
+        complex_field(f" DOCVARIABLE {VAULT} ", r("<w:t>a&amp;</w:t>") + r("<w:t>&lt;b</w:t>")),
+        VAULT,
+        "a&amp;&#60;b",
+        "a&<b",
+    ),
+]
+
+
+def read_settings(name: str, value: str) -> str:
+    """The variable, beside one of another name and one of none."""
+    held = variables((name, value), ("VAULT_ND_other", "x"))
+    return held.replace("</w:docVars>", '<w:docVar w:val="y"/></w:docVars>')
+
+
+@pytest.mark.parametrize(
+    ("field", "name", "value", "shown"),
+    [case[1:] for case in DOCVARIABLE_READS],
+    ids=[case[0] for case in DOCVARIABLE_READS],
+)
+def test_a_docvariable_showing_its_variables_value_is_read(
+    field: str, name: str, value: str, shown: str
+) -> None:
+    # Word shows the stored result until fields are updated, then the variable's value: where
+    # the two are one text, it is what Word shows either way.
+    data = anchored(field, read_settings(name, value))
+    assert [x.text for x in read_docx(data)] == [f"4.1{shown}b"]
+    value_read = json.loads(served(data)[0])
+    assert "refusal" not in value_read, value_read.get("refusal")
+
+
+_NESTED = complex_field(" QUOTE x ", r("<w:t>x</w:t>"))
+
+# Each a DOCVARIABLE Word may show otherwise than read: its name, the field, the settings, the
+# reader's refusal (code and detail).
+DOCVARIABLE_REFUSALS: list[tuple[str, str, str, str, str]] = [
+    (
+        "no-variable",
+        complex_field(f" DOCVARIABLE {VAULT} \\* MERGEFORMAT ", SPACE),
+        "",
+        "computed-field",
+        "a DOCVARIABLE without one variable of its name",
+    ),
+    (
+        "another-value",
+        complex_field(f" DOCVARIABLE {VAULT} ", SPACE),
+        variables((VAULT, "x")),
+        "computed-field",
+        "a DOCVARIABLE showing other than its value",
+    ),
+    (
+        "another-case",
+        complex_field(f" DOCVARIABLE {VAULT} ", SPACE),
+        variables((_LOWER, " ")),
+        "computed-field",
+        "a DOCVARIABLE without one variable of its name",
+    ),
+    (
+        "two-ignoring-case",
+        complex_field(f" DOCVARIABLE {VAULT} ", SPACE),
+        variables((VAULT, " "), (_LOWER, " ")),
+        "computed-field",
+        "a DOCVARIABLE without one variable of its name",
+    ),
+    (
+        "no-value",
+        complex_field(f" DOCVARIABLE {VAULT} ", SPACE),
+        f'<w:docVars><w:docVar w:name="{VAULT}"/></w:docVars>',
+        "computed-field",
+        "a DOCVARIABLE without one variable of its name",
+    ),
+    (
+        "empty-result",
+        complex_field(f" DOCVARIABLE {VAULT} ", r("<w:t/>")),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE showing other than its value",
+    ),
+    (
+        "hidden-result",
+        complex_field(
+            f" DOCVARIABLE {VAULT} ", r('<w:t xml:space="preserve"> </w:t>', "<w:vanish/>")
+        ),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE showing other than its value",
+    ),
+    (
+        "another-switch",
+        complex_field(f" DOCVARIABLE {VAULT} \\h ", SPACE),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE field the reader cannot read",
+    ),
+    (
+        "another-format",
+        complex_field(f" DOCVARIABLE {VAULT} \\* Upper ", SPACE),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE field the reader cannot read",
+    ),
+    (
+        "quoted-name",
+        complex_field(f' DOCVARIABLE "{VAULT}" ', SPACE),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE field the reader cannot read",
+    ),
+    (
+        "no-name",
+        complex_field(" DOCVARIABLE \\* MERGEFORMAT ", SPACE),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE field the reader cannot read",
+    ),
+    (
+        "bare-code",
+        complex_field(" DOCVARIABLE ", SPACE),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE field the reader cannot read",
+    ),
+    (
+        "format-switch-without-its-format",
+        complex_field(f" DOCVARIABLE {VAULT} \\* ", SPACE),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE field the reader cannot read",
+    ),
+    (
+        "field-in-its-code",
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r('<w:instrText xml:space="preserve"> DOCVARIABLE x </w:instrText>')
+        + _NESTED
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + SPACE
+        + r('<w:fldChar w:fldCharType="end"/>'),
+        variables(("x", " ")),
+        "computed-field",
+        "a DOCVARIABLE field with a field in its code",
+    ),
+    (
+        "tab",
+        complex_field(f" DOCVARIABLE {VAULT} ", r("<w:tab/>")),
+        variables((VAULT, "&#9;")),
+        "computed-field",
+        "a DOCVARIABLE's result holding other than text",
+    ),
+    (
+        "symbol",
+        complex_field(
+            f" DOCVARIABLE {VAULT} ",
+            r('<w:t xml:space="preserve"> </w:t>', '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/>'),
+        ),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE's result holding other than text",
+    ),
+    (
+        "note-mark",
+        complex_field(f" DOCVARIABLE {VAULT} ", SPACE + r('<w:footnoteReference w:id="1"/>')),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE's result holding other than text",
+    ),
+    (
+        "field-in-its-result",
+        complex_field(f" DOCVARIABLE {VAULT} ", _NESTED),
+        variables((VAULT, "x")),
+        "computed-field",
+        "a field in a DOCVARIABLE's result",
+    ),
+    (
+        "simple-field-in-its-result",
+        complex_field(f" DOCVARIABLE {VAULT} ", simple_field(" HYPERLINK x ", SPACE)),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a field in a DOCVARIABLE's result",
+    ),
+    (
+        "field-character-in-a-simple-result",
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r('<w:instrText xml:space="preserve"> HYPERLINK x </w:instrText>')
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + simple_field(f" DOCVARIABLE {VAULT} ", SPACE + r('<w:fldChar w:fldCharType="end"/>')),
+        variables((VAULT, " ")),
+        "computed-field",
+        "a DOCVARIABLE's result holding other than text",
+    ),
+    (
+        "no-stored-result",
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r(f'<w:instrText xml:space="preserve"> DOCVARIABLE {VAULT} </w:instrText>')
+        + r('<w:fldChar w:fldCharType="end"/>'),
+        variables((VAULT, " ")),
+        "field-without-result",
+        "a field with no stored result",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("field", "settings", "code", "detail"),
+    [case[1:] for case in DOCVARIABLE_REFUSALS],
+    ids=[case[0] for case in DOCVARIABLE_REFUSALS],
+)
+def test_a_docvariable_word_may_show_otherwise_is_refused(
+    field: str, settings: str, code: str, detail: str
+) -> None:
+    with pytest.raises(DocxRefusedError) as caught:
+        read_document(anchored(field, settings))
+    assert (caught.value.code, caught.value.detail) == (code, detail)
+
+
+def test_a_docvariable_result_past_its_paragraph_is_refused() -> None:
+    body = p(
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r(f'<w:instrText xml:space="preserve"> DOCVARIABLE {VAULT} </w:instrText>')
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + SPACE
+    ) + p(r('<w:fldChar w:fldCharType="end"/>'))
+    with pytest.raises(DocxRefusedError) as caught:
+        read_document(with_settings(body, variables((VAULT, " "))))
+    assert caught.value.code == "unbalanced-field"
+
+
+def _declaring(declaration: str, name: str, content: bytes, before: bytes = b"") -> bytes:
+    """A one-paragraph .docx with ``name`` holding ``content`` under an XML ``declaration``."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(docx(p(r("<w:t>x</w:t>"))))) as source:
+        parts = {n: source.read(n) for n in source.namelist()}
+    parts[name] = before + f'<?xml version="1.0" encoding="{declaration}"?>'.encode() + content
+    with zipfile.ZipFile(buffer, "w") as package:
+        for part, data in parts.items():
+            package.writestr(part, data)
+    return buffer.getvalue()
+
+
+# A customXml part, as Word keeps a bibliography.
+_ITEM = "customXml/item1.xml"
+_SOURCES = b"<b:Sources xmlns:b='x'/>"
+
+
+@pytest.mark.parametrize("spelling", ["us-ascii", "US-ASCII", "ascii", "us_ascii"])
+def test_a_part_declaring_ascii_is_read_when_every_byte_is_ascii(spelling: str) -> None:
+    # ASCII is UTF-8's first 128 characters: such a part reads alike either way. EMA
+    # product-information files hold customXml parts that declare us-ascii, every byte below 0x80.
+    assert [x.text for x in read_docx(_declaring(spelling, _ITEM, _SOURCES))] == ["x"]
+    # The document itself too: a character reference is ASCII bytes for any character.
+    body = document_xml(p(r("<w:t>caf&#233;</w:t>"))).encode()
+    data = _declaring(spelling, "word/document.xml", body)
+    assert [x.text for x in read_docx(data)] == ["caf\u00e9"]
+    DocxSource(data).certify(json.loads(served(data)[0]))
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        _declaring("us-ascii", _ITEM, "<b:Sources xmlns:b='x'>caf\u00e9</b:Sources>".encode()),
+        _declaring("us-ascii", _ITEM, _SOURCES + b"<!-- \xef\xbb\xbf -->"),
+        _declaring("windows-1252", _ITEM, _SOURCES),
+        _declaring("ASCII-ish", _ITEM, _SOURCES),
+    ],
+    ids=["a-letter-past-ascii", "a-byte-past-ascii", "another-encoding", "an-unknown-encoding"],
+)
+def test_a_part_declaring_ascii_over_other_bytes_or_another_encoding_is_refused(
+    data: bytes,
+) -> None:
+    with pytest.raises(DocxRefusedError) as caught:
+        read_docx(data)
+    assert caught.value.code == "invalid-package"
+    with pytest.raises(CertificationError):
+        DocxSource(data)
+
+
+def test_an_underline_without_a_value_sets_nothing_at_any_level() -> None:
+    """A bare ``w:u`` draws no underline and leaves a style's underline as it is.
+
+    Word's answer: Microsoft Word 16.113.3 for Mac, asked 2026-10-05 with two documents of
+    this very XML (uval.docx: the first three paragraphs; uval2.docx: the rest, its styles U and
+    UC). A bare ``<w:u/>`` draws no underline, with a ``w:color`` or without; under a paragraph
+    style's single underline the text stays underlined (single), and under a character style's
+    double it stays underlined (double). The reader passes it over at every level, as absent.
+    """
+    styles = (
+        '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/>'
+        "</w:style>"
+        '<w:style w:type="paragraph" w:styleId="U"><w:name w:val="U"/>'
+        '<w:rPr><w:u w:val="single"/></w:rPr></w:style>'
+        '<w:style w:type="character" w:styleId="UC"><w:name w:val="UC"/>'
+        '<w:rPr><w:u w:val="double"/></w:rPr></w:style>'
+    )
+    underlined = '<w:pStyle w:val="U"/>'
+    body = (
+        p(r("<w:t>noval</w:t>", "<w:u/>"))
+        + p(r("<w:t>single</w:t>", '<w:u w:val="single"/>'))
+        + p(r("<w:t>plain</w:t>"))
+        + p(r("<w:t>styleSingleRunBare</w:t>", "<w:u/>"), underlined)
+        + p(r("<w:t>styleSingleRunNothing</w:t>"), underlined)
+        + p(r("<w:t>charStyleDoubleRunBare</w:t>", '<w:rStyle w:val="UC"/><w:u/>'))
+        + p(r("<w:t>bareWithColour</w:t>", '<w:u w:color="FF0000"/>'))
+    )
+    paragraphs = read_docx(docx(body, styles))
+    assert [[m.kind for m in x.marks if m.kind == "underline"] for x in paragraphs] == [
+        [],
+        ["underline"],
+        [],
+        ["underline"],
+        ["underline"],
+        ["underline"],
+        [],
+    ]
+    # The check works it out on its own: the result is certified.
+    value = json.loads(served(docx(body, styles))[0])
+    assert "refusal" not in value, value.get("refusal")

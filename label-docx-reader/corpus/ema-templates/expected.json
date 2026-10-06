@@ -1,98 +1,98 @@
 {
   "atmp-product-information-template-version-11_bg.docx": {
-    "certificateSha256": "971bc43770d0f9cf7e2602a9a80904310d313fcf3023cc25b66079c10b4ef072",
+    "certificateSha256": "7ee00078291e15741849e3262a787334c5bdfc5b018d3b4a3230811df857ece2",
     "paragraphsSha256": "fe705acbd7336859a28b800b7af156bd5f0f8d46c40c3b89658db97ef8cc9393",
-    "resultSha256": "02c570884c563658316f2ec6fdd57e045ec52586e6954f8c59d75e75361648b5",
+    "resultSha256": "b8618e0b9036065a36104b3169aebdb609190f37e6fa3c6f2ad82ba51ef966b2",
     "sha256": "b99d4fec71cfcc28a6923c6062f82d7468011a36e20d9bb9942e3a1d1b50e842"
   },
   "atmp-product-information-template-version-11_el.docx": {
-    "certificateSha256": "757c693d424d8c8da3429e02588e939dbef60500e1692c6b479edcdf0d758edb",
+    "certificateSha256": "010f0a191e7fa9c22107901760b2201644885a2fe4cedbff62e7d6f9e1f2135f",
     "paragraphsSha256": "773f8685f5fb0a7edfdce1ac7f26cfd448dd18ccc2f0e62f5d41fe37f9dfd20a",
-    "resultSha256": "0f15c712fa5373c3b493fe7f058e781e789b52d5a2d0e8868ea1d4d2e8204f47",
+    "resultSha256": "0ecef430d85632d2a6d387c0176ffff12e9b66f14ccc49a5d666316c1f30840c",
     "sha256": "abc62efb3273c38074dc8a1a5c71458603aaeca3fabdbfbde6a65ca34cb2acfa"
   },
   "atmp-product-information-template-version-11_en.docx": {
-    "certificateSha256": "9e0d2842c5b5562fae5410503d25e126e867d1d4fe32ebee799f59ef0f5b1827",
+    "certificateSha256": "bca50d09518af2a8037b72e7231afabb8f072184065b55a519e9353d9c2a9ce8",
     "paragraphsSha256": "6eb91112c06ebad66ada926b74dc2a1a5d64c2017cc7c6bfadad2224a5e22a72",
-    "resultSha256": "0085d781c420bd7b58e9c607fa233a1062e21a2abf8ab29601b43ab14da379b1",
+    "resultSha256": "10662f338e122ad59f3b863babfc2d20af7e64156267d36d4734c528e5374c62",
     "sha256": "82314e8c204360c836f2a8cca35fd625f3b88d99a3678dcdd2514695acdf941d"
   },
   "mutual-recognition-decentralised-referral-product-information-template-version-42_en.docx": {
-    "certificateSha256": "78486a82c1250e304d558bc21fd52d02cf8f410c5b7cdcd2cead0665e9f7d6d2",
+    "certificateSha256": "7af7abeb380256de0e8c004ab26003439448fe433eb3dc606ced0ed01e9fdcae",
     "paragraphsSha256": "2c5e3a443cfe08b73f392de2f640071004955f3430978d76a2945b5e18ef822e",
-    "resultSha256": "bb0b60eaaad6ecd7e5e314c9a278e23fc288a8cd8aef73740721d22e0b3b3844",
+    "resultSha256": "b623e99360a846af11b17441ec2c2e1068df47b87ed65b6f1908e837456c554e",
     "sha256": "12af462b1f204731ebc191fe674b549b2b56690742863c7544943709701f432b"
   },
   "mutual-recognition-decentralised-referral-product-information-template-version-42_et.docx": {
-    "certificateSha256": "2f74a331ae796c7cb990603148486aa82f571c78c5d4dac53b71f0f7c197d1a0",
+    "certificateSha256": "500c7641f8533d4e856eec924cb81db218a03972f46c06d2ebd388e78202a175",
     "paragraphsSha256": "ac3541935eb00ed052cc0a63e4524c4146b68bd49ee771cdff2dbb3aefa7f8d0",
-    "resultSha256": "ecaf6aace0fa512b99887552a51467bb17d91a96c11ac91dec1d79b7bce7bf01",
+    "resultSha256": "54a28160b2b6cda2a3193ae5cee6d8d9185b1e0264b79956c52e96a19144f2d3",
     "sha256": "c71142ece1273c5002050c8639a9023bbef04d29153271deadfc86b913039c1a"
   },
   "psusa-nationally-authorised-products-template_en.docx": {
-    "certificateSha256": "f33d097d6874c48461a81984d2556f0e5c533754a6b67273a9d73f1e71b84065",
+    "certificateSha256": "f00d1a0797984b4a36a13e753594def94f566b271570ce57fe1e4b8c91499bb7",
     "paragraphsSha256": "aaedc1514d33269576ee7ba8e49ff5919baa22cb4cf4e69142a502999e44feb4",
-    "resultSha256": "280f5bd02355b278db0cd1d986ef0ffd075426ffbda378c42f03dedcfb347621",
+    "resultSha256": "5445251fb848bac4c4ea5d57489ebe936b8ad6a76902b19caf74df3d32600956",
     "sha256": "b91a3f2258687a08e53ea6a351d5fe22ac8a1198baeabf6782fb56e2c51889d6"
   },
   "qrd-annex-iv-conditional-positive-template_en.docx": {
-    "certificateSha256": "ab5d4fba4d6dacce1d3310781294f27e37eea52002ed3b0a43203f6de0dbda3d",
+    "certificateSha256": "eb66e17c7d9abb6d6db5a44545cf1f0a9cd7131825773b2b45bef163bc69a396",
     "paragraphsSha256": "4c69b1578f2897a091bd4be7e0b28201db84bd4cfde1dc5d0daf6ff9d77c01a2",
-    "resultSha256": "5348c1652d9f35f573f519793fd0e005d25c6a2cf229e0c969820b5597fbe242",
+    "resultSha256": "96e65659fe083dc9f67bb199b4f9b850cb88489fc8b38a6e4b97e4a1fd1395e3",
     "sha256": "336bb1d2fd0b7982d4caf2947d21152b338a5c078eb7a13f640511409a3e044b"
   },
   "qrd-annex-iv-exceptional-circumstances-positive-template_en.docx": {
-    "certificateSha256": "b35958f826567aef1b977bea5f8976a8c89d986a5d995f17e8c06aee0bcbe9fd",
+    "certificateSha256": "bb72ca85135c11ad8df575d6c82da15bcb5144c8acadf49b52609c83efb26305",
     "paragraphsSha256": "b544189a857f62487a6c9773826e09d7b2ed4a8403718ae3fccfcd0df73b13e9",
-    "resultSha256": "58af556a8579633c073dc63bb33146b790b7c74c2092a01642f01173a5cef23c",
+    "resultSha256": "b402afc63211e82cac54024cad3d1c23883c922a314d4f0b17b29829f333b06e",
     "sha256": "e1ede3cde3f46e81a8646df0dd6abebc09b9d2b38ee11fd10ab145c33d399629"
   },
   "qrd-annex-iv-standard-positive-template_en.docx": {
-    "certificateSha256": "b1db04c5216a2827012dd08c5ec2fdbc0af5e471acc8d7afe8e77b7009a78105",
+    "certificateSha256": "58b05cc1634686013a8b2b17ad06c6338d39cf51a3a9f79f46e148f42bb16c46",
     "paragraphsSha256": "fa3a269c8b6d714dc53e2464d6b1aba9730997092de3d752d76de3f2a21f9c6e",
-    "resultSha256": "03957dfe2ed22a6a071876fdd005a7e64e6fbeeec49fc7e0d7d8a30f2ab0ed1d",
+    "resultSha256": "fcadc035f1edbebe1acdfae0c2ffd28a263f4603cc287873c43da3befeede5e3",
     "sha256": "6c5c80ba204ca0e7504a343f572cdad287ae6f6effe15c614791024c89d5bfc8"
   },
   "qrd-annex-related-article-127a-template_en.docx": {
-    "certificateSha256": "4bd12e108a9714d67f9534b0a2d674ad061cdc9382850db6340fd96c24d05be1",
+    "certificateSha256": "b1e4353dae6f375a7d3515405323d197d4ac27aca235c8d4e6947e7fcb72d14a",
     "paragraphsSha256": "3012c08019fe5c4aaa2dfba013e5cc2e2682d31e389b1e14b2d83fc03bb01718",
-    "resultSha256": "462d29078951919fe30367afce7f03c287d2514e39fda5103a67ad3c1bb54649",
+    "resultSha256": "d5071a90ee5dedad0b14996b65b0414f8a23ea8079bb329283d718a39f1d00f7",
     "sha256": "758769ff386c7893373c428bb197a2d30f917329e38ac49e87a9d350d441fd4c"
   },
   "qrd-annex-template_en.docx": {
-    "certificateSha256": "b6b72bc6a3784a468074ed5d2658ff5380078aee722178eb436a62eaa74cce7b",
+    "certificateSha256": "c63ec4aa9c0dbf8b5c5c39456fded3847a8ad0ea4d464730285e61222aa2d11f",
     "paragraphsSha256": "d24704614ae330f53b6a47e76e688365e721719109f9ead73b3cebe3b534e558",
-    "resultSha256": "94e98636b1b70a612af2fe042553f492f357a917de89d6c1ffe0344e067daa81",
+    "resultSha256": "8a59dd4ad2f4eeba8a138f017c9c502509cc210d9aff54d0fa253248cfa63c09",
     "sha256": "7c2abdee2313fda45c8fc1e87d1d9ee9251954b79c9c9c3de1d46913377e2bf4"
   },
   "qrd-annex-template_es.docx": {
-    "certificateSha256": "b1bc5c782cd73a75e34e65308bdcdd66070e361ec34c2a2325345b333a7e3d00",
+    "certificateSha256": "6ffc66ab76a1a4826a7dd4361c028544f3182ead34f5c0c74236e84af395596a",
     "paragraphsSha256": "a86cf03e6e269f4705cb76f923dc88775e6db08506a3c5de2d8368d258a6f7b2",
-    "resultSha256": "cf6dce73e8625fe0f030ebb29817e4781b8d9e3822a9e61a9d938546d4adf27d",
+    "resultSha256": "10f6b6e0fb89bbffad49c14c7bfb24ec915ea2daa60b0e929aa38e445cc1560e",
     "sha256": "b72a6e90971d35c0c6a27815e7558805127c208062f79b4aae7cd2a861ac56ad"
   },
   "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics-cover-page_en.docx": {
-    "certificateSha256": "82b50476d724c8d5dbf72a898445660ef6fcbeb542ee859342505f7fabc69b98",
+    "certificateSha256": "16d4b8f81839cd0cb7db1809a8c67181192e4517c672e5b853e45c593644549d",
     "paragraphsSha256": "3183ed75921d1f2c90e2bb3dc777cccd4fa3d332ae6a6a81659c2bbdf4aeaa73",
-    "resultSha256": "3793eafab34bc3e37dec4ce57da72486a80c0ca411dac200e52a70afaa4aa433",
+    "resultSha256": "adfb2ec2779e7073046f87fb0c22d88e0d3e66d3e88b6dc6bda3a4db8a76db15",
     "sha256": "116d6fdba94491658865b984f7ba0d9ca686cfc166d14034c309502ae5de7746"
   },
   "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics-cover-page_en.docx": {
-    "certificateSha256": "79526cde098c5df3c63a546a480092c898266674c699986631b25d30efb3a8bc",
+    "certificateSha256": "d8d5e68e0a2a729598e954825607406ba68119e1ab8be10b1fcc16d30d58f3f9",
     "paragraphsSha256": "8edd5dde80ef1b85525eb9fc60aee3784509400b01b53ed15975aeee0612151a",
-    "resultSha256": "3efe66168cdbe2fe0257789cf4b14cc5b2b88db9c43081003f2a87d594871ab1",
+    "resultSha256": "4aa2888f842e13df63dc313856f05ee860a5650616b530983f8903c9827fdcbc",
     "sha256": "b88d0a6bc5ecf4817de10e1ecfb310f68ada720499742e214332dd2d55c4cc51"
   },
   "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products-cover-page_en.docx": {
-    "certificateSha256": "cf7901dc77a53528750bb76e0c7cdc4a526b0822e89e48c720095c2907a57551",
+    "certificateSha256": "bb4ff83606cb5c90eb2b91faa14d8344d8fd76c46fc4a776b9b38cd74fc41348",
     "paragraphsSha256": "e8c9f5e05ec7a02a9a0b70ad4e5c8a6ff644dbbf5dccf3ac08db984ffbe1501f",
-    "resultSha256": "f1fc9497e8e32e352e670c642cb54df1b6e41a8e61327097d07db09d9b31257e",
+    "resultSha256": "67742186b655dc617fdba2236b6de133196e15970230b84f250faa55cbcc9e1f",
     "sha256": "a9a5a12650d3552697aa9ae8604c4067bd7f7969c5a47df025b92e59ad90f5d0"
   },
   "qrd-appendix-v-adverse-drug-reaction-reporting-details_en.docx": {
-    "certificateSha256": "d3aca40be54434d5907d006a2e8cbce0656a16795f6846f87fdd857f3f05d629",
+    "certificateSha256": "61209cfb0a9817d873d53a553e3ab6e07a38551578991f0f6f101d44096cdc8f",
     "paragraphsSha256": "58959c148c76d70f63fa1564fb9db7ab0a8e5b5e570026ceaa77fe1f86a787d3",
-    "resultSha256": "986ff1a769f39fb5b08e956de75e6397bb3502242609a05cd614be7fd621ae23",
+    "resultSha256": "f745721badbb1fba46679ca375873870e00123e49a926bd20df5eeda082e4d2c",
     "sha256": "819865682208fc41a0105f6ee20b98d637693065dc232a3bb20a02d8273e41a0"
   },
   "qrd-product-information-template-version-104_es.docx": {
@@ -101,9 +101,9 @@
     "sha256": "ec5001be6de714288fc1b89d85fb882cc4773eb25ca1cce60ea558d6016b85c5"
   },
   "qrd-psur-annex-iv-template_en.docx": {
-    "certificateSha256": "501d443010d51bb077be4aeacee6d8e5bdcbabba7af1a087cc2bbc14d5024a23",
+    "certificateSha256": "f546677add740992b8e15221ca868ee25d80ef7cdb91f49b5041a136551177c7",
     "paragraphsSha256": "d5168e92371d0b3b63679c4d353b2f2e21ff096e0243412a8b221643e70d59e8",
-    "resultSha256": "2b76fc2fb6aa718c9eecc2552fefca41aa0071b4bd30ab02da28a1e7dbed6c62",
+    "resultSha256": "6f42bdca061abae5b1775128407ebec0ff5e1774726f9ab6f98ffe5132d524aa",
     "sha256": "34a0e572d1894939df0bbe9989a601c6d7fb860f7277b43d25e29a7fec9b2e43"
   }
 }

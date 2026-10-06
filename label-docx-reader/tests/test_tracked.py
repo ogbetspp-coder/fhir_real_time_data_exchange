@@ -21,7 +21,7 @@ from label_docx.reader import DocxRefusedError, read_document, tracked
 from label_docx.store import Store
 from label_docx.word import tracked_verdict
 from test_headers_comments import header, reference, with_parts
-from test_reader import W, docx, p, r
+from test_reader import VAULT, W, docx, p, r, variables
 
 VIEWS = ("accepted", "original")
 WHO = 'w:author="A" w:date="2026-01-01T00:00:00Z"'
@@ -76,6 +76,26 @@ def test_inserted_and_deleted_text_is_in_one_view_each() -> None:
         "accepted": [("a", None)],
         "original": [("av", None)],
     }
+
+
+def test_a_deleted_docvariable_is_read_in_the_original_against_its_variable() -> None:
+    # As DOCVARIABLE fields stand in EMA product-information files: deleted, their variable kept.
+    code = f" DOCVARIABLE {VAULT} \\* MERGEFORMAT "
+    field = (
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r(f'<w:delInstrText xml:space="preserve">{code}</w:delInstrText>')
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + r('<w:delText xml:space="preserve"> </w:delText>')
+        + r('<w:fldChar w:fldCharType="end"/>')
+    )
+    body = p(t("4.1") + f'<w:del w:id="3" {WHO}>{field}</w:del>' + t("b"))
+    data = with_parts(
+        docx(body),
+        {"settings.xml": f'<w:settings xmlns:w="{W}">{variables((VAULT, " "))}</w:settings>'},
+        [("s1", "settings", "settings.xml")],
+    )
+    assert views(data) == {"accepted": [("4.1b", None)], "original": [("4.1 b", None)]}
+    assert "tracked" in result(data)
 
 
 def test_a_paragraph_mark_a_view_drops_joins_the_paragraph_to_the_next() -> None:
@@ -283,7 +303,7 @@ def test_the_check_holds_each_view_to_the_source_on_its_own() -> None:
     source = docx(p(t("a"), mark("ins")) + p(t("b") + dele("c") + ins(t("d"))))
     accepted, original, _ = tracked(source)
     assert certify_tracked(source, {"accepted": accepted, "original": original}) == {
-        "checker": "conservation-check/1.16.0",
+        "checker": "conservation-check/1.17.0",
         "accepted": {"characters": 3, "elements": 0, "paragraphsJoined": 0},
         "original": {"characters": 3, "elements": 0, "paragraphsJoined": 1},
     }
@@ -400,7 +420,7 @@ def test_the_check_counts_what_each_view_holds_and_only_the_revised_parts() -> N
     source = _with_part(docx(body, footnotes=note), "word/media/image1.png", b"\x89PNG\r\n")
     accepted, original, _ = tracked(source)
     assert certify_tracked(source, {"accepted": accepted, "original": original}) == {
-        "checker": "conservation-check/1.16.0",
+        "checker": "conservation-check/1.17.0",
         "accepted": {"characters": 5, "elements": 2, "paragraphsJoined": 0},
         "original": {"characters": 4, "elements": 1, "paragraphsJoined": 0},
     }

@@ -17,7 +17,9 @@ normalises or repairs.
   never folded in.
 - **What Word shows.** List labels ("4.8", "b)", "•"), footnote marks and computed fields (SEQ,
   STYLEREF, REF, NOTEREF) follow Word's rules, each Word's own answer to a test document
-  (`corpus/*/word.json`). Body, notes, headers, footers and comments are read.
+  (`corpus/*/word.json`). A DOCVARIABLE (Veeva Vault's anchor at a heading) is read where its
+  stored result is its variable's value, so Word shows it alike before and after an update.
+  Body, notes, headers, footers and comments are read.
 - **Tracked changes: two texts, never one.** A tracked document is read with every change
   accepted and with every change rejected, plus the list of changes. There is no default text;
   the caller chooses.
@@ -84,14 +86,14 @@ from another web page.
 
 ```json
 {"certificate": {…}, "comments": [], "endnotes": [], "footers": [], "footnotes": [],
- "format": "label-docx-json/1.17.0", "headers": [],
+ "format": "label-docx-json/1.17.1", "headers": [],
  "paragraphs": [{"comments": [], "markHidden": false,
    "marks": [{"end": 5, "kind": "superscript", "start": 4}], "notes": [], "numbering": null,
    "pages": [], "pictures": [{"crop": null, "extent": [76200, 76200], "kind": "picture",
      "offset": 8, "part": "word/media/image1.png", "pixels": [8, 8], "reason": null,
      "sha256": "…", "type": "png"}],
    "style": "Heading2", "table": [0, 1, 0], "text": "x 109/l \ufffc"}],
- "reader": "docx-reader/1.28.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
+ "reader": "docx-reader/1.29.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
  "tables": [{"grid": {"columns": 2, "rows": [
    {"after": 0, "before": 0, "cells": [{"column": 0, "merge": null, "span": 2}],
     "exactHeight": false},
