@@ -700,7 +700,7 @@ def test_a_heading_is_plain_text() -> None:
     for heading, code in (
         (_p("4.1 Y", (4, 5, "strike")), "heading-formatting"),
         (_p("4.1 Y", (4, 5, "superscript")), "heading-formatting"),
-        (_p("4.1 y", (4, 5, "caps")), "heading-formatting"),
+        (_p("4.1 y", (4, 5, "smallCaps")), "heading-formatting"),
         (_p("4.1 Y", mark_hidden=True), "hidden-mark"),
         (_p("4.1 Y", comments=(CommentReference(0, 1),)), "comment"),
     ):
