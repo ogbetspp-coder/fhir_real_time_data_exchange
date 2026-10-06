@@ -1,0 +1,20 @@
+{
+  "resourceType": "NamingSystem",
+  "id": "authority-file",
+  "url": "https://khs.dev/fhir/NamingSystem/authority-file",
+  "version": "0.3.0",
+  "name": "AuthorityFile",
+  "title": "Authority file",
+  "status": "active",
+  "kind": "identifier",
+  "experimental": true,
+  "date": "2026-10-06",
+  "description": "An authority's published file an import read: the authority's segment, then Bundle/ or List/ and the authority's id for the file.",
+  "uniqueId": [
+    {
+      "type": "uri",
+      "value": "https://khs.dev/fhir/identifier/authority-file",
+      "preferred": true
+    }
+  ]
+}

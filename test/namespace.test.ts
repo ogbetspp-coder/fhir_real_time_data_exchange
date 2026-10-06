@@ -43,7 +43,7 @@ function issuesOf(action: () => unknown): string[] {
 
 function persisted(bundle: FhirBundle): { urls: Set<string>; refs: Set<string> } {
   const ema = transformType2ToEma(bundle, mapping);
-  const transaction = buildPersistTransaction(ema.list, ema.documentBundle, "run");
+  const transaction = buildPersistTransaction(ema.list, ema.documentBundle, "run", "absent");
   const resources = transaction.entry.map(({ resource }) => resource);
   return {
     urls: new Set(transaction.entry.map(({ request }) => request.url)),
@@ -133,7 +133,7 @@ describe("run namespaces", () => {
       { url: "https://example.org/ext", valueReference: { reference: organization.fullUrl } },
     ];
     const ema = transformType2ToEma(source, mapping);
-    const transaction = buildPersistTransaction(ema.list, ema.documentBundle, "run");
+    const transaction = buildPersistTransaction(ema.list, ema.documentBundle, "run", "absent");
     // Inside the document Bundle a reference is an entry's fullUrl; on a standalone resource it
     // is the Type/id of a transaction entry (src/gcp/healthcare.ts).
     const outputs = new Set([

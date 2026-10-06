@@ -1,0 +1,20 @@
+{
+  "resourceType": "NamingSystem",
+  "id": "import-requester",
+  "url": "https://khs.dev/fhir/NamingSystem/import-requester",
+  "version": "0.3.0",
+  "name": "ImportRequester",
+  "title": "Import requester",
+  "status": "active",
+  "kind": "identifier",
+  "experimental": true,
+  "date": "2026-10-06",
+  "description": "Who requested an authority import, by the id the import request records.",
+  "uniqueId": [
+    {
+      "type": "uri",
+      "value": "https://khs.dev/fhir/identifier/import-requester",
+      "preferred": true
+    }
+  ]
+}

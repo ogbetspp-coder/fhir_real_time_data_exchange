@@ -1,0 +1,20 @@
+{
+  "resourceType": "NamingSystem",
+  "id": "package",
+  "url": "https://khs.dev/fhir/NamingSystem/package",
+  "version": "0.3.0",
+  "name": "Package",
+  "title": "Synthetic package",
+  "status": "active",
+  "kind": "identifier",
+  "experimental": true,
+  "date": "2026-10-06",
+  "description": "A synthetic packaged product's identifier in the fixtures (src/fixtures/synthetic.ts). Synthetic content only: never a real product's.",
+  "uniqueId": [
+    {
+      "type": "uri",
+      "value": "https://khs.dev/fhir/identifier/package",
+      "preferred": true
+    }
+  ]
+}

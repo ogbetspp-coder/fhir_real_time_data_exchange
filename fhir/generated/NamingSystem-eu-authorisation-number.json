@@ -1,0 +1,20 @@
+{
+  "resourceType": "NamingSystem",
+  "id": "eu-authorisation-number",
+  "url": "https://khs.dev/fhir/NamingSystem/eu-authorisation-number",
+  "version": "0.3.0",
+  "name": "EuAuthorisationNumber",
+  "title": "EU authorisation number",
+  "status": "active",
+  "kind": "identifier",
+  "experimental": true,
+  "date": "2026-10-06",
+  "description": "An EU marketing authorisation number, EU/1/YY/NNN/PPP (YY the year, NNN the product in three or four digits, PPP the presentation), as a RegulatedAuthorization's identifier: one RegulatedAuthorization per number, one number per RegulatedAuthorization. https://khs.dev/fhir/StructureDefinition/eu-product-identity holds every value to ^EU/1/[0-9]{2}/[0-9]{3,4}/[0-9]{3}$ (khs-eu-1, khs-eu-3).",
+  "uniqueId": [
+    {
+      "type": "uri",
+      "value": "https://khs.dev/fhir/identifier/eu-authorisation-number",
+      "preferred": true
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "resourceType": "NamingSystem",
+  "id": "authorization",
+  "url": "https://khs.dev/fhir/NamingSystem/authorization",
+  "version": "0.3.0",
+  "name": "Authorization",
+  "title": "Synthetic authorisation",
+  "status": "active",
+  "kind": "identifier",
+  "experimental": true,
+  "date": "2026-10-06",
+  "description": "A synthetic authorisation's identifier in the fixtures (src/fixtures/synthetic.ts). Synthetic content only: never a real product's. Never an EU authorisation number.",
+  "uniqueId": [
+    {
+      "type": "uri",
+      "value": "https://khs.dev/fhir/identifier/authorization",
+      "preferred": true
+    }
+  ]
+}

@@ -128,7 +128,7 @@ sequenceDiagram
   APP->>APP: Deterministic ConceptMap and structural mapping
   APP->>VAL: Validate Global and EMA profiles
   APP->>TGT: Healthcare API validate for each required profile
-  APP->>TGT: Idempotent transaction if all gates pass
+  APP->>TGT: Transaction conditioned on the stored version, if all gates pass
   TGT-->>BQ: Native ANALYTICS_V2 mutation stream
   APP->>EV: Artifacts, manifest signature, ledger, lineage
   WF->>BQ: Wait until target Bundle is queryable
@@ -159,9 +159,11 @@ The transformer accepts two authoritative source categories:
 - an authored canonical SmPC Composition with stable section identifiers.
 
 The source preflight is `validateCanonicalPreflight(bundle, graphType)`: Type 2 as strict as
-ever, Type 1 exactly one Composition, MedicinalProductDefinition, Organization and
-RegulatedAuthorization, linked, named and identified. The graph type is the submission's, and
-the ungated sources are always Type 2.
+ever, Type 1 exactly one Composition, MedicinalProductDefinition and Organization and one
+RegulatedAuthorization per authorisation, linked, named and identified. Both check EU numbers:
+one RegulatedAuthorization per EU authorisation number (`EU/1/YY/NNN/PPP`), and the product's EU
+product numbers (`EU/1/YY/NNN`) exactly theirs (`docs/design/version-identity.md`). The graph type
+is the submission's, and the ungated sources are always Type 2.
 
 It does not infer clinical narrative from ingredients or product properties. Every output
 field is classified as copied, code-mapped, structurally moved, deterministically defaulted,
@@ -206,7 +208,8 @@ heading, the source's heading when the rule permits it (the rule's `title` or on
 `alternativeTitles`, the QRD template's forms without optional wording, since mapping 1.3.0) and otherwise
 the rule's `title`; only the target coding is kept; the EMA List is titled by the product's name
 (the document's title only where the graph names no product) and carries the holder, regulatory
-agency and procedure number the graph states in their identifier systems, never a value it does not;
+agency and procedure number the graph states in their identifier systems, and its one EU product
+number as `ext-epi-eu-number`, never a value it does not;
 Composition.language and Bundle.language are written as `en`; and a section without a source code
 and without narrative — an empty container — is dropped, title included. The `xml:lang` of a
 narrative `div` is not checked yet. The manifest loader rejects a manifest in which two rules, or a
@@ -226,6 +229,19 @@ pinned validator and executed on its transform engine in CI against this crosswa
 (`test/official/structuremap-twin.test.ts`). It transforms; the ids, the reference rewrite and the
 refusals stay here (`docs/design/structuremap-twin.md`).
 
+## Versions
+
+An ePI's versions follow the Global ePI and EUePI profiles (`docs/design/version-identity.md`):
+`Bundle.identifier`, `Bundle.timestamp` (the original approval date) and the EMA List's identifier
+stay the same across versions, and so does every id the run persists, so the store keeps one
+logical resource per document and its versions as resource versions. `Composition.identifier`
+names one version: the EMA Composition's is derived from the source identifier and its content.
+The run reads the version of its document Bundle the store holds before it signs, and the
+transaction carries it as its precondition (`ifMatch`, or `ifNoneMatch: "*"` for a first
+publication), so a transaction refused because the document changed since writes nothing. Whether
+the Healthcare API honours these entry fields inside a transaction is to be checked live (that
+note, "Needs a live check").
+
 ## Validation model
 
 Validation is deliberately redundant:
@@ -240,12 +256,14 @@ Validation is deliberately redundant:
 2. the official HL7 Java validator evaluates the pinned packages, FHIRPath, slicing, and
    profile chain. It loads five packages with `-ig`: the four HL7 and EMA ones and the
    repository's own, `dev.khs.fhir.epi` (`fhir/generated/`, built by
-   `scripts/fhir/generate-artifacts.ts`), which defines every `https://khs.dev/fhir/` code system
-   and extension the pipeline writes. Besides the source and the EMA List, Bundle and
-   Composition, it validates a `document` run's Provenance against base R5;
+   `scripts/fhir/generate-artifacts.ts`), which defines every `https://khs.dev/fhir/` code system,
+   identifier system (as a NamingSystem) and extension the pipeline writes, and the EU number
+   profile `eu-product-identity`. Besides the source and the EMA List, Bundle and Composition, it
+   validates a `document` run's Provenance against base R5, and the source and the EMA Bundle
+   against `eu-product-identity` too;
 3. Cloud Healthcare API `$validate?profile=` verifies each profile as deployed in the target
-   store. The Provenance is not sent there: the store's profile import takes the four HL7 and
-   EMA packages only, so the store has no definition of its extension or code systems; and
+   store. The Provenance and the package's own profile are not sent there: the store's profile
+   import takes the four HL7 and EMA packages only, so the store has no definition of them; and
 4. a write is attempted only when all required outcomes contain no `fatal` or `error` issue.
 
 The target store does not enable implementation-guide enforcement globally. Cloud Healthcare

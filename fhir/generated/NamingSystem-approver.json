@@ -1,0 +1,20 @@
+{
+  "resourceType": "NamingSystem",
+  "id": "approver",
+  "url": "https://khs.dev/fhir/NamingSystem/approver",
+  "version": "0.3.0",
+  "name": "Approver",
+  "title": "Approver",
+  "status": "active",
+  "kind": "identifier",
+  "experimental": true,
+  "date": "2026-10-06",
+  "description": "The approver of a submission, by the opaque id its approval records, never an e-mail address.",
+  "uniqueId": [
+    {
+      "type": "uri",
+      "value": "https://khs.dev/fhir/identifier/approver",
+      "preferred": true
+    }
+  ]
+}

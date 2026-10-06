@@ -1,0 +1,20 @@
+{
+  "resourceType": "NamingSystem",
+  "id": "ema-composition",
+  "url": "https://khs.dev/fhir/NamingSystem/ema-composition",
+  "version": "0.3.0",
+  "name": "EmaComposition",
+  "title": "EMA Composition (retired)",
+  "status": "retired",
+  "kind": "identifier",
+  "experimental": true,
+  "date": "2026-10-06",
+  "description": "The EMA Composition's identifier until 2026-10-06: the Composition's id, the same for every version, which the Global ePI and EMA profiles define as one per version. No longer written; versions written before then keep it in the store's history.",
+  "uniqueId": [
+    {
+      "type": "uri",
+      "value": "https://khs.dev/fhir/identifier/ema-composition",
+      "preferred": true
+    }
+  ]
+}

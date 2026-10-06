@@ -59,6 +59,7 @@ export const FAILURE_REASONS: Readonly<Record<string, string>> = {
   "SOURCE_FHIR_STORE_ID is required": "source-store-not-configured",
   "A source resource id must be a single path segment": "source-id-not-a-segment",
   "TARGET_FHIR_STORE_ID is required": "target-store-not-configured",
+  "The target store answered a resource without a version id": "target-version-missing",
   "Data Lineage API returned no process name": "lineage-no-process",
   "Data Lineage API returned no run name": "lineage-no-run",
   "SUBMISSION_BUCKET is required": "submission-bucket-not-configured",

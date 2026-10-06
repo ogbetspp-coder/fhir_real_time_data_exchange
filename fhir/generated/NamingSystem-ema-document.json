@@ -1,0 +1,20 @@
+{
+  "resourceType": "NamingSystem",
+  "id": "ema-document",
+  "url": "https://khs.dev/fhir/NamingSystem/ema-document",
+  "version": "0.3.0",
+  "name": "EmaDocument",
+  "title": "EMA document Bundle",
+  "status": "active",
+  "kind": "identifier",
+  "experimental": true,
+  "date": "2026-10-06",
+  "description": "The EMA document Bundle's identifier. Its value is the Bundle's id, derived from the source Bundle.identifier.value (src/fhir/transform.ts), and is the same for every version of the ePI document (Bundle-uv-epi).",
+  "uniqueId": [
+    {
+      "type": "uri",
+      "value": "https://khs.dev/fhir/identifier/ema-document",
+      "preferred": true
+    }
+  ]
+}

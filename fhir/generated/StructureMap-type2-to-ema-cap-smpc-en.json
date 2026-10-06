@@ -33,7 +33,7 @@
   "group": [
     {
       "name": "Type2BundleToEmaBundle",
-      "documentation": "The document Bundle. FML has no SHA-256, so the map leaves to the implementation the ids it\r\nmints. The target identifier's system is ema-document, and its value, also the Bundle's id, is\r\nderived from the source Bundle.identifier.value (src/lib/hash.ts stableUuid, namespace \"ema-bundle\"):\r\ntake the SHA-256 of the UTF-8 string \"ema-bundle:\" followed by the value, in lowercase hex;\r\nkeep its first 32 hex digits;\r\nset the 13th digit to 5 and the 17th digit to a;\r\nand write the 32 digits as a UUID, in groups of 8-4-4-4-12 joined by hyphens.\r\nEvery entry's fullUrl and id, the Composition's identifier value and each section's id are\r\nminted alike, and every Reference.reference is rewritten to the new fullUrls.",
+      "documentation": "The document Bundle. FML has no SHA-256, so the map leaves to the implementation the ids it\r\nmints. The target identifier's system is ema-document, and its value, also the Bundle's id, is\r\nderived from the source Bundle.identifier.value (src/lib/hash.ts stableUuid, namespace \"ema-bundle\"):\r\ntake the SHA-256 of the UTF-8 string \"ema-bundle:\" followed by the value, in lowercase hex;\r\nkeep its first 32 hex digits;\r\nset the 13th digit to 5 and the 17th digit to a;\r\nand write the 32 digits as a UUID, in groups of 8-4-4-4-12 joined by hyphens.\r\nEvery entry's fullUrl and id and each section's id are minted alike, and every\r\nReference.reference is rewritten to the new fullUrls. The Composition's identifier names one\r\nversion (docs/design/version-identity.md): its value is minted alike from the source\r\nBundle.identifier.value and the SHA-256 of the Composition without its identifier.",
       "input": [
         {
           "name": "src",
@@ -604,7 +604,7 @@
                   "transform": "copy",
                   "parameter": [
                     {
-                      "valueString": "https://khs.dev/fhir/identifier/ema-composition"
+                      "valueString": "https://khs.dev/fhir/identifier/ema-composition-version"
                     }
                   ]
                 }

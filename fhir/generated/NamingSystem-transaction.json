@@ -1,0 +1,20 @@
+{
+  "resourceType": "NamingSystem",
+  "id": "transaction",
+  "url": "https://khs.dev/fhir/NamingSystem/transaction",
+  "version": "0.3.0",
+  "name": "Transaction",
+  "title": "Persist transaction",
+  "status": "active",
+  "kind": "identifier",
+  "experimental": true,
+  "date": "2026-10-06",
+  "description": "The identifier of a run's persist transaction Bundle: the run's id, a UUID.",
+  "uniqueId": [
+    {
+      "type": "uri",
+      "value": "https://khs.dev/fhir/identifier/transaction",
+      "preferred": true
+    }
+  ]
+}

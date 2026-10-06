@@ -1,0 +1,20 @@
+{
+  "resourceType": "NamingSystem",
+  "id": "fidelity-report-sha256",
+  "url": "https://khs.dev/fhir/NamingSystem/fidelity-report-sha256",
+  "version": "0.3.0",
+  "name": "FidelityReportSha256",
+  "title": "Fidelity report SHA-256",
+  "status": "active",
+  "kind": "identifier",
+  "experimental": true,
+  "date": "2026-10-06",
+  "description": "A fidelity report, by its reportHash, 64 lowercase hexadecimal digits.",
+  "uniqueId": [
+    {
+      "type": "uri",
+      "value": "https://khs.dev/fhir/identifier/fidelity-report-sha256",
+      "preferred": true
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "resourceType": "NamingSystem",
+  "id": "authority-import",
+  "url": "https://khs.dev/fhir/NamingSystem/authority-import",
+  "version": "0.3.0",
+  "name": "AuthorityImport",
+  "title": "Authority import record",
+  "status": "active",
+  "kind": "identifier",
+  "experimental": true,
+  "date": "2026-10-06",
+  "description": "An authority import's canonical record: the Bundle's identifier, authority-import:, the authority's segment, a colon and the authority's id for the document; and the Composition's, the same followed by :composition.",
+  "uniqueId": [
+    {
+      "type": "uri",
+      "value": "https://khs.dev/fhir/identifier/authority-import",
+      "preferred": true
+    }
+  ]
+}

@@ -28,8 +28,10 @@ import { mappingReference, type EmaMapping } from "./fhir/mapping.js";
 import type { FhirBundle, FhirResource, OperationOutcome } from "./fhir/types.js";
 import {
   EMA_EPI_PACKAGE_ID,
+  EU_PRODUCT_IDENTITY_PROFILE,
   GLOBAL_EPI_PACKAGE_ID,
   GLOBAL_TYPE2_BUNDLE_PROFILE,
+  KHS_CANONICAL,
   QRD_TEMPLATE_VERSION,
 } from "./fhir/standards.js";
 import { pinnedPackage, pinnedPackages } from "./fhir/standards-lock.js";
@@ -88,11 +90,12 @@ export type PipelineResult = {
 // resource with the profiles it is validated against, in the order they are sent: the source
 // against the Global ePI Bundle profile, then the EMA List, document Bundle and Composition against
 // the mapping's profiles, and a document run's Provenance against base R5 with the repository's
-// own package defining its extension and code systems. The Provenance goes to the official
-// validator only: the store has no definition of them (its profile import takes the four HL7 and
-// EMA packages), so $validate is not asked about it. CI's "Official validation" job validates
-// exactly this set (scripts/ci/emit-validation-set.ts), so a resource or a profile added here
-// reaches that gate too.
+// own package defining its extension and code systems. The source and the EMA document Bundle are
+// also validated against the package's EU number invariants (EU_PRODUCT_IDENTITY_PROFILE). The
+// Provenance and the package's own profiles go to the official validator only: the store has no
+// definition of them (its profile import takes the four HL7 and EMA packages), so $validate is not
+// asked about them. CI's "Official validation" job validates exactly this set
+// (scripts/ci/emit-validation-set.ts), so a resource or a profile added here reaches that gate too.
 export type OfficialValidationTarget = {
   name: "source" | "ema-list" | "ema-bundle" | "ema-composition" | "provenance";
   resource: FhirResource;
@@ -108,12 +111,16 @@ export function officialValidationTargets(
   const composition = transformed.documentBundle.entry[0]?.resource;
   if (composition === undefined) throw new Error("Transformed Composition is missing");
   return [
-    { name: "source", resource: source, profiles: [GLOBAL_TYPE2_PROFILE] },
+    {
+      name: "source",
+      resource: source,
+      profiles: [GLOBAL_TYPE2_PROFILE, EU_PRODUCT_IDENTITY_PROFILE],
+    },
     { name: "ema-list", resource: transformed.list, profiles: [mapping.profiles.list] },
     {
       name: "ema-bundle",
       resource: transformed.documentBundle,
-      profiles: [mapping.profiles.bundle],
+      profiles: [mapping.profiles.bundle, EU_PRODUCT_IDENTITY_PROFILE],
     },
     { name: "ema-composition", resource: composition, profiles: mapping.profiles.composition },
     ...(provenance === undefined
@@ -451,10 +458,11 @@ export async function runPipeline(
     throw new Error("Official HL7 FHIR profile validation failed");
   }
 
-  // One request per resource and profile: $validate takes one profile at a time.
+  // One request per resource and profile: $validate takes one profile at a time. The store knows
+  // the HL7 and EMA profiles only.
   const healthcare = new HealthcareApiClient(config);
   for (const target of targets.filter(({ name }) => name !== "provenance")) {
-    for (const profile of target.profiles) {
+    for (const profile of target.profiles.filter((url) => !url.startsWith(`${KHS_CANONICAL}/`))) {
       cloudOutcomes.push(await healthcare.validate(target.resource, profile, runId));
     }
   }
@@ -473,10 +481,15 @@ export async function runPipeline(
   // no ledger row is one of the two, and the target store tells them apart: only the second left
   // a Bundle version, written by the `persist-transaction` object's transaction. Nothing is written
   // before the manifest is proved against its schema.
+  // The version of the document the store holds now is the transaction's precondition, read
+  // before the manifest is signed so the signed hash covers it: a transaction refused because the
+  // document changed since leaves nothing written (docs/design/version-identity.md).
+  const stored = await healthcare.readStoredVersion("Bundle", emaBundleId, runId);
   const transaction = buildPersistTransaction(
     transformed.list,
     transformed.documentBundle,
     runId,
+    stored,
     provenanceResource === undefined ? [] : [provenanceResource],
   );
   const transactionSha256 = sha256(transaction);

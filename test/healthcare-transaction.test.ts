@@ -31,7 +31,7 @@ async function transactionFor(
   const mapping = await loadEmaMapping();
   const source = createSyntheticType2Bundle(mapping, { product, version });
   const target = transformType2ToEma(source, mapping);
-  return buildPersistTransaction(target.list, target.documentBundle, RUN_ID);
+  return buildPersistTransaction(target.list, target.documentBundle, RUN_ID, "absent");
 }
 
 describe("the transaction a run persists", () => {
@@ -57,7 +57,12 @@ describe("the transaction a run persists", () => {
   it("addresses every entry by resource type and id, so a rerun updates rather than duplicates", async () => {
     const mapping = await loadEmaMapping();
     const target = transformType2ToEma(createSyntheticType2Bundle(mapping), mapping);
-    const transaction = buildPersistTransaction(target.list, target.documentBundle, RUN_ID);
+    const transaction = buildPersistTransaction(
+      target.list,
+      target.documentBundle,
+      RUN_ID,
+      "absent",
+    );
 
     expect(transaction.type).toBe("transaction");
     expect(transaction.entry.length).toBeGreaterThan(0);
@@ -71,7 +76,12 @@ describe("the transaction a run persists", () => {
     const mapping = await loadEmaMapping();
     const source = createSyntheticType2Bundle(mapping);
     const target = transformType2ToEma(source, mapping);
-    const transaction = buildPersistTransaction(target.list, target.documentBundle, RUN_ID);
+    const transaction = buildPersistTransaction(
+      target.list,
+      target.documentBundle,
+      RUN_ID,
+      "absent",
+    );
 
     expect(transaction.entry).toHaveLength(target.documentBundle.entry.length + 2);
     const urls = transaction.entry.map(({ request }) => request.url).sort();
@@ -101,9 +111,13 @@ describe("the transaction a run persists", () => {
           { reference: `Bundle/${target.documentBundle.id ?? ""}` },
         ],
       };
-      const transaction = buildPersistTransaction(target.list, target.documentBundle, RUN_ID, [
-        provenance,
-      ]);
+      const transaction = buildPersistTransaction(
+        target.list,
+        target.documentBundle,
+        RUN_ID,
+        "absent",
+        [provenance],
+      );
       const written = new Set<string>();
       let checked = 0;
       for (const { request, resource } of transaction.entry) {
@@ -132,7 +146,7 @@ describe("the transaction a run persists", () => {
       target: [{ reference: "Provenance/a" }],
     };
     expect(() =>
-      buildPersistTransaction(target.list, target.documentBundle, RUN_ID, [a, b]),
+      buildPersistTransaction(target.list, target.documentBundle, RUN_ID, "absent", [a, b]),
     ).toThrow("The persisted resources reference each other in a cycle");
   });
 
@@ -143,7 +157,12 @@ describe("the transaction a run persists", () => {
   it("stores each standalone resource as validated, but for the form of its references", async () => {
     const mapping = await loadEmaMapping();
     const target = transformType2ToEma(createSyntheticType2Bundle(mapping), mapping);
-    const transaction = buildPersistTransaction(target.list, target.documentBundle, RUN_ID);
+    const transaction = buildPersistTransaction(
+      target.list,
+      target.documentBundle,
+      RUN_ID,
+      "absent",
+    );
     const fullUrlOf = new Map<string, string>([
       [`Bundle/${target.documentBundle.id ?? ""}`, `urn:uuid:${target.documentBundle.id ?? ""}`],
       ...target.documentBundle.entry.map(
@@ -198,7 +217,12 @@ describe("the transaction a run persists", () => {
   it("writes the List's entry as the document Bundle's Type/id", async () => {
     const mapping = await loadEmaMapping();
     const target = transformType2ToEma(createSyntheticType2Bundle(mapping), mapping);
-    const transaction = buildPersistTransaction(target.list, target.documentBundle, RUN_ID);
+    const transaction = buildPersistTransaction(
+      target.list,
+      target.documentBundle,
+      RUN_ID,
+      "absent",
+    );
 
     const list = transaction.entry.find(({ resource }) => resource.resourceType === "List");
     expect(references(list?.resource)).toEqual([`Bundle/${target.documentBundle.id ?? ""}`]);
@@ -210,7 +234,12 @@ describe("the transaction a run persists", () => {
   it("writes the document Bundle unchanged, its references resolving against its own entries", async () => {
     const mapping = await loadEmaMapping();
     const target = transformType2ToEma(createSyntheticType2Bundle(mapping), mapping);
-    const transaction = buildPersistTransaction(target.list, target.documentBundle, RUN_ID);
+    const transaction = buildPersistTransaction(
+      target.list,
+      target.documentBundle,
+      RUN_ID,
+      "absent",
+    );
 
     const bundle = transaction.entry.find(({ resource }) => resource.resourceType === "Bundle");
     expect(bundle?.resource).toEqual(target.documentBundle);
@@ -230,7 +259,7 @@ describe("the transaction a run persists", () => {
     };
 
     expect(() =>
-      buildPersistTransaction(target.list, target.documentBundle, RUN_ID, [stray]),
+      buildPersistTransaction(target.list, target.documentBundle, RUN_ID, "absent", [stray]),
     ).toThrow("A persisted reference names no resource in the transaction");
   });
 
@@ -242,9 +271,13 @@ describe("the transaction a run persists", () => {
       id: "p1",
       target: [{ reference: `Bundle/${target.documentBundle.id ?? ""}` }],
     };
-    const transaction = buildPersistTransaction(target.list, target.documentBundle, RUN_ID, [
-      provenance,
-    ]);
+    const transaction = buildPersistTransaction(
+      target.list,
+      target.documentBundle,
+      RUN_ID,
+      "absent",
+      [provenance],
+    );
 
     expect(transaction.entry.at(-1)?.resource).toEqual(provenance);
   });
@@ -254,8 +287,10 @@ describe("the transaction a run persists", () => {
     const target = transformType2ToEma(createSyntheticType2Bundle(mapping), mapping);
     const at = "2026-09-27T00:00:00.000Z";
 
-    expect(buildPersistTransaction(target.list, target.documentBundle, RUN_ID, [], at)).toEqual(
-      buildPersistTransaction(target.list, target.documentBundle, RUN_ID, [], at),
+    expect(
+      buildPersistTransaction(target.list, target.documentBundle, RUN_ID, "absent", [], at),
+    ).toEqual(
+      buildPersistTransaction(target.list, target.documentBundle, RUN_ID, "absent", [], at),
     );
   });
 
@@ -266,7 +301,7 @@ describe("the transaction a run persists", () => {
     const anonymous = { resourceType: "Organization" } as FhirResource;
 
     expect(() =>
-      buildPersistTransaction(target.list, target.documentBundle, RUN_ID, [anonymous]),
+      buildPersistTransaction(target.list, target.documentBundle, RUN_ID, "absent", [anonymous]),
     ).toThrow(/requires an id/);
   });
 });
