@@ -888,3 +888,28 @@ def test_character_scaling_with_a_picture_refuses_the_document() -> None:
     assert certified.layout(package(picture + scaled)) == ("character-scale",)
     assert certified.layout(package(picture + unscaled)) == ()
     assert certified.layout(package(scaled)) == ()
+
+
+def test_the_scoreboard_counts_without_saying_anything(tmp_path: Path) -> None:
+    spec = importlib.util.spec_from_file_location(
+        "scoreboard", Path(__file__).parents[1] / "scripts" / "scoreboard.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    script = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(script)
+    out = tmp_path / "board.json"
+    keys = REPOSITORY / "labels" / "ema-epi" / "sources"
+    assert script.main([str(FIXTURES), "--keys", str(keys), "--no-drawing", "--out", str(out)]) == 0
+    board = json.loads(out.read_text("utf-8"))
+    totals = board["totals"]
+    # Brukinsa words 6.5 and 6.6 otherwise than the template: it waits for a person.
+    assert totals["outcomes"] == {"built": 4, "needs-a-person": 1}
+    assert totals["carried"] == sum(OUTCOMES[n]["carried"] for n in OUTCOMES if "brukinsa" not in n)
+    assert totals["key"]["same"] > 100
+    # Nothing a label says: no fixture's longest paragraph, nor any part of it, is in the board.
+    text = out.read_text("utf-8")
+    for name in OUTCOMES:
+        body = read_body((FIXTURES / f"{name}.docx").read_bytes())
+        longest = max((p.text for p in body.paragraphs), key=len)
+        assert longest[:40] not in text
