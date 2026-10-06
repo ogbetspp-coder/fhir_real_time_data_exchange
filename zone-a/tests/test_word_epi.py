@@ -148,6 +148,29 @@ def test_a_list_fhir_cannot_number_is_refused(labels: list[str]) -> None:
     assert refused.value.code == "list-label"
 
 
+def test_a_tab_after_a_bullet_glyph_that_begins_the_text_is_a_space() -> None:
+    # Owner decision 2026-10-06: a typed bullet's tab is written as a space, as the EMA's own
+    # ePIs carry no tab; on the page section 3 step 4 still reads the bullet as a list bullet.
+    div, page = _build(_p("\u2022\tOnce a day"), _p("  \u25aa\tor twice"))
+    assert _inner(div) == "<p>\u2022 Once a day</p><p>  \u25aa or twice</p>"
+    assert page == "\n\u2022 Once a day\n  \u25aa or twice\n"
+    # Every other tab is still Word's jump to a tab stop: a second one, one before the bullet,
+    # one in the text, after a dash, after a list label, or in a table cell.
+    cell = (_grid(1, [(0, 1, None)]),)
+    for paragraph, tables in (
+        (_p("\u2022\t\tdouble"), ()),
+        (_p("\t\u2022\tled"), ()),
+        (_p("a \u2022\tb"), ()),
+        (_p("\u2022\ta\tb"), ()),
+        (_p("-\tdash"), ()),
+        (_p("\u2022\tx", label="1."), ()),
+        (_p("\u2022\tx", table=(0, 0, 0)), cell),
+    ):
+        with pytest.raises(RefusedError) as refused:
+            _build(paragraph, tables=tables)
+        assert refused.value.code == "tab"
+
+
 def test_a_table_carries_its_grid() -> None:
     # A cell spanning two columns, then one spanning two rows beside an ordinary cell.
     tables = (

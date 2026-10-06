@@ -56,7 +56,9 @@ else, with the code in parentheses:
   2%; a picture is an ``img`` of the ``data:`` URI of its exact bytes, and on the page U+FFFC, the
   SHA-256 of that URI, and U+FFFC (``picture``);
 - text: no soft hyphen (``soft-hyphen``), tab (``tab``: Word draws it as a jump to a tab stop),
-  line or paragraph separator (``line-separator``), or
+  but one right after a bullet glyph that begins a paragraph's text outside a table and after
+  no list label, which the narrative and the page write as a space (``bullet_tab``; owner
+  decision 2026-10-06), line or paragraph separator (``line-separator``), or
   line that starts with a bullet glyph after a line break (``bullet-after-break``: section 3 step
   4 would read it as a list bullet);
 - no comment (``comment``) and no hidden paragraph mark (``hidden-mark``, the paragraph runs on
@@ -101,7 +103,7 @@ from zone_a.structure import line
 from zone_a.underline import underline_changes
 
 # The narrative builder's and the page serialiser's version: one, as they are one closed list.
-WORD_EPI_VERSION: Final = "word-epi/1.1.1"
+WORD_EPI_VERSION: Final = "word-epi/1.1.2"
 
 CARRIED: Final = {"bold": "strong", "italic": "em", "superscript": "sup", "subscript": "sub"}
 # Section 3 step 4's bullet glyphs: a list bullet in page text, removed at a line start.
@@ -165,12 +167,33 @@ _INLINE_WHITESPACE: Final = "".join(sorted(WHITESPACE - {"\n"}))
 _SUFFIXES: Final = frozenset({"tab", "space"})
 
 
+def bullet_tab(paragraph: Paragraph) -> int | None:
+    """Where a tab stands right after a bullet glyph that begins the paragraph's text, else None.
+
+    Only outside a table and after no list label: the narrative and the page write that tab as a
+    space (owner decision 2026-10-06, ADR 0006 decision 3); the EMA's own ePIs carry no tab.
+    """
+    text = paragraph.text
+    start = len(text) - len(text.lstrip(_INLINE_WHITESPACE))
+    if (
+        paragraph.table is None
+        and not _label(paragraph)
+        and text[start : start + 1] in BULLETS
+        and text[start + 1 : start + 2] == "\t"
+    ):
+        return start + 1
+    return None
+
+
 def _check(index: int, paragraph: Paragraph, images: Mapping[str, bytes] | None = None) -> None:
     """The refusals of the module docstring that do not depend on marks.
 
-    A paragraph drawn as nothing may hold a tab; its marks are judged as any others are.
+    A paragraph drawn as nothing may hold a tab; its marks are judged as any others are. A tab
+    right after a bullet glyph that begins the text is a space (``bullet_tab``).
     """
     text = paragraph.text.replace("\t", " ") if blank(paragraph) else paragraph.text
+    if (at := bullet_tab(paragraph)) is not None:
+        text = text[:at] + " " + text[at + 1 :]
     if paragraph.comments:
         raise RefusedError("comment", index, "a comment")
     if paragraph.mark_hidden:
@@ -379,6 +402,8 @@ def _source(picture: Picture, images: Mapping[str, bytes]) -> str:
 def _inline(paragraph: Paragraph, marks: Sequence[Mark], images: Mapping[str, bytes]) -> str:
     """The text as XHTML: a run of one set of marks in its elements, a break br, a picture img."""
     text = paragraph.text
+    if (at := bullet_tab(paragraph)) is not None:
+        text = text[:at] + " " + text[at + 1 :]
     pictures = {picture.offset: picture for picture in paragraph.pictures}
     cuts = sorted(
         {0, len(text), *(m.start for m in marks), *(m.end for m in marks)}
@@ -537,6 +562,11 @@ def _line(
         text[picture.offset] = "\ufffc" + hashlib.sha256(uri.encode("utf-8")).hexdigest() + "\ufffc"
     label = _label(paragraph)
     head = "" if not label or (in_cell and label in BULLETS) else label + " "
+    # A tab right after a bullet glyph that begins the text, outside a table and after no label,
+    # is a space (section 7), on the page as in the narrative.
+    lead = paragraph.text.lstrip(_INLINE_WHITESPACE)
+    if not in_cell and not label and lead[:1] in BULLETS and lead[1:2] == "\t":
+        text[len(paragraph.text) - len(lead) + 1] = " "
     lines = "".join(text).split("\n")
     if in_cell:
         return head + " ".join(lines)

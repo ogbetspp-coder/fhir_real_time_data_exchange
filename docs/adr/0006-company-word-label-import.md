@@ -59,9 +59,10 @@ The record does not admit this today, for reasons this ADR has to answer rather 
      text a browser shows for our narrative (the Chrome oracle), section by section, under the
      rules the two oracles already use.
 
-   Adding a qualified source invalidates no existing output. By §8's own reasoning, and as
-   `3.1.0` did, this is therefore a **minor** version (`fidelity-norm/3.3.0`, after the reserved
-   `3.2.0`). Its new vectors are reviewed by hand and the differential run covers them.
+   Adding a qualified source invalidates no existing output, so it is a **minor** version:
+   `fidelity-norm/3.2.0` (amended 2026-10-05: the withheld design, which had reserved 3.2.0 and is
+   not built, takes 3.3.0, so versions are released in order; §8 now names this case). Its new
+   vectors are reviewed by hand and the differential run covers them.
 
 2. **The page text is defined exactly**, by a stated serialiser in §7's form:
    - one page per section, in pre-order, empty parents included (as ADR 0005 decision 4 does);
@@ -158,7 +159,7 @@ The record does not admit this today, for reasons this ADR has to answer rather 
    - report grid spans, vertical merges and nested tables;
    - extract picture bytes with crop and scale, refusing what it cannot carry;
    - in this path, refuse floating objects instead of setting them aside.
-2. **P2, specification:** `fidelity-norm/3.3.0`, with §7's `certified-word` contract, its
+2. **P2, specification:** `fidelity-norm/3.2.0`, with §7's `certified-word` contract, its
    serialiser and vectors.
 3. **P3, Zone A:** the builder, the page serialiser and the drawing cross-check.
 4. **P4, contract and Zone B:**
@@ -175,6 +176,13 @@ The record does not admit this today, for reasons this ADR has to answer rather 
    that shows where a person's one-time confirmation is needed.
 3. **Headings that differ from the template:** a remediation finding for the responsible label
    team to decide (decision 4).
+
+## Owner decisions (2026-10-06)
+
+1. **A tab after a typed bullet:** a tab right after a bullet glyph (§3 step 4's) that begins a
+   paragraph's text, outside a table and after no list label, is written as a space in the
+   narrative and on the page (§7, `fidelity-norm/3.2.0`), as the EMA's own ePIs carry no tab. Any
+   other tab is still refused: Word draws it as a jump to a tab stop.
 
 ## Progress
 

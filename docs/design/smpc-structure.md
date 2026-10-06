@@ -1,6 +1,6 @@
 # Design note: finding an SmPC's sections
 
-- Status: Built (`smpc-structure/1.0.6`, `zone-a/src/zone_a/structure.py`); run on the EMA's QRD
+- Status: Built (`smpc-structure/1.0.7`, `zone-a/src/zone_a/structure.py`); run on the EMA's QRD
   template and on synthetic labels. No company label is in the repository.
 - Date: 2026-10-05
 - Related: the UI proposal (Claude Docs, "Label Intake — UI proposal"), `docs/design/qrd-registry.md`

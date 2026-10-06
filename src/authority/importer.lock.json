@@ -30,5 +30,9 @@
   "2.3.0": {
     "sourceSha256": "3eba3c10b65c2d2e439bbfbeee63cb393f422fef3be3854f31badc392de05ee0",
     "vectorsSha256": "f4d4b9df316db8939c3974e4177edc14ee4d56e0fc2550310b3ea9576311b7fc"
+  },
+  "2.3.1": {
+    "sourceSha256": "1674ca99f05260aecd7ee2259b21e2c55c3de4aa42bbbd248024751cd986eed3",
+    "vectorsSha256": "d394f3642af857d0f3fec74cb56ad75fbd232110ee4b3f288ca2f0b9c1a3a052"
   }
 }

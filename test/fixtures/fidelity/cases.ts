@@ -512,6 +512,34 @@ const LIST_ITEM_SOURCE = customSource([LIST_ITEM]);
 const LIST_ITEM_PAGE_START_SOURCE = rawSource([{ text: `${LIST_ITEM}\n` }]);
 const BULLET_AT_PAGE_HEAD = customSource(["Keep the bottle", "\u2022 in the outer carton."]);
 
+// fidelity-norm/3.2.0: a certified Word source's page, one per section and wholly body
+// (docs/fidelity-normalization.md section 7, the certified Word rule).
+function wordSource(page: string): SourceDocumentText {
+  return {
+    extractorVersion: "word-epi/1.0.0",
+    pages: [{ page: 1, text: page, bodyStart: 0, bodyEnd: Array.from(page).length }],
+  };
+}
+
+const WORD_PAGE =
+  "\nSynthetic demonstration content for section 4.2; not for clinical use.\n" +
+  "• Adults: 10 mg once daily.\n• Children: 5 mg once daily.\nReduce the dose:\n" +
+  "1. if the count is below 10 ⁹/l;\n2. if the AUC₀₋∞ doubles.\n" +
+  "﷐\n﷒\t﷓\tDose by weight\t﷔\t\n" +
+  "﷒\t﷓\tUnder 50 kg\t﷓\t5 mg\n" +
+  "﷒\t﷕\t\t﷓\t2.5 mg in the elderly\n﷑\n";
+
+const WORD_NARRATIVE =
+  '<div xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">' +
+  "<p>Synthetic demonstration content for section 4.2; not for clinical use.</p>" +
+  "<ul><li>Adults: 10 mg once daily.</li><li>Children: 5 mg once daily.</li></ul>" +
+  "<p><strong>Reduce</strong> the dose:</p>" +
+  "<ol><li>if the count is below 10 <sup>9</sup>/l;</li>" +
+  "<li>if the AUC<sub>0-∞</sub> doubles.</li></ol>" +
+  '<table><tr><td colspan="2"><p>Dose by weight</p></td></tr>' +
+  '<tr><td rowspan="2"><p>Under 50 kg</p></td><td><ul><li>5 mg</li></ul></td></tr>' +
+  "<tr><td><p>2.5 mg in the elderly</p></td></tr></table></div>";
+
 export const verifyCases: VerifyCase[] = [
   // A body boundary inside a line, or a body that excludes more than a header/footer could hold,
   // invalidates the page: the extractor-declared range is bounded, not trusted.
@@ -2770,6 +2798,68 @@ export const verifyCases: VerifyCase[] = [
         spanFor(SPACE_SOURCE, 1, SPACE_LINE),
       ]),
     ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // fidelity-norm/3.2.0: a certified Word source (section 7's certified Word rule, ADR 0006).
+  // One page per section, wholly body; the page as zone_a.word_epi writes it from a read, the
+  // narrative as its builder writes it from the same read. Reviewed by hand: the page begins with
+  // a line break, writes each list label and a space (a bullet is then removed on both sides),
+  // folds the raised 9 and the lowered 0 and minus (keeping the lowered infinity), leaves the
+  // bullet in a cell out, and writes the colspan and the rowspan as grid slots.
+  {
+    name: "certified-word-section",
+    input: (() => {
+      const source = wordSource(WORD_PAGE);
+      return toInput(
+        source,
+        single("smpc.4.2.posology", WORD_NARRATIVE, [spanFor(source, 1, WORD_PAGE)]),
+      );
+    })(),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  // The same page against a narrative whose merged cell is not merged: the third row's first slot
+  // is a cell of its own, not the cell above.
+  {
+    name: "certified-word-rowspan-dropped",
+    input: (() => {
+      const source = wordSource(WORD_PAGE);
+      const unmerged = WORD_NARRATIVE.replace('<td rowspan="2">', "<td>").replace(
+        "<tr><td><p>2.5 mg",
+        "<tr><td></td><td><p>2.5 mg",
+      );
+      return toInput(
+        source,
+        single("smpc.4.2.posology", unmerged, [spanFor(source, 1, WORD_PAGE)]),
+      );
+    })(),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // ... and against the numbered list drawn as bullets, its numbers lost.
+  {
+    name: "certified-word-list-number",
+    input: (() => {
+      const source = wordSource(WORD_PAGE);
+      const later = WORD_NARRATIVE.replace("<ol><li>if", "<ul><li>if").replace(
+        "doubles.</li></ol>",
+        "doubles.</li></ul>",
+      );
+      return toInput(source, single("smpc.4.2.posology", later, [spanFor(source, 1, WORD_PAGE)]));
+    })(),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // A line after a break that starts with a bullet glyph is written with a leading tab, so the
+  // glyph is content on the page; a narrative drawing it after a br reads it as a list bullet, and
+  // fails (zone_a.word_epi refuses such a paragraph before it gets here).
+  {
+    name: "certified-word-bullet-after-break",
+    input: (() => {
+      const page = "\nTake 2\n\t• 10 mg\n";
+      const source = wordSource(page);
+      return toInput(
+        source,
+        single("smpc.4.2.posology", div("<p>Take 2<br/>• 10 mg</p>"), [spanFor(source, 1, page)]),
+      );
+    })(),
     expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
   },
 ];

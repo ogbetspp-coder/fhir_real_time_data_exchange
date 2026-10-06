@@ -154,7 +154,7 @@ checked. It is not a comment; it is the shape of the code.
   its last with nothing between them but the spaces the cuts dropped (`coverage-gap`); and any
   hash that disagrees — a match naming another text hash than the section's, an answer whose
   `quoteSha256` is not the chunk's, a block whose text or XHTML does not hash to what its
-  citation shows, or an answer under another normalisation version than `fidelity-norm/3.1.0`
+  citation shows, or an answer under another normalisation version than `fidelity-norm/3.2.0`
   (`checksum-mismatch`). A match that does not say where, or over no section, is refused by
   the contract since query-tools 4.0.0 and by the post-check too.
 
@@ -428,7 +428,7 @@ no more chunks than the full one is used, so a block just over 2,000 units is tw
 full chunk and a sliver of a few words.
 
 **A normalisation-version bump needs this agent first.** The post-check accepts answers under
-`fidelity-norm/3.1.0` only (`quote_edge.NORMALIZATION_VERSION`, held to the service's own export
+`fidelity-norm/3.2.0` only (`quote_edge.NORMALIZATION_VERSION`, held to the service's own export
 by a test). When Zone B moves to a new normalisation version, port the quote-edge rule to it and
 redeploy the agent **before** the service answers under it; until then every block is flagged
 `checksum-mismatch` and shown unverified.

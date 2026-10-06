@@ -74,7 +74,7 @@ def verification(
             "lastUpdated": "2026-09-19T00:00:00Z",
         },
         "result": "match" if result == "match" else "no-match",
-        "normalizationVersion": "fidelity-norm/3.1.0",
+        "normalizationVersion": "fidelity-norm/3.2.0",
         "quoteSha256": sha256_hex(text[start:end]),
         "sectionsSearched": 1,
     }
@@ -251,7 +251,7 @@ def test_an_answer_about_another_quote_is_flagged() -> None:
 
 def test_an_answer_under_another_normalisation_version_is_flagged() -> None:
     verdict = verification()
-    verdict["normalizationVersion"] = "fidelity-norm/3.2.0"
+    verdict["normalizationVersion"] = "fidelity-norm/3.1.0"
     assert only_block(verdict).flags == ("checksum-mismatch",)
 
 

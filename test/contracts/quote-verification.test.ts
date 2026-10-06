@@ -10,7 +10,7 @@ import {
 
 const base = {
   document: { bundleId: "synthetic-smpc", versionId: "1", lastUpdated: "2026-09-19T00:00:00Z" },
-  normalizationVersion: "fidelity-norm/3.1.0",
+  normalizationVersion: "fidelity-norm/3.2.0",
   quoteSha256: "1".repeat(64),
 };
 const where = {
