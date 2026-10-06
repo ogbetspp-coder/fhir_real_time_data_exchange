@@ -3015,6 +3015,8 @@ def group(inner: str = IN_BOX) -> str:
 FLOATING_TEXT = {
     "text-box": (_alternate(floating(box()), vml_box()), "text-box"),
     "text-box-drawing": (floating(box()), "text-box"),
+    # A picture in the box's text: a graphic Word draws there, holding no text.
+    "text-box-picture": (floating(box(IN_BOX + p(r(PICTURE)))), "text-box"),
     "group": (group(), "shapes"),
     "canvas": (
         _alternate(floating(f"<wpc:wpc xmlns:wpc='{WPC}'>{box()}</wpc:wpc>", WPC), requires="wpc"),
@@ -3067,6 +3069,13 @@ def test_every_floating_object_is_placed_where_it_is_anchored() -> None:
 # What, in a floating object, Word refers to or counts elsewhere: each keeps it refused whole.
 COUNTED_INSIDE = {
     "field": p(_field("DOCPROPERTY Title", "x")),
+    "field-marks": p(
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + r("<w:t>x</w:t>")
+        + r('<w:fldChar w:fldCharType="end"/>')
+    ),
+    "field-code": p(r("<w:instrText> PAGE </w:instrText>")),
     "seq": p(_field("SEQ Figure", "1")),
     "simple-field": p('<w:fldSimple w:instr=" SEQ Figure "><w:r><w:t>1</w:t></w:r></w:fldSimple>'),
     "footnote": p(r('<w:footnoteReference w:id="1"/>')),
@@ -3074,8 +3083,12 @@ COUNTED_INSIDE = {
     "list-item": p(r("<w:t>x</w:t>"), '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>'),
     "list-by-style": p(r("<w:t>x</w:t>"), '<w:pStyle w:val="L"/>'),
     "bookmark": p(_marked("b", r("<w:t>x</w:t>"))),
+    "bookmark-start": p('<w:bookmarkStart w:id="1" w:name="b"/>' + r("<w:t>x</w:t>")),
+    "bookmark-end": p(r("<w:t>x</w:t>") + '<w:bookmarkEnd w:id="1"/>'),
     "comment-range": p('<w:commentRangeStart w:id="0"/>' + r("<w:t>x</w:t>")),
+    "comment-range-end": p(r("<w:t>x</w:t>") + '<w:commentRangeEnd w:id="0"/>'),
     "comment-mark": p(r('<w:commentReference w:id="0"/>')),
+    "comment-echo": p(r("<w:annotationRef/>")),
     "section": p(r("<w:t>x</w:t>"), "<w:sectPr/>"),
     "bound": '<w:sdt><w:sdtPr><w:dataBinding w:xpath="/a"/></w:sdtPr><w:sdtContent>'
     + IN_BOX
@@ -4674,6 +4687,13 @@ _LOWER = VAULT.replace("VAULT_ND_", "vault_nd_")
 # CHARFORMAT, no switch, a code in any case, a value as XML reads it, split over runs.
 DOCVARIABLE_READS: list[tuple[str, str, str, str, str]] = [
     ("complex", complex_field(f" DOCVARIABLE {VAULT} \\* MERGEFORMAT ", SPACE), VAULT, " ", " "),
+    (
+        "two-formats",
+        complex_field(f" DOCVARIABLE {VAULT} \\* MERGEFORMAT \\* CHARFORMAT ", SPACE),
+        VAULT,
+        " ",
+        " ",
+    ),
     (
         "complex-no-trailing-space",
         complex_field(f" DOCVARIABLE {VAULT} \\* MERGEFORMAT", SPACE),

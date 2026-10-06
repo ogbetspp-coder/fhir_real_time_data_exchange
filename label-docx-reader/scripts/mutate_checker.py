@@ -113,6 +113,10 @@ _SIX_BYTES = (
     "a frame of six bytes holds no component: it is refused just after, as naming none or too "
     "short for those it names"
 )
+_HELD_CONTROLS = (
+    "every content control of the part, a text box's too, is held to _control before the walk "
+    "(DocxSource._part), so none met here refuses"
+)
 EQUIVALENT: dict[tuple[str, str, str, int], str] = {
     ("_raw_texts", _GUARD, "compare:0", 1): _ATTRIBUTES,
     ("_raw_texts", _GUARD, "str:'&'", 0): _ATTRIBUTES,
@@ -435,6 +439,26 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
         "bool",
         0,
     ): _STRICT,
+    # certify survivors, floating objects set aside (scoped refusals, phase 1)
+    ("_unread_kind", "return None", "statement", 4): (
+        "kind is None there: what follows returns kind, None, or None for a style it refuses"
+    ),
+    ("_unread_kind", "continue", "statement", 0): (
+        "the drawing itself passes every test after it: its tag is drawing or pict, or not "
+        "WordprocessingML's (alternate content), and none of those is a revision or referred to"
+    ),
+    ("_unread_kind", 'if node.tag == _w("sdt"):', "compare:0", 0): _HELD_CONTROLS,
+    ("_unread_kind", 'if node.tag == _w("sdt"):', "str:'sdt'", 0): _HELD_CONTROLS,
+    ("_unread_kind", "_control(node)", "call", 0): _HELD_CONTROLS,
+    (
+        "_Story.paragraph",
+        'if _local(drawing.tag) in ("drawing", "pict", "AlternateContent")',
+        "boolop",
+        0,
+    ): (
+        "a drawing the walk does not set aside is refused as a token when met (token: text "
+        "inside it), so leaving its paragraphs out of this test changes only the refusal's words"
+    ),
 }
 
 _COMPARE = {

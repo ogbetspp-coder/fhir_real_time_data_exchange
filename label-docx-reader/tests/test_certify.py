@@ -49,6 +49,7 @@ from lock import MANIFESTS
 from test_headers_comments import with_parts
 from test_reader import (
     _ITEM,
+    _NESTED,
     _NO_GRID,
     _SOURCES,
     ALL_LOOKS,
@@ -1477,12 +1478,15 @@ def test_a_floating_object_holding_text_is_set_aside_whole_and_placed(name: str)
     data = docx(_p(f"<w:r><w:t>a</w:t>{drawing}<w:t>b</w:t></w:r>"))
     value = _docx_value(data)
     certificate = DocxSource(data).certify(value)
-    # Its text is set aside in every branch: Word's choice and the VML fallback.
+    # Its text is set aside in every branch, Word's choice and the VML fallback, and the run
+    # content that is not text with it (a picture in the box): the object stands for one.
     boxed = drawing.count("in the box") * len("in the box")
+    inner = 1 if name == "text-box-picture" else 0
     assert certificate["source"]["textCharacters"] == len("ab") + boxed
+    assert certificate["source"]["elements"] == 1 + inner
     assert certificate["setAside"]["floatingObjects"] == 1
     assert certificate["setAside"]["unreadObjects"] == 1
-    assert certificate["setAside"]["unreadObjectCharacters"] == boxed
+    assert certificate["setAside"]["unreadObjectCharacters"] == boxed + inner
     placed = {"kind": kind, "offset": 1, "read": False}
     for wrong in (
         [],  # dropped
@@ -1505,11 +1509,11 @@ def test_a_floating_object_holding_text_is_set_aside_whole_and_placed(name: str)
 
 @pytest.mark.parametrize("inside", COUNTED_INSIDE)
 def test_an_object_holding_what_is_counted_elsewhere_is_never_set_aside(inside: str) -> None:
-    claimed = _value({"text": "", "anchored": [{"kind": "text-box", "offset": 0, "read": False}]})
+    # Refused as the walk meets it, whatever result is claimed: never set aside.
     for name in ("text-box", "group", "vml-text-box"):
         drawing = FLOATING_TEXT[name][0].replace(IN_BOX, COUNTED_INSIDE[inside])
         with pytest.raises(CertificationError):
-            DocxSource(docx(_p(f"<w:r>{drawing}</w:r>"), LIST_STYLE)).certify(claimed)
+            DocxSource(docx(_p(f"<w:r>{drawing}</w:r>"), LIST_STYLE))
 
 
 def test_an_object_in_line_in_a_field_or_under_a_listing_style_is_never_set_aside() -> None:
@@ -1532,20 +1536,20 @@ def test_an_object_in_line_in_a_field_or_under_a_listing_style_is_never_set_asid
         (_p(f"<w:r>{FLOATING_TEXT['text-box'][0].replace('wp:anchor', 'wp:inline')}</w:r>"), None),
     ):
         with pytest.raises(CertificationError):
-            DocxSource(docx(body, styles)).certify(claimed)
+            DocxSource(docx(body, styles))
     # The same table with no list there: set aside.
     DocxSource(docx(_p(f"<w:r>{in_table}</w:r>"))).certify(claimed)
     # A revision inside (the check reads each view of a tracked document, which holds none).
     revised = drawing.replace(IN_BOX, '<w:p><w:ins w:id="1"><w:r><w:t>x</w:t></w:r></w:ins></w:p>')
     with pytest.raises(CertificationError):
-        DocxSource(docx(_p(f"<w:r>{revised}</w:r>"))).certify(claimed)
+        DocxSource(docx(_p(f"<w:r>{revised}</w:r>")))
 
 
 @pytest.mark.parametrize("name", NOT_SET_ASIDE)
 def test_a_text_box_not_set_aside_is_never_certified(name: str) -> None:
-    claimed = _value({"text": "x", "anchored": [{"kind": "text-box", "offset": 0, "read": False}]})
+    # Refused as the walk meets it, whatever result is claimed.
     with pytest.raises(CertificationError):
-        DocxSource(docx(NOT_SET_ASIDE[name])).certify(claimed)
+        DocxSource(docx(NOT_SET_ASIDE[name]))
 
 
 def test_paragraphs_in_block_containers_are_read_and_one_in_a_paragraph_is_not() -> None:
@@ -3609,6 +3613,32 @@ def test_a_view_holds_a_text_box_as_stored_and_a_change_in_it_is_never_certified
         certify_tracked(source, {"accepted": _with_part(source, "word/document.xml", accepted)})
 
 
+def test_a_change_inside_a_drawing_is_never_certified_but_in_the_glossary() -> None:
+    from label_docx.certify import certify_tracked
+    from test_tracked import WHO, ins, t
+
+    # A DrawingML text box, as the VML one above.
+    box = FLOATING_TEXT["text-box-drawing"][0]
+    source, views = _views_of(_p(f"<w:r>{box.replace(IN_BOX, _p(ins(t('in'), 2)))}</w:r>"))
+    accepted = _part(views[0]).decode().replace(f'<w:ins w:id="2" {WHO}>', "")
+    with pytest.raises(CertificationError, match="a revision inside a drawing"):
+        certify_tracked(source, {"accepted": _with_part(source, "word/document.xml", accepted)})
+    # In the glossary, which no view reads, it is held as any other change.
+    inserted = ins(t("in"), 5)
+    glossary = (
+        f'<w:glossaryDocument xmlns:w="{W}"><w:docParts><w:docPart><w:docPartBody>'
+        f"{_p(f'<w:r>{box.replace(IN_BOX, _p(inserted))}</w:r>')}"
+        "</w:docPartBody></w:docPart></w:docParts></w:glossaryDocument>"
+    )
+    name = "word/glossary/document.xml"
+    source = _package(docx(_p("<w:r><w:t>a</w:t></w:r>")), name, glossary)
+    kept = _with_part(source, name, glossary.replace(inserted, t("in")))
+    certify_tracked(source, {"accepted": kept})
+    lost = _with_part(source, name, glossary.replace(inserted, ""))
+    with pytest.raises(CertificationError):
+        certify_tracked(source, {"accepted": lost})
+
+
 def test_a_view_holds_text_elements_by_their_namespace() -> None:
     foreign = '<w:r><x:delText xmlns:x="urn:x">a</x:delText></w:r>'
     _held(*_views_of(_p(foreign), (foreign, "<w:r><w:t>a</w:t></w:r>")))
@@ -4345,6 +4375,21 @@ def test_a_docvariable_word_may_show_otherwise_is_never_certified(
     with pytest.raises(CertificationError, match=f"^{re.escape(reason)}$"):
         DocxSource(anchored(field, settings))
     assert len(_HELD) == len(DOCVARIABLE_REFUSALS) - 1  # all but the one with no result
+
+
+def test_a_docvariable_with_a_field_first_in_its_code_is_never_certified() -> None:
+    # Before any of its own code: the field is in the code all the same.
+    first = (
+        _BEGIN
+        + _NESTED
+        + '<w:r><w:instrText xml:space="preserve"> DOCVARIABLE x </w:instrText></w:r>'
+        + _SEPARATE
+        + '<w:r><w:t xml:space="preserve"> </w:t></w:r>'
+        + _END
+    )
+    reason = "a DOCVARIABLE with a field in its code"
+    with pytest.raises(CertificationError, match=f"^{reason}$"):
+        DocxSource(anchored(first, variables(("x", " "))))
 
 
 def test_a_docvariable_result_past_its_paragraph_is_never_certified() -> None:
