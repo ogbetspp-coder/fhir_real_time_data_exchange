@@ -64,8 +64,9 @@ else, with the code in parentheses:
 
 A paragraph of only whitespace with no label is drawn as nothing and left out of both; a section
 of such paragraphs has no narrative and the empty page. The heading itself is held to the text
-rules above and may carry only bold, italic, an underline that cannot change it and capitals over
-text they draw the same (``heading-formatting``), since its line is the section's title.
+rules above and may carry only bold, italic, capitals (its title is its line as Word draws it,
+capitals applied), an underline that cannot change it and small capitals over text they draw the
+same (``heading-formatting``).
 
 A document is refused whole where Word draws something the read does not say: a floating picture
 or shape (``floating-object``, counted by the certificate but not placed), or one of
@@ -94,7 +95,7 @@ from zone_a.structure import line
 from zone_a.underline import underline_changes
 
 # The narrative builder's and the page serialiser's version: one, as they are one closed list.
-WORD_EPI_VERSION: Final = "word-epi/1.0.1"
+WORD_EPI_VERSION: Final = "word-epi/1.0.2"
 
 CARRIED: Final = {"bold": "strong", "italic": "em", "superscript": "sup", "subscript": "sub"}
 # Section 3 step 4's bullet glyphs: a list bullet in page text, removed at a line start.
@@ -622,16 +623,17 @@ def _section(
 def _heading(index: int, paragraph: Paragraph) -> None:
     """The heading's own refusals: its line is the section's title, plain text.
 
-    A tab is a gap the title reads as a space; any mark but bold, italic, an underline that cannot
-    change the text and capitals over text they draw the same, and a label run into the text,
-    would draw the title otherwise.
+    A tab is a gap the title reads as a space; capitals are taken as Word draws them in the title
+    (``zone_a.structure.line``); any other mark but bold, italic, an underline that cannot change
+    the text and small capitals over text they draw the same, and a label run into the text, would
+    draw the title otherwise.
     """
     _check(index, dataclasses.replace(paragraph, text=paragraph.text.replace("\t", " ")))
     for mark in paragraph.marks:
         text = paragraph.text[mark.start : mark.end]
         if not (
-            mark.kind in ("bold", "italic")
-            or (mark.kind in CAPITALS and unchanged_by_capitals(text))
+            mark.kind in ("bold", "italic", "caps")
+            or (mark.kind == "smallCaps" and unchanged_by_capitals(text))
             or (
                 mark.kind == "underline"
                 and not underline_changes(

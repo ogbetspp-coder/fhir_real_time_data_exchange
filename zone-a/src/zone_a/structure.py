@@ -53,17 +53,49 @@ from label_docx.reader import Paragraph
 from zone_a.qrd.headings import collapse, forms, index, match_heading
 from zone_a.qrd.registry import SMPC_END
 
-STRUCTURE_VERSION = "smpc-structure/1.0.3"
+STRUCTURE_VERSION = "smpc-structure/1.0.4"
 
 _NUMBER = re.compile(r"^(\d+(?:\.\d+)?)\.?\s+\S")
 _HEADING_STYLE = re.compile(r"Heading", re.IGNORECASE)
 NEEDS_A_PERSON = frozenset({"missing", "duplicate", "order", "no-code"})
 
 
+# How Word draws text in capitals (``w:caps``), as the label reader's Word oracle records Word's
+# own answers (``label_docx.word``): a character's one capital where it has one; the micro sign and
+# the small roman numerals stay as they are, a character whose capital is more than one character
+# stays, and Greek iota and upsilon with dialytika and tonos lose the tonos. Held equal to the
+# oracle's copy by tests/test_structure.py.
+_CAPS_KEPT = frozenset("\u00b5" + "".join(chr(code) for code in range(0x2170, 0x2180)))
+_CAPS_OWN = {"\u0390": "\u03aa", "\u03b0": "\u03ab"}
+
+
+def capitals(text: str) -> str:
+    """``text`` as Word draws it in capitals."""
+    out: list[str] = []
+    for character in text:
+        capital = character.upper()
+        if character in _CAPS_OWN:
+            out.append(_CAPS_OWN[character])
+        elif character in _CAPS_KEPT or len(capital) != 1:
+            out.append(character)
+        else:
+            out.append(capital)
+    return "".join(out)
+
+
 def line(paragraph: Paragraph) -> str:
-    """What Word shows on the paragraph's first line: its list label and its text, collapsed."""
+    """What Word shows on the paragraph's first line: its list label and its text, collapsed.
+
+    Text in capitals (a heading style that sets ``w:caps`` over a heading typed in lower case) is
+    taken as Word draws it. Small capitals are not: they draw a capital in a small size, and the
+    line keeps the letters as typed, so such a heading is found by a person, not by its text.
+    """
     label = paragraph.numbering.text if paragraph.numbering and paragraph.numbering.text else ""
-    return collapse(f"{label} {paragraph.text}")
+    text = paragraph.text
+    for mark in paragraph.marks:
+        if mark.kind == "caps":
+            text = text[: mark.start] + capitals(text[mark.start : mark.end]) + text[mark.end :]
+    return collapse(f"{label} {text}")
 
 
 def _nodes(registry: dict[str, Any], mapping: Mapping[str, Any]) -> list[dict[str, Any]]:

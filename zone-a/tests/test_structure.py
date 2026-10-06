@@ -12,11 +12,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from label_docx.reader import Numbering, Paragraph
+from label_docx import word
+from label_docx.reader import Mark, Numbering, Paragraph
 
 from zone_a.certified import read_docx
 from zone_a.qrd.headings import forms
-from zone_a.structure import structure
+from zone_a.structure import capitals, line, structure
 
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = json.loads((ROOT / "qrd" / "registry" / "cap-smpc-en-10.4.json").read_text("utf-8"))
@@ -199,3 +200,26 @@ def test_the_script_writes_the_structure_or_the_refusal(tmp_path: Path) -> None:
     broken.write_bytes(b"not a zip")
     assert script.main([str(broken), "--out", str(out)]) == 0
     assert json.loads(out.read_text("utf-8"))["refusal"]["code"] == "invalid-package"
+
+
+def test_a_heading_word_draws_in_capitals_is_found_as_drawn() -> None:
+    """A heading style with ``w:caps`` over a heading typed in lower case (as real labels have)."""
+    # Section 1's template heading is in capitals ("1. NAME OF THE MEDICINAL PRODUCT").
+    typed = next(iter(forms(SECTIONS["smpc.1"]))).lower()
+    in_capitals = Paragraph(typed, None, None, None, marks=(Mark(0, len(typed), "caps"),))
+    small = Paragraph(typed, None, None, None, marks=(Mark(0, len(typed), "smallCaps"),))
+    paragraphs = _skeleton()
+    at = next(i for i, p in enumerate(paragraphs) if line(p) == typed.upper())
+    paragraphs[at] = in_capitals
+    found = {s["key"]: s for s in structure(paragraphs, REGISTRY, MAPPING)["sections"]}
+    assert (found["smpc.1"]["status"], found["smpc.1"]["heading"]) == ("mapped", at)
+    assert line(in_capitals) == typed.upper()
+    paragraphs[at] = small
+    found = {s["key"]: s for s in structure(paragraphs, REGISTRY, MAPPING)["sections"]}
+    assert found["smpc.1"]["status"] == "missing"
+
+
+def test_capitals_are_the_word_oracles_capitals() -> None:
+    """Held equal, character by character, to the copy the label reader holds to Word's answers."""
+    sample = "".join(chr(c) for c in range(0x20, 0x2200) if chr(c).isprintable())
+    assert capitals(sample) == word._word_capitals(sample)
