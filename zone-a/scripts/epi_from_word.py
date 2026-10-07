@@ -55,6 +55,13 @@ def _assignment(text: str) -> tuple[str, int]:
     return key, int(at)
 
 
+def _placed(assignments: dict[str, int], parts: list[tuple[int, int, int | None]]) -> None:
+    """Refuses an assignment to a paragraph in no part: it would be dropped, not refused."""
+    for key, at in assignments.items():
+        if not any(start <= at < end for start, end, _ in parts):
+            raise ValueError(f"{key}={at}: paragraph {at} is in no part the document holds")
+
+
 def build(
     data: bytes,
     assignments: dict[str, int],
@@ -80,6 +87,7 @@ def build(
         found, reason = leaflet.leaflets(body.paragraphs, registry)
         if reason is not None:
             return result | {"leaflets": {"ready": False, "reason": reason}}
+        _placed(assignments, found)
         result["leaflets"] = [
             {"span": [start, end]}
             | _sections(
@@ -103,6 +111,7 @@ def build(
     if why is not None:
         # Several SmPCs whose boundary the template's own lines do not settle: for a person.
         return result | {"smpcs": {"ready": False, "reason": why}}
+    _placed(assignments, parts)
     if len(parts) == 1:
         return result | _smpc(body, registry, mapping, assignments, None, chrome)
     result["smpcs"] = [

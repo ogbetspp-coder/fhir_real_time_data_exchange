@@ -34,13 +34,14 @@ information may hold several leaflets, one per presentation.
    leaflet (its list of sections included) must name the same one, or no heading holding X is
    recognised and a person names them.
 4. **Headings, exactly.** As for the SmPC: a line is a heading only when it is one of the
-   template's forms, with three readings, each the EMA's own:
+   template's forms (of two or more optional segments standing together, "<take> <use>", at least
+   one), with three readings, each the EMA's own:
    - an optional segment that begins with a comma is written without the space before it
      ("Pregnancy, breast-feeding and fertility"), and a non-breaking hyphen is the hyphen it
      draws;
-   - a heading whose title holds a fill-in ("This leaflet was last revised in <{MM/YYYY}><{month
-     YYYY}>.", completed at printing) is found by its text before the fill-in, followed by
-     nothing or by anything but a letter or digit;
+   - a heading whose title ends in the date completed at printing ("This leaflet was last revised
+     in <{MM/YYYY}><{month YYYY}>.") is found by its text before the date, followed by nothing, a
+     date ("06/2026", "June 2026") or the placeholder still as written, and at most a full stop;
    - "Marketing Authorisation Holder" alone heads the section the template calls "Marketing
      Authorisation Holder and Manufacturer": the annotated template allows the combined heading
      only where holder and manufacturer are the same, and otherwise has each stated "and
@@ -50,12 +51,19 @@ information may hold several leaflets, one per presentation.
    ("If you take more X than you should") stays text of its section, as for the SmPC.
 
 5. **Lists are not headings.** Lines next to each other (blank paragraphs aside), each starting
-   with a section number from 1 to 6, the numbers rising by one, are a list: the leaflet's list
-   of its sections, or numbered steps. Two sections never stand next to each other with no text
-   between.
-6. **Several leaflets.** Each line that opens a leaflet ("Package leaflet: Information for the
+   with a section number from 1 to 6, the numbers rising by one, are a list. One that starts with
+   section 1's heading is the leaflet's list of its sections: none of its lines is a heading,
+   since two sections never stand next to each other with no text between. Any other is numbered
+   steps, whose lines are not candidates, but a section's heading among them ("3. Dispose of the
+   pen." then "4. Possible side effects") stays a heading.
+6. **Where it ends.** At the product information's next annex ("ANNEX IV", in 10 of the corpus's
+   files) or the end of the document.
+7. **Several leaflets.** Each line that opens a leaflet ("Package leaflet: Information for the
    patient") after the first starts the next one; each is its own ePI, with the root line they
-   share as its root heading, as for the SmPCs of one Annex I (owner decision 3).
+   share as its root heading, as for the SmPCs of one Annex I (owner decision 3). A leaflet opened
+   by a line the template does not write ("Package Leaflet: ...") is not split off, so its
+   headings are each found twice, which is for a person: a boundary the template's lines do not
+   settle is never guessed.
 
 The output has the SmPC structure's shape and statuses, so `zone_a.word_epi` builds a ready
 leaflet's sections as it builds an SmPC's.

@@ -238,15 +238,18 @@ recommendations ... the rest you are authorized to do as well"); each reading is
    the template's own:
    - a choice that begins with a comma is written without the space before it, and a
      non-breaking hyphen is the hyphen it draws;
-   - a heading that ends in a fill-in completed at printing ("This leaflet was last revised in
-     <{MM/YYYY}>...") is found by its text before the fill-in;
+   - a heading that ends in the date completed at printing ("This leaflet was last revised in
+     <{MM/YYYY}>...") is found by its text followed by that date, its placeholder or nothing;
    - "Marketing Authorisation Holder" alone heads the holder's section, which the template calls
      "Marketing Authorisation Holder and Manufacturer" and the annotated template allows only
      where the two are the same.
 
    A wording the annotated template leaves to the EMA case by case ("How X is given" for a
    medicine a nurse gives) is for a person, as decision 4 says. Each leaflet of a file is its own
-   ePI, as decision 3 says for SmPCs.
+   ePI, as decision 3 says for SmPCs. Two judgements of structure, not wording: the leaflet ends
+   at the product information's next annex ("ANNEX IV") or the document's end, and numbered lines
+   standing together are a list (the leaflet's list of its sections when it starts with section
+   1's heading; else numbered steps, among which a section's heading stays a heading).
 
 ## Progress
 

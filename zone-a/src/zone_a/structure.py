@@ -20,7 +20,9 @@ is a ``number`` candidate for that section, and a paragraph in a heading style t
 heading is a ``style`` candidate in the section it stands in: both are shown to a person, and a
 section stays ``missing`` until the person names its heading (``assignments``), which makes it
 ``assigned``. A heading a person names is a heading for the scan too: a named subsection after an
-assigned numbered section is found inside it.
+assigned numbered section is found inside it, and an assigned paragraph is no candidate. What the
+template's lines settle is not a person's to name: a paragraph the scan finds as a heading, or a
+section whose heading it finds, without the assignments, cannot be assigned.
 
 Text. The SmPC ends where a line is the registry's own end of it (``SMPC_END``, "ANNEX II"): a
 file of the whole product information goes on with the labelling, which reuses section 1's line,
@@ -304,39 +306,51 @@ def find(
             raise ValueError(f"paragraph {at} is assigned twice")
         assigned[at] = key
 
-    found: list[tuple[int, str, str]] = []  # (paragraph, key, how): how = "found" or "assigned"
-    candidates: dict[str, list[dict[str, Any]]] = {}
-    current: str | None = None  # the numbered section the scan is in
-    if shared is not None:
-        found.append((shared, nodes[0]["key"], "found"))
-    for i in range(start, stop):
-        paragraph = paragraphs[i]
-        text = line(paragraph)
-        hit = recognise(text, current) if text and i not in listed else None
-        if i in assigned:
-            # A person's heading is a heading for the scan too: a named section after an assigned
-            # numbered one is found inside it.
+    def scan(
+        assigned: Mapping[int, str],
+    ) -> tuple[list[tuple[int, str, str]], dict[str, list[dict[str, Any]]]]:
+        """(paragraph, key, how) for each heading, how "found" or "assigned"; and the candidates."""
+        found: list[tuple[int, str, str]] = []
+        candidates: dict[str, list[dict[str, Any]]] = {}
+        current: str | None = None  # the numbered section the scan is in
+        if shared is not None:
+            found.append((shared, nodes[0]["key"], "found"))
+        for i in range(start, stop):
+            paragraph = paragraphs[i]
+            text = line(paragraph)
+            hit = recognise(text, current) if text and i not in listed else None
+            if i in assigned:
+                # A person's heading is a heading for the scan too: a named section after an
+                # assigned numbered one is found inside it.
+                hit = assigned[i]
+                found.append((i, hit, "assigned"))
+            elif hit is not None:
+                found.append((i, hit, "found"))
             if hit is not None:
-                raise ValueError(f"paragraph {i} is already a heading")
-            hit = assigned[i]
-            found.append((i, hit, "assigned"))
-        elif hit is not None:
-            found.append((i, hit, "found"))
-        if hit is not None:
-            if by_key[hit]["number"] is not None:
-                current = hit
-            continue
-        if not text or i in listed:
-            continue
-        number = _NUMBER.match(text)
-        if number is not None and number.group(1) in numbers:
-            candidates.setdefault(numbers[number.group(1)], []).append(
-                {"paragraph": i, "why": "number"}
-            )
-        elif paragraph.style is not None and _HEADING_STYLE.match(paragraph.style):
-            where = current or nodes[0]["key"]
-            candidates.setdefault(where, []).append({"paragraph": i, "why": "style"})
+                if by_key[hit]["number"] is not None:
+                    current = hit
+                continue
+            if not text or i in listed:
+                continue
+            number = _NUMBER.match(text)
+            if number is not None and number.group(1) in numbers:
+                candidates.setdefault(numbers[number.group(1)], []).append(
+                    {"paragraph": i, "why": "number"}
+                )
+            elif paragraph.style is not None and _HEADING_STYLE.match(paragraph.style):
+                where = current or nodes[0]["key"]
+                candidates.setdefault(where, []).append({"paragraph": i, "why": "style"})
+        return found, candidates
 
+    # A person names what the template's lines do not: a paragraph the scan finds as a heading
+    # cannot be assigned, and neither can a section whose heading it finds.
+    unassigned, _ = scan({})
+    for at, key in assigned.items():
+        if any(i == at for i, _, _ in unassigned):
+            raise ValueError(f"paragraph {at} is already a heading")
+        if any(k == key for _, k, _ in unassigned):
+            raise ValueError(f"section {key} already has its heading")
+    found, candidates = scan(assigned)
     for key in set(assigned.values()):
         if sum(1 for _, k, _ in found if k == key) > 1:
             raise ValueError(f"section {key} already has its heading")

@@ -219,8 +219,9 @@ def test_a_leaflet_whose_section_1_lines_name_two_medicines_has_no_name() -> Non
     assert not result["ready"]
     statuses = {s["key"]: s["status"] for s in result["sections"]}
     assert statuses["pl.1"] == statuses["pl.2.do-not-take"] == "missing"
-    # A heading without X is found, and so is a named one inside it.
-    assert statuses["pl.4"] == statuses["pl.4.reporting"] == "mapped"
+    # A heading without X is found; with no name the list of sections is not told from steps, so
+    # its "4. Possible side effects" is found too, and the two are for a person.
+    assert statuses["pl.4"] == "duplicate"
 
 
 def test_a_document_with_two_leaflets_gives_each_its_own() -> None:
@@ -270,6 +271,114 @@ def test_the_line_key_collapses_spaces_and_reads_a_non_breaking_hyphen() -> None
 def test_every_form_of_every_heading_names_x_only_as_a_word() -> None:
     # A form that wrote "X" inside a word would put the name there.
     for head in HEADS.values():
+        if head["key"] == "pl.2.excipients":
+            # "X contains {name the excipient(s)}" ends in a fill-in no line can match exactly.
+            with pytest.raises(ValueError, match="not the date"):
+                forms(head)
+            continue
         lines, _ = forms(head)
         for line in lines:
             assert all(word == "X" or "X" not in word for word in line.split()), line
+
+
+# ---- the independent review's cases (2026-10-06) -------------------------------------------------
+
+
+def test_the_leaflet_ends_at_the_next_annex() -> None:
+    after = ["ANNEX IV", "SCIENTIFIC CONCLUSIONS", "The CHMP recommends ..."]
+    end = len(_leaflet())
+    # As written: _p would write the name for the X of "ANNEX".
+    paragraphs = [*_paragraphs(_leaflet()), *(Paragraph(t, None, None, None) for t in after)]
+    assert leaflets(paragraphs, REGISTRY) == ([(0, end, None)], None)
+    result = structure(paragraphs, REGISTRY, MAPPING)
+    assert result["ready"]
+    assert result["end"] == end
+    assert all(i < end for s in result["sections"] for i in s["paragraphs"])
+
+
+def test_the_revision_date_heading_takes_a_date_or_its_placeholder_only() -> None:
+    def status(wording: str) -> str:
+        lines = _leaflet({"This leaflet was last revised in": wording})
+        return str(
+            _by_key(structure(_paragraphs(lines), REGISTRY, MAPPING))["pl.6.revised"]["status"]
+        )
+
+    for wording in (
+        "This leaflet was last revised in June 2026.",
+        "This leaflet was last revised in <{MM/YYYY}><{month YYYY}>.",
+        "This leaflet was last revised in month/YYYY",
+        "This leaflet was last revised in .",
+    ):
+        assert status(wording) == "mapped", wording
+    for wording in (
+        "This leaflet was last revised in accordance with the CHMP opinion; ask your doctor.",
+        "This leaflet was last revised in Other sources of information",
+        "This leaflet was last revised in 2026.",
+    ):
+        assert status(wording) == "missing", wording
+
+
+def test_steps_before_a_heading_do_not_take_it_into_their_list() -> None:
+    lines = _leaflet()
+    at = lines.index(CONTENTS[3], 10)
+    lines[at:at] = ["1. Wash your hands.", "2. Clean the skin.", "3. Dispose of the pen."]
+    result = structure(_paragraphs(lines), REGISTRY, MAPPING)
+    assert result["ready"]
+    assert _by_key(result)["pl.4"]["heading"] == at + 3
+    lines = _leaflet()
+    at = lines.index(CONTENTS[4], 10)
+    lines[at + 1] = "6 months after first opening, throw it away."
+    result = structure(_paragraphs(lines), REGISTRY, MAPPING)
+    assert _by_key(result)["pl.5"]["heading"] == at
+
+
+def test_steps_at_the_end_of_a_leaflet_are_a_list_and_a_seventh_is_no_step() -> None:
+    result = structure(
+        _paragraphs(_leaflet(extra=["1. Open the box.", "2. Take out the pen."])), REGISTRY, MAPPING
+    )
+    assert result["ready"]
+    assert all(not s["candidates"] for s in result["sections"])
+    lines = _leaflet()
+    at = lines.index(CONTENTS[2], 10) + 1
+    lines[at:at] = ["6. Hold the pen.", "7. Press the button."]
+    result = structure(_paragraphs(lines), REGISTRY, MAPPING)
+    assert _by_key(result)["pl.6"]["candidates"] == [{"paragraph": at, "why": "number"}]
+
+
+def test_a_choice_of_two_takes_at_least_one() -> None:
+    assert forms(HEADS["pl.2.do-not-take"])[0] == {
+        "Do not take X",
+        "Do not use X",
+        "Do not take use X",
+    }
+    assert "Package leaflet: Information for the" not in forms(REGISTRY["leafletTitle"])[0]
+    pregnancy = forms(HEADS["pl.2.pregnancy"])[0]
+    assert "Pregnancy breast-feeding" not in pregnancy
+    assert "Pregnancy and breast-feeding and fertility" in pregnancy
+
+
+def test_a_name_with_regular_expression_characters_is_taken_as_written() -> None:
+    for called in ("Zor(vex)+", "Zor\\1vex", "a.b*c"):
+        lines = [line.replace(NAME, called) for line in _leaflet()]
+        paragraphs = [Paragraph(text.replace("X", called), None, None, None) for text in lines]
+        result = structure(paragraphs, REGISTRY, MAPPING)
+        assert (result["name"], result["ready"]) == (called, True), called
+
+
+def test_two_sections_sharing_a_form_are_refused() -> None:
+    registry = json.loads(json.dumps(REGISTRY))
+    heads = {h["key"]: h for h in registry["headings"]}
+    heads["pl.2.driving"]["title"] = heads["pl.2.warnings"]["title"]
+    with pytest.raises(ValueError, match="a heading of two sections"):
+        structure(_paragraphs(_leaflet()), registry, MAPPING)
+
+
+def test_a_heading_with_a_choice_before_its_date_is_refused() -> None:
+    head = {
+        "title": [
+            {"kind": "optional", "value": [{"kind": "text", "value": "a"}]},
+            {"kind": "fill", "value": "MM/YYYY"},
+        ]
+    }
+    with pytest.raises(ValueError, match="a choice before its fill-in"):
+        forms(head)

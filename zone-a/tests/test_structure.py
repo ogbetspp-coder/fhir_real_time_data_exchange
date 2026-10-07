@@ -340,3 +340,23 @@ def test_where_one_smpc_ends_is_for_a_person_unless_the_template_settles_it() ->
         assert parts == []
         assert reason is not None
         assert why in reason
+
+
+def test_an_assignment_cannot_take_a_paragraph_the_template_settles() -> None:
+    paragraphs = _skeleton()
+    at = next(i for i, p in enumerate(paragraphs) if p.text.startswith("4.3"))
+    paragraphs[at] = _p("4.3 Contraindications (adults)")
+    text = next(i for i, p in enumerate(paragraphs) if p.text == "Take 5 mg daily.")
+    method = next(i for i, p in enumerate(paragraphs) if p.text == "Method of administration")
+    with pytest.raises(ValueError, match="already a heading"):
+        structure(
+            paragraphs, REGISTRY, MAPPING, {"smpc.4.3": text, "smpc.4.2.administration": method}
+        )
+    # A subsection a person names after naming its section: theirs, not the scan's.
+    at = next(i for i, p in enumerate(paragraphs) if p.text.startswith("4.2"))
+    paragraphs[at] = _p("4.2 Posology and method of administration (adults)")
+    posology = next(i for i, p in enumerate(paragraphs) if p.text == "Posology")
+    result = _by_key(
+        structure(paragraphs, REGISTRY, MAPPING, {"smpc.4.2": at, "smpc.4.2.posology": posology})
+    )
+    assert result["smpc.4.2.posology"]["status"] == "assigned"

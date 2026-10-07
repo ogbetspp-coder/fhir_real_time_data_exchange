@@ -677,6 +677,9 @@ def test_the_script_writes_the_sections_the_structure_or_the_refusal(tmp_path: P
     assert statuses["pl"] == statuses["pl.1"] == statuses["pl.6.revised"] == "mapped"
     assert statuses["pl.2"] == "missing"
     assert "epi" not in only
+    # An assignment to a paragraph in no leaflet is an error, not dropped.
+    with pytest.raises(SystemExit):
+        script.main([str(TEMPLATE), "--no-drawing", "--document", "pl", "--assign", "pl.2=3"])
     # An SmPC alone has no leaflet.
     assert script.main([str(label), "--no-drawing", "--document", "pl", "--out", str(out)]) == 0
     assert json.loads(out.read_text("utf-8"))["leaflets"] == {

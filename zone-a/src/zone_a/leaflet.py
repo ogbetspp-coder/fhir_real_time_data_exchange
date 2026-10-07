@@ -8,10 +8,13 @@ mean what they mean for an SmPC. The output has the SmPC structure's shape, so
 ``zone_a.word_epi.sections`` builds a leaflet as it builds an SmPC. It finds; a person confirms.
 
 The leaflet. It starts at the registry's root line ("B. PACKAGE LEAFLET", which must stand once)
-and runs to the end of the document. A file of the whole product information may hold several
-leaflets, one per presentation: each starts at a line the template opens a leaflet with
+and runs to the product information's next annex ("ANNEX IV", a line of "ANNEX" and a roman
+numeral, ``END``) or the end of the document. A file of the whole product information may hold
+several leaflets, one per presentation: each starts at a line the template opens a leaflet with
 ("Package leaflet: Information for the <patient> <user>"), and each is its own ePI whose root
-heading is the root line they share (``leaflets``), as for the SmPCs of one Annex I.
+heading is the root line they share (``leaflets``), as for the SmPCs of one Annex I. A leaflet
+opened by a line the template does not write ("Package Leaflet: ...") is not split off: the two
+leaflets' headings are then each found twice, which is for a person.
 
 The name. The template writes the medicine's (invented) name as "X" in its headings ("Throughout
 the text 'X' stands for the (invented) name of the medicine", the annotated template 10.4). A
@@ -21,20 +24,24 @@ has none and no heading holding X is recognised.
 
 Headings. A line, collapsed as ``zone_a.qrd.headings`` collapses it and with each non-breaking
 hyphen (U+2011) read as the hyphen it draws, is a heading when it is one of the forms the
-registry allows for it with the leaflet's name for X: each optional segment present or absent, an
-optional segment that begins with a comma written without the space before it ("Pregnancy,
-breast-feeding and fertility"). The root line starts the leaflet; a numbered section's line
-anywhere in it; a named section's line only inside its numbered section, and only a named section
-the mapping (the EMA's profile) requires: an optional one stays text of its section, as for an
-SmPC. A heading whose title holds a fill-in ("This leaflet was last revised in <{MM/YYYY}><{month
-YYYY}>.", completed at printing) is recognised by its text before the first fill-in: a line that
-is that text, or that text followed by anything but a letter or digit. Two forms the template does
-not write are each a named section's heading too (``ALSO``).
+registry allows for it with the leaflet's name for X: each optional segment present or absent,
+but of two or more standing together (only spaces between them, "<take> <use>"), a choice, at
+least one; an optional segment that begins with a comma written without the space before it
+("Pregnancy, breast-feeding and fertility"). The root line starts the leaflet; a numbered
+section's line anywhere in it; a named section's line only inside its numbered section, and only a
+named section the mapping (the EMA's profile) requires: an optional one stays text of its
+section, as for an SmPC. A heading whose title ends in the date completed at printing ("This
+leaflet was last revised in <{MM/YYYY}><{month YYYY}>.") is recognised by its text before the
+date: a line that is that text followed by nothing, a date ("06/2026", "June 2026") or the
+template's placeholder for one ("{MM/YYYY}"), and at most a full stop. A form the template does not
+write is a named section's heading only where ``ALSO`` names it.
 
 Lists. Lines with text that stand next to each other (blank paragraphs aside), each starting with
-a section number from 1 to 6, the numbers rising by one, are a list: the leaflet's list of its
-own sections, or numbered steps. None of them is a heading or a candidate: two sections never
-stand next to each other with no text between.
+a section number from 1 to 6, the numbers rising by one, are a list. One that starts with section
+1's heading is the leaflet's list of its own sections, none of whose lines is a heading or a
+candidate (two sections never stand next to each other with no text between). Any other is
+numbered steps, whose lines are neither headings nor candidates except a numbered section's
+heading among them ("3. Dispose of the pen." then "4. Possible side effects").
 """
 
 from __future__ import annotations
@@ -59,8 +66,17 @@ LEAFLET_VERSION = "pl-structure/1.0.0"
 # Holder" opening the section, the manufacturer's in its text.
 ALSO: dict[str, tuple[str, ...]] = {"pl.6.holder": ("Marketing Authorisation Holder",)}
 
+# The product information's next annex after the leaflet: Annex IV, in the corpus, as its own line.
+END = re.compile(r"^ANNEX [IVXL]+(?: |$)")
+
 _X = re.compile(r"\bX\b")
 _NUMBERED = re.compile(r"^([1-6])\.?\s+\S")
+# The date a heading ends in, completed at printing: the template's fill-ins for it, and what may
+# follow its text in a label: a date, the placeholder still as written, then at most a full stop.
+_DATE_FILLS = frozenset({"MM/YYYY", "month YYYY"})
+_MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December"
+_DATE = rf"(?:[0-9]{{1,2}}/[0-9]{{4}}|(?:{_MONTHS}) [0-9]{{4}}|MM/YYYY|month YYYY|month/YYYY)"
+_DATE_TAIL = re.compile(rf"(?: ?[<{{]*{_DATE}[>}}]*)* ?\.?")
 
 
 def key(text: str) -> str:
@@ -69,16 +85,45 @@ def key(text: str) -> str:
 
 
 def _expand(tokens: list[Token]) -> list[str]:
-    """Every rendering of text and optional tokens, each optional segment present or absent."""
+    """Every rendering of text and optional tokens (the module docstring's choices)."""
     out = [""]
-    for token in tokens:
+    at = 0
+    while at < len(tokens):
+        token = tokens[at]
         if token["kind"] == "text":
             out = [o + str(token["value"]) for o in out]
-        elif token["kind"] == "optional":
-            inner = _expand(children(token))
-            out = [o + i for o in out for i in ["", *inner]]
-        else:
+            at += 1
+            continue
+        if token["kind"] != "optional":
             raise ValueError(f"a heading form holds a {token['kind']}")
+        # The optional segments standing together from here, with the spaces between them.
+        run = [token]
+        at += 1
+        while at < len(tokens):
+            gap = tokens[at]
+            if gap["kind"] == "optional":
+                run.append(gap)
+                at += 1
+            elif (
+                gap["kind"] == "text"
+                and not str(gap["value"]).strip()
+                and at + 1 < len(tokens)
+                and tokens[at + 1]["kind"] == "optional"
+            ):
+                run += [gap, tokens[at + 1]]
+                at += 2
+            else:
+                break
+        renderings: list[tuple[str, bool]] = [("", False)]  # (text, an option present)
+        for part in run:
+            if part["kind"] == "text":
+                renderings = [(r + str(part["value"]), present) for r, present in renderings]
+            else:
+                inner = _expand(children(part))
+                renderings = [*renderings, *((r + i, True) for r, _ in renderings for i in inner)]
+        options = sum(1 for part in run if part["kind"] == "optional")
+        chosen = [r for r, present in renderings if present or options == 1]
+        out = [o + r for o in out for r in chosen]
     return out
 
 
@@ -89,9 +134,10 @@ def _has_fill(tokens: list[Token]) -> bool:
 
 
 def forms(head: Mapping[str, Any]) -> tuple[set[str], str | None]:
-    """A registry heading's lines, X as written, and the text before its first fill-in (if any).
+    """A registry heading's lines, X as written, or the text before the date it ends in.
 
-    The template's own wording, every optional segment present, is the first form.
+    Raises:
+        ValueError: The heading holds a fill-in that is not that date, or a choice before it.
     """
     title: list[Token] = head["title"]
     number = (head["number"] + ("." if head["dotted"] else "") + " ") if "number" in head else ""
@@ -99,9 +145,21 @@ def forms(head: Mapping[str, Any]) -> tuple[set[str], str | None]:
     if cut is not None:
         if any(t["kind"] != "text" for t in title[:cut]):
             raise ValueError("a heading holds a choice before its fill-in")
+        if not set(_fills(title[cut:])) <= _DATE_FILLS:
+            raise ValueError("a heading holds a fill-in that is not the date it was revised")
         return set(), key(number + "".join(str(t["value"]) for t in title[:cut]))
     lines = {key(number + rendered).replace(" ,", ",") for rendered in _expand(title)}
     return {form for form in lines if form}, None
+
+
+def _fills(tokens: list[Token]) -> list[str]:
+    out: list[str] = []
+    for token in tokens:
+        if token["kind"] == "fill":
+            out.append(str(token["value"]))
+        elif token["kind"] == "optional":
+            out += _fills(children(token))
+    return out
 
 
 def _named(text: str, name: str) -> str:
@@ -134,34 +192,50 @@ def leaflets(
     roots = [i for i, p in enumerate(paragraphs) if key(line(p)) == root]
     if len(roots) != 1:
         return [], f"{len(roots)} lines {registry['root']!r}, expected one"
+    end = next(
+        (i for i in range(roots[0] + 1, len(paragraphs)) if END.match(key(line(paragraphs[i])))),
+        len(paragraphs),
+    )
     titles, _ = forms(registry["leafletTitle"])
-    opens = [i for i in range(roots[0], len(paragraphs)) if key(line(paragraphs[i])) in titles]
+    opens = [i for i in range(roots[0], end) if key(line(paragraphs[i])) in titles]
     if len(opens) < 2:
-        return [(roots[0], len(paragraphs), None)], None
+        return [(roots[0], end, None)], None
     starts = [roots[0], *opens[1:]]
-    stops = [*opens[1:], len(paragraphs)]
+    stops = [*opens[1:], end]
     return [
         (start, stop, None if n == 0 else roots[0])
         for n, (start, stop) in enumerate(zip(starts, stops, strict=True))
     ], None
 
 
-def _listed(paragraphs: Sequence[Paragraph], start: int, end: int) -> frozenset[int]:
-    """The paragraphs of runs of numbered lines, numbers rising by one (the module docstring)."""
+def _listed(
+    paragraphs: Sequence[Paragraph], start: int, end: int, numbered: Mapping[str, str]
+) -> frozenset[int]:
+    """The paragraphs of lists that are neither headings nor candidates (the module docstring).
+
+    ``numbered`` maps each numbered section's heading line to its key.
+    """
     out: set[int] = set()
-    run: list[tuple[int, int]] = []
-    for i in [*range(start, end), None]:
-        text = key(line(paragraphs[i])) if i is not None else "end"
+    run: list[tuple[int, int, str]] = []
+
+    def close() -> None:
+        if len(run) < 2:
+            return
+        contents = numbered.get(run[0][2]) == "pl.1"
+        out.update(at for at, _, text in run if contents or text not in numbered)
+
+    for i in range(start, end):
+        text = key(line(paragraphs[i]))
         if not text:
             continue  # a blank paragraph: the lines on either side stand next to each other
         hit = _NUMBERED.match(text)
         n = int(hit.group(1)) if hit else None
-        if n is not None and i is not None and run and n == run[-1][1] + 1:
-            run.append((i, n))
+        if n is not None and run and n == run[-1][1] + 1:
+            run.append((i, n, text))
             continue
-        if len(run) >= 2:
-            out.update(at for at, _ in run)
-        run = [(i, n)] if n is not None and i is not None else []
+        close()
+        run = [(i, n, text)] if n is not None else []
+    close()
     return frozenset(out)
 
 
@@ -241,17 +315,20 @@ def structure(
     called = name(paragraphs, registry, start, end)
     nodes = _nodes(registry, mapping)
     exact: dict[str, str] = {}
-    prefixes: list[tuple[str, str]] = []
+    prefixes: dict[str, str] = {}
     for node in nodes[1:]:
         lines, prefix = forms(node["head"])
-        if prefix is not None:
-            prefixes.append((prefix, node["key"]))
-        for form in [*lines, *(key(also) for also in ALSO.get(node["key"], ()))]:
+        for form, table in [
+            *((form, exact) for form in lines),
+            *((key(also), exact) for also in ALSO.get(node["key"], ())),
+            *(((prefix, prefixes),) if prefix is not None else ()),
+        ]:
             if _X.search(form) and called is None:
                 continue  # no name: a heading holding X is not recognised
             text = _named(form, called or "X")
-            if exact.setdefault(text, node["key"]) != node["key"]:
+            if (exact.get(text) or prefixes.get(text) or node["key"]) != node["key"]:
                 raise ValueError(f"{text!r} is a heading of two sections")
+            table[text] = node["key"]
     by_key = {n["key"]: n for n in nodes}
     root = key(registry["root"])
 
@@ -264,9 +341,8 @@ def structure(
             found = next(
                 (
                     k
-                    for prefix, k in prefixes
-                    if text.startswith(prefix)
-                    and (len(text) == len(prefix) or not text[len(prefix)].isalnum())
+                    for prefix, k in prefixes.items()
+                    if text.startswith(prefix) and _DATE_TAIL.fullmatch(text[len(prefix) :])
                 ),
                 None,
             )
@@ -275,7 +351,8 @@ def structure(
         node = by_key[found]
         return found if node["number"] is not None or node["parent"] == current else None
 
-    listed = _listed(paragraphs, start, end)
+    numbered = {text: k for text, k in exact.items() if by_key[k]["number"] is not None}
+    listed = _listed(paragraphs, start, end, numbered)
     result = find(paragraphs, nodes, recognise, start, end, shared, assignments, listed)
     return {
         "structurer": LEAFLET_VERSION,
