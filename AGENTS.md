@@ -71,7 +71,8 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
    token, runs `npm run check` again and makes the deploy's inputs; the `deploy` job installs
    nothing and waits for CI's run on the commit (every job but Renderer, which stays a required
    pull-request check). A merge touching only the paths in
-   its `paths-ignore` does not deploy. Cloud Build only builds images.
+   its `paths-ignore` does not deploy. Cloud Build builds images, and draws a certified Word
+   label on request (`infra/word-drawing.tf`); it never applies or deploys.
 6. Use a separate git worktree for every parallel writing agent.
 7. Merge a pull request with a merge commit (or a squash), never by rebase or fast-forward: the
    importer lock's test reads main's first-parent history as released

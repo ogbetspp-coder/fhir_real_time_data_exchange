@@ -179,6 +179,10 @@ def one(document: str, path: Path, shell: Path, chrome: Path) -> dict[str, Any]:
                     raw[name] = list(answers)
                 entry["agree"] = {k: sum(v["agrees"] for v in verdicts[k]) for k in verdicts}
                 entry["differ"] = [[v["key"], v["where"]] for v in verdicts["shell"] if v["where"]]
+                # SHELL's raw answers by digest, to compare runs on other machines.
+                entry["shell_raw_sha256"] = hashlib.sha256(
+                    json.dumps(raw["shell"]).encode("utf-8")
+                ).hexdigest()
                 for name in ("google", "shell2", "window"):
                     entry[f"verdicts_shell_eq_{name}"] = verdicts["shell"] == verdicts[name]
                     entry[f"raw_shell_eq_{name}"] = raw["shell"] == raw[name]

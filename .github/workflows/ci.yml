@@ -241,7 +241,10 @@ jobs:
           node-version: 22.22.0
           package-manager-cache: false
 
+      # With the legacy builder, as the deploy's images build pushes it (cloudbuild.images.yaml).
       - name: Build the word-drawing image
+        env:
+          DOCKER_BUILDKIT: "0"
         run: npm run word-drawing:image
 
       - name: Draw the fixtures in the image

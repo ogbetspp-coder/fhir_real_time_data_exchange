@@ -65,8 +65,8 @@ describe("the worker identity once the transitional grants are removed", () => {
         { type: "google_kms_crypto_key_iam_member", role: "roles/cloudkms.publicKeyViewer" },
       ]),
     );
-    // objectViewer twice: the submissions bucket and the approval heads bucket.
-    expect(roles).toHaveLength(10);
+    // objectViewer three times: the submissions, the approval heads and the Word drawing records.
+    expect(roles).toHaveLength(11);
   });
 
   // It verifies a document's head before it publishes (docs/design/approval.md, D8): it reads the

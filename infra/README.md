@@ -3,7 +3,9 @@
 The Terraform configuration for one EMA Flow environment on Google Cloud: the worker, query and
 approval signer Cloud Run services, the pipeline workflow, the Healthcare dataset, the evidence,
 submission, profile and approval heads buckets, the BigQuery analytics and ledger datasets, the customer-managed keys, the
-service accounts and their bindings, the audit log sink and bucket, monitoring, and the API list.
+service accounts and their bindings, the audit log sink and bucket, monitoring, and the API list;
+and the Word drawing's identity, key, record bucket, topic and Cloud Build trigger
+(`word-drawing.tf`, `docs/design/certified-word-drawing.md`).
 `docs/architecture.md` describes what these pieces do; this file describes the configuration.
 
 Two things an environment needs are deliberately not here:

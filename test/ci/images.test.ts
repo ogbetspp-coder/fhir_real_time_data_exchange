@@ -223,16 +223,21 @@ describe("the Cloud Build configuration", () => {
       "build-validator-image",
       "build-query-image",
       "build-signer-image",
+      "build-word-drawing-image",
     ]);
   });
 
   it("builds only what the legacy builder can build, and CI builds it the same way", () => {
     const built = cloudbuildDockerfiles();
-    expect(built).toEqual(["Dockerfile", "Dockerfile.validator"]);
+    expect(built).toEqual(["Dockerfile", "Dockerfile.renderer", "Dockerfile.validator"]);
     for (const file of built)
       expect([file, buildkitOnly(readFileSync(file, "utf8"))]).toEqual([file, []]);
     expect(readFileSync("scripts/ci/build-images.sh", "utf8")).toMatch(
       /^export DOCKER_BUILDKIT=0$/m,
+    );
+    // The word-drawing image is built by CI's Word drawing job, with the legacy builder too.
+    expect(readFileSync(".github/workflows/ci.yml", "utf8")).toMatch(
+      / {6}- name: Build the word-drawing image\n {8}env:\n {10}DOCKER_BUILDKIT: "0"\n {8}run: npm run word-drawing:image\n/,
     );
   });
 
