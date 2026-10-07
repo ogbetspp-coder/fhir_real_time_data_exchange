@@ -8,11 +8,12 @@ import type { CertifiedWordSourceDocument, RecomputeRequest } from "../contracts
 import { readAuthorityJson } from "../authority/json.js";
 import { sha256Bytes } from "../authority/import.js";
 import { storageFetcher, type GcsObjectFetcher } from "../gcp/submission-reader.js";
+import { drawingPins, MAX_RECORD_BYTES, type DrawingSource } from "./drawing.js";
 import { RecomputeRefusalSchema } from "./shape.js";
 
 // What the certified Word gate reads and runs (docs/design/certified-word-import.md, D4 and D2):
 // the uploaded .docx, from the one place the producer may put it, and `python -m zone_a.recompute`
-// on its bytes, in a subprocess.
+// on its bytes, in a subprocess; and where it reads the drawing record (D3, ./drawing.ts).
 
 // D4: the producer stores the .docx once, content-addressed, in the submissions bucket:
 // `gs://<SUBMISSION_BUCKET>/uploads/sha256/<its SHA-256>.docx`. Nothing else is read.
@@ -59,6 +60,8 @@ export type RecomputeOutcome = { made: Uint8Array } | { refused: string };
 export type CertifiedWordSources = {
   upload: (document: CertifiedWordSourceDocument["document"]) => Promise<Uint8Array>;
   recompute: (docx: Uint8Array, request: RecomputeRequest) => Promise<RecomputeOutcome>;
+  // Absent, the gate finds no record (`certified-word-drawing-missing`).
+  drawing?: DrawingSource;
 };
 
 // The object a source's storage URI names, if it is the upload of these bytes in this bucket.
@@ -203,20 +206,38 @@ export function exclusive<T>(task: () => Promise<T>): Promise<T> {
 // The worker's own: the submissions bucket under its identity, and the Python its image installs
 // (Dockerfile, the worker target, sets RECOMPUTE_PYTHON and ZONE_A_ROOT). Without either, none:
 // the gate then cannot recompute, and refuses a certified Word submission that is not a dry run.
+// With the record bucket and the environment (infra/run.tf sets both), the drawing records, read
+// under the worker's identity, and the image and keys this build pins for that environment.
+// `fetchObject` is for tests.
 export function certifiedWordSources(
   config: Pick<
     AppConfig,
-    "SUBMISSION_BUCKET" | "GOOGLE_CLOUD_PROJECT" | "RECOMPUTE_PYTHON" | "ZONE_A_ROOT"
+    | "SUBMISSION_BUCKET"
+    | "GOOGLE_CLOUD_PROJECT"
+    | "RECOMPUTE_PYTHON"
+    | "ZONE_A_ROOT"
+    | "WORD_DRAWING_BUCKET"
+    | "WORD_DRAWING_ENVIRONMENT"
   >,
+  fetcher?: GcsObjectFetcher,
 ): CertifiedWordSources | undefined {
   const { SUBMISSION_BUCKET: bucket, GOOGLE_CLOUD_PROJECT: project } = config;
   const { RECOMPUTE_PYTHON: python, ZONE_A_ROOT: root } = config;
+  const { WORD_DRAWING_BUCKET: records, WORD_DRAWING_ENVIRONMENT: environment } = config;
   if (bucket === undefined || project === undefined || python === undefined || root === undefined) {
     return undefined;
   }
-  const fetchObject = storageFetcher(project);
+  const fetchObject = fetcher ?? storageFetcher(project);
   return {
     upload: (document) => readUpload(document, bucket, fetchObject),
     recompute: pythonRecompute({ python, root }),
+    ...(records === undefined || environment === undefined
+      ? {}
+      : {
+          drawing: {
+            pins: drawingPins(environment),
+            read: (object) => fetchObject(records, object, MAX_RECORD_BYTES),
+          },
+        }),
   };
 }

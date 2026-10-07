@@ -103,7 +103,7 @@ describe("the worker and query image", () => {
     // adds the recompute's Python first (below).
     const cmd = (target: string) =>
       new RegExp(
-        `^FROM runtime AS ${target}\\n(?:(?:#|COPY --from=python |COPY qrd/|ENV |    |RUN \\[")[^\\n]*\\n)*CMD (\\[[^\\n]*\\])$`,
+        `^FROM runtime AS ${target}\\n(?:(?:#|COPY --from=python |COPY qrd/|COPY src/render/word-drawing |ENV |    |RUN \\[")[^\\n]*\\n)*CMD (\\[[^\\n]*\\])$`,
         "m",
       ).exec(dockerfile)?.[1];
     expect(cmd("worker")).toBe('["node", "dist/server.js"]');
@@ -166,6 +166,9 @@ describe("the worker and query image", () => {
       "COPY --from=python /opt/python /opt/python",
       "COPY --from=python /opt/zone-a /opt/zone-a",
       "COPY qrd/registry ./qrd/registry",
+      // The Word drawing's lock and public keys, which the gate's step 5 reads from its working
+      // directory (src/certified-word/drawing.ts, drawingPins).
+      "COPY src/render/word-drawing ./src/render/word-drawing",
     ]) {
       expect([line, worker.includes(line), others.includes(line)]).toEqual([line, true, false]);
     }

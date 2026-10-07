@@ -113,9 +113,12 @@ is `certified-word/` and the SHA-256 of the importer's and the recompute's versi
 reads the uploaded .docx itself, from its content address in the submissions bucket (D4), runs
 `python -m zone_a.recompute` on it in a subprocess (the worker image carries Python 3.14 and the
 two packages, D2), runs the importer again on the result and requires the very submission, page
-text and report. Until the drawing records exist (D3) it accepts one only as a dry run, and refuses
-it when `DRY_RUN` is false with a closed code the caller learns (`certified-word-drawing-missing`
-once the recompute has passed).
+text and report. Then it reads the signed drawing record of the .docx and request from the record
+bucket and verifies it against the public key its image pins (D3,
+`docs/design/certified-word-drawing.md`); a dry run whose record verifies answers `drawn`. Until
+P5 binds the ePI's document id it accepts one only as a dry run, and refuses it when `DRY_RUN` is
+false with a closed code the caller learns (`certified-word-document-unbound` once its record
+verified, `certified-word-drawing-missing` without one).
 
 ### Renderer gate
 

@@ -2,8 +2,9 @@
 
 - Status: decided, 2026-10-06 (the owner took the recommendations: D2 (a), D3 (a), and D4's
   narrow upload path in the existing CMEK submissions bucket); being built in steps (below,
-  "Progress"): D1, D2 and D4 built; of D3, the drawing's code and image (its PR 1), its
-  infrastructure (PR 2) and dev's pins (PR 3), not the gate's check of its record (PR 4)
+  "Progress"): D1, D2 and D4 built; D3 built (the drawing's code and image, its PR 1; its
+  infrastructure, PR 2; dev's pins, PR 3; the gate's check of its record, PR 4), but for what waits
+  for P5 (the gate's step 6 and run manifest 7.0.0)
 - Implements: ADR 0006 decisions 1, 5, 6 and 7, prerequisite P4
 - Related: ADR 0002 (invariants 7, 8, 11), ADR 0004 (service boundaries), ADR 0005's amendment
   (the renderer gate's attested records), `docs/design/authority-import-contract.md` (D1, the
@@ -288,8 +289,16 @@ after the shape bound and the lossless parse, and refuses at the first that fail
    `createdAt`, `extractionRunId`, `serviceVersion`, the page text's and the report's URIs), and
    requires the very submission, page text and fidelity report it was sent, by SHA-256, as the
    authority gate does. Malformed output is the importer's refusal (`bytes`, `shape`, `binding`...);
-5. **the drawing (D3) is not built**: a run that is not a dry run is refused here, after all of the
-   above passed, with the closed code `certified-word-drawing-missing`;
+5. **the drawing record (D3; since PR 4, `src/certified-word/drawing.ts`):** it reads the signed
+   record of the .docx and request from the record bucket under its own identity, verifies it
+   against a public key pinned in the worker image and holds it to the submission and to its own
+   recompute's output (`docs/design/certified-word-drawing.md`, section 3, "How Zone B verifies
+   it"). An object at the record's path that is not a record it verifies refuses with
+   `certified-word-drawing-invalid`, a signed record that is not this submission's with
+   `certified-word-drawing-mismatch`, dry run or not; a Storage error other than not-found fails
+   the run. Until P5 binds the document id, a run that is not a dry run is refused here: with
+   `certified-word-document-unbound` once a record verified, `certified-word-drawing-missing`
+   where there is none;
 6. a dry run then goes through the ordinary gate with `certifiedWordDryRun` bound to the
    submission's hash; nothing is persisted.
 
@@ -299,13 +308,16 @@ upload's content address are the ones the source pins, that this build's recompu
 them, under the source's request, the result this build's importer makes the very submission, page
 text and report from, and that the ordinary gate's checks pass. It does **not** prove that Chrome
 draws the narratives as Word does (D3), nor that the document id names this product's ePI (P5),
-and it persists nothing. Where the worker cannot recompute (no bucket or no Python configured: a
+and it persists nothing. With step 5 (PR 4) a dry run whose record verified also proves that the
+drawing build signed, for these very bytes and this request, that Chrome in the pinned image draws
+each of these narratives as the .docx was read, and says so (`drawn`). Where the worker cannot recompute (no bucket or no Python configured: a
 local run, the official validation set), a dry run checks only what the submission holds (the
 token, the importer, the pages against the record) as before, and any other run is refused with
 `certified-word-not-recomputed`. A submission never passes without both legs: no run that is not a
-dry run passes at all until D3. The two dry runs say which they were: the run's HTTP answer and its
-completion log line carry the closed field `certifiedWordCheck`, `recomputed` or
-`submission-only` (after the review of #196, which found the two `validated` answers alike).
+dry run passes at all until P5. The dry runs say which they were: the run's HTTP answer and its
+completion log line carry the closed field `certifiedWordCheck`, `drawn`, `recomputed` (no record
+found) or `submission-only` (after the review of #196, which found the two `validated` answers
+alike).
 
 **The run manifest** is unchanged (6.0.0): it already names the worker's image (`runtime.imageDigest`)
 and, through the extractor token (`parser`), the importer's and every recompute version. Whether a
@@ -341,10 +353,9 @@ speed-up there to be held to its mutation record.
 
 Still to build:
 
-- (step 5) D3's signed drawing record for the submission's narratives, required in place of the
-  refusal above (`docs/design/certified-word-drawing.md`, proposed);
-- (step 6, with P5) the ordinary gate with that proof bound to the submission's hash, in place of
-  `certifiedWordDryRun`, and the recompute's run and the drawing recorded in the run manifest.
+- (step 6, with P5) the ordinary gate with the drawing's proof bound to the submission's hash, in
+  place of `certifiedWordDryRun`, and the recompute's run and the drawing recorded in the run
+  manifest (7.0.0), with the record's bytes kept with the run's evidence.
 
 ## ADR amendments this carries
 
@@ -414,5 +425,12 @@ bucket, before the label gateway.
    drawing topic starts a build of main, under an identity and an HSM key of its own, that draws
    the .docx twice and signs a record where every section agrees; dev's image and key are pinned.
    The gate does not read records yet.
-7. Next: the gate's step 5 (D3's PR 4); and P5's form, which supplies what
-   the request says a person confirmed, and the registry that binds the document id.
+7. **The gate's step 5** (D3's PR 4, 2026-10-07, importer 1.3.0;
+   `docs/design/certified-word-drawing.md`, "Step 4: PR 4 as built"): the worker reads the drawing
+   record of the submission's .docx and request from the record bucket, verifies it against the
+   public key its image pins, and holds it to the submission and its own recompute; a dry run whose
+   record verifies answers `drawn`, against the first real record (dev's, for the committed
+   synthetic SmPC) in the tests; a run that is not dry is refused, with
+   `certified-word-document-unbound` once its record verifies.
+8. Next: P5's form, which supplies what the request says a person confirmed, and the registry
+   that binds the document id; then the gate's step 6 and run manifest 7.0.0.

@@ -135,6 +135,16 @@ resource "google_cloud_run_v2_service" "worker" {
         name  = "SUBMISSION_BUCKET"
         value = google_storage_bucket.submissions.name
       }
+      # The certified Word gate's step 5 reads drawing records here (word-drawing.tf grants the
+      # read) and verifies them against this environment's pins (src/render/word-drawing/).
+      env {
+        name  = "WORD_DRAWING_BUCKET"
+        value = google_storage_bucket.word_drawings.name
+      }
+      env {
+        name  = "WORD_DRAWING_ENVIRONMENT"
+        value = var.environment
+      }
       env {
         name  = "ENABLED_RUN_SOURCES"
         value = join(",", local.enabled_run_sources)

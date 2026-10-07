@@ -108,6 +108,18 @@ describe("the drawing identity", () => {
       ["roles/storage.objectViewer", "worker"],
     ]);
   });
+
+  // PR 4: the gate's step 5 reads the records there and verifies them against its environment's
+  // pins (src/certified-word/recompute.ts, certifiedWordSources).
+  it("is named to the worker, with the environment whose pins verify a record", () => {
+    const worker = block("google_cloud_run_v2_service", "worker");
+    const env = (name: string) =>
+      new RegExp(`env \\{\\s*name\\s*=\\s*"${name}"\\s*value\\s*=\\s*([^\\n]+)\\n`).exec(
+        worker,
+      )?.[1];
+    expect(env("WORD_DRAWING_BUCKET")).toBe("google_storage_bucket.word_drawings.name");
+    expect(env("WORD_DRAWING_ENVIRONMENT")).toBe("var.environment");
+  });
 });
 
 describe("the drawing key", () => {

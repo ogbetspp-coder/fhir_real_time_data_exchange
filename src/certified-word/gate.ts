@@ -1,3 +1,4 @@
+import { sha256Bytes } from "../authority/import.js";
 import {
   CERTIFIED_WORD_PREFIX,
   CanonicalSubmissionSchema,
@@ -15,6 +16,7 @@ import {
 import type { EmaMapping } from "../fhir/mapping.js";
 import { EU_AUTHORISATION_NUMBER_SYSTEM } from "../fhir/standards.js";
 import { sha256 } from "../lib/hash.js";
+import { drawingVerdict } from "./drawing.js";
 import {
   CANONICAL_ORGANIZATION_SYSTEM,
   CANONICAL_PRODUCT_SYSTEM,
@@ -33,20 +35,29 @@ import {
 // `python -m zone_a.recompute` on them with the source's request (D2), make the importer's request
 // again from the submission, run the importer this build contains on the recompute's result, and
 // require the very submission, page text and fidelity report it was sent, as the authority gate
-// does. The drawing (D3) is not built, so a submission that passes all of that is still refused
-// unless the run is a dry run, which persists nothing (ADR 0002 invariant 11, as ADR 0006 amends
-// it). Where the worker cannot recompute (no bucket or no Python configured), a dry run checks only
-// what the submission holds, and any other run is refused.
+// does; then find and verify the signed drawing record of the .docx and request (D3, step 5:
+// docs/design/certified-word-drawing.md, ./drawing.ts). Until P5 binds the ePI's document id, a
+// submission that passes all of that is still refused unless the run is a dry run, which persists
+// nothing (ADR 0002 invariant 11, as ADR 0006 amends it). Where the worker cannot recompute (no
+// bucket or no Python configured), a dry run checks only what the submission holds, and any other
+// run is refused.
 
 export const CERTIFIED_WORD_NOT_RECOMPUTED =
   "certified-word-not-recomputed: this worker cannot recompute a certified Word source, so it runs only as a dry run";
 export const CERTIFIED_WORD_DRAWING_MISSING =
-  "certified-word-drawing-missing: the sections were recomputed, but no drawing record (D3) vouches for them";
+  "certified-word-drawing-missing: the sections were recomputed, but no drawing record (D3) is stored for them";
+export const CERTIFIED_WORD_DRAWING_INVALID =
+  "certified-word-drawing-invalid: the object at the drawing record's path is not a record this build verifies";
+export const CERTIFIED_WORD_DRAWING_MISMATCH =
+  "certified-word-drawing-mismatch: the signed drawing record is not this submission's";
+export const CERTIFIED_WORD_DOCUMENT_UNBOUND =
+  "certified-word-document-unbound: the drawing is verified, but the ePI's document id is bound to no product until P5";
 
-// Whether the gate made the sections again from the upload (D2, D4) and compared, or, where the
-// worker cannot recompute, checked only what a dry run's submission holds. The run's answer and
-// its log carry it, so a dry run's `validated` says which it proves.
-export type CertifiedWordCheck = "recomputed" | "submission-only";
+// Whether the gate made the sections again from the upload (D2, D4) and compared, and found their
+// signed drawing record (D3), or, where the worker cannot recompute, checked only what a dry run's
+// submission holds. The run's answer and its log carry it, so a dry run's `validated` says which it
+// proves.
+export type CertifiedWordCheck = "drawn" | "recomputed" | "submission-only";
 
 function rejected(issue: string, reason?: SubmissionRefusal): never {
   throw new SubmissionRejectedError("Document submission rejected", [issue], reason);
@@ -147,6 +158,7 @@ export async function verifyCertifiedWordImport(
   // result, with the request made again from the submission and the run's own fields, which must
   // make this very submission, page text and report.
   let made: ReturnType<typeof importCertifiedWord>;
+  let outputSha256: string;
   try {
     const outcome = await sources.recompute(
       await sources.upload(source.document),
@@ -158,6 +170,7 @@ export async function verifyCertifiedWordImport(
         "certified-word-recompute-refused",
       );
     }
+    outputSha256 = sha256Bytes(outcome.made);
     made = importCertifiedWord(outcome.made, requestOf(submission, source), mapping, {
       submissionId: submission.submissionId,
       createdAt: submission.createdAt,
@@ -189,11 +202,28 @@ export async function verifyCertifiedWordImport(
   if (sha256(made.fidelityReport) !== sha256(input.fidelityReport)) {
     return rejected("The fidelity report is not the recomputed one");
   }
-  // Step 5 (D3) is not built: nothing vouches that Chrome draws the narratives as Word does.
-  if (!options.dryRun) rejected(CERTIFIED_WORD_DRAWING_MISSING, "certified-word-drawing-missing");
+  // Step 5 (D3): the signed record that Chrome draws these narratives as the .docx was read. A
+  // Storage error other than not-found is thrown, never read as `missing`.
+  const drawing =
+    sources.drawing === undefined
+      ? "missing"
+      : await drawingVerdict(sources.drawing, submission, source, outputSha256);
+  if (drawing === "invalid") {
+    rejected(CERTIFIED_WORD_DRAWING_INVALID, "certified-word-drawing-invalid");
+  }
+  if (drawing === "mismatch") {
+    rejected(CERTIFIED_WORD_DRAWING_MISMATCH, "certified-word-drawing-mismatch");
+  }
+  // Until P5 binds the document id to its product, no run that is not a dry run passes.
+  if (!options.dryRun) {
+    if (drawing === "missing") {
+      rejected(CERTIFIED_WORD_DRAWING_MISSING, "certified-word-drawing-missing");
+    }
+    rejected(CERTIFIED_WORD_DOCUMENT_UNBOUND, "certified-word-document-unbound");
+  }
   const gate = verifyDocumentSubmission(input, mapping.sourceCodeSystem, {
     allowSyntheticSources: options.allowSyntheticSources,
     ...dryRunProof,
   });
-  return { gate, check: "recomputed" };
+  return { gate, check: drawing === "drawn" ? "drawn" : "recomputed" };
 }
