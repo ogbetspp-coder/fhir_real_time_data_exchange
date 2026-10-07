@@ -1,101 +1,127 @@
 # The drawing record: Zone B's proof that Chrome draws a certified Word label as it was read (ADR 0006 P4, D3)
 
-- Status: proposed, 2026-10-07, for the owner's review; docs only, nothing here is built
+- Status: proposed 2026-10-07; revised the same day after an independent review of #197, whose
+  recommendations the owner said to go ahead on. Docs only; nothing here is built
 - Implements: `docs/design/certified-word-import.md` D3 (a), the owner's choice of 2026-10-06
   ("extend the renderer gate's attested records"), and that note's "The gate", steps 5 and 6
 - Fits: `docs/design/authority-import-renderer.md` R1 (attested records), frozen, its architecture
-  owner-approved; nothing changes there for an authority import ("What this changes in R1", below)
+  owner-approved. It follows R1's pattern with a key, identity and bucket of its own, and changes
+  nothing for an authority import ("What this takes from R1", below)
 - Related: ADR 0002 (invariant 11), ADR 0005's amendment of 2026-09-25, ADR 0006 decision 1,
   `zone-a/src/zone_a/drawing.py`, `label-docx-reader/src/label_docx/browser.py`,
-  `src/certified-word/gate.ts`, `docs/design/approval.md`
+  `src/certified-word/gate.ts`, `src/approval/statement.ts`, `docs/design/pl-structure.md`
 
 ## Summary
 
-The producer asks for a drawing by sending only the stored submission's address and hash. A build
-running main's code under the renderer gate's identity reads the submission and the .docx itself,
-remakes the sections with `zone_a.recompute`, and checks them by `zone_a.drawing`'s rules, twice,
-in a pinned Chrome-and-Python image with no network. If both runs agree, it signs a record: the
-submission's hash, the .docx, each section's narrative hash and verdict, the versions and the image.
-Zone B's gate (step 5) finds it by the submission's hash, checks the signature with a key pinned in
-the worker image, and requires every hash to be the submission's and every section to agree. The
-renderer gate's signing half was never built; D3 builds it, as R1 designs it. Recommended: run
-`zone_a.drawing` itself, not a port. Three questions for the owner, at the end.
+As soon as it has uploaded a .docx and a person has confirmed its structure, the producer asks for
+a drawing of that .docx under that recompute request. A build of main's code, under an identity
+used for nothing else, remakes the sections with `zone_a.recompute` and checks them by
+`zone_a.drawing`'s rules, twice, in a pinned Chrome-and-Python image with no network. Only if both
+runs are identical and every section agrees does it sign a record, with a key used for nothing
+else. The record holds hashes computed in the container: the .docx, the recompute's output and
+each narrative drawn. Zone B's gate (step 5) finds it from the submission's .docx and request,
+checks the signature against a key pinned in the worker image, and requires every hash to match
+its own. The same record serves every submission of that label version, SmPC or leaflet.
 
 ## What exists, and what is assumed
 
-**Verified on 2026-10-07** (main at 0c64a51; the dev project, read with `gcloud` only):
+**Verified on 2026-10-07** (main at 4030270; the dev project, read with `gcloud` only):
 
 - The renderer image (`Dockerfile.renderer`: chrome-headless-shell 154.0.8037.57 and the pinned
-  fonts) is built and checked in CI's Renderer job only. It is pushed nowhere: dev has one image
-  repository, `ema-flow-images`, holding the worker, query, signer and validator images, and no
-  `renderer-images`.
-- R1's signing half does not exist. The renderer note's Delivery dropped it on 2026-09-29 (3c-C3 to
-  C5). Dev has no render identity, no signing key for records (the evidence key ring holds
-  `approval-signing-hsm`, `evidence-encryption`, `manifest-signing` and `manifest-signing-hsm`), no
-  attestation bucket, and no `cloudbuild.render.yaml`; it has no Cloud Build trigger at all, and no
-  repository connection in `europe-west4`. So D3 (a)'s "Reused: the image, the identity, the key,
-  the verification" holds for the image only.
+  fonts) is built and checked in CI's Renderer job only, in about 40 s (three runs). It is pushed
+  nowhere: dev's one image repository, `ema-flow-images`, holds the worker, query, signer and
+  validator images, and has no cleanup policy.
+- R1's signing half was never built: the renderer note's Delivery dropped it on 2026-09-29 (3c-C3
+  to C5). Dev has no render identity, no signing key for records, no attestation bucket, no Cloud
+  Build trigger at all, and no repository connection in `europe-west4`. So D3 (a)'s "Reused: the
+  image, the identity, the key, the verification" holds for the image only.
 - `zone_a.drawing` (`word-drawing/1.1.2`) draws with whatever Chrome is installed, through
   `label_docx.browser` (`browser-verifier/1.1.0`), with Chrome's own default stylesheet. The
   recording its tests replay was made with Google Chrome 154.0.8037.98.
-- The recompute's output (`recompute/1.1.0`) holds each section's narrative but not the read it was
-  made from (each paragraph's text, marks, list label and pictures), which the comparison needs.
-- `src/certified-word/gate.ts`, in a worker that can recompute, refuses at step 5 every run that
-  is not a dry run, with `certified-word-drawing-missing`.
+- The recompute's output holds each section's narrative but not the read it was made from (each
+  paragraph's text, marks, list label and pictures), which the comparison needs.
+- Since #198 the worker carries the package leaflet (`document: "pl"`), in dry runs only.
+- `src/certified-word/gate.ts`, in a worker that can recompute, refuses at step 5 every run that is
+  not a dry run, with `certified-word-drawing-missing`.
 - The GitHub repository is public.
 
-**Assumed, each to be proven by a test or a measurement in the first change that builds this:**
+**Assumed, each to be measured or tested before it is relied on** (build order, step 1 or the
+change named):
 
-- chrome-headless-shell runs `label_docx.browser`'s two pages (one read with `--dump-dom`, one
-  over the DevTools pipe) as Google Chrome does, and gives the same verdicts on the five Word-made
-  fixtures (`zone-a/tests/fixtures/word-smpc/`) and on the EMA corpus.
+- chrome-headless-shell runs `label_docx.browser`'s two pages (one read with `--dump-dom`, one over
+  the DevTools pipe) as Google Chrome does, and gives the same verdicts on the fixtures and on the
+  EMA's SmPCs and leaflets.
 - What the check compares does not depend on the window's width or on the fonts: it reads text by
   block, styles as Chrome computes them, list labels and picture sizes, never glyph positions.
-- A Cloud Build trigger fired by a Pub/Sub message runs as its own service account without the
-  publisher holding `actAs` on it, and hands the build the message's attributes.
+- Cloud Build, for a trigger fired by a Pub/Sub message (PR 2): it runs the build as the trigger's
+  own service account without the publisher holding `actAs` on it; it binds a field of the
+  message's JSON body to a substitution; its CEL filter can refuse a message before any build
+  starts; and it accepts an inline build with no repository connection.
 - Every timing not measured below ("Cost and operations").
+
+## The trust model, plainly
+
+Zone B trusts three things: main's code (whoever can change main can change everything, as R1
+says), the signature of the drawing identity, checked against a public key pinned in the worker
+image, and what the worker reads and recomputes itself. It trusts nothing the producer says.
+
+**Today the producer is the operator:** the person who runs `scripts/demo/seed.ts` under their own
+Google account, which holds the owner role on dev (checked 2026-10-07). That person is already
+inside the trust root, so nothing here protects against them. The design is for the day the
+producer is a separate service the owners do not fully trust (the label gateway). The checks below
+are built to hold then.
 
 ## 1. The request
 
-- **Who asks: the producer**, the identity that writes submissions to the submissions bucket (today
-  the operator, through `scripts/demo/seed.ts`; later the label gateway). It asks after it has
-  stored the .docx at its content address (D4) and the submission, because the build reads both.
-  Zone A's code writes the request, as the producer; Zone A has no identity of its own. Zone B does
-  not ask: a run without a record tells its caller `certified-word-drawing-missing`, and the caller
-  asks.
-- **The request is the submission's reference, nothing else:** `{ uri, sha256 }`, the very
-  `submission` of a `RunRequest` (a URI in the submissions bucket, and the canonical-JSON SHA-256
-  that Zone B's submission reader checks). It is sent as two attributes of a message on one Pub/Sub
-  topic. The producer needs `roles/pubsub.publisher` on that topic and no other new grant.
-- **The narrative hashes are carried by reference.** The submission lists each section's
-  `narrativeDivSha256` in its provenance, and its source names the .docx and the recompute's
-  request. The hash pins all of them, so the build takes them from the submission. Anything else the
-  requester said would be one more claim to check.
-- **What is drawn:** every section that has a narrative, as the recompute makes it from the stored
-  .docx under the submission's own request. That is the set the submission's provenance lists. A
-  section with no narrative (an empty heading) is not drawn, as in Zone A.
+- **Who asks: the producer**, the identity that uploads the .docx (today the operator; later the
+  label gateway). Zone A's code writes the request; Zone A has no identity of its own. Zone B does
+  not ask: a run without a record tells its caller `certified-word-drawing-missing`, and the
+  caller asks.
+- **When:** as soon as the .docx is at its content address in the submissions bucket (D4) and a
+  person has confirmed the structure. The submission does not need to exist yet.
+- **What it carries:** one value, the drawing request:
+
+  ```text
+  DrawingRequest (canonical JSON, RFC 8785)
+    docxSha256   the .docx's SHA-256, lower-case hex: it names the upload uploads/sha256/<hash>.docx
+    recompute    { document, view, part, assignments, versions }, exactly the submission's
+                 sourceDocument.recompute: "smpc" or "pl", the view a person named, which part,
+                 the headings a person assigned, and every version the recompute names
+  ```
+
+  It travels in the body of one Pub/Sub message, as the field `request`: the base64url form of its
+  canonical bytes. The **record's key** is the SHA-256 of those canonical bytes. The producer
+  needs `roles/pubsub.publisher` on that topic, and no other new grant.
+
+- **No narrative hash, no submission hash.** The build makes the narratives itself from the
+  .docx, so it hashes them itself. A record serves every submission whose .docx and request are
+  these, which is right, since nothing else in a submission is drawn.
+- **What is drawn:** every section with a narrative, as the recompute makes it from the .docx under
+  the request: an SmPC's or a leaflet's. A section with no narrative (an empty heading) is not
+  drawn, as in Zone A.
 - **With which stylesheet: none but Chrome's own default**, not the EMA ePI viewer's. Three
   reasons. `zone_a.drawing`'s rules and verdicts are defined that way. The EMA's stylesheet is not
   pinned in this repository, and the EMA can change it. And the renderer gate draws authority labels
   without it too (R2). That the EMA's viewer could draw otherwise is a stated residual, as in R2.
 - **How:** each narrative in its own element of one page, parsed as HTML, read in turn, as
   `zone_a.drawing` does today. R2's widths, device pixel ratios and XML mode are not used: nothing
-  this check compares depends on them (assumed above).
+  this check compares depends on them (assumed above). The narrative is persisted as XHTML, so PR 1
+  tests that Chrome's HTML parser and its XML parser make the same tree of every narrative drawn
+  (the same elements, attributes and text, in order, but for a `tbody` the HTML parser inserts).
 
 ## 2. The verdict
 
 **What the drawing is compared with:** the label reader's read of the .docx, the very read the
 recompute made the narratives from. In the image, one call gives both: `zone_a.recompute` gains a
-function that returns its result (the bytes Zone B compares) together with the read behind it.
-Its output does not change. Nothing reads the .docx a second time, and nothing comes from the
-requester.
+function that returns its result (the bytes Zone B compares) together with the read behind it. Its
+output does not change. Nothing reads the .docx a second time.
 
 **What "agrees" means:** `zone_a.drawing.check`'s rules, exactly, because that code runs:
 
 - **Lines.** Both sides are cut into lines where a paragraph or a line ends (on Chrome's side, also
-  where a table cell ends). Spaces, tabs and line feeds collapse to one space. Lines are
-  trimmed, and empty lines dropped. A list label the narrative writes as text starts its line. The
-  lines must be the same, in the same order, character for character.
+  where a table cell ends). Spaces, tabs and line feeds collapse to one space. Lines are trimmed,
+  and empty lines dropped. A list label the narrative writes as text starts its line. The lines
+  must be the same, in the same order, character for character.
 - **Marks.** Each character that is not a space carries a set of marks, and the sets must be the
   same, character by character. Chrome's side is read from the style Chrome computed, by the
   reader's own thresholds: bold at weight 600 or more; italic; underline and strike only where their
@@ -115,27 +141,30 @@ requester.
 out, a faint label as none); no numeric tolerance. Everything compared is text, sets of mark names,
 label strings or whole pixel counts. Nothing is measured on the drawn pixels.
 
-A section **agrees** when all four are equal and Chrome reported no error for it. Otherwise the
-record says where, never what: "line 12: text differs at character 40", the names of the marks that
-differ, "list markers differ", or the picture rule.
+A section agrees when all four are equal and Chrome reported no error for it. **Only a drawing in
+which every section agrees is signed.** One that differs signs nothing: the build fails, and its log
+says where (a line and character, the names of the marks, "list markers differ" or the picture
+rule), never what. Zone A's preview shows the producer the same.
 
 **The code that runs inside the image, and nothing else:**
 
 - `zone_a.drawing`, `word-drawing/1.2.0`: today's rules unchanged, plus an entry point,
-  `python -m zone_a.drawing LABEL.docx < REQUEST.json`, that runs the recompute and the check for
-  one label and writes the verdicts as canonical JSON;
+  `python -m zone_a.drawing LABEL.docx < REQUEST.json`, that hashes the .docx it opens and requires
+  the request's `docxSha256`, runs the recompute and the check, and writes the record's fields
+  (section 3) as canonical JSON. It exits non-zero, with nothing on standard output, on a refusal
+  of the recompute, a browser failure (no Chrome, a crash, a timeout, a page error) or a section
+  that differs; standard error then gives the closed code or the place, never the text;
 - `zone_a.recompute` (`recompute/1.2.0`, for the new function) and what it imports: the label
-  reader, `zone_a.structure`, `zone_a.word_epi`;
+  reader, `zone_a.structure`, `zone_a.leaflet`, `zone_a.word_epi`;
 - `label_docx.browser` (`browser-verifier/1.1.0`, unchanged), which writes the two pages and
   drives Chrome;
-- chrome-headless-shell 154.0.8037.57, through a one-line launcher that adds `--no-sandbox`, as the
-  renderer gate runs it: inside a container with no network, no credentials and a read-only
-  workspace;
+- chrome-headless-shell 154.0.8037.57, through a one-line launcher. PR 1 tries Chrome's own
+  sandbox inside the hardened container (section 4); if it cannot start there, the launcher adds
+  `--no-sandbox`, as the renderer gate runs it, and the residual is recorded;
 - Python 3.14.7, installed as the worker image installs it.
 
 The two packages, with the registry and mapping files the recompute reads, come from the build's
-own checkout of main. They are not installed in the image, so a code change does not change the
-image.
+checkout of main. They are not installed in the image, so a code change does not change the image.
 
 ## 3. The record
 
@@ -146,236 +175,313 @@ WordDrawingRecord (canonical JSON, RFC 8785)
   recordVersion  "word-drawing-record/1.0.0"
   environment    "dev" | "validation" | "prod"
   commitSha      the first-parent commit of main the build ran
-  submission     { sha256 }                    sha256(submission), the RunRequest's hash
-  document       { sha256, byteLength }        the .docx, as the build read it
-  recompute      { versions, outputSha256 }    the versions the submission's request names, and the
-                                               SHA-256 of the bytes the recompute writes
-  drawing        { version, imageDigest, chrome }  "word-drawing/1.2.0"; the image by digest;
-                                                   Chrome's version as it reports it
-  sections       [{ key, narrativeDivSha256, agrees, where }]  every narrative, in the
-                                                               recompute's order
+  request        the DrawingRequest, as decoded; its SHA-256 is the record's key
+  document       { sha256, byteLength }       of the .docx bytes the container opened
+  recompute      { outputSha256 }             of the bytes the recompute's result serialises to,
+                                              exactly what `python -m zone_a.recompute` writes
+  drawing        { version, chrome, imageDigest }   "word-drawing/1.2.0"; Chrome's version as it
+                                                    reports it; the image by digest
+  sections       [{ key, narrativeDivSha256 }]      every narrative drawn, in the recompute's order
   keyVersion     the version of the key that signs it
 ```
 
-It is stored as `{ record, signature }`: an RSA-PSS signature over the record's canonical bytes.
-It holds hashes, keys and positions only, never a word of the label.
+**Every hash is computed in the container**, from the exact bytes or string it used:
+`narrativeDivSha256` is the SHA-256 of the UTF-8 bytes of the very string handed to Chrome, as the
+importer computes the submission's (`sha256Utf8(narrative.div)`, `src/certified-word/import.ts`).
+`imageDigest` alone is added outside, by the signing step, from the lock it pulled the image by.
+Nothing comes from the requester but the request, which is the key.
+
+It is stored as `{ record, signatureBase64 }`: an RSA-PSS signature over the record's canonical
+bytes, written as a signed approval statement writes its own. Being signed means every listed
+section agrees. It holds hashes, keys and versions, never a word of the label.
 
 ### Who signs it, and with which key
 
-R1's render identity, with its environment's key. Neither exists, so D3 creates both as R1 states
-them, and the authority records use them too if they are ever built:
+An identity and a key used for Word drawings and nothing else, not shared with R1's authority
+records (which, if ever built, get their own):
 
-- **the identity** `ema-flow-render-<environment>`, with R1's grants (reader on the renderer image
-  repository and the build's staging bucket, read and create on the attestation bucket, signer on
-  its key, the repository connection's token, log writer), and one more: **reader on the
-  submissions bucket**, for the submission and the .docx. R1's captures bucket and proposal identity
-  are not needed for Word;
-- **the key** `render-attestation-hsm`, in the evidence key ring: for signing only, in an HSM,
-  RSA-PSS 3072 with SHA-256 (the approval key's algorithm, since a record must stay verifiable as
-  long as the evidence), `prevent_destroy`, 120 days before any destruction, and watched by the
-  existing key alert. Only the render identity may sign with it.
+- **the identity** `ema-flow-word-drawing-<environment>`. Its grants, proven exhaustive by a
+  Terraform test as the signer's are (`test/infra/signer-identity.test.ts`):
+  - `roles/storage.objectViewer` on the submissions bucket, under a condition: objects under
+    `uploads/sha256/` only, so it never reads a submission, a page text or a report;
+  - `roles/storage.objectCreator` and `roles/storage.objectViewer` on the record bucket, never
+    `objectAdmin`: overwriting an object needs the delete permission, which neither role has, so
+    IAM itself enforces create-if-absent;
+  - `roles/cloudkms.signer` on its key, not `signerVerifier`;
+  - reader on the repository the image is pulled from, and log writer.
+- **the key** `word-drawing-hsm`, in the evidence key ring: for signing only, in an HSM, RSA-PSS
+  3072 with SHA-256 (the approval key's algorithm, since a record must stay verifiable as long as
+  the evidence), `prevent_destroy`, 120 days before any destruction, and watched by the existing
+  key alert, which fires on any key's destruction request, disabled version or grant change.
 
-### The determinism rule
+### Determinism, and the signing rules
 
-The build makes the record twice, in two containers with no network, each with its own Python and
-Chrome. The two outputs must be equal, byte for byte, before anything is signed (R1's two
-regenerations; R7's rule). If they differ, nothing is signed, the build fails, and the difference is
-investigated, never waived. There are no pixel fields, so there is no ε. If a record already sits at
-its path (a second request, or a message delivered twice), the build requires it to equal the one
-it made, and stops.
+- The build makes the record's fields twice, in two containers, each with its own Python and
+  Chrome. The two outputs must be equal, byte for byte, before anything is signed (R1's two
+  regenerations; R7's rule). If they differ, nothing is signed, the build fails, and the
+  difference is investigated, never waived. There are no pixel fields, so there is no ε.
+- A browser failure, a recompute refusal or a section that differs ends the container with a
+  non-zero status, and nothing is signed.
+- A request for a record that already exists ends at the build's first step. If two builds of one
+  request run at once (a message delivered twice), the second's create-if-absent write finds the
+  first's record. RSA-PSS signatures are randomised, so two signatures of one record differ: the
+  build compares the stored record's canonical bytes with its own, never the signatures. If the
+  records differ, the build fails as a determinism failure.
 
 ### Where it is stored, and why no person commits it
 
-It is stored in a bucket only the render identity may write: the attestation bucket R1 calls for,
-made now and named `<project>-<prefix>-render-attestations`, encrypted with the evidence key. The path is
-`word/<submission sha256>/<drawing id>/<key version>.json`. The drawing id is the SHA-256 of the
-canonical JSON `{ version, imageDigest }` that the build's commit pins in
-`src/certified-word/drawing.lock.json`, the file the worker reads too. Writes are create-if-absent.
-The worker and the producer may read it.
+In a bucket only the drawing identity may write: `<project>-<prefix>-word-drawings`, encrypted with
+the evidence key. The path is `word/<key>/<drawing id>/<key version>.json`. The drawing id is the
+SHA-256 of the canonical JSON `{ version, imageDigest }` that the build's commit pins in
+`src/render/word-drawing/lock.json`, outside `src/certified-word/`, so pinning a new image does not
+change the importer's version. The worker may read the bucket. The producer may not: Zone A's
+preview already tells it where a drawing differs, and the run's answer tells it whether a record
+was found.
 
 **R1's rule that a person commits each record does not apply here.** Three reasons:
 
 1. The repository is public. A record describes a company's unpublished label: its hash, its
-   section keys, where it failed. That does not belong in a public repository; and `AGENTS.md`
+   section keys, its versions. That does not belong in a public repository; and `AGENTS.md`
    admits no client content at all until the data-handling paragraph of
    `docs/design/verifiable-answers.md` is written.
 2. In R1 the commit adds no trust ("nothing trusts it for having been committed"). Trust comes from
-   the render identity running main's code and signing, and that stays.
+   the identity running main's code and signing, and that stays.
 3. Each import would wait for a pull request, a merge and a deploy.
 
-So Word has no propose mode and no committed store. A person still decides: the approver (D7), who
-approves the submission's hash, and whose review can show the record.
+So Word has no propose mode and no committed store. A person still decides: the approver (D7),
+who approves the submission, and whose review can show the record.
 
 ### How Zone B verifies it
 
-In the worker, at step 5, with no call to Cloud KMS:
+In the worker, at step 5, after steps 1 to 4, with no call to Cloud KMS:
 
-1. It reads the record at its path, for each key version this build pins for its environment and
-   has not revoked, highest first.
-2. It parses it strictly (canonical bytes, no repeated keys, exactly the fields above) and checks
-   the signature against that version's public key, pinned in the worker image
-   (`src/render/attestation-keys/<environment>/<version>.pem`, with R1's `revoked` list).
-3. It requires that:
-   - the environment is this deployment's;
-   - the submission hash is this submission's;
-   - the document's hash and length are the source's;
-   - the recompute's versions are the source's request's, and its output hash is the hash of the
-     bytes the worker's own recompute wrote at step 3;
-   - the drawing's version and image are the ones this build pins;
-   - the sections are exactly the submission's provenance sections, each key with its
-     `narrativeDivSha256`;
-   - every section agrees.
-4. It keeps the record's bytes with the run's evidence, by hash, as R10 does for a record.
+1. **The key.** It computes the SHA-256 of the canonical JSON of
+   `{ docxSha256: source.document.sha256, recompute: source.recompute }`.
+2. **The read.** For each key version this build pins for its environment and has not revoked,
+   highest first, it reads `word/<key>/<drawing id>/<version>.json`. The first object it finds
+   decides: one that fails below refuses the run, and the gate never steps over it to a lower
+   version. None found is `missing`. Any Storage error but not-found fails the run, as the D4 read
+   does; it is never read as `missing`.
+3. **The bytes.** Their size is capped (64 KiB) before anything is parsed. They must be the
+   canonical JSON of exactly the shape above, with no repeated key. The record's `keyVersion` must
+   be the version in its path, and the SHA-256 of its `request` must be the key in its path.
+4. **The signature**, against that version's public key, pinned in the worker image
+   (`src/render/word-drawing/keys/<environment>/<version>.pem`, with a `revoked` list), by
+   `src/approval/statement.ts`'s check, factored out so both call one function: a 3072-bit RSA key,
+   base64 written one way only, RSA-PSS with SHA-256 and a 32-byte salt over the canonical bytes.
+5. **The fields.** The environment is this deployment's. The request is the source's .docx hash and
+   recompute request. The document's hash and length are the source's. `outputSha256` is the
+   SHA-256 of the bytes the worker's own recompute wrote at step 3. The drawing's version and image
+   are the ones this build pins. And `sections` equals the submission's provenance `sections`, in
+   order, each `key` the `sourceKey` and the same `narrativeDivSha256`. Both lists are in the
+   mapping tree's order, a parent before its children: the importer holds the recompute's sections
+   to it (`placeSections`), and the provenance walks the Composition the same way.
+6. **The evidence.** It keeps the record's bytes with the run's evidence, by hash, as R10 does for
+   a record.
 
 For Word, this replaces R1's check at deploy time, in the image build. That check served records
-committed to the repository and copied into the image. The worker already reads the .docx from
-Cloud Storage at run time (D4), so reading the record there adds no new kind of dependency, and the
+committed to the repository and copied into the image. The worker already reads the .docx from Cloud
+Storage at run time (D4), so reading the record there adds no new kind of dependency, and the
 signature check itself needs no network.
+
+### Why this key is safe
+
+The record says: _the .docx with this hash, recomputed under this request by the code at this
+commit, gives output with this hash, whose narratives (these hashes) Chrome in this image draws as
+the read, twice, identically._
+
+Zone B accepts a submission only if:
+
+- the submission's source pins that .docx, and the worker read those bytes itself;
+- its request is that request;
+- the worker's own recompute of them gives that output hash;
+- the submission is exactly what the worker's importer makes of that output (step 4);
+- its narratives have those hashes, in that order.
+
+So every narrative it would persist is a string the record says Chrome draws as read. Nothing else
+in a submission (the product, the document id, the approval, the run's fields) is drawn, so nothing
+else needs binding. Two submissions of one label version share one record, rightly.
+
+What the requester chooses is the key itself. A request for the same .docx under another request
+makes another record, at another key, which no submission with the first request ever finds. The
+build fetches the .docx by its content address and checks its hash. It takes nothing else from the
+requester. The circularity of the first draft, a record naming a submission that would want to name
+it, is gone: neither names the other.
 
 ## 4. The flow, and where trust changes hands
 
 1. **Zone A, at the producer** (Zone B trusts none of it; ADR 0002). It reads the .docx, a person
-   confirms the structure, it builds the sections, checks them with the local Chrome (a preview
-   only), runs the recompute and the importer, and makes the submission, its page text and its
-   report.
+   confirms the structure, it builds the sections and previews their drawing with the local Chrome.
 2. **Upload.** _Boundary: the submissions bucket._ The producer stores the .docx at
-   `uploads/sha256/<hash>.docx`, then the submission and its two parts.
+   `uploads/sha256/<hash>.docx`.
 3. **Request.** _Boundary: one Pub/Sub topic; the producer may publish to it and do nothing else._
-   It publishes `{ uri, sha256 }`.
-4. **The drawing build.** _Boundary: the render identity and its key, running main's code only._
-   1. With network: it checks the request's two values against strict patterns (and never pastes
-      them into a command line). It reads the submission and the .docx with the
-      worker's own readers and rules (the configured bucket, the size caps, the content address,
-      the hash and the length). It stops if the record already exists, then pulls the drawing image
-      by digest.
-   2. With no network: two containers, each running `python -m zone_a.drawing` on the .docx with
-      the source's recompute request. The two outputs must be equal.
-   3. With network: it checks that the commit is a first-parent commit of main (R1), assembles the
-      record, signs it with Cloud KMS and writes it, create-if-absent.
+   It publishes the drawing request. It can then make the submission, its page text and its report
+   meanwhile.
+4. **The drawing build.** _Boundary: the drawing identity and its key, running main's code only._
+   Below, "The trigger and the build".
 5. **The run.** _Boundary: Workflows calls the worker with the `RunRequest`, as today._
 6. **Zone B's gate,** under the worker's identity: steps 1 to 4 as built (the importer's version,
-   the .docx's bytes, the recompute, the importer again); step 5, the record; step 6, the ordinary
-   gate with that proof bound to the submission's hash.
-7. **Approval and persistence,** once P5 binds the document id (section 5): the approval as
-   `approval.md` has it (today an attestation; the signed statement once enforced), then the
-   transform, validation, the FHIR store, the run manifest and the evidence.
+   the .docx's bytes, the recompute, the importer again), then step 5, the record.
+7. **Persistence waits for P5** (section 5). Then: the approval as `approval.md` has it, the
+   transform, validation, the FHIR store, the run manifest and the evidence. A leaflet also waits,
+   since #198, until the query service and the signer read one.
+
+### The trigger and the build
+
+- **The trigger.** It is fired by a message on the topic. Its source is `refs/heads/main` and its
+  build configuration a fixed path (or inline), both literals in Terraform, which a Terraform test
+  holds. A CEL filter on the trigger lets only a message whose `request` is base64url of a bounded
+  length start a build, so a malformed one never does. The build's `queueTtl` is short (minutes),
+  so a backlog expires rather than runs late.
+- **Values only through `env:`.** The request reaches each step as an environment value, never in
+  a step's arguments or script text.
+- **Step 1, slim** (a pinned Cloud SDK image, before any download): it decodes the request,
+  computes the key, and looks for the record under the newest pinned key version. If it is there,
+  every later step ends at once.
+- **Step 2,** with network: it parses the request strictly (canonical JSON, the recompute
+  request's own shape) and reads the .docx by the worker's rules (the configured bucket, the
+  content address, the 32 MiB cap, the hash). It pulls the image by digest.
+- **Step 3,** with no network: two containers, each running `python -m zone_a.drawing`. Each is
+  hardened as `scripts/render/run.mjs` hardens the renderer's: `--network none`, a read-only root,
+  a tmpfs `/tmp`, `--cap-drop=ALL`, `no-new-privileges`, the image's non-root user, and bounded
+  processes and memory.
+- **Step 4,** with network: it requires the two outputs to be identical, checks that the commit is
+  a first-parent commit of main (R1), adds the environment, commit, image digest and key version,
+  signs with Cloud KMS, and writes create-if-absent.
 
 **What a compromised Zone A, or producer, could do:**
 
 - make Zone B refuse its own submissions;
-- spend build minutes by publishing requests. A request that does not name a stored certified Word
-  submission, whose .docx has the pinned hash, is refused within the first step, and a request for
-  a submission already drawn stops after the reads. A budget alert is the backstop (a residual);
+- spend build minutes by publishing well-formed requests. A request for a record that exists stops
+  at step 1; one whose .docx is not uploaded stops at step 2. A budget alert is the backstop (a
+  residual);
 - send a label built to attack Chrome's picture decoders, or the reader, inside the drawing
-  containers. Both drawings get the same input, so one exploit could make both say "agrees". The
-  containers have no network and no credentials, and the narratives are written by
-  `zone_a.word_epi`, not by the producer. This is R6's residual (Chrome without its sandbox);
-- what it can do today without D3, it still can: assert an approval, which is an attestation
-  until `approval.md`'s signed approvals are enforced.
+  containers. Both drawings get the same input, so one exploit in the container could make both
+  outputs agree falsely. An escape from the container as well reaches the build machine, its
+  metadata server, and so the drawing identity's token, which can sign a false record and read
+  every uploaded label. This is the residual of running Chrome on producer-supplied bytes; the
+  hardening above, and Chrome's own sandbox if it runs, are what stand in the way;
+- what it can do today without D3, it still can: assert an approval, which is an attestation until
+  `approval.md`'s signed approvals are enforced.
 
-**What it could not do:**
+**What it could not do,** short of that escape:
 
 - sign a record, or write to the record bucket: neither grant is its own;
-- have anything drawn but the recompute of the stored .docx under the submission's own request: the
-  build reads both itself and takes nothing else from the request;
-- reuse a record for another submission, environment, .docx, recompute, drawing version or image:
-  Zone B checks each;
-- have a narrative persisted that Chrome draws otherwise than the read: the record says so, and
-  Zone B refuses;
-- change the code that draws: it runs from main, under the render identity. R1's trust root stands:
-  whoever can change main, the build configuration, the trigger or the pinned keys (the owners and
-  deployers) is trusted, as R1 states.
+- read a record, or any other company's upload: no grant;
+- have anything drawn but the recompute of the uploaded .docx under the request: the build reads
+  the .docx itself, by its hash;
+- have a record serve a submission with another .docx, request, output, drawing version or image,
+  or another environment: Zone B checks each;
+- have a narrative persisted that Chrome draws otherwise than the read: such a drawing is never
+  signed;
+- change the code that draws: it runs from main. Whoever can change main, the trigger, its
+  configuration or the pinned keys (the owners and deployers) is the trust root, as R1 states.
 
 ## 5. The gate change
 
 ### Step 5
 
-After step 4 passes, in every run the worker recomputes, the gate verifies the record as in
-section 3. It refuses with these closed codes, each of which the HTTP caller learns, as it learns the
-three existing ones:
+After step 4 passes, in every run the worker recomputes, the gate looks for the record and verifies
+it as in section 3. Its closed codes, each of which the HTTP caller learns, as it learns the three
+existing ones:
 
-- `certified-word-drawing-missing`: no record for this submission and this build's drawing (the
-  existing code, now meaning just that);
-- `certified-word-drawing-invalid`: bytes that are not a canonical record of the right shape, or a
-  signature that does not verify against a key version this build pins for its environment and has
-  not revoked;
-- `certified-word-drawing-mismatch`: a signed record whose environment, submission, .docx,
-  recompute or sections are not this submission's;
-- `certified-word-drawing-failed`: a section Chrome drew otherwise than the read.
+- `certified-word-drawing-missing`: no record at any pinned key version's path (the existing code,
+  now meaning just that);
+- `certified-word-drawing-invalid`: bytes over the cap, not a canonical record of the shape, a
+  `keyVersion` or request not those of its path, or a signature that does not verify;
+- `certified-word-drawing-mismatch`: a signed record whose environment, request, .docx, output,
+  drawing or sections are not this submission's.
 
-A dry run is refused for any of these but `missing`. Without a record it passes as today
-(`certifiedWordCheck: "recomputed"`); with a verified one it says `"drawn"`.
+There is no `failed`: a record is signed only when every section agrees.
 
-### Step 6, and what the run manifest records (a contract change, under change control)
+**Until P5.** `certified-word-import.md` keeps every run dry until P5 binds the ePI's document id
+to its product ("Open: the document id is bound to nothing"). So until then:
+
+- a dry run is refused for `invalid` or `mismatch`; with no record it answers as today; with a
+  verified one its closed field `certifiedWordCheck` says `"drawn"`, beside today's `"recomputed"`
+  and `"submission-only"`;
+- a run that is not dry is still refused: `missing`, `invalid` or `mismatch` where they apply, and,
+  once the record verifies, `certified-word-document-unbound`, one more closed code.
+
+### Step 6, with P5 (a contract change, under change control)
+
+Built with P5's binding of the document id, not before, since only then can a run persist:
 
 - The ordinary gate accepts a certified Word submission in a run that is not dry only with
   `GateOptions.certifiedWordDrawn = { submissionSha256, recordSha256 }`, which only
-  `src/certified-word/gate.ts` sets, after step 5 (as only the authority gate sets
+  `src/certified-word/gate.ts` sets, after step 5 and P5's check (as only the authority gate sets
   `recomputedImport`).
-- **D3 alone does not let a run persist.** `certified-word-import.md` keeps the dry-run rule until
-  P5 binds the ePI's document id to its product ("Open: the document id is bound to nothing").
-  Until then, a run that is not dry and passes step 5 is refused with one more closed code,
-  `certified-word-document-unbound`, and the gate sets `certifiedWordDrawn` only once P5's check
-  passes.
 - The run manifest's `IngestionEvidence` gains
   `certifiedWord: { recomputeSha256, drawing: { recordSha256, keyVersion, version, imageDigest } }`,
-  present exactly when `sourceKind` is `certified-word`, a rule like the one `authority` has.
-- That is a major under ADR 0002's rule (a block required for a source kind Zone B branches on): run
+  present exactly when `sourceKind` is `certified-word`, a rule like the one `authority` has. That
+  is a major under ADR 0002's rule (a block required for a source kind Zone B branches on): run
   manifest **7.0.0**, with 6.0.0 frozen and still readable, a change record, and
   `npm run contracts:lock -- --record <change record>`. The renderer gate's reserved run-manifest
   major moves to the one after 7.0.0.
-- `CanonicalSubmission` and `ingestion-provenance` do not change. The record names the submission,
-  so the submission cannot name the record. D1 had planned to put the record in the source; that
-  would be circular.
-- `src/certified-word/` changes, so the importer's version and lock change (its directory holds the
-  gate), and so do the recompute's fixtures, for `recompute/1.2.0`.
+- `CanonicalSubmission` and `ingestion-provenance` do not change: the record and the submission do
+  not name each other.
 
 ## 6. Cost and operations
 
 **Measured** on this Mac (Apple M2, Google Chrome 154.0.8037.98, one process at a time), on the
-EMA's published Word SmPCs (`label-docx-reader-scratch/ema-pi-tc/en-smpc`, 296 files, a tracked
-label by its accepted view; counts and times only, no text kept). 130 SmPCs build with no heading
-left for a person to assign (an Annex I can hold several); 11 of them carry every section, which
-the recompute requires.
+EMA's published Word product information, cut into SmPCs and leaflets
+(`label-docx-reader-scratch/ema-pi-tc/en-smpc` and `en-pl`; a tracked label by its accepted view;
+counts and times only, no text kept). "Builds" means with no heading left for a person to assign.
 
-- **The largest SmPC that carries every section** (28 narratives, 260,247 characters of narrative
-  markup, 712 paragraphs): one `zone_a.drawing.check` took 4.0 s the first time and 1.8 s
-  the second. Reading and building it took 0.9 s.
-- The next two largest (27 narratives each): 1.8 to 2.1 s per check.
-- The largest of those that do not carry every section (26 narratives, 1,711 paragraphs): 1.9 to
-  2.6 s per check; reading and building took 11 s.
-- The slowest single read among the files that build (2,280 paragraphs, five SmPCs, by its
-  accepted view): 40.1 s.
+- **SmPCs:** 296 files; 130 SmPCs build (an Annex I can hold several), and 11 of them carry every
+  section, which the recompute requires.
+  - The largest of the 11 (28 narratives, 260,247 characters of narrative markup, 712
+    paragraphs): one `zone_a.drawing.check` took 4.0 s the first time and 1.8 s the second; reading
+    and building it, 0.9 s.
+  - The next two (27 narratives each): 1.8 to 2.1 s per check.
+  - A larger file that does not carry every section (26 narratives, 1,711 paragraphs): 1.9 to
+    2.6 s per check; reading and building it, 11 s.
+  - The slowest single read among the files that build (2,280 paragraphs, five SmPCs, by its
+    accepted view): 40.1 s.
+- **Leaflets:** 286 files; 110 leaflets build, and 12 of them carry every section.
+  - The three largest of the 12 (15 or 16 narratives, about 26,000 characters of narrative markup,
+    376 to 470 paragraphs): 1.1 to 1.2 s per check, 4.4 s for the very first check, with Chrome
+    cold; reading and building each, 2.2 to 2.4 s.
+  - The slowest read among the files that build (2,023 paragraphs): 8.1 s.
+- Times for a tracked label include a first, refused read without a view, except the 40.1 s,
+  which is its view's read alone.
 
 Each check starts Chrome twice (once for the text, once for the list labels). The build runs two
 checks, side by side.
 
-**Estimated, to be measured on the first build:** about 2 to 4 build-minutes per label. Most of it
-is fixed: fetching main's source, `npm ci`, pulling the image and signing. Each drawing container
-runs a read and a check: under 5 s for the largest carried SmPC here, about 45 s for the slowest
-read. Cloud Build's default machine is likely slower per core than an M2; by how much is not
-measured. The build's timeout is set from that first measurement, as R11 sets the authority
-build's. The 40 s read is also closer to the worker's 60 s recompute limit (D2) than D2's 4.1 s
-figure suggests, so the first deploy's measurement of the recompute should include that label.
+**Estimated, to be measured first** (build order, step 1): about 2 to 4 build-minutes per label.
+Most of it is fixed: fetching main's source, `npm ci`, pulling the image and signing. Each drawing
+container runs a read and a check: under 5 s for the largest carried SmPC here, under 7 s for the
+largest carried leaflet, and about 45 s for the slowest read. Cloud Build's default machine is
+likely slower per core than an M2; by how much is not measured. The build's timeout is set from
+that measurement, as R11 sets the authority build's.
+The 40 s read is also closer to the worker's 60 s recompute limit (D2) than D2's 4.1 s figure
+suggests, so the first deploy's measurement of the recompute should include that label.
 
 **Operations:**
 
-- From request to record: a few minutes, once per submission. A refused run says
-  `certified-word-drawing-missing` until then; the producer requests, then runs again.
-- A merge that changes the drawing's version or image: a worker built after it looks for records
-  under its own drawing id, so it does not find older ones (`missing`), and the producer asks again.
-  Between such a merge and its deploy, the build (main's code) and the worker (the deployed code)
-  can differ; the request is repeated after the deploy. A merge that changes the recompute's
-  versions already refuses older submissions at step 3, and the build's recompute refuses them too.
-- The drawing image is built only when its pins change, by R1's renderer image build
-  (`cloudbuild.renderer-image.yaml`, with its own identity and writer on `renderer-images` only),
-  and its digest is then locked in a pull request.
-- Key rotation and revocation are R1's: a new key version, its public key pinned in a pull request;
-  a revoked version listed in `revoked`; records requested again.
-- New infrastructure, all in Terraform: the render identity, the renderer image build's identity,
-  the HSM key, the attestation bucket, the `renderer-images` repository, one Pub/Sub topic, two
-  Cloud Build triggers (one per image change, one per request), and the worker's read on the
-  attestation bucket. The repository connection to GitHub is a step only the owner can take.
+- From request to record: a few minutes, once per label version, before the submission is made.
+- A merge that changes the drawing's version or image: a worker built after it looks under its own
+  drawing id, so it does not find older records (`missing`), and the producer asks again. Between
+  such a merge and its deploy, the build (main's code) and the worker (the deployed code) can
+  differ; the request is repeated after the deploy. A merge that changes the recompute's versions
+  already refuses older requests in both places.
+- Key rotation and revocation, as R1 has them: a new key version, its public key pinned in a pull
+  request; a revoked version listed in `revoked`; records requested again.
+- **The image** (recommended, from the review): the existing images build (`cloudbuild.images.yaml`,
+  every deploy) also builds the `word-drawing` target and pushes it to `ema-flow-images`, and a
+  pull request pins its digest per environment. That saves a repository, an identity and a trigger
+  over R1's separate image build. The cost: about 40 s more per deploy (CI's time for the renderer
+  image), a third-party download (Chrome, the Debian snapshot) on the deploy's path, and a new
+  digest each deploy that nothing uses until pinned. Old digests stay, since the repository has no
+  cleanup policy; one must be added with an exception for pinned digests if it ever is.
+- **The repository connection** (to be tested in PR 2): a trigger with an inline build that clones
+  the public repository at `refs/heads/main` over HTTPS needs no GitHub connection. It records the
+  commit and checks it is first-parent on main. If Cloud Build accepts such a trigger, the owner's
+  connection step falls away; if not, the trigger takes its source through the connection, which
+  only the owner can make.
+- **New infrastructure**, all in Terraform (PR 2): the drawing identity, its key, its record bucket,
+  one topic, one trigger, the worker's read on the record bucket, and the producer's publish grant.
 
 ## 7. Alternatives within (a)
 
@@ -392,70 +498,89 @@ figure suggests, so the first deploy's measurement of the recompute should inclu
    exist twice, in two languages, to be held equal forever by a differential test; the recompute's
    output grows; and the importer's input changes. Against a 100% bar, two copies of a rule are a
    risk with no gain in what is proved.
-3. **The submission names the record, not the reverse** (as D1 first planned): the record keyed
-   by the .docx and the recompute's request, and its hash in the source. The approver's content
-   hash would then cover the drawing, and one record would serve every submission of the same label
-   version. But Zone A could not finish a submission until the record came back (a round trip
-   inside its flow), and `CanonicalSubmission` would take another major. Keyed by the submission,
-   as this note has it, the record needs no change to the submission's contract.
+3. **Key the record by the submission** (this note's first draft). One record per submission, and
+   the producer could ask only once the submission exists. The drawing identity would need to read
+   the whole submissions bucket. And the submission could never name the record. Keyed by the .docx
+   and the request, none of that holds. Replaced.
 4. **Zone B asks for the drawing itself** when the record is missing. One step fewer for the
    producer, but the worker gains a publish grant, and every refused run would start a build. Not
    recommended.
 5. **Check records at deploy time, as R1 does,** copying them into the worker image. A pure lookup
    at run time, but every import would wait for a deploy, and with the records out of the
    repository there is nothing reviewed to copy. Not recommended.
+6. **Share R1's identity and key with authority records** (the first draft). Fewer resources, but a
+   flaw in one kind of drawing could sign the other kind. Replaced by a key and an identity of its
+   own.
 
-## 8. What the owner is asked
+## 8. The owner
 
-1. **Approve the new infrastructure, and make the repository connection.** It is listed in
-   section 6. Its deploy creates an HSM key that Terraform cannot destroy and whose destruction
-   waits 120 days. The GitHub connection to Cloud Build in `europe-west4` is a step only the owner
-   can take; R1 needs it too.
-2. **May the render identity read the submissions bucket?** It would be the first identity besides
-   the worker to read companies' uploaded labels. It runs only main's code, and reads in a step
-   with network but without Chrome.
-3. **The recommendation:** `zone_a.drawing` itself, in Python, in a second image target (section 7,
-   alternative 1), rather than a TypeScript port.
+**Answered 2026-10-07:** the owner said to go ahead on the recommendations of this design's first
+draft and of its review, which this revision takes in: among them `zone_a.drawing` itself in a
+second image target, and the drawing identity's read of `uploads/sha256/` alone. PR 2 is still
+reviewed as any change is; its deploy creates an HSM key that Terraform cannot destroy and whose
+destruction waits 120 days.
 
-## What this changes in R1, and what it does not
+**Left for the owner,** only if PR 2's test shows a Pub/Sub trigger cannot run an inline build that
+clones the public repository: the GitHub connection to Cloud Build in `europe-west4`, a step only
+the owner can take.
 
-**Kept from R1:** the render identity, running main's code only, with the first-parent `commitSha`
-check; a Cloud Build trigger bound to the repository, under that identity; two drawings in separate containers with no
-network before anything is signed; a KMS key per environment, its public keys pinned in the
-repository with a `revoked` list; create-if-absent writes to a bucket only the render identity may
-write; the renderer image (Chrome and fonts) pinned by digest from `renderer-images`; R1's trust
-root, unchanged.
+## What this takes from R1, and what differs
+
+**Taken from R1:** main's code only, with the first-parent `commitSha` check; a Cloud Build trigger
+under a dedicated identity; two drawings in separate containers with no network before anything is
+signed; a signing key per environment, its public keys pinned in the repository with a `revoked`
+list; create-if-absent writes to a bucket only that identity may write; the renderer image's Chrome
+and fonts; R1's trust root.
 
 **Different, for Word only:**
 
+- its own identity, key and bucket, shared with nothing;
 - the build takes a request, which is data, and makes the record; it does not regenerate a
   committed one;
 - no person commits the record, and there is no propose mode (section 3);
 - the worker verifies the record at run time; the image build does not, at deploy;
-- the drawing image is a second target of `Dockerfile.renderer` with Python added;
+- only a drawing in which every section agrees is signed;
+- the drawing image is a second target of `Dockerfile.renderer` with Python added, built in the
+  existing images build;
 - no captures: no person acknowledges anything, and the verdict is exact;
-- the render identity also reads the submissions bucket;
 - R2's widths, ratios and modes, R3's model, R4's geometry and R8's record shape are not used;
   `zone_a.drawing`'s check is.
 
 **Not touched:** R2 to R11 for authority imports. Their dropped parts (3c-C3 to C5) stay dropped.
-The parts D3 builds (the identity, the key, the bucket, the image repository and its build) are
-the ones those parts would need.
 
-## Delivery, each change reviewed on its own
+## Build order, each change reviewed on its own
 
-1. **The drawing, in code, no cloud:** `recompute/1.2.0`'s function; `zone_a.drawing`'s entry point
-   (`word-drawing/1.2.0`); the `word-drawing` image target and its launcher. CI draws the five
-   Word-made fixtures in that image and requires the recorded verdicts; a run on the EMA corpus,
-   kept local, requires the same verdicts as Google Chrome on macOS. This proves or refutes the
-   assumptions above.
-2. **The infrastructure:** section 6's list, after the owner's answers. The owner then makes the
-   repository connection, and the renderer image build pushes the first image.
-3. **The pins:** the image's digest and the key's first public key
-   (`src/certified-word/drawing.lock.json`, `src/render/attestation-keys/<environment>/`).
-4. **The gate:** step 5 and step 6, `cloudbuild.word-drawing.yaml`, run manifest 7.0.0, and ADR
-   0002's invariant 11 restated with step 5's codes; then the first record on a synthetic label in
-   dev, checked by a dry run (`"drawn"`). A run that persists one waits for P5.
+1. **Measure first**, with nothing merged: build the `word-drawing` image locally from a scratch
+   copy of the target. In it, measure:
+   - **parity:** the same verdicts as Google Chrome on the five Word-made SmPCs, the synthetic
+     certified Word fixtures (SmPC and leaflet), and the EMA's SmPCs and leaflets that build;
+   - **repeatability:** two runs, byte for byte;
+   - **the HTML and XML parsers** making the same tree of every narrative;
+   - **Chrome's sandbox** in the hardened container;
+   - **time and memory** per label.
+
+   If parity fails anywhere, the design stops there and the difference is understood first.
+
+2. **PR 1, the code and the image target:**
+   - `recompute/1.2.0`'s function, and `zone_a.drawing`'s entry point (`word-drawing/1.2.0`);
+   - the `word-drawing` target and its launcher;
+   - a CI job that draws the fixtures in the image and requires the recorded verdicts, two
+     identical runs and the parser test;
+   - step 1's corpus parity, repeatability and timings recorded in the pull request.
+3. **PR 2, the infrastructure:** section 6's list, with the Terraform tests (the identity's grants
+   proven exhaustive; the trigger's ref and configuration as literals) and the trigger tests
+   (payload binding, CEL filter, `actAs`, the inline clone).
+4. **PR 3, the pins:**
+   - each environment's image digest in `src/render/word-drawing/lock.json`;
+   - the key's first public key in `src/render/word-drawing/keys/<environment>/`.
+5. **PR 4, the gate:**
+   - step 5 with its codes and the dry run's `"drawn"`;
+   - `certified-word-document-unbound` for the runs that are not dry;
+   - the shared PSS check;
+   - ADR 0002's invariant 11 restated;
+   - then the first record of a synthetic label in dev, seen by a dry run.
+
+   Step 6 and run manifest 7.0.0 come with P5.
 
 ## Stated residuals
 
@@ -463,7 +588,10 @@ the ones those parts would need.
   could draw a list label, a colour or a background otherwise (R2's residual).
 - One Chrome build is the reference: the pinned chrome-headless-shell on Linux, not every browser
   a reader uses.
-- An exploit in the drawing containers could forge both drawings of one build (R6's residual).
-- A flood of valid requests costs build minutes; the backstop is a budget alert.
+- An exploit in the drawing container could make both drawings agree falsely; an escape from the
+  container reaches the build machine's metadata server and the drawing identity's token, which can
+  sign and can read every upload. If Chrome's own sandbox cannot run in the container, one layer
+  fewer stands in the way.
+- A flood of well-formed requests costs build minutes; the backstop is a budget alert.
 - The record does not vouch for the product, the document id (P5) or the approval: only that each
   narrative draws as the .docx was read.

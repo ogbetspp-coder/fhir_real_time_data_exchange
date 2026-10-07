@@ -68,8 +68,10 @@ change under the same token; the gate checks it from the source alone, and refus
 another importer version made. The importer's version is locked to the hash of
 `src/certified-word/` (with the fidelity scanner's two files and the strict JSON reader it uses)
 and of its golden vectors (`src/certified-word/importer.lock.json`, `npm run certified-word:lock`,
-`test/certified-word/lock.test.ts`), as the authority importer's is. The drawing record (D3) joins
-the source when it is built, a new version again. `CanonicalSubmission` and `ingestion-provenance`
+`test/certified-word/lock.test.ts`), as the authority importer's is. The drawing record (D3) does
+not join the source (corrected 2026-10-07): it is keyed by the .docx's hash and the recompute's
+request, and Zone B finds it from them (`docs/design/certified-word-drawing.md`), so the source
+names no record and needs no new version for it. `CanonicalSubmission` and `ingestion-provenance`
 are 3.0.0 and the run manifest 6.0.0, majors (its `contractVersion` follows the submission's;
 5.0.0 is frozen); the renderer gate's and the withheld design's change, which had reserved
 `CanonicalSubmission` 3.0.0, takes 4.0.0 and the run manifest's next major after 6.0.0.
@@ -194,11 +196,22 @@ Either way the recomputed code is deterministic and has no model in it, so it ma
   FHIR store, which ADR 0004 point 1 argues against.
 - (c) Zone B trusts Zone A's verdict. Rejected: it makes the drawing check a claim.
 
-**D3 (a), designed (2026-10-07, proposed):** `docs/design/certified-word-drawing.md`, the drawing
-record: the request, the verdict, the record, its signer and store, the gate's steps 5 and 6, cost,
-and the owner's questions. It corrects (a) above in two places. Of the renderer gate's parts, only
-the image exists: its identity, key, trigger and verification were dropped with 3c-C3 to C5, so D3
-builds them. And the record names the submission by its hash, so it does not join the source (D1).
+**D3 (a), designed (2026-10-07, proposed, revised after its review):**
+`docs/design/certified-word-drawing.md`, the drawing record: the request, the verdict, the record,
+its signer and store, the gate's steps 5 and 6, cost, and the build order. It corrects (a) above in
+three places:
+
+- of the renderer gate's parts, only the image exists: its identity, key, trigger and verification
+  were dropped with 3c-C3 to C5;
+- Word drawings get an identity, a key and a bucket of their own, not the authority records';
+- the producer asks by the .docx's hash and the recompute's request, not by narrative hashes. The
+  record is keyed by them, and Zone B finds it from the submission's source.
+
+**The trust model, plainly.** Zone B trusts main's code, the drawing identity's signature (checked
+against a key pinned in the worker image) and what the worker reads and recomputes itself, never the
+producer. Today the producer is the operator, whose own account holds the owner role on dev, so
+today nothing here guards against the producer. The checks are built for the day the producer is a
+separate service (the label gateway).
 
 **D4. The bytes.** The uploaded .docx is stored once, content-addressed, in the CMEK intake bucket
 (the label gateway's design, `docs/design/label-gateway.md`, which is also not yet approved). The
@@ -327,7 +340,7 @@ Still to build:
 
 - (step 5) D3's signed drawing record for the submission's narratives, required in place of the
   refusal above (`docs/design/certified-word-drawing.md`, proposed);
-- (step 6) the ordinary gate with that proof bound to the submission's hash, in place of
+- (step 6, with P5) the ordinary gate with that proof bound to the submission's hash, in place of
   `certifiedWordDryRun`, and the recompute's run and the drawing recorded in the run manifest.
 
 ## ADR amendments this carries
