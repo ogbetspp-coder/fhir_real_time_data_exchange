@@ -2,7 +2,7 @@
   "resourceType": "NamingSystem",
   "id": "model",
   "url": "https://khs.dev/fhir/NamingSystem/model",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "name": "Model",
   "title": "Extraction model",
   "status": "active",

@@ -2,7 +2,7 @@
   "resourceType": "NamingSystem",
   "id": "canonical-product",
   "url": "https://khs.dev/fhir/NamingSystem/canonical-product",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "name": "CanonicalProduct",
   "title": "Canonical product",
   "status": "active",

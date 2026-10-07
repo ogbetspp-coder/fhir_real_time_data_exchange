@@ -2,7 +2,7 @@
   "resourceType": "ConceptMap",
   "id": "canonical-to-ema-cap-smpc-en",
   "url": "https://khs.dev/fhir/ConceptMap/canonical-to-ema-cap-smpc-en",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "name": "CanonicalToEmaCapSmpcEnglish",
   "title": "Canonical SmPC sections to EMA CAP SmPC English QRD sections",
   "status": "active",
@@ -258,7 +258,7 @@
           ]
         },
         {
-          "code": "smpc.4.6.breast-feeding",
+          "code": "smpc.4.6.breastfeeding",
           "display": "Breast-feeding",
           "target": [
             {
@@ -478,7 +478,7 @@
           ]
         },
         {
-          "code": "smpc.5.2.pk-pd",
+          "code": "smpc.5.2.pkpd",
           "display": "Pharmacokinetic/pharmacodynamic relationship(s)",
           "target": [
             {

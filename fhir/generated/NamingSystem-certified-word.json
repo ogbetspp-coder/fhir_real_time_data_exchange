@@ -2,7 +2,7 @@
   "resourceType": "NamingSystem",
   "id": "certified-word",
   "url": "https://khs.dev/fhir/NamingSystem/certified-word",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "name": "CertifiedWord",
   "title": "Certified Word record",
   "status": "active",

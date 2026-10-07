@@ -479,7 +479,10 @@ manifest's. The decision above is otherwise unchanged.
   the worker refuses a leaflet's run that is not a dry run (`leaflet-not-readable`), whatever
   approvals say; the query service answers `document-not-found` for a stored document of another
   type than its manifest's.
-- **Found, not fixed.** Two optional SmPC keys of mapping 1.4.0, `smpc.4.6.breast-feeding` and
-  `smpc.5.2.pk-pd`, are not `SourceKey`s, so no submission can carry those sections (it is refused
-  at the contract). Their fix is a `SourceKey` with a hyphen (a major, taking `CanonicalSubmission`
-  4.0.0) or the two keys renamed (SmPC mapping 1.5.0).
+- **Found, then fixed.** Two optional SmPC keys of mapping 1.4.0, `smpc.4.6.breast-feeding` and
+  `smpc.5.2.pk-pd`, were not `SourceKey`s, so no submission could carry those sections (it was
+  refused at the contract). Their fix was a `SourceKey` with a hyphen (a major, taking
+  `CanonicalSubmission` 4.0.0) or the two keys renamed: SmPC mapping 1.5.0 renamed them
+  (`smpc.4.6.breastfeeding`, `smpc.5.2.pkpd`), with no contract change, and every key of every
+  manifest is now held to `SourceKey`
+  (`docs/validation/changes/2026-10-07-smpc-mapping-1-5-0-keys.md`).

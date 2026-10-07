@@ -2,7 +2,7 @@
   "resourceType": "CodeSystem",
   "id": "canonical-smpc-sections",
   "url": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "status": "active",
   "experimental": true,
   "name": "CanonicalSmpcSections",
@@ -114,7 +114,7 @@
                   "display": "Pregnancy"
                 },
                 {
-                  "code": "smpc.4.6.breast-feeding",
+                  "code": "smpc.4.6.breastfeeding",
                   "display": "Breast-feeding"
                 },
                 {
@@ -204,7 +204,7 @@
                   "display": "Linearity/non-linearity"
                 },
                 {
-                  "code": "smpc.5.2.pk-pd",
+                  "code": "smpc.5.2.pkpd",
                   "display": "Pharmacokinetic/pharmacodynamic relationship(s)"
                 }
               ]

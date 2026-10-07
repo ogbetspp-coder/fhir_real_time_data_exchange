@@ -10,7 +10,7 @@
 
 ## The event
 
-`https://khs.dev/fhir/SubscriptionTopic/epi-published`, in our package `dev.khs.fhir.epi#0.6.0`,
+`https://khs.dev/fhir/SubscriptionTopic/epi-published`, in our package `dev.khs.fhir.epi#0.7.0`,
 names it: an ePI document was published or superseded. Its one trigger is a `Bundle` whose `type`
 is `document`, created or updated in the validated store. The official validator checks the
 resource against base R5 in CI (`scripts/ci/emit-validation-set.ts` validates everything in

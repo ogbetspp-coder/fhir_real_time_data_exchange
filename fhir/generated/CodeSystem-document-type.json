@@ -2,7 +2,7 @@
   "resourceType": "CodeSystem",
   "id": "document-type",
   "url": "https://khs.dev/fhir/CodeSystem/document-type",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "status": "active",
   "experimental": true,
   "name": "DocumentType",

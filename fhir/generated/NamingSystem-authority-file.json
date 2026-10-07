@@ -2,7 +2,7 @@
   "resourceType": "NamingSystem",
   "id": "authority-file",
   "url": "https://khs.dev/fhir/NamingSystem/authority-file",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "name": "AuthorityFile",
   "title": "Authority file",
   "status": "active",

@@ -60,7 +60,7 @@ const mapping = await loadEmaMapping();
 const leaflet = await loadEmaMapping(path.resolve(`fhir/mappings/${DOCUMENTS.pl.mappingId}.json`));
 
 const PACKAGE_NAME = "dev.khs.fhir.epi";
-const PACKAGE_VERSION = "0.6.0";
+const PACKAGE_VERSION = "0.7.0";
 const PACKAGE_FILE = `${PACKAGE_NAME}.tgz`;
 const CANONICAL = KHS_CANONICAL;
 

@@ -2,7 +2,7 @@
   "resourceType": "StructureDefinition",
   "id": "ext-approval-content-sha256",
   "url": "https://khs.dev/fhir/StructureDefinition/ext-approval-content-sha256",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "name": "ApprovalContentSha256",
   "title": "Approved content SHA-256",
   "status": "active",
