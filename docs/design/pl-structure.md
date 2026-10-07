@@ -83,20 +83,21 @@ On the EMA's published Word product information in English (internal corpus, cou
 
 - **Read:** 193 of 286 files. The reader's refusals are its own (tracked-change edge cases, symbol
   fonts and the like), as for the SmPC cuts.
-- **Found:** the 193 hold 289 leaflets; every one has a single name. 113 are ready with no
-  person. 10 more are ready once a person names the numbered headings the template does not word
+- **Found:** the 193 hold 289 leaflets; every one has a single name. 111 are ready with no
+  person. 9 more are ready once a person names the numbered headings the template does not word
   ("How X is given", "What you need to know before you are given X"); their named sections are
-  then found inside them. Of the other 166, a person confirms one named section in 99 of them and
-  two in 46. What is left is wording the template does not have: "You must not be given X", "Do
-  not take X:", "Pregnancy" alone, "Marketing Authorisation Holder:".
-- **Built:** in the 69 files whose every leaflet is ready (98 leaflets), 1,418 of 1,666
+  then found inside them. Of the other 169, a person confirms one named section in 100 of them and
+  two in 47. What is left is wording the template does not have: "You must not be given X", "Do
+  not take X:", "Pregnancy" alone, "Marketing Authorisation Holder:", or a revision date written
+  as "{date}".
+- **Built:** in the 68 files whose every leaflet is ready (97 leaflets), 1,406 of 1,649
   sections are carried. The rest are refused section by section on the builder's closed lists
-  (list-label 87, formatting 45, tab 35, list-level 24, picture 19, table-shape 15,
-  anchored-object 12, heading-in-table 9, narrative 1, underline 1); one file is refused whole.
+  (list-label 83, formatting 45, tab 35, list-level 24, picture 19, table-shape 15,
+  anchored-object 12, heading-in-table 9, underline 1); one file is refused whole.
 
 ## Next
 
-- The leaflet's own refusals. The commonest (105 sections of ready leaflets) is a list whose level
+- The leaflet's own refusals. The commonest (101 sections of ready leaflets) is a list whose level
   is Word 6 numbering (`w:legacy`), as the template's own dash list is: the reader reports its
   suffix as `legacy`, and the builder refuses it, since ISO 29500 (17.9.5) says the text starts
   exactly `legacySpace` after the label, and these levels set `legacySpace` to 0 with a
