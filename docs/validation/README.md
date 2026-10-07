@@ -461,3 +461,4 @@ order.
 - [Two SmPC section keys inside `SourceKey`: SmPC mapping 1.5.0, authority importer 2.4.2, certified Word importer 1.2.1, `dev.khs.fhir.epi#0.7.0`, 2026-10-07](changes/2026-10-07-smpc-mapping-1-5-0-keys.md)
 - [The worker's recompute sized: one at a time, 2 GiB, 300 s, certified Word importer 1.2.2, 2026-10-07](changes/2026-10-07-worker-recompute-capacity.md)
 - [The Word drawing's entry point and image: `recompute/1.2.0`, `word-drawing/1.2.0`, certified Word importer 1.2.3, 2026-10-07](changes/2026-10-07-word-drawing-entry-point.md)
+- [The Word drawing's pins in dev: its image digest and its first public key, 2026-10-07](changes/2026-10-07-word-drawing-pins.md)

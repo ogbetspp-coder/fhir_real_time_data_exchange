@@ -3,8 +3,8 @@
 - Status: proposed 2026-10-07; revised the same day after an independent review of #197, whose
   recommendations the owner said to go ahead on. Build order step 1 partly measured and PR 1
   built the same day ("Step 1: measured, and PR 1 as built", below); PR 2 built and step 1's
-  remainder measured the same day ("Step 2: PR 2 as built, and measured", below); PR 3 and 4 are
-  not built
+  remainder measured the same day ("Step 2: PR 2 as built, and measured", below); PR 3 built the
+  same day, pinning dev's image and key ("Step 3: PR 3 as built", below); PR 4 is not built
 - Implements: `docs/design/certified-word-import.md` D3 (a), the owner's choice of 2026-10-06
   ("extend the renderer gate's attested records"), and that note's "The gate", steps 5 and 6
 - Fits: `docs/design/authority-import-renderer.md` R1 (attested records), frozen, its architecture
@@ -875,8 +875,58 @@ yet): `parse` 1.9 s; `draw-1` and `draw-2` at once, 4.2 and 4.4 s, byte for byte
 **Uncertain until the first build after PR 3:** what needs the deployed resources has run only
 against stand-ins (`test/infra/word-drawing.test.ts`) and the throwaway tests above: `exists`'s
 lookup in the record bucket, `pull` of the pushed image as the drawing identity, `fetch` under the
-conditioned grant, Cloud KMS's signature, and the write. The first synthetic label's record (PR 4)
-is their first run; until then a request ends at `exists`, refused, since nothing is pinned.
+conditioned grant, Cloud KMS's signature, and the write. The first synthetic label's record, made
+once PR 3 is merged ("Step 3"), is their first run; until PR 3, a request ends at `exists`, refused,
+since nothing is pinned.
+
+## Step 3: PR 3 as built (2026-10-07)
+
+**What PR 3 pins, for dev only.** Validation and prod stay unpinned (a null digest, no key), so
+their builds still end at `exists`, refused, until a pull request pins each from its own deploy.
+
+- `src/render/word-drawing/lock.json`: dev's image,
+  `sha256:eff4827a9f5ebefe001e624ae197ecace2ca126d8827f2fe70dacf1632061c27`, the `word-drawing`
+  target as the images build pushed it from main at `cb27bd9` (tag `word-drawing:cb27bd9c4a95`).
+  Dev's drawing id is therefore
+  `03d058be759c88620d0748c07ea6c747c468b7ad9b0e95f23476e07db67d4000`.
+- `src/render/word-drawing/keys/dev/1.pem`: `word-drawing-hsm` version 1's public key, the PEM as
+  Cloud KMS gave it. No `revoked.json`: nothing is revoked, and the build reads its absence as an
+  empty list.
+
+**How each was verified** (read only, with `gcloud` and GETs authorised by its token):
+
+- **The image.** The deploy's run 37688275636 (a push to main, at
+  `cb27bd9c4a95f8876da978f9fb527d1d730cd3b4`, main's first-parent head) made Cloud Build build
+  `adba9d09-1227-4361-88b4-d2c20930ad67` in `europe-west4`, as `ema-flow-build-dev`, with
+  `_REVISION` that commit. The build's results list `word-drawing:cb27bd9c4a95` at the pinned
+  digest. The manifest the registry serves for the digest hashes to it, and is one linux/amd64
+  image, not an index. Its configuration carries `org.opencontainers.image.revision` =
+  `cb27bd9c4a95f8876da978f9fb527d1d730cd3b4`, and runs as `node` with the drawing's environment
+  (`LABEL_CHROME`, `ZONE_A_ROOT=/work`).
+- **The key.** Version 1 is `ENABLED`, `RSA_SIGN_PSS_3072_SHA256`, `HSM`, made at
+  2026-10-07T21:31:28Z. The PEM from `gcloud kms keys versions get-public-key` and the API's
+  `publicKey` are byte for byte the same, and its CRC32C is the `pemCrc32c` the API sent with it
+  (939517586). It is a 3072-bit RSA key, exponent 65537, and both OpenSSL (as `stored.py` runs
+  it) and Node take it for RSA-PSS with SHA-256 and a 32-byte salt.
+
+**Tests.** `test/render/word-drawing.test.ts`: dev's digest is a digest reference; the key is RSA
+3072, exponent 65537, its PEM the key's own SubjectPublicKeyInfo export with KMS's CRC32C, and it
+verifies under PSS with SHA-256 and a 32-byte salt. `test/infra/word-drawing.test.ts`: with main's
+own lock and keys, `exists` goes on in dev, by the pinned image and key version 1, and validation
+and prod are still refused. `scripts/word-drawing/build.sh` is unchanged.
+
+**What PR 3 leaves.**
+
+- **The worker's copy of the key.** The worker image carries `dist/` and not `src/`, so the key is
+  not in it yet. PR 4, whose gate reads it, puts `src/render/word-drawing/` in the worker image.
+- **No version moves.** The lock and the keys are outside `src/certified-word/` and every other
+  lock, so neither importer, nor `word-drawing/1.2.0`, nor a contract changes.
+- **The first record.** Once PR 3 is merged, the committed synthetic SmPC
+  (`test/fixtures/certified-word/recompute/smpc.docx`, SHA-256 `f86f053e…fbee09`) is uploaded to its
+  content address and its request published once (the pull request's post-merge verification). Its
+  record is at `word/7e4c389f…cd92809/03d058be…db67d4000/1.json`, with `recompute.outputSha256` the
+  committed `smpc.json`'s and 32 sections. That build is the first run of what "Uncertain until the
+  first build after PR 3" lists. PR 4's dry run then finds the record.
 
 ## Build order, each change reviewed on its own
 
@@ -902,15 +952,16 @@ is their first run; until then a request ends at `exists`, refused, since nothin
 3. **PR 2, the infrastructure** (built 2026-10-07, "Step 2"): section 6's list, with the Terraform
    tests (the identity's grants proven exhaustive; the trigger's ref and configuration as literals)
    and the trigger tests (payload binding, CEL filter, `actAs`, the inline clone).
-4. **PR 3, the pins:**
+4. **PR 3, the pins** (built 2026-10-07 for dev, "Step 3"):
    - each environment's image digest in `src/render/word-drawing/lock.json`;
-   - the key's first public key in `src/render/word-drawing/keys/<environment>/`.
+   - the key's first public key in `src/render/word-drawing/keys/<environment>/`;
+   - after its merge, the first record of a synthetic label in dev.
 5. **PR 4, the gate:**
    - step 5 with its codes and the dry run's `"drawn"`;
    - `certified-word-document-unbound` for the runs that are not dry;
-   - the shared PSS check;
+   - the shared PSS check, and the pinned keys in the worker image;
    - ADR 0002's invariant 11 restated;
-   - then the first record of a synthetic label in dev, seen by a dry run.
+   - then a dry run in dev that finds the synthetic label's record.
 
    Step 6 and run manifest 7.0.0 come with P5.
 
