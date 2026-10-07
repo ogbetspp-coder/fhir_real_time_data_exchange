@@ -1,7 +1,8 @@
 # A company's Word SmPC through Zone B: the contract, the recompute and the drawing (ADR 0006 P4)
 
-- Status: proposed, 2026-10-05; needs the owner's decision on D2 and D3 (both add to what is
-  deployed) before anything here is built
+- Status: decided, 2026-10-06 (the owner took the recommendations: D2 (a), D3 (a), and D4's
+  narrow upload path in the existing CMEK submissions bucket); being built in steps (below,
+  "Progress")
 - Implements: ADR 0006 decisions 1, 5, 6 and 7, prerequisite P4
 - Related: ADR 0002 (invariants 7, 8, 11), ADR 0004 (service boundaries), ADR 0005's amendment
   (the renderer gate's attested records), `docs/design/authority-import-contract.md` (D1, the
@@ -108,3 +109,20 @@ assignments and the canonical product it is for.
 
 Nothing here is built until these are answered; the contract change (D1) and the product proposal
 (D5) can be built and tested without deploying anything.
+
+**Answered 2026-10-06 (evening):** D2 (a), the worker runs the recompute; D3 (a), the renderer
+gate's attested records, extended; D4, a narrow upload path in the existing CMEK submissions
+bucket, before the label gateway.
+
+## Progress
+
+1. **The recompute** (D2's function): `zone_a.recompute` (`recompute/1.0.0`), run as
+   `python -m zone_a.recompute LABEL.docx < REQUEST.json`. One function for both sides: the
+   producer makes a part's sections with it, the gate makes them again and compares. The request
+   names the document (`smpc` or `pl`), the view, which part, the assignments and every version
+   that decides the result; a request naming other versions is refused, so only the build that
+   made a submission recomputes it. It refuses unless every section of the part is carried. No
+   network, clock or browser; tested on synthetic SmPCs and leaflets, byte for byte twice.
+2. Next: the `certified-word` source kind and the TypeScript importer that builds a submission
+   from the recompute's result (D1); then the worker image and the gate's subprocess (D2), the
+   upload path (D4) and the drawing records (D3).

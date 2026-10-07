@@ -96,6 +96,7 @@ COMPONENTS: dict[str, Component] = {
             "src/zone_a/qrd/registry.py",
         ),
     ),
+    "recompute": Component("zone_a.recompute", "RECOMPUTE_VERSION", ("src/zone_a/recompute.py",)),
     "word-epi": Component(
         "zone_a.word_epi",
         "WORD_EPI_VERSION",
