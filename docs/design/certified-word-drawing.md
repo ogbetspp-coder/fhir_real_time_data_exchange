@@ -465,7 +465,7 @@ Each check starts Chrome twice (once for the text, once for the list labels). Th
 checks, side by side.
 
 **Measured in PR 2** on Cloud Build's default machine, an e2-standard-2 ("Step 2", below): about
-1 to 1.5 build-minutes for a label of the corpus, and under 4 for the slowest read that builds.
+about 1.5 build-minutes for a label of the corpus, and under 4 for the slowest read that builds.
 Most of it is fixed: pulling the Cloud SDK image (38 s), main's source (2 to 3 s), the drawing
 image (about 20 s, estimated from the worker image's pull) and signing. The two drawings, at
 once, take 5 to 26 s for the corpus's labels that carry every section, and 132 to 152 s for the
@@ -815,8 +815,8 @@ after (`gs://…-build-staging/word-drawing-pr2-corpus/`, within its seven-day s
   markup) are the Mac's, on all 253 parts, and so are the reads (view, paragraphs).
 - Repeatability: the shell drew every part again, and at 375 by 812 and a ratio of 2: the same raw
   answers on all 241 parts. HTML and XML parse trees: 4,649 of 4,649 the same.
-- Across machines: two runs on AMD (e2-highcpu-8) gave the same raw answers on all 241 parts;
-  a run on Intel (e2-standard-2) is still drawing as this is written.
+- Across machines: two runs on AMD (e2-highcpu-8) and one on Intel (e2-standard-2) gave the same
+  raw answers on all 241 parts, and every section agreed in each.
 - Not measured: the corpus's raw answers against macOS's; the Mac kept no digests of them. The
   fixtures' raw answers are byte for byte Google Chrome's on macOS (above).
 
@@ -826,9 +826,11 @@ after (`gs://…-build-staging/word-drawing-pr2-corpus/`, within its seven-day s
   8.9 s); each container peaked at 114 to 186 MiB. Every label wrote one output across all twelve
   runs (six builds, two containers).
 - The slowest read that builds (2,280 paragraphs, its accepted view, refused at `section` for its
-  first part): 132 to 152 s a pair, each container peaking at 893 to 896 MiB. Under the build's own bound, 2 GiB (below), the same: refused at `section` in both
-  containers, in 119 s, neither killed for memory.
-- The committed labels: 2.1 to 3.9 s a pair on Intel, 1.4 to 2.5 s on AMD; about 100 MiB each.
+  first part): 132 to 152 s a pair, each container peaking at 893 to 896 MiB. Under the build's
+  own bound, 2 GiB (below), the same: refused at `section` in both containers, in 119 s, neither
+  killed for memory.
+- The committed labels: 2.1 to 3.9 s a pair on Intel, 1.4 to 2.5 s on AMD (both e2-standard-2);
+  99 to 114 MiB each.
 - Fixed: the Cloud SDK image's pull, 38 s; main's source, 2 to 3 s; a trigger's build queued for 1
   to 32 s; the worker image (393 MB) pulled from `ema-flow-images` in 9.4 to 10.3 s, so the drawing
   image (781 MB) in about 20 s, estimated.
