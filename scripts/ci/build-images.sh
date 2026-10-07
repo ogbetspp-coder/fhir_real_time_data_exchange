@@ -84,7 +84,9 @@ fi
 docker rm --force offline >/dev/null 2>&1 || true
 docker run --detach --name offline --network none ema-flow/validator:ci >/dev/null
 for _ in $(seq 1 120); do
-  if docker logs offline 2>&1 | grep -q "FHIR Validator HTTP Service started"; then break; fi
+  # grep reads the whole log (no -q): leaving at the first match would kill docker logs on the
+  # closed pipe, and pipefail would take the match for a failure.
+  if docker logs offline 2>&1 | grep "FHIR Validator HTTP Service started" >/dev/null; then break; fi
   if [[ "$(docker inspect --format '{{.State.Running}}' offline)" != "true" ]]; then break; fi
   sleep 2
 done

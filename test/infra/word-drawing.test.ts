@@ -311,7 +311,9 @@ function checkout(): { dir: string; bin: string; key: KeyObject } {
   stub("gcloud", "echo token");
   stub(
     "git",
-    `case "$1" in rev-parse) echo ${COMMIT} ;; rev-list) printf '%s\\n' \${STUB_MAIN:-${COMMIT}} ;; esac`,
+    // STUB_LONG: main's first-parent line runs on after the commit, as a real one does, so a
+    // reader that leaves at its first match closes the pipe on a git still writing.
+    `case "$1" in rev-parse) echo ${COMMIT} ;; rev-list) printf '%s\\n' \${STUB_MAIN:-${COMMIT}}; [ -n "\${STUB_LONG:-}" ] && yes ${"e".repeat(40)} | head -n 200000 ;; esac`,
   );
   stub(
     "curl",
@@ -511,6 +513,12 @@ describe("the build's signing step", () => {
     expect(readFileSync(path.join(dir, "calls"), "utf8")).toContain(
       "https://storage.googleapis.com/upload/storage/v1/b/records/o?uploadType=media&ifGenerationMatch=0&name=word%2Fk%2Fd%2F1.json",
     );
+  });
+
+  it("finds its commit at the head of a long first-parent line (the first live build, 2026-10-07)", () => {
+    const { dir, bin } = signing();
+    expect(run(dir, bin, "sign", { STUB_LONG: "1" })).toMatchObject({ status: 0 });
+    expect(readFileSync(path.join(dir, "written"), "utf8")).toContain('"signatureBase64":"');
   });
 
   it("takes a record already stored only when it is signed and this record, but for its commit", () => {
