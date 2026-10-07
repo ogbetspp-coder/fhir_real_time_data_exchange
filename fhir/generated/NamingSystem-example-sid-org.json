@@ -2,7 +2,7 @@
   "resourceType": "NamingSystem",
   "id": "example-sid-org",
   "url": "https://khs.dev/fhir/NamingSystem/example-sid-org",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "name": "ExampleSidOrg",
   "title": "Example org",
   "status": "active",

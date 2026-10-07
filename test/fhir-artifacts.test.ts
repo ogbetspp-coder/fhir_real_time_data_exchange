@@ -7,6 +7,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { EmaMapping, SectionRule } from "../src/fhir/mapping.js";
 import { loadEmaMapping } from "../src/fhir/mapping.js";
 import { transformType2ToEma } from "../src/fhir/transform.js";
+import { buildPersistTransaction } from "../src/gcp/healthcare.js";
 import { createSyntheticType2Bundle } from "../src/fixtures/synthetic.js";
 import { SMOKE_PRODUCT_ID } from "../src/fixtures/synthetic-products.js";
 import { stableUuid } from "../src/lib/hash.js";
@@ -322,5 +323,64 @@ describe("the repository's own package", () => {
       members.find(({ name }) => name === "package/.index.json")?.data ?? "{}",
     ) as { files: { filename: string }[] };
     expect(index.files.map(({ filename }) => filename).sort()).toEqual([...resources].sort());
+  });
+});
+
+// The event the validated store publishes (docs/design/epi-published-notifications.md): the topic
+// names what a run writes, and the store sends a resource's name, never its content.
+describe("the ePI published topic", () => {
+  type Topic = {
+    resourceTrigger: {
+      resource: string;
+      supportedInteraction: string[];
+      fhirPathCriteria: string;
+    }[];
+    notificationShape: { resource: string }[];
+  };
+  const topic = artifact("SubscriptionTopic-epi-published.json") as Topic;
+
+  it("triggers on what a run writes: one document Bundle, by PUT, first or later version", () => {
+    expect(topic.resourceTrigger).toMatchObject([
+      {
+        resource: "Bundle",
+        supportedInteraction: ["create", "update"],
+        fhirPathCriteria: "%current.type = 'document'",
+      },
+    ]);
+    expect(topic.notificationShape).toEqual([{ resource: "Bundle" }]);
+    const ema = transformType2ToEma(
+      createSyntheticType2Bundle(mapping, { product: SMOKE_PRODUCT_ID }),
+      mapping,
+    );
+    for (const stored of ["absent", { versionId: "1" }] as const) {
+      const bundles = buildPersistTransaction(
+        ema.list,
+        ema.documentBundle,
+        "run",
+        stored,
+      ).entry.filter(({ resource }) => resource.resourceType === "Bundle");
+      expect(bundles.map(({ resource, request }) => [resource.type, request.method])).toEqual([
+        ["document", "PUT"],
+      ]);
+    }
+  });
+
+  it("is delivered by the validated store alone, as resource names", () => {
+    const script = readFileSync("scripts/gcp/reconcile-fhir-stores.sh", "utf8");
+    const store = (name: string): Record<string, unknown> => {
+      const body = new RegExp(`cat >"\\$TMP/${name}\\.json" <<JSON\\n([\\s\\S]*?)\\nJSON\\n`).exec(
+        script,
+      )?.[1];
+      if (body === undefined) throw new Error(`no ${name}.json in the reconciler`);
+      return JSON.parse(body.replace(/\$\{[A-Z_]+\}/g, "0")) as Record<string, unknown>;
+    };
+    expect(store("source").notificationConfigs).toEqual([]);
+    expect(store("target").notificationConfigs).toEqual([
+      { pubsubTopic: "0", sendFullResource: false, sendPreviousResourceOnDelete: false },
+    ]);
+    // Every PATCH, of either store, sets notificationConfigs, so a notification added to the
+    // source store by hand does not outlive the next deploy.
+    const masks = [...script.matchAll(/update_mask="([^"]*)"/g)].map(([, mask]) => mask);
+    expect(masks[0]?.split(",")).toContain("notificationConfigs");
   });
 });

@@ -92,7 +92,7 @@ describe("the pinned standards", () => {
     // The count the validator's own Package Summary reported on 2026-10-05: twelve since
     // 2026-09-28, and the repository's own package.
     expect(pinnedPackages()).toHaveLength(13);
-    expect(pinnedPackage(pinnedPackages(), "dev.khs.fhir.epi")).toBe("dev.khs.fhir.epi#0.4.0");
+    expect(pinnedPackage(pinnedPackages(), "dev.khs.fhir.epi")).toBe("dev.khs.fhir.epi#0.5.0");
     const terminology = pinnedPackages().filter(({ package: ref }) =>
       ref.startsWith("hl7.terminology.r5#"),
     );

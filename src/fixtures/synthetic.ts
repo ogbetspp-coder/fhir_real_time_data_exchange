@@ -66,6 +66,19 @@ function syntheticIdentifier(kind: string, value: string): { system: string; val
   return [{ system: `https://khs.dev/fhir/identifier/${kind}`, value }];
 }
 
+// A product-graph coding in the system its element is bound to: the Global ePI profiles' own
+// value sets for dose forms, unit of presentation, route and ingredient role, base R5's for the
+// rest. Every system but SNOMED CT is a code system the pinned hl7.fhir.r5.core#5.0.0 holds with
+// content `complete`, so the official validator checks the code and its display offline, as
+// errors. SNOMED CT it cannot check offline, and says nothing about
+// (docs/design/terminology-server.md); the route's code and display are the Global ePI package's
+// own example's (package/example/Bundle-bundlepackageleaflet75type2.json).
+const R5 = "http://hl7.org/fhir";
+function coded(system: string, code: string, display: string) {
+  return { coding: [{ system, code, display }] };
+}
+const active = () => coded(`${R5}/publication-status`, "active", "Active");
+
 export function createSyntheticType2Bundle(
   mapping: EmaMapping,
   options: SyntheticFixtureOptions = {},
@@ -131,9 +144,9 @@ export function createSyntheticType2Bundle(
       id: product.id,
       meta: globalEpiProfile("MedicinalProductDefinition"),
       identifier: syntheticIdentifier("product", product.productIdentifier),
-      type: { coding: [{ code: "MedicinalProduct" }] },
-      domain: { coding: [{ code: "Human" }] },
-      status: { coding: [{ code: "active" }] },
+      type: coded(`${R5}/medicinal-product-type`, "MedicinalProduct", "Medicinal Product"),
+      domain: coded(`${R5}/medicinal-product-domain`, "Human", "Human use"),
+      status: active(),
       name: [{ productName: product.productName }],
     },
     {
@@ -149,7 +162,7 @@ export function createSyntheticType2Bundle(
       holder: {
         reference: organizationUrl,
       },
-      status: { coding: [{ code: "active" }] },
+      status: active(),
     },
     {
       resourceType: "PackagedProductDefinition",
@@ -164,7 +177,8 @@ export function createSyntheticType2Bundle(
       ],
       packaging: {
         identifier: syntheticIdentifier("packaging", `${product.productIdentifier}-PKG-1`),
-        type: { coding: [{ display: "Carton" }] },
+        // packaging-type has no "Carton"; it has "Box".
+        type: coded(`${R5}/packaging-type`, "100000073498", "Box"),
         quantity: 1,
         containedItem: [
           {
@@ -183,8 +197,8 @@ export function createSyntheticType2Bundle(
       meta: globalEpiProfile("ManufacturedItemDefinition"),
       identifier: syntheticIdentifier("manufactured-item", `${product.productIdentifier}-ITEM`),
       status: "active",
-      manufacturedDoseForm: { coding: [{ display: "Tablet" }] },
-      unitOfPresentation: { coding: [{ display: "Tablet" }] },
+      manufacturedDoseForm: coded(`${R5}/manufactured-dose-form`, "100000073664", "Tablet"),
+      unitOfPresentation: coded(`${R5}/unit-of-presentation`, "200000002152", "Tablet"),
     },
     {
       resourceType: "AdministrableProductDefinition",
@@ -197,7 +211,7 @@ export function createSyntheticType2Bundle(
           reference: productUrl,
         },
       ],
-      administrableDoseForm: { coding: [{ display: "Tablet" }] },
+      administrableDoseForm: coded(`${R5}/administrable-dose-form`, "100000073664", "Tablet"),
       producedFrom: [
         {
           reference: itemUrl,
@@ -205,7 +219,7 @@ export function createSyntheticType2Bundle(
       ],
       routeOfAdministration: [
         {
-          code: { coding: [{ display: "Oral use" }] },
+          code: coded("http://snomed.info/sct", "26643006", "Oral route"),
         },
       ],
     },
@@ -219,7 +233,7 @@ export function createSyntheticType2Bundle(
           reference: itemUrl,
         },
       ],
-      role: { coding: [{ display: "Active" }] },
+      role: coded(`${R5}/ingredient-role`, "100000072072", "Active"),
       substance: {
         code: {
           reference: {
@@ -247,8 +261,8 @@ export function createSyntheticType2Bundle(
       meta: globalEpiProfile("SubstanceDefinition"),
       identifier: syntheticIdentifier("substance", product.substanceIdentifier),
       version: "1",
-      status: { coding: [{ code: "active" }] },
-      name: [{ name: product.substanceName, status: { coding: [{ code: "current" }] } }],
+      status: active(),
+      name: [{ name: product.substanceName, status: active() }],
     },
   ];
 

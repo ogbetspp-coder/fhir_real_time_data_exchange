@@ -60,6 +60,7 @@ cat >"$TMP/source.json" <<JSON
     "disableReferenceTypeValidation": false,
     "disableFhirpathValidation": false
   },
+  "notificationConfigs": [],
   "labels": {
     "application": "ema-flow",
     "environment": "${ENVIRONMENT}",
@@ -185,10 +186,13 @@ reconcile() {
     exit 1
   fi
 
+  # notificationConfigs on both stores: the source store holds narrative and sends no
+  # notification, so one added by hand is removed by the next deploy
+  # (docs/design/epi-published-notifications.md).
   local update_mask
-  update_mask="enableUpdateCreate,defaultSearchHandlingStrict,validationConfig,labels"
+  update_mask="enableUpdateCreate,defaultSearchHandlingStrict,validationConfig,labels,notificationConfigs"
   if [[ "$store_id" == "$TARGET_STORE" ]]; then
-    update_mask="${update_mask},notificationConfigs,streamConfigs"
+    update_mask="${update_mask},streamConfigs"
   fi
   if ! request PATCH "${resource}?updateMask=${update_mask}" "$body" >"$current"; then
     echo "Response summary: $(summarize_response "$current")" >&2

@@ -7,6 +7,9 @@ node_modules/
 dist/
 coverage/
 fhir/vendor/
+# Written by scripts/fhir/generate-artifacts.ts and held byte for byte by npm run artifacts:check
+# (and the package's pinned SHA-256): Prettier would put a short array on one line.
+fhir/generated/
 .terraform/
 package-lock.json
 

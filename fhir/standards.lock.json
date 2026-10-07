@@ -48,9 +48,9 @@
     },
     {
       "name": "ema-flow ePI definitions package",
-      "package": "dev.khs.fhir.epi#0.4.0",
+      "package": "dev.khs.fhir.epi#0.5.0",
       "path": "fhir/generated/dev.khs.fhir.epi.tgz",
-      "sha256": "add2311a9de6abc2db2d2b8b85f0f48e83a48f2a191ca8ce29e3def65c61d90d",
+      "sha256": "d0f9daabc7e4526c301dc736e709e1249997f12f9739d2bd444aaf61c392433e",
       "status": "own"
     },
     {
