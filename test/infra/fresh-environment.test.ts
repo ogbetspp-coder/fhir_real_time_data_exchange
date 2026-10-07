@@ -113,7 +113,7 @@ describe("import_unmanaged", { timeout: 30_000 }, () => {
       "import_unmanaged google_kms_key_ring.record the-id gcloud kms keyrings describe r";
     const missing = run("bash", script.replace("describe r", "list"));
     expect(imports(missing.calls)).toEqual([
-      "terraform -chdir=infra import -var=project_id=p-new -var=worker_image=us-docker.pkg.dev/cloudrun/container/hello -var=validator_image=us-docker.pkg.dev/cloudrun/container/hello -var=query_image=us-docker.pkg.dev/cloudrun/container/hello google_kms_key_ring.record the-id",
+      "terraform -chdir=infra import -var=project_id=p-new -var=worker_image=us-docker.pkg.dev/cloudrun/container/hello -var=validator_image=us-docker.pkg.dev/cloudrun/container/hello -var=query_image=us-docker.pkg.dev/cloudrun/container/hello -var=signer_image=us-docker.pkg.dev/cloudrun/container/hello google_kms_key_ring.record the-id",
     ]);
     expect(imports(run("bash", script).calls)).toEqual([]);
     const managed = run("bash", script.replace("describe r", "list"), {

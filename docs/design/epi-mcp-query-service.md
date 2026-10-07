@@ -227,8 +227,24 @@ identity, and shares only pure libraries with the worker.
 - **Identity.** The service is its own Cloud Run service (`ema-flow-<env>-query`) with its own
   service account holding `roles/healthcare.fhirResourceReader` on the validated store (and,
   until audit B04's phase 2, the dataset) and
-  `roles/logging.logWriter`, and nothing else — no write role anywhere, no BigQuery, no
-  buckets. A negative test asserts the role set across every file under `infra/`.
+  `roles/logging.logWriter`, and, for signed approvals (2026-10-06), read on the approval heads
+  bucket and `roles/cloudkms.publicKeyViewer` on `approval-signing-hsm`, and nothing else — no
+  write role anywhere, no BigQuery, no other bucket. A negative test asserts the role set across
+  every file under `infra/`.
+- **Signed approvals (`query-tools` 5.0.0).** With `APPROVAL_VERIFICATION` on (off by default, and
+  off until the demonstration documents are approved through the signer:
+  `docs/design/approval.md`, step 6), every tool verifies, before it answers, the signed statement
+  linked to the version it read (D5, D9): it reads the link by id, verifies the signature against the
+  environment's approval key, re-hashes every section against the statement, and reads the
+  document's head. A version without a valid approval, or whose sections do not re-hash, is
+  `not-approved`; a plain request whose newest version is not the head's is `not-approved`; a named
+  version a later approval supersedes is answered and marked `superseded`. `get_section` and
+  `get_provenance` carry `approval` (the statement's hash, the approver's subject, role, name and
+  e-mail, the time and meaning of the signature), `get_provenance` names the statement's approver,
+  and the audit record `approverSub` and `statementSha256`. Each verification is three store reads
+  beyond the Bundle, so `find_product` scans at most 50 entitled documents. With it off, every
+  answer is as 4.1.0's, and the rule below ("An approval is stated only for the current version")
+  is the one in force.
 - **Image.** `cloudbuild.images.yaml` builds `Dockerfile --target query` and publishes it as the
   `query` path of the shared `ema-flow` Artifact Registry repository
   (`<region>-docker.pkg.dev/<project>/

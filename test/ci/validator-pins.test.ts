@@ -331,8 +331,13 @@ describe("the image build", () => {
     expect(build).not.toMatch(/Error fetching|Failed to determine latest version|Installing /);
   });
 
-  it("builds the three images at once, the validator from its previous layers", () => {
-    for (const id of ["build-app-image", "build-query-image", "pull-validator-cache"]) {
+  it("builds the images at once, the validator from its previous layers", () => {
+    for (const id of [
+      "build-app-image",
+      "build-query-image",
+      "build-signer-image",
+      "pull-validator-cache",
+    ]) {
       expect(build).toMatch(new RegExp(`- id: ${id}\\n[^\\n]*\\n\\s+waitFor: \\["-"\\]`));
     }
     expect(build).toMatch(/waitFor: \["pull-validator-cache"\]/);
@@ -345,8 +350,8 @@ describe("the image build", () => {
     const labels = build.match(
       /- --label\n\s+- org\.opencontainers\.image\.revision=\$\{_REVISION\}/g,
     );
-    expect(builds).toHaveLength(3);
-    expect(labels).toHaveLength(3);
+    expect(builds).toHaveLength(4);
+    expect(labels).toHaveLength(4);
     expect(readFileSync("scripts/gcp/deploy.sh", "utf8")).toContain("_REVISION=${SERVICE_VERSION}");
   });
 });

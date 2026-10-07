@@ -235,6 +235,12 @@ export class HealthcareFhirReader implements FhirReader {
     return this.#read<FhirBundle>(url, signal);
   }
 
+  // A Provenance by its id: the versioned approval link and the ingestion Provenance a verified
+  // statement names (docs/design/approval.md, D5 and D9), read directly, never searched for.
+  public async readProvenance(id: string, signal?: AbortSignal): Promise<FhirResource | undefined> {
+    return this.#read<FhirResource>(`${this.#storeBase()}/Provenance/${addressable(id)}`, signal);
+  }
+
   // One document can carry more than one Provenance: publishing a second approved version
   // writes a second, and the demonstration set deliberately does exactly that. The previous
   // search asked for `_count=1` in no stated order, so which of them came back was decided by

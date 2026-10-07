@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://khs.dev/contracts/review-record/1.0.0/schema.json",
+  "$ref": "#/$defs/ReviewRecord",
+  "$defs": {
+    "ReviewRecord": {
+      "type": "object",
+      "properties": {
+        "reviewVersion": {
+          "type": "string",
+          "const": "review/1"
+        },
+        "environment": {
+          "$ref": "#/$defs/ApprovalEnvironment"
+        },
+        "submissionId": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "approvedContentSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "document": {
+          "$ref": "#/$defs/ApprovalDocument"
+        },
+        "mappingVersion": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*#[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "sha256": {
+              "$ref": "#/$defs/Sha256Hex"
+            },
+            "mediaType": {
+              "$ref": "#/$defs/MediaType"
+            }
+          },
+          "required": ["sha256", "mediaType"],
+          "additionalProperties": false
+        },
+        "fidelity": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "const": "passed"
+            },
+            "reportSha256": {
+              "$ref": "#/$defs/Sha256Hex"
+            },
+            "normalizationVersion": {
+              "$ref": "#/$defs/NormalizationVersion"
+            },
+            "sectionsChecked": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "sectionsMatched": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "status",
+            "reportSha256",
+            "normalizationVersion",
+            "sectionsChecked",
+            "sectionsMatched"
+          ],
+          "additionalProperties": false
+        },
+        "meaning": {
+          "$ref": "#/$defs/ApprovalStatementMeaning"
+        },
+        "baseline": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "sequence": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 999999999999
+                },
+                "statementSha256": {
+                  "$ref": "#/$defs/Sha256Hex"
+                },
+                "submissionId": {
+                  "$ref": "#/$defs/Uuid"
+                }
+              },
+              "required": ["sequence", "statementSha256", "submissionId"],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sections": {
+          "minItems": 1,
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sourceKey": {
+                "$ref": "#/$defs/SourceKey"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              "div": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 8388608
+              },
+              "narrativeDivSha256": {
+                "$ref": "#/$defs/Sha256Hex"
+              },
+              "change": {
+                "$ref": "#/$defs/ReviewSectionChange"
+              }
+            },
+            "required": ["sourceKey", "title", "div", "narrativeDivSha256", "change"],
+            "additionalProperties": false
+          }
+        },
+        "removed": {
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ApprovedSection"
+          }
+        }
+      },
+      "required": [
+        "reviewVersion",
+        "environment",
+        "submissionId",
+        "approvedContentSha256",
+        "document",
+        "mappingVersion",
+        "source",
+        "fidelity",
+        "meaning",
+        "baseline",
+        "sections",
+        "removed"
+      ],
+      "additionalProperties": false,
+      "description": "What an approver is shown before they approve: the document, the source and fidelity result by hash, and every published section verbatim with what changed since the current approval. Rendered once into the review file whose bytes the statement's reviewSha256 covers."
+    },
+    "ApprovalEnvironment": {
+      "type": "string",
+      "enum": ["dev", "validation", "prod"]
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "Sha256Hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Lower-case hexadecimal SHA-256 digest."
+    },
+    "ApprovalDocument": {
+      "type": "object",
+      "properties": {
+        "identifier": {
+          "type": "object",
+          "properties": {
+            "system": {
+              "$ref": "#/$defs/CanonicalUri"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          "required": ["value"],
+          "additionalProperties": false
+        },
+        "emaBundleId": {
+          "$ref": "#/$defs/AddressableFhirId"
+        },
+        "language": {
+          "type": "string",
+          "pattern": "^[a-z]{2,3}(?:-[A-Z]{2})?$"
+        }
+      },
+      "required": ["identifier", "emaBundleId", "language"],
+      "additionalProperties": false
+    },
+    "CanonicalUri": {
+      "type": "string",
+      "maxLength": 256,
+      "pattern": "^(?:https?:\\/\\/[A-Za-z0-9.-]{1,253}(?:[/?#][A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]*)?|urn:[A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]+)$"
+    },
+    "AddressableFhirId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9\\-.]{0,63}$",
+      "description": "FHIR id that begins with a letter or digit, so a single URL path segment."
+    },
+    "MediaType": {
+      "type": "string",
+      "enum": [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ]
+    },
+    "NormalizationVersion": {
+      "type": "string",
+      "pattern": "^fidelity-norm\\/[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Version of docs/fidelity-normalization.md the hashes were computed under."
+    },
+    "ApprovalStatementMeaning": {
+      "type": "string",
+      "enum": ["record-represents-approved-label"]
+    },
+    "SourceKey": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:\\.[a-z0-9]+)*$",
+      "description": "Canonical SmPC section identifier from the mapping manifest, e.g. smpc.4.2.posology."
+    },
+    "ReviewSectionChange": {
+      "type": "string",
+      "enum": ["added", "changed", "unchanged"]
+    },
+    "ApprovedSection": {
+      "type": "object",
+      "properties": {
+        "sourceKey": {
+          "$ref": "#/$defs/SourceKey"
+        },
+        "narrativeDivSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        }
+      },
+      "required": ["sourceKey", "narrativeDivSha256"],
+      "additionalProperties": false
+    }
+  }
+}

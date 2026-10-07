@@ -56,8 +56,9 @@ describe("every bucket", () => {
     },
   );
 
-  it("includes the four Terraform creates, and the ones it does not are enforced by script", () => {
+  it("includes the five Terraform creates, and the ones it does not are enforced by script", () => {
     expect(buckets.map(({ name }) => name).sort()).toEqual([
+      "approval_heads",
       "build_staging",
       "evidence",
       "profiles",
@@ -72,6 +73,23 @@ describe("every bucket", () => {
     const keys = readFileSync("scripts/gcp/storage-keys.sh", "utf8");
     expect(keys).toContain("--public-access-prevention >/dev/null");
     expect(keys).toMatch(/BUCKETS=\("\$STATE_BUCKET" "\$\{PROJECT_ID\}-ema-flow-agent-staging"\)/);
+  });
+});
+
+// The approval heads (docs/design/approval.md, the amendment's heads): append-only under
+// retention, never versioned, so a head can be neither replaced nor hidden from a listing, and never
+// destroyed by an apply.
+describe("the approval heads bucket", () => {
+  it("keeps no versions, holds retention, and is never destroyed", () => {
+    const heads = blocks.find(
+      ({ type, name }) => type === "google_storage_bucket" && name === "approval_heads",
+    )?.body;
+    expect(heads).toMatch(/versioning \{\s*enabled = false\s*\}/);
+    expect(heads).toMatch(
+      /retention_policy \{\s*retention_period = var\.evidence_retention_days \* 86400/,
+    );
+    expect(heads).toMatch(/prevent_destroy = true/);
+    expect(heads).not.toMatch(/lifecycle_rule/);
   });
 });
 

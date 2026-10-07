@@ -69,15 +69,23 @@ function buildkitOnly(text: string): string[] {
 describe("the worker and query image", () => {
   it("is one file with a build stage, a runtime, and a target per service, the worker last", () => {
     expect(existsSync("Dockerfile.query")).toBe(false);
-    expect(stages.map(({ name }) => name)).toEqual(["build", "runtime", "query", "worker"]);
+    expect(stages.map(({ name }) => name)).toEqual([
+      "build",
+      "runtime",
+      "query",
+      "signer",
+      "worker",
+    ]);
     expect(stages[2]?.image).toBe("runtime");
     expect(stages[3]?.image).toBe("runtime");
+    expect(stages[4]?.image).toBe("runtime");
     const cmd = (target: string) =>
       new RegExp(`^FROM runtime AS ${target}\\n(?:#[^\\n]*\\n)*CMD (\\[[^\\n]*\\])$`, "m").exec(
         dockerfile,
       )?.[1];
     expect(cmd("worker")).toBe('["node", "dist/server.js"]');
     expect(cmd("query")).toBe('["node", "dist/query/server.js"]');
+    expect(cmd("signer")).toBe('["node", "dist/signer/server.js"]');
   });
 
   it("runs the pinned Node binary on a Debian base pinned by digest, which Dependabot moves", () => {
@@ -167,6 +175,7 @@ describe("the Cloud Build configuration", () => {
       "build-app-image",
       "build-validator-image",
       "build-query-image",
+      "build-signer-image",
     ]);
   });
 
@@ -196,7 +205,7 @@ describe("the Cloud Build configuration", () => {
   });
 
   it("builds each service's target with B08's revision label", () => {
-    for (const target of ["worker", "query"]) {
+    for (const target of ["worker", "query", "signer"]) {
       expect(cloudbuild).toMatch(
         new RegExp(
           `- build\\n\\s+- --target\\n\\s+- ${target}\\n\\s+- --label\\n\\s+- org\\.opencontainers\\.image\\.revision=\\$\\{_REVISION\\}\\n`,

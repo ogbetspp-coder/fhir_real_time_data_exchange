@@ -211,6 +211,18 @@ describe("reading a document Bundle", () => {
     },
   );
 
+  // The approval link and the ingestion Provenance are read by id (docs/design/approval.md, D5).
+  it("GETs a Provenance by its id, and none for a missing one", async () => {
+    const link = { resourceType: "Provenance", id: "11111111-2222-5333-a444-555555555555" };
+    answer = respond(200, link);
+    const reader = new HealthcareFhirReader(OPTIONS);
+    expect(await reader.readProvenance(link.id)).toEqual(link);
+    expect(only().url).toBe(`${STORE}/Provenance/${link.id}`);
+    answer = respond(404, { resourceType: "OperationOutcome", issue: [] });
+    expect(await reader.readProvenance(link.id)).toBeUndefined();
+    await expect(reader.readProvenance("..")).rejects.toThrow(/single URL path segment/);
+  });
+
   it("GETs one version through _history", async () => {
     answer = respond(200, DOCUMENT);
     const reader = new HealthcareFhirReader(OPTIONS);

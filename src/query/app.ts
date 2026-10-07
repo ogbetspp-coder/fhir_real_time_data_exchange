@@ -42,9 +42,11 @@ import {
 import type { QueryConfig } from "./config.js";
 import { parseEntitlements, type EntitlementDirectory, type Entitlements } from "./entitlements.js";
 import { FhirReadError, HealthcareFhirReader, type FhirReader } from "./fhir-reader.js";
+import { GcsApprovalObjects, kmsKeySource } from "../gcp/approval-store.js";
 import {
   REQUEST_READ_BUDGET,
   createReadBudget,
+  type ApprovalSources,
   findProduct,
   getProvenance,
   getSection,
@@ -91,6 +93,8 @@ export type RequestIdentity = {
 
 export type McpServerDeps = {
   reader: FhirReader;
+  // Present when the deployment verifies approvals (query-tools 5.0.0, APPROVAL_VERIFICATION).
+  approvals?: ApprovalSources | undefined;
   mapping: EmaMapping;
   serviceVersion: string;
   identity: RequestIdentity;
@@ -206,6 +210,12 @@ function auditRecord(
         : {}),
       ...(outcome.bundleId === undefined ? {} : { bundleId: outcome.bundleId }),
       ...(outcome.versionId === undefined ? {} : { versionId: outcome.versionId }),
+      ...(outcome.approval === undefined
+        ? {}
+        : {
+            approverSub: outcome.approval.approverSub,
+            statementSha256: outcome.approval.statementSha256,
+          }),
       ...(identity.turnId === undefined ? {} : { turnId: identity.turnId }),
     };
 
@@ -276,6 +286,7 @@ async function runTool<Input, Output extends Record<string, unknown>>(
   const context: ToolContext = {
     entitlements: deps.entitlements,
     reader: deps.reader,
+    approvals: deps.approvals,
     mapping: deps.mapping,
     readBudget: deps.readBudget,
     signal: deps.signal,
@@ -437,6 +448,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
 
 export type QueryAppDeps = {
   reader: FhirReader;
+  approvals?: ApprovalSources | undefined;
   mapping: EmaMapping;
   serviceVersion: string;
   // Present when the service runs from a container: `sha256:<64 hex>`, as the config validates.
@@ -781,6 +793,7 @@ export function createQueryApp(
     const requestOver = new AbortController();
     const server = createMcpServer({
       reader: deps.reader,
+      approvals: deps.approvals,
       mapping: deps.mapping,
       serviceVersion: deps.serviceVersion,
       identity,
@@ -862,8 +875,10 @@ export function createQueryApp(
 // so a test can hold the wiring itself — which setting reaches which dependency — to what the
 // configuration says. Nothing here reads the network until a request needs it.
 export function buildQueryServer(config: QueryConfig, mapping: EmaMapping): Server {
+  const reader = new HealthcareFhirReader(config);
   return createQueryServer({
-    reader: new HealthcareFhirReader(config),
+    reader,
+    approvals: approvalSources(config, reader),
     mapping,
     serviceVersion: config.QUERY_SERVICE_VERSION,
     imageDigest: config.IMAGE_DIGEST,
@@ -875,6 +890,31 @@ export function buildQueryServer(config: QueryConfig, mapping: EmaMapping): Serv
     logRejectionReason: config.QUERY_LOG_REJECTION_REASON,
     entitlements: parseEntitlements(config.QUERY_ENTITLEMENTS_JSON),
   });
+}
+
+// What verification reads, when the deployment turns it on (APPROVAL_VERIFICATION): the link and
+// ingestion Provenance from the validated store, heads from the heads bucket, public keys from the
+// environment's approval key. Off, there is none, and every answer is as query-tools 4.1.0's.
+export function approvalSources(
+  config: QueryConfig,
+  reader: Pick<HealthcareFhirReader, "readProvenance">,
+): ApprovalSources | undefined {
+  if (!config.APPROVAL_VERIFICATION) return undefined;
+  const { APPROVAL_ENVIRONMENT, APPROVAL_HEADS_BUCKET, APPROVAL_SIGNING_KEY } = config;
+  if (
+    APPROVAL_ENVIRONMENT === undefined ||
+    APPROVAL_HEADS_BUCKET === undefined ||
+    APPROVAL_SIGNING_KEY === undefined
+  ) {
+    throw new Error("APPROVAL_VERIFICATION needs its environment, heads bucket and key");
+  }
+  const heads = new GcsApprovalObjects(APPROVAL_HEADS_BUCKET);
+  return {
+    environment: APPROVAL_ENVIRONMENT,
+    readProvenance: (id, signal) => reader.readProvenance(id, signal),
+    heads: (signal) => heads.withSignal(signal),
+    keys: kmsKeySource(APPROVAL_SIGNING_KEY),
+  };
 }
 
 export function createQueryServer(deps: QueryAppDeps): Server {

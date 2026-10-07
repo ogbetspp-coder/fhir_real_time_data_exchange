@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The worker, query and validator images, built from the files Cloud Build builds them from and
+# The worker, query, signer and validator images, built from the files Cloud Build builds them from and
 # checked as the deploy needs them (audit B07). Until B07 nothing built them before a merge: the
 # first build of a changed Dockerfile was the deploy's. CI's Images job runs this on every pull
 # request; it pushes nothing, and Cloud Build still builds the images that deploy.
@@ -26,6 +26,7 @@ export DOCKER_BUILDKIT=0
 
 docker build --target worker --tag ema-flow/worker:ci .
 docker build --target query --tag ema-flow/query:ci .
+docker build --target signer --tag ema-flow/signer:ci .
 docker build --file Dockerfile.validator --tag ema-flow/validator:ci .
 
 expect_config() { # <image> <user> <cmd as JSON>
@@ -39,6 +40,7 @@ expect_config() { # <image> <user> <cmd as JSON>
 }
 expect_config ema-flow/worker:ci node '["node","dist/server.js"]'
 expect_config ema-flow/query:ci node '["node","dist/query/server.js"]'
+expect_config ema-flow/signer:ci node '["node","dist/signer/server.js"]'
 expect_config ema-flow/validator:ci validator '["server","8090","-allowNetworkAccess","-version","5.0.0","-jurisdiction","uv","-locale","en-US","-ig","/opt/fhir/terminology-package.tgz","-ig","/opt/fhir/extensions-package.tgz","-ig","/opt/fhir/global-epi-package.tgz","-ig","/opt/fhir/ema-epi-package.tgz","-ig","/opt/fhir/khs-epi-package.tgz","-tx","n/a","-no-http-access"]'
 
 # The standards the worker's manifest names, read inside the image as the pipeline reads them.

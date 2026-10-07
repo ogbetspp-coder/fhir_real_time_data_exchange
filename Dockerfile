@@ -2,6 +2,7 @@
 #
 #   docker build --target worker .     # CMD node dist/server.js
 #   docker build --target query .      # CMD node dist/query/server.js
+#   docker build --target signer .     # CMD node dist/signer/server.js
 #
 # Until B07 the query image had a file of its own that differed from this one only in its CMD.
 #
@@ -54,6 +55,11 @@ EXPOSE 8080
 
 FROM runtime AS query
 CMD ["node", "dist/query/server.js"]
+
+# The approval signer (docs/design/approval.md, D3): its own image, so its digest names it alone in
+# every statement it signs (ADR 0004, decision 1).
+FROM runtime AS signer
+CMD ["node", "dist/signer/server.js"]
 
 # Last, so a build without --target is the worker, as it always was.
 FROM runtime AS worker

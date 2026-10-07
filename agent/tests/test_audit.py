@@ -108,14 +108,14 @@ def test_the_record_names_the_contracts_it_was_written_and_checked_under() -> No
     payload = emitted()
     assert payload["contractVersion"] == load_agent_turn_schema()["$id"].split("/")[-2]
     assert payload["queryToolsVersion"] == load_schema()["$id"].split("/")[-2]
-    assert (payload["contractVersion"], payload["queryToolsVersion"]) == ("1.2.0", "4.1.0")
+    assert (payload["contractVersion"], payload["queryToolsVersion"]) == ("1.2.0", "5.0.0")
     minimal = minimal_record(
         service_version="agent/0.1.0",
         principal="urn:reviewer:synthetic-01",
         turn_id=TURN_ID,
         outcome="model-failed",
     ).model_dump(by_alias=True, mode="json", exclude_none=True)
-    assert minimal["queryToolsVersion"] == "4.1.0"
+    assert minimal["queryToolsVersion"] == "5.0.0"
     assert not list(agent_turn_validator().iter_errors(minimal))
 
 

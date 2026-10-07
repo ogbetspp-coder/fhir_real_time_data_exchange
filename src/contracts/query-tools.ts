@@ -16,6 +16,7 @@ import {
   Token,
   Uuid,
 } from "./common.js";
+import { ApprovalKind, ApprovalStatementMeaning, ApprovalStatementSchema } from "./approval.js";
 import { ApproverRole } from "./ingestion-provenance.js";
 
 // The tool surface of the read-only ePI query service (docs/design/epi-mcp-query-service.md),
@@ -70,8 +71,19 @@ import { ApproverRole } from "./ingestion-provenance.js";
 // 4.1.0: the audit record gains an optional `contractVersion`, the version of this contract the
 // service answered under, so a record says which `match` rule decided a quote (audit C-9). Minor:
 // one optional field on a record no tool answer carries; no answer changes.
+//
+// 5.0.0: signed approvals (docs/design/approval.md, D9). The error code `not-approved`: a version
+// that no valid approval covers, whose linked statement does not verify, or whose sections do not
+// re-hash to the statement's. `get_section` and `get_provenance` answers gain `approval`, the
+// verified statement that covers the version (its hash, the approver's subject, role, name and
+// e-mail, the time and meaning of the signature, and whether a later approval supersedes it), and
+// the audit record gains `approverSub` and `statementSha256`. Major because a returnable enum
+// gained a member (ADR 0002, "Versioning"). The new fields are optional so that one build answers
+// both before and after the deployment turns verification on (APPROVAL_VERIFICATION): with it off
+// no answer carries them and none is `not-approved`, so every answer is one 4.1.0 also accepts;
+// with it on every answer carries `approval`, and a version without a valid one is `not-approved`.
 
-export const QUERY_TOOLS_VERSION = "4.1.0";
+export const QUERY_TOOLS_VERSION = "5.0.0";
 
 // A product identifier's value: letters, digits and ". _ : / -". The slash is what an EMA ePI
 // id ("EPI/23/1047") and an EU marketing authorisation number ("EU/1/12/780/003") are built
@@ -122,6 +134,33 @@ const DocumentSelector = {
   // Absent: the current version.
   versionId: Token.optional(),
 };
+
+// The verified approval that covers the version answered (docs/design/approval.md, D9): present on
+// every answer once the deployment verifies approvals, never otherwise.
+export const ApprovalCitationSchema = z
+  .strictObject({
+    // SHA-256 of the canonical JSON of the signed ApprovalStatement (contract approval-statement).
+    statementSha256: Sha256Hex,
+    kind: ApprovalKind,
+    meaning: ApprovalStatementMeaning,
+    sequence: PositiveInt,
+    approver: z.strictObject({
+      sub: PrincipalId,
+      role: ApproverRole,
+      name: ApprovalStatementSchema.shape.manifestation.shape.name,
+      email: ApprovalStatementSchema.shape.manifestation.shape.email,
+    }),
+    signedAt: IsoDateTime,
+    // True when a later approval of the same document is its head: the version is not the
+    // document's current approved text. `supersededBy` is that head's statement hash.
+    superseded: z.boolean(),
+    supersededBy: Sha256Hex.optional(),
+  })
+  .meta({
+    id: "ApprovalCitation",
+    description:
+      "The signed approval that covers this version, verified on this answer: who approved it (Google subject, role, name, e-mail), when, with what meaning, and whether a later approval supersedes it.",
+  });
 
 // --- find_product ------------------------------------------------------------------------------
 
@@ -186,6 +225,7 @@ export const SectionContentSchema = z
     // its own approval, and the most recently written approval — the only one the service can
     // find — is not it.
     provenanceResourceId: Uuid.optional(),
+    approval: ApprovalCitationSchema.optional(),
     contentNotice: ContentNotice,
   })
   .meta({
@@ -221,6 +261,7 @@ export const ProvenanceDetailSchema = z
         normalizedTextSha256: Sha256Hex,
       })
       .optional(),
+    approval: ApprovalCitationSchema.optional(),
   })
   .meta({
     id: "ProvenanceDetail",
@@ -320,6 +361,7 @@ export const QueryErrorCode = z
     "version-not-found",
     "section-not-found",
     "unavailable",
+    "not-approved",
   ])
   .meta({ id: "QueryErrorCode" });
 
@@ -371,6 +413,10 @@ export const QueryAuditRecordSchema = z
     // `X-Query-Turn-Id` request header, a UUID). It is what joins this record to the assistant's
     // own turn record (contracts/agent-turn) after the fact.
     turnId: Uuid.optional(),
+    // The approval the answer was verified against (5.0.0), when the deployment verifies approvals
+    // and the call verified one: the approver's Google subject and the statement's hash.
+    approverSub: PrincipalId.optional(),
+    statementSha256: Sha256Hex.optional(),
     // Present only when the record could not be written in full, so that no call goes
     // unrecorded. Why: `arguments-unhashable`, the arguments could not be hashed and
     // `argumentsSha256` is 64 zeros, not a hash of anything; `record-rejected`, the full record
@@ -426,4 +472,5 @@ export type QuoteMatch = z.infer<typeof QuoteMatchSchema>;
 export type QueryError = z.infer<typeof QueryErrorSchema>;
 export type QueryAuditOutcome = z.infer<typeof QueryAuditOutcome>;
 export type QueryAuditRecord = z.infer<typeof QueryAuditRecordSchema>;
+export type ApprovalCitation = z.infer<typeof ApprovalCitationSchema>;
 export type CredentialType = z.infer<typeof CredentialType>;

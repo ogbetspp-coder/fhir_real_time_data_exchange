@@ -1,8 +1,8 @@
 # infra
 
-The Terraform configuration for one EMA Flow environment on Google Cloud: the worker and query
-Cloud Run services, the pipeline workflow, the Healthcare dataset, the evidence, submission and
-profile buckets, the BigQuery analytics and ledger datasets, the customer-managed keys, the
+The Terraform configuration for one EMA Flow environment on Google Cloud: the worker, query and
+approval signer Cloud Run services, the pipeline workflow, the Healthcare dataset, the evidence,
+submission, profile and approval heads buckets, the BigQuery analytics and ledger datasets, the customer-managed keys, the
 service accounts and their bindings, the audit log sink and bucket, monitoring, and the API list.
 `docs/architecture.md` describes what these pieces do; this file describes the configuration.
 
@@ -79,6 +79,7 @@ Set by `deploy.sh` on every plan and apply unless marked "default".
 | `worker_image`                    | built image, by digest                                                                    | Worker container; its digest becomes `IMAGE_DIGEST` in every signed run manifest                                           |
 | `validator_image`                 | built image, by digest                                                                    | HL7 validator sidecar container; its digest becomes `VALIDATOR_IMAGE_DIGEST` in every signed run manifest                  |
 | `query_image`                     | built image, by digest                                                                    | Query service container; its digest becomes `IMAGE_DIGEST` in every audit record                                           |
+| `signer_image`                    | built image, by digest                                                                    | Approval signer container; its digest is named in every statement it signs (`signer.tf`)                                   |
 | `service_version`                 | the deployed commit's full 40-hex SHA (a plan precondition)                               | `QUERY_SERVICE_VERSION` on the query service and `GIT_COMMIT` on the worker                                                |
 | `deployer_account`                | the active service account                                                                | Granted run.invoker on the worker (smoke run), actAs on the build account, FHIR editor                                     |
 | `query_invokers`                  | `QUERY_INVOKERS`                                                                          | Members granted run.invoker on the query service                                                                           |
@@ -98,6 +99,11 @@ Set by `deploy.sh` on every plan and apply unless marked "default".
 | `enforce_binary_authorization`    | default (`false`)                                                                         | Binary Authorization on the worker service (the query service has none yet)                                                |
 | `lock_regulated_audit_log_bucket` | default (`false`)                                                                         | Bucket Lock on the regulated audit log bucket; irreversible                                                                |
 | `kms_manifest_key_version`        | default (`1`)                                                                             | Version of `manifest-signing-hsm` the worker signs with                                                                    |
+| `kms_approval_key_version`        | default (`1`)                                                                             | Version of `approval-signing-hsm` the signer signs with                                                                    |
+| `approvers`                       | `APPROVERS_JSON` (default `{}`: nobody approves)                                          | Approver map: Google subject to role and e-mail (docs/design/approval.md, D2)                                              |
+| `approval_addon_service_account`  | `APPROVAL_ADDON_SERVICE_ACCOUNT` (default empty: nothing calls the signer)                | The Workspace add-on's service account: run.invoker on the signer, and the system ID token's email                         |
+| `approval_addon_oauth_client_id`  | `APPROVAL_ADDON_OAUTH_CLIENT_ID` (default empty: the signer refuses every event)          | The add-on's OAuth client id: the user ID token's audience                                                                 |
+| `query_approval_verification`     | `QUERY_APPROVAL_VERIFICATION` (default `false`)                                           | Whether the query service verifies every answer's signed approval (`not-approved` without one)                             |
 
 Each variable's full description, validation and reasoning are in `variables.tf`.
 
@@ -121,6 +127,8 @@ Each variable's full description, validation and reasoning are in `variables.tf`
 | `query_service_urls`            | operators                                              | Every hostname Cloud Run serves the query service on          |
 | `query_audience`                | callers                                                | The only audience an ID token for the query service may carry |
 | `query_caller_service_account`  | callers                                                | The impersonation-only caller account                         |
+| `signer_service_url`            | the Workspace add-on's HTTP endpoint                   | The approval signer's URL, and its system ID token's audience |
+| `approval_heads_bucket`         | operators                                              | Every document's approval heads                               |
 | `workflow_name`                 | `bootstrap.sh`                                         | Pipeline workflow name                                        |
 | `workflow_console_url`          | operators                                              | Console link to workflow executions                           |
 | `bigquery_console_url`          | operators                                              | Console link to the analytics dataset                         |

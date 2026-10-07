@@ -65,6 +65,8 @@ describe("generated contract JSON Schemas", () => {
       "query-tools",
       "agent-turn",
       "run-manifest",
+      "approval-statement",
+      "review-record",
     ]);
   });
 

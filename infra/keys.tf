@@ -114,6 +114,46 @@ resource "google_kms_crypto_key_iam_member" "worker_manifest_signer_hsm" {
   member        = "serviceAccount:${google_service_account.worker.email}"
 }
 
+# Approvals are signed in an HSM with this key, used by nothing else (docs/design/approval.md, D3;
+# ADR 0004): RSA-PSS with SHA-256, whose salt Cloud KMS makes the digest's length, 32 bytes, on a
+# 3072-bit key, since a statement must stay verifiable as long as the evidence it approves. The
+# signer alone signs (signer.tf); the worker and the query service only read its public keys, to
+# verify every statement before they publish or answer (D8, D9).
+resource "google_kms_crypto_key" "approval_signing_hsm" {
+  name                       = "approval-signing-hsm"
+  key_ring                   = google_kms_key_ring.evidence.id
+  purpose                    = "ASYMMETRIC_SIGN"
+  destroy_scheduled_duration = local.key_destroy_wait
+  labels                     = merge(local.labels, { purpose = "approval-signing" })
+
+  version_template {
+    algorithm        = "RSA_SIGN_PSS_3072_SHA256"
+    protection_level = "HSM"
+  }
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "google_kms_crypto_key_iam_member" "signer_approval_signer" {
+  crypto_key_id = google_kms_crypto_key.approval_signing_hsm.id
+  role          = "roles/cloudkms.signerVerifier"
+  member        = "serviceAccount:${google_service_account.signer.email}"
+}
+
+resource "google_kms_crypto_key_iam_member" "worker_approval_public_key" {
+  crypto_key_id = google_kms_crypto_key.approval_signing_hsm.id
+  role          = "roles/cloudkms.publicKeyViewer"
+  member        = "serviceAccount:${google_service_account.worker.email}"
+}
+
+resource "google_kms_crypto_key_iam_member" "query_approval_public_key" {
+  crypto_key_id = google_kms_crypto_key.approval_signing_hsm.id
+  role          = "roles/cloudkms.publicKeyViewer"
+  member        = "serviceAccount:${google_service_account.query.email}"
+}
+
 # A key made unavailable pages within minutes. Cloud KMS Admin Activity audit logs are always on,
 # so this needs no logging configuration. It fires on:
 #   - a request to destroy a version;

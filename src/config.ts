@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { ApprovalEnvironment } from "./contracts/approval.js";
 import { GitCommit, ImageDigest, Token } from "./contracts/common.js";
 import type { RunRequest } from "./contracts/run-request.js";
 
@@ -36,6 +37,8 @@ const EnabledRunSources = z
 // KMS with an opaque error, after the run's other work is done. Checked at startup instead.
 const KMS_KEY_VERSION =
   /^projects\/[^/]+\/locations\/[^/]+\/keyRings\/[^/]+\/cryptoKeys\/[^/]+\/cryptoKeyVersions\/[^/]+$/;
+// A crypto key, whose versions a reader trusts: the approval key (docs/design/approval.md, D4).
+const KMS_KEY = /^projects\/[^/]+\/locations\/[^/]+\/keyRings\/[^/]+\/cryptoKeys\/[^/]+$/;
 
 const ConfigSchema = z
   .object({
@@ -77,6 +80,16 @@ const ConfigSchema = z
       .regex(KMS_KEY_VERSION, "KMS_MANIFEST_KEY must name a crypto key version")
       .optional(),
     FHIR_VALIDATOR_URL: z.url().optional(),
+    // A document run publishes only under the document's signed head statement
+    // (docs/design/approval.md, D8 and D5): the environment every statement it accepts names, the
+    // heads bucket it reads the head from, and the approval key whose versions it trusts.
+    APPROVAL_ENVIRONMENT: ApprovalEnvironment.optional(),
+    APPROVAL_HEADS_BUCKET: optionalNonEmpty,
+    APPROVAL_SIGNING_KEY: z
+      .string()
+      .trim()
+      .regex(KMS_KEY, "APPROVAL_SIGNING_KEY must name a crypto key, not a version")
+      .optional(),
     // The code and the images a run manifest names (`runtime`, run manifest 5.0.0), each in its
     // own grammar: infra/run.tf sets the commit (`service_version`, which scripts/gcp/deploy.sh
     // passes as the full git SHA) and both image digests; Cloud Run sets K_REVISION. A value in
@@ -119,7 +132,14 @@ const ConfigSchema = z
       "TRANSFORMATION_LEDGER_DATASET",
     ] as const;
 
-    for (const key of required) {
+    // A persisted document run is always verified against its approval: there is no unapproved
+    // document publication.
+    const documentRuns = (value.ENABLED_RUN_SOURCES ?? RUN_SOURCES).includes("document");
+    const approval = documentRuns
+      ? (["APPROVAL_ENVIRONMENT", "APPROVAL_HEADS_BUCKET", "APPROVAL_SIGNING_KEY"] as const)
+      : [];
+
+    for (const key of [...required, ...approval]) {
       if (value[key] === undefined) {
         context.addIssue({
           code: "custom",

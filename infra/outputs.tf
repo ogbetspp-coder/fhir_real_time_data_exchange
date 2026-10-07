@@ -51,6 +51,7 @@ output "record_readers_targets" {
       google_storage_bucket.submissions.name,
       google_storage_bucket.profiles.name,
       google_storage_bucket.build_staging.name,
+      google_storage_bucket.approval_heads.name,
     ]
     datasets = [
       google_bigquery_dataset.ledger.dataset_id,
@@ -118,4 +119,14 @@ output "operations_dashboard_json" {
 output "operations_dashboard_id" {
   description = "Resource name of the operations dashboard (projects/<number>/dashboards/<id>), read by the deploy's dashboard drift check."
   value       = google_monitoring_dashboard.operations.id
+}
+
+output "signer_service_url" {
+  description = "The approval signer's deterministic URL: the HTTP endpoint URL to configure in the Workspace add-on, and the audience of the system ID token it sends (docs/design/approval.md, D2)."
+  value       = local.signer_url
+}
+
+output "approval_heads_bucket" {
+  description = "The bucket holding every document's approval heads (docs/design/approval.md, D8)."
+  value       = google_storage_bucket.approval_heads.name
 }

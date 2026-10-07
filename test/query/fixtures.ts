@@ -26,7 +26,7 @@ import {
   type Entitlements,
 } from "../../src/query/entitlements.js";
 import type { FhirReader } from "../../src/query/fhir-reader.js";
-import { createReadBudget } from "../../src/query/tools.js";
+import { createReadBudget, type ApprovalSources } from "../../src/query/tools.js";
 import { stableUuid } from "../../src/lib/hash.js";
 import { SYNTHETIC, attested, drawn } from "../support/submission.js";
 
@@ -375,11 +375,14 @@ export async function connectHarness(options: {
   // Replaces the harness's own sink, so a test can make writing a record fail; `audits` then
   // stays empty.
   audit?: AuditSink;
+  // When set, every answer is verified against its version's signed approval (query-tools 5.0.0).
+  approvals?: ApprovalSources;
 }): Promise<Harness> {
   const audits: QueryAuditRecord[] = [];
   const { reader, log } = createFakeReader(options.documents ?? options.store.documents);
   const server = createMcpServer({
     reader: options.wrapReader === undefined ? reader : options.wrapReader(reader),
+    approvals: options.approvals,
     mapping: options.store.mapping,
     serviceVersion: SERVICE_VERSION,
     identity: options.identity ?? testIdentity(options.principal),

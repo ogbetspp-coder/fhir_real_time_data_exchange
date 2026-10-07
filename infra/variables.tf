@@ -397,3 +397,74 @@ variable "kms_manifest_key_version" {
     error_message = "kms_manifest_key_version must be a positive integer, as Cloud KMS numbers crypto key versions from 1."
   }
 }
+
+variable "signer_image" {
+  description = "Immutable Artifact Registry approval signer image reference, by digest; its digest is named in every statement it signs (docs/design/approval.md, D3)."
+  type        = string
+}
+
+variable "kms_approval_key_version" {
+  description = "Version of approval-signing-hsm (keys.tf) the signer signs with. Cloud KMS does not rotate asymmetric signing keys, so this changes only when a new version is created by hand; readers trust every version of the key (D4)."
+  type        = string
+  default     = "1"
+
+  validation {
+    condition     = can(regex("^[1-9][0-9]*$", var.kms_approval_key_version))
+    error_message = "kms_approval_key_version must be a positive integer, as Cloud KMS numbers crypto key versions from 1."
+  }
+}
+
+variable "approvers" {
+  description = <<-EOT
+    The approver map (docs/design/approval.md, D2): each approver's Google subject (the `sub` of
+    their ID token, never an e-mail address) to their role and the e-mail address their verified
+    token must carry. The signer reads the role from here and names the map's hash in every
+    statement; each address is granted read on the evidence bucket's `reviews/` only, so the
+    approver can open a review. Empty, the default: nobody can approve. A change to it is a change
+    record (Infrastructure and controls, "Approver map").
+  EOT
+  type = map(object({
+    role  = string
+    email = string
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for sub, approver in var.approvers :
+      can(regex("^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$", sub)) &&
+      !startswith(sub, "accounts.google.com:") &&
+      contains(["content-reviewer", "qa-reviewer"], approver.role) &&
+      can(regex("^[a-z0-9._%+-]{1,64}@[a-z0-9-]+(\\.[a-z0-9-]+)+$", approver.email))
+    ])
+    error_message = "Each approver is keyed by a bare Google subject (an opaque id, not accounts.google.com:<id> and not an e-mail address), with role content-reviewer or qa-reviewer and a lower-case e-mail address."
+  }
+}
+
+variable "approval_addon_service_account" {
+  description = "The Google Workspace add-on's service account, from the Marketplace SDK's HTTP deployment (Authorization Resource, Service Account Email). Granted roles/run.invoker on the signer, and the email the signer requires of every system ID token. Empty, the default: no add-on exists yet, nothing can call the signer, and it refuses every event."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.approval_addon_service_account == "" || can(regex("^[a-z0-9-]+@[a-z0-9.-]+\\.iam\\.gserviceaccount\\.com$", var.approval_addon_service_account))
+    error_message = "approval_addon_service_account must be a service account e-mail address, or empty."
+  }
+}
+
+variable "approval_addon_oauth_client_id" {
+  description = "The add-on's OAuth client id, from the Marketplace SDK's HTTP deployment (Authorization Resource, OAuth Client Id): the audience of every user ID token the signer accepts. Empty, the default: the signer refuses every event."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.approval_addon_oauth_client_id == "" || can(regex("^[0-9]+-[a-z0-9]+\\.apps\\.googleusercontent\\.com$", var.approval_addon_oauth_client_id))
+    error_message = "approval_addon_oauth_client_id must be a Google OAuth client id (<number>-<id>.apps.googleusercontent.com), or empty."
+  }
+}
+
+variable "query_approval_verification" {
+  description = "Whether the query service verifies, on every answer, the signed approval linked to the version it serves (docs/design/approval.md, D9; query-tools 5.0.0). Off by default: turning it on makes every version without a valid approval not-approved, so it is turned on only with the migration of the demonstration documents and the agent (the design's step 6)."
+  type        = bool
+  default     = false
+}
