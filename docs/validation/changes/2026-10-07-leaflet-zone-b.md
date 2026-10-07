@@ -121,9 +121,11 @@ sections, and Zone B carried the SmPC only.
   SmPC's output, every id and every hash of it, is unchanged; `test/` passes unchanged but for
   the tests of what changed.
 - The signer and the query service load the SmPC mapping only: a leaflet's review is refused by
-  the crosswalk (another document than the mapping's), and the query service does not resolve a
-  leaflet's sections. Neither persists or serves a leaflet from a certified Word source, which
-  runs dry only.
+  the crosswalk (another document than the mapping's), and `get_section` answers
+  `section-not-found` for a leaflet's keys, its index being the SmPC's. A leaflet from a certified
+  Word source runs dry only, so neither the signer nor the store sees one; a synthetic Type 2
+  leaflet could still be published where synthetic sources are allowed and approvals are not
+  enforced.
 - Zone A: the recompute's versions name mapping 1.1.0 for a leaflet, so a leaflet request made
   with 1.0.0 is refused (`versions`); no leaflet submission was ever made, as the importer refused
   every one. `zone_a.leaflet` and `zone_a.word_epi` are unchanged; three keys in its tests.

@@ -352,13 +352,12 @@ export async function runPipeline(
   // One manifest, the caller's choice; or every manifest Zone B carries (the SmPC's and the
   // package leaflet's), of which the source's document type picks one. Either way the crosswalk
   // refuses a source that says it is another document than its manifest maps.
-  mappings: EmaMapping | readonly EmaMapping[],
+  mappings: EmaMapping | readonly [EmaMapping, ...EmaMapping[]],
   config: AppConfig,
   dependencies: PipelineDependencies = {},
 ): Promise<PipelineResult> {
-  const candidates: readonly EmaMapping[] = "root" in mappings ? [mappings] : mappings;
+  const candidates = "root" in mappings ? ([mappings] as const) : mappings;
   const [fallback] = candidates;
-  if (fallback === undefined) throw new Error("No mapping manifest is loaded");
   // The gate's manifest, from the record the submission says it carries, before the gate has
   // proved anything of it; where that names none, the first, so the gate refuses the submission
   // on its own grounds. Either way it is chosen again below from the record the gate passed.

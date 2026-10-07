@@ -137,10 +137,10 @@ transformed to an EMA ePI Bundle as an SmPC is, by its own manifest
   its Provenance, pass the pinned official validator with no error, every warning the SmPC's
   own kind with the SmPC's reason.
 
-What Zone B does not do for a leaflet yet: the query service and the signer read the SmPC's
-manifest only (the signer refuses a leaflet's review at the crosswalk, the query service does not
-resolve a leaflet's sections), and the StructureMap twin is the SmPC's alone
-(`docs/design/structuremap-twin.md`, "The package leaflet").
+What Zone B does not do for a leaflet yet: the query service and the signer load the SmPC's
+manifest only (the signer's crosswalk refuses a leaflet's review; the query service answers
+`section-not-found` for a leaflet's keys), and the StructureMap twin is the SmPC's alone
+(`docs/design/structuremap-twin.md`, "The package leaflet: not twinned").
 
 ## Next
 

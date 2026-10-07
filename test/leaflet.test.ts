@@ -30,18 +30,12 @@ import { runPipeline } from "../src/pipeline.js";
 
 let smpc: EmaMapping;
 let leaflet: EmaMapping;
-let mappings: EmaMapping[];
+let mappings: [EmaMapping, EmaMapping];
 let config: AppConfig;
 
 beforeAll(async () => {
-  mappings = await loadEmaMappings();
-  const byKey = (key: string): EmaMapping => {
-    const found = mappings.find(({ root }) => root.sourceKey === key);
-    if (found === undefined) throw new Error(`no ${key} mapping`);
-    return found;
-  };
-  smpc = byKey("smpc");
-  leaflet = byKey("pl");
+  ({ smpc, pl: leaflet } = await loadEmaMappings());
+  mappings = [smpc, leaflet];
   config = loadConfig({ ALLOW_SYNTHETIC_SOURCES: "true", NODE_ENV: "test", DRY_RUN: "true" });
 });
 
@@ -237,7 +231,7 @@ describe("a package leaflet through the worker's pipeline", () => {
   });
 
   it("is refused where its document type names no mapping, or another than the one given", async () => {
-    const run = (bundle: FhirBundle, given: EmaMapping | EmaMapping[]) =>
+    const run = (bundle: FhirBundle, given: EmaMapping | [EmaMapping, EmaMapping]) =>
       runPipeline(
         {
           runId: "00000000-0000-4000-8000-0000000001e2",

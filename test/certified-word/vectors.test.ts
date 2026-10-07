@@ -3,12 +3,12 @@ import { readFileSync } from "node:fs";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { importerVectors } from "../../src/certified-word/vectors.js";
-import { loadEmaMappings, type EmaMapping } from "../../src/fhir/mapping.js";
+import { loadEmaMappings, type EmaMappings } from "../../src/fhir/mapping.js";
 
 // The certified Word importer's golden vectors are what this importer makes: `npm run
 // contracts:check` regenerates and compares them, and this holds the suite to the same.
 
-let mappings: EmaMapping[];
+let mappings: EmaMappings;
 
 beforeAll(async () => {
   mappings = await loadEmaMappings();
@@ -19,7 +19,7 @@ describe("the certified Word importer's vectors", () => {
     const committed = JSON.parse(
       readFileSync("test/fixtures/certified-word/vectors.json", "utf8"),
     ) as { imports: { name: string; outcome: unknown }[] };
-    const vectors = importerVectors(mappings);
+    const vectors = importerVectors(Object.values(mappings));
     expect(vectors).toEqual(committed.imports);
     const outcome = (name: string): unknown =>
       vectors.find((vector) => vector.name === name)?.outcome;

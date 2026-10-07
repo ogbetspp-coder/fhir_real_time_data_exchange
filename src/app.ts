@@ -2,7 +2,7 @@ import { Hono } from "hono";
 
 import { loadConfig, type AppConfig } from "./config.js";
 import { RunRequestSchema, SubmissionRejectedError } from "./contracts/index.js";
-import { loadEmaMappings, type EmaMapping } from "./fhir/mapping.js";
+import { loadEmaMappings } from "./fhir/mapping.js";
 import { OfficialValidatorError } from "./fhir/official-validator.js";
 import { TransformationError } from "./fhir/transform.js";
 import type { FhirBundle } from "./fhir/types.js";
@@ -25,8 +25,6 @@ import { runPipeline, type PipelineDependencies, type PipelineInput } from "./pi
 // `unclassified`. test/failure-reasons.test.ts holds every literal thrown there to an entry.
 export const FAILURE_REASONS: Readonly<Record<string, string>> = {
   "runId must be a UUID": "bad-run-id",
-  "No mapping manifest is loaded": "mapping-not-loaded",
-  "The SmPC mapping is not loaded": "mapping-not-loaded",
   "Run source is disabled": "source-disabled",
   "Canonical preflight failed": "source-preflight-failed",
   "EMA structural preflight failed": "ema-preflight-failed",
@@ -107,13 +105,6 @@ export function pipelineFailure(failure: Error): { reason: string; status: 409 |
   return { reason, status: FAILURE_STATUS[reason] ?? 500 };
 }
 
-// The SmPC's manifest, which the smoke product's fixture is built with.
-function smpcMapping(mappings: readonly EmaMapping[]): EmaMapping {
-  const found = mappings.find((mapping) => mapping.root.sourceKey === "smpc");
-  if (found === undefined) throw new Error("The SmPC mapping is not loaded");
-  return found;
-}
-
 export type AppOverrides = {
   config?: AppConfig;
   submissionReader?: SubmissionReader;
@@ -190,7 +181,7 @@ export function createApp(overrides: AppOverrides = {}): Hono<AppEnvironment> {
       input = {
         runId,
         sourceKind: "fixture",
-        source: createSyntheticType2Bundle(smpcMapping(mappings), { product: SMOKE_PRODUCT_ID }),
+        source: createSyntheticType2Bundle(mappings.smpc, { product: SMOKE_PRODUCT_ID }),
         sourceResource: `fixture:${SMOKE_PRODUCT_ID}`,
       };
     } else if (request.source === "healthcare-api") {
@@ -215,7 +206,7 @@ export function createApp(overrides: AppOverrides = {}): Hono<AppEnvironment> {
 
     const result = await runPipeline(
       input,
-      mappings,
+      [mappings.smpc, mappings.pl],
       config,
       overrides.approvals === undefined ? {} : { approvals: overrides.approvals },
     );

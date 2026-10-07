@@ -9,5 +9,5 @@ import { loadEmaMappings } from "../../src/fhir/mapping.js";
 const mappings = await loadEmaMappings();
 writeFileSync(
   "test/fixtures/certified-word/vectors.json",
-  `${JSON.stringify({ imports: importerVectors(mappings) }, null, 2)}\n`,
+  `${JSON.stringify({ imports: importerVectors(Object.values(mappings)) }, null, 2)}\n`,
 );

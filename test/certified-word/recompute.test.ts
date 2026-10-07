@@ -632,10 +632,9 @@ describe(`the gate, recomputing (${PYTHON === undefined ? "the committed results
   // A package leaflet (docs/design/pl-structure.md, "Zone B"): the worker, given every mapping,
   // takes the leaflet's by the record's document type, and the gate makes it again from its upload.
   it("carries a package leaflet through the worker's pipeline dry, by the leaflet's mapping", async () => {
-    const mappings = await loadEmaMappings();
-    const leaflet = mappings.find(({ root }) => root.sourceKey === "pl");
+    const { smpc, pl: leaflet } = await loadEmaMappings();
     const found = recomputedCases().find(({ name }) => name === "pl");
-    if (leaflet === undefined || found === undefined) throw new Error("no leaflet");
+    if (found === undefined) throw new Error("no leaflet");
     const input = importCertifiedWord(
       recomputed("pl"),
       { ...caseRequest(found), upload: { filename: "pl.docx", storageUri: uri(label("pl")) } },
@@ -654,7 +653,7 @@ describe(`the gate, recomputing (${PYTHON === undefined ? "the committed results
         sourceResource: "document:certified-word-leaflet",
         ...input,
       },
-      mappings,
+      [smpc, leaflet],
       config,
       { certifiedWord: sources() },
     );

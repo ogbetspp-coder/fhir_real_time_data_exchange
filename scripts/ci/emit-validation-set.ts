@@ -75,13 +75,7 @@ if (!destinationArg) {
 }
 
 const mappings = await loadEmaMappings();
-const byDocument = (key: string): EmaMapping => {
-  const found = mappings.find(({ root }) => root.sourceKey === key);
-  if (found === undefined) throw new Error(`no ${key} mapping`);
-  return found;
-};
-const mapping = byDocument("smpc");
-const leaflet = byDocument("pl");
+const { smpc: mapping, pl: leaflet } = mappings;
 
 type SetEntry = { file: string; resource: FhirResource; profiles: string[] };
 
@@ -162,7 +156,7 @@ const wordOf = (name: string) => {
   const made = importCertifiedWord(
     recomputed(label.name),
     caseRequest(label),
-    caseMapping(label, mappings),
+    caseMapping(label, Object.values(mappings)),
     CERTIFIED_WORD_RUN,
   );
   return { bundle: made.submission.bundle as unknown as FhirBundle, made };

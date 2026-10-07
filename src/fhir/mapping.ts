@@ -170,12 +170,14 @@ export async function loadEmaMapping(
 }
 
 // Every manifest Zone B carries, one per document: the SmPC's and the package leaflet's.
-export async function loadEmaMappings(): Promise<EmaMapping[]> {
-  return Promise.all(
-    Object.values(DOCUMENTS).map(({ mappingId: id }) =>
-      loadEmaMapping(path.resolve(`fhir/mappings/${id}.json`)),
-    ),
-  );
+export type EmaMappings = Record<DocumentKey, EmaMapping>;
+
+export async function loadEmaMappings(): Promise<EmaMappings> {
+  const [smpc, pl] = await Promise.all([
+    loadEmaMapping(),
+    loadEmaMapping(path.resolve(`fhir/mappings/${DOCUMENTS.pl.mappingId}.json`)),
+  ]);
+  return { smpc, pl };
 }
 
 // The documents a source's Composition.type names: our own code (smpc, pl), or the EMA's, in
