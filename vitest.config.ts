@@ -24,8 +24,9 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**"],
-      // The files copied into the renderer's images (a fontconfig, a shell launcher) are not code.
-      exclude: ["src/render/image/**"],
+      // The files copied into the renderer's images (a fontconfig, a shell launcher) and the Word
+      // drawing's pinned public keys (PEM) are not code.
+      exclude: ["src/render/image/**", "src/render/word-drawing/keys/**"],
       // Summaries only: the text one for the log, the JSON one for anyone comparing runs. The
       // directory is git-, prettier-, eslint- and docker-ignored.
       reporter: ["text-summary", "json-summary"],

@@ -1,6 +1,14 @@
 import { spawnSync } from "node:child_process";
 import { constants, generateKeyPairSync, type KeyObject, sign } from "node:crypto";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -432,6 +440,34 @@ describe("the build's first step", () => {
   ])("fails on %s", (_, env) => {
     const { dir, bin } = checkout();
     expect(run(dir, bin, "exists", env).status).toBe(1);
+  });
+
+  // PR 3: with main's own lock and keys in place of the stand-ins, dev goes on to draw, by the
+  // pinned image and key version 1, and the environments with nothing pinned are still refused.
+  it("goes on in dev with main's pins, and still refuses where nothing is pinned", () => {
+    const { dir, bin } = checkout();
+    cpSync("src/render/word-drawing", path.join(dir, "src/render/word-drawing"), {
+      recursive: true,
+    });
+    const lock = JSON.parse(readFileSync("src/render/word-drawing/lock.json", "utf8")) as {
+      imageDigests: Record<string, string | null>;
+    };
+    const result = run(dir, bin, "exists", { REQUEST: base64url(REQUEST) });
+    expect(result).toMatchObject({ status: 0 });
+    expect(result.out).toMatch(/^to draw: word\/[0-9a-f]{64}\/[0-9a-f]{64}\/1\.json\n$/);
+    expect(readFileSync(path.join(dir, "run/image"), "utf8")).toBe(
+      `europe-west4-docker.pkg.dev/p/ema-flow-images/word-drawing@${lock.imageDigests.dev}`,
+    );
+    expect(readFileSync(path.join(dir, "run/key-version"), "utf8")).toBe("1\n");
+    for (const environment of ["validation", "prod"]) {
+      expect(lock.imageDigests[environment]).toBeNull();
+      expect(
+        run(dir, bin, "exists", { REQUEST: base64url(REQUEST), ENVIRONMENT: environment }),
+      ).toEqual({
+        status: 1,
+        out: `word-drawing: no drawing image is pinned for ${environment}\n`,
+      });
+    }
   });
 
   it("fails while no image or no key version is pinned, and skips a revoked one", () => {

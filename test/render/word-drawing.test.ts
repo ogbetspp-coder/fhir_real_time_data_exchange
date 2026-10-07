@@ -1,14 +1,17 @@
+import { constants, createPublicKey, verify } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
 import { readRendererPins } from "../../scripts/ci/renderer-pins.mjs";
+import { crc32c } from "../../src/lib/crc32c.js";
 import { HARDENING } from "../../scripts/render/run.mjs";
 import { dockerArgs, IMAGE, MOUNTS } from "../../scripts/render/word-drawing.mjs";
 
 // The Word drawing's image and its run (docs/design/certified-word-drawing.md, PR 1): the
 // renderer's image with Python added, run only hardened as the renderer's is, with only what the
-// drawing reads mounted, read-only; and the lock that will pin each environment's image.
+// drawing reads mounted, read-only; and the lock that pins each environment's image, with the
+// public keys that verify each environment's records (PR 3).
 
 const dockerfile = readFileSync("Dockerfile.renderer", "utf8");
 const stages = [...dockerfile.matchAll(/^FROM (\S+) AS (\S+)$/gm)].map(([, image, name]) => ({
@@ -126,5 +129,27 @@ describe("the word-drawing lock", () => {
     for (const digest of Object.values(lock.imageDigests)) {
       expect(digest === null || /^sha256:[0-9a-f]{64}$/.test(digest)).toBe(true);
     }
+    // PR 3: dev's image, by digest, never by a tag that can move. The build pulls
+    // `<repository>/word-drawing@<digest>` and the drawing id hashes it.
+    expect(lock.imageDigests.dev).toMatch(/^sha256:[0-9a-f]{64}$/);
+  });
+});
+
+describe("the drawing's public keys", () => {
+  // PR 3: word-drawing-hsm's version 1 in dev (section 3, "Who signs it, and with which key"), the
+  // PEM exactly as Cloud KMS gave it on 2026-10-07, whose CRC32C it reported as pemCrc32c.
+  it("pin dev's version 1: RSA 3072, for RSA-PSS with SHA-256 and a 32-byte salt", () => {
+    const pem = readFileSync("src/render/word-drawing/keys/dev/1.pem");
+    expect(crc32c(pem)).toBe(939517586);
+    const key = createPublicKey(pem);
+    expect(key.type).toBe("public");
+    expect(key.asymmetricKeyType).toBe("rsa");
+    expect(key.asymmetricKeyDetails).toEqual({ modulusLength: 3072, publicExponent: 65537n });
+    // One spelling: the PEM is the key's own SubjectPublicKeyInfo export, and nothing else.
+    expect(key.export({ type: "spki", format: "pem" })).toBe(pem.toString("utf8"));
+    // It verifies under PSS with SHA-256 and a 32-byte salt, as the build and the worker check it:
+    // a signature that is not one is refused, not an error.
+    const pss = { key, padding: constants.RSA_PKCS1_PSS_PADDING, saltLength: 32 };
+    expect(verify("sha256", Buffer.from("record"), pss, Buffer.alloc(384, 1))).toBe(false);
   });
 });
