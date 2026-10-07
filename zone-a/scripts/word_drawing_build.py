@@ -8,7 +8,9 @@
 (its ``parse`` and ``record`` steps).
 
 ``request``: the request parsed strictly, before the .docx is read: the canonical JSON exactly, of
-``{docxSha256, recompute}``, the recompute request of its own shape (``zone_a.recompute``). Writes
+``{docxSha256, recompute}``, the recompute request of its own shape (``zone_a.recompute``), whose
+assignments name only sections of the document's template and whose versions are this build's.
+So a request it accepts holds a hash, section keys, counts and versions, and no other text. Writes
 the .docx's SHA-256.
 
 ``record``: the record's fields as two drawings wrote them, byte for byte the same, each the
@@ -23,26 +25,29 @@ label.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
 from typing import Any, Final
 
-from zone_a import drawing, recompute
+from zone_a import drawing, leaflet, recompute, structure
 from zone_a.canonical_json import CanonicalJsonError, canonical_json
 
 ENVIRONMENTS: Final = frozenset({"dev", "validation", "prod"})
 FIELDS: Final = frozenset(
     {"recordVersion", "request", "document", "recompute", "drawing", "sections"}
 )
+# The contracts' SourceKey (src/contracts/common.ts).
+SOURCE_KEY: Final = re.compile(r"[a-z0-9]+(?:\.[a-z0-9]+)*")
 
 
 class RefusedError(Exception):
     """A request or a drawing the build signs nothing for."""
 
 
-def request(raw: bytes) -> str:
-    """The .docx's SHA-256 a strictly parsed request names.
+def request(raw: bytes, root: Path = recompute.ROOT) -> str:
+    """The .docx's SHA-256 a strictly parsed request names; ``root`` holds the registry files.
 
     Raises:
         RefusedError: The bytes are not the canonical JSON of a drawing request.
@@ -59,10 +64,17 @@ def request(raw: bytes) -> str:
     if not isinstance(sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", sha256):
         raise RefusedError("request")
     try:
-        recompute._request(value["recompute"])
+        document, _, _, assignments, versions = recompute._request(value["recompute"])
     # A list where the document or the view is named cannot even be looked up.
     except recompute.RefusedError, TypeError:
         raise RefusedError("request") from None
+    registry, mapping = recompute._load(document, root)
+    nodes = (structure._nodes if document == "smpc" else leaflet._nodes)(registry, mapping)
+    keys = {node["key"] for node in nodes}
+    if not all(key in keys and SOURCE_KEY.fullmatch(key) for key in assignments):
+        raise RefusedError("request")
+    if versions != recompute.versions(document, root):
+        raise RefusedError("request")
     return sha256
 
 
@@ -115,7 +127,8 @@ def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     try:
         if args == ["request"]:
-            sys.stdout.write(request(sys.stdin.buffer.read()))
+            root = Path(os.environ.get("ZONE_A_ROOT", recompute.ROOT))
+            sys.stdout.write(request(sys.stdin.buffer.read(), root))
         elif len(args) == 8 and args[0] == "record":
             environment, commit, digest, version = args[1:5]
             asked, *drawn = (Path(name).read_bytes() for name in args[5:])

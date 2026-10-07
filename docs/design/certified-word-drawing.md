@@ -237,13 +237,25 @@ records (which, if ever built, get their own):
   request run at once (a message delivered twice), the second's create-if-absent write finds the
   first's record. RSA-PSS signatures are randomised, so two signatures of one record differ: the
   build compares the stored record's canonical bytes with its own, never the signatures. If the
-  records differ, the build fails as a determinism failure.
+  records differ, the build fails as a determinism failure. (As built, "Step 2": the stored object
+  must also carry a signature that verifies with the pinned key, and the records may differ in
+  their commit alone, since two builds of one request can run on either side of a merge.)
 
 ### Where it is stored, and why no person commits it
 
-In a bucket only the drawing identity may write: `<project>-<prefix>-word-drawings`, encrypted with
-the evidence key. The path is `word/<key>/<drawing id>/<key version>.json`. The drawing id is the
-SHA-256 of the canonical JSON `{ version, imageDigest }` that the build's commit pins in
+In a bucket where Terraform lets the drawing identity alone write:
+`<project>-<prefix>-word-drawings`, encrypted with the evidence key. At project level others can
+write it too (checked in dev on 2026-10-07): the owner, `ema-flow-deployer`
+(`roles/storage.admin`), and Cloud Build's legacy service account
+`<project number>@cloudbuild.gserviceaccount.com` (`roles/cloudbuild.builds.builder`, which writes
+every bucket and publishes to every topic). The owner can also sign with the key, and the deployer
+could grant itself that; both are the trust root already (section 4). The legacy account cannot
+sign, so what it, or anyone without the signer grant, puts at a record's path is not a record: the
+build verifies any object it finds there and fails on one that is not ("Step 2"), and the gate
+refuses it. What it can do is deny that label its record (a stated residual).
+
+The path is `word/<key>/<drawing id>/<key version>.json`. The drawing id is the SHA-256 of the
+canonical JSON `{ version, imageDigest }` that the build's commit pins in
 `src/render/word-drawing/lock.json`, outside `src/certified-word/`, so pinning a new image does not
 change the importer's version. The worker may read the bucket. The producer may not: Zone A's
 preview already tells it where a drawing differs, and the run's answer tells it whether a record
@@ -538,9 +550,15 @@ reviewed as any change is; its deploy creates an HSM key that Terraform cannot d
 destruction waits 120 days.
 
 **Left for the owner:** no GitHub connection. PR 2's test showed a Pub/Sub trigger runs an inline
-build that clones the public repository ("Step 2"). One step remains outside Terraform, as the
-planner always is: `scripts/gcp/plan-identity.sh`, run once by the owner after PR 2's deploy, gives
-the planner `cloudbuild.builds.get`, without which every later plan fails to read the trigger.
+build that clones the public repository ("Step 2"). Two steps remain outside Terraform:
+
+- `scripts/gcp/plan-identity.sh` (`--check` first), run before the merge that adds the trigger
+  (PR 2), as the planner always is, gives the planner `cloudbuild.builds.get`: without it, every
+  plan after that deploy fails to read the trigger.
+- A hardening item that predates this design: Cloud Build's legacy service account holds
+  `roles/cloudbuild.builds.builder` on the project, which writes every bucket (the record bucket
+  among them) and publishes to every topic. Nothing here builds as it; removing the binding is the
+  owner's, and PR 2 does not.
 
 ## What this takes from R1, and what differs
 
@@ -729,8 +747,10 @@ deploy applies it after the merge; nothing was made by hand.
 - The image: `cloudbuild.images.yaml` builds the `word-drawing` target on every deploy, with the
   legacy builder (as CI's Word drawing job now builds it too), and pushes it as
   `word-drawing:<commit>`. PR 3 pins a digest from it.
-- The build itself: `scripts/word-drawing/build.sh`, one step per call, and, in the image,
-  `zone-a/scripts/word_drawing_build.py` (the strict parse, and the record's assembly).
+- The build itself: `scripts/word-drawing/build.sh`, one step per call;
+  `scripts/word-drawing/stored.py`, which decides whether a stored object is a record the build
+  accepts; and, in the image, `zone-a/scripts/word_drawing_build.py` (the strict parse, and the
+  record's assembly).
 - The planner gains `cloudbuild.builds.get` (`scripts/gcp/plan-identity.sh`), the one permission
   that reads a trigger, and the deploy's effective-IAM export names the drawing identity.
 
@@ -743,15 +763,21 @@ inputs (environment, buckets, key, image repository) are literals Terraform writ
 trigger, and the first fetches `refs/heads/main` of the public repository over HTTPS. Its timeout
 is 600 s and its `queueTtl` 300 s. The steps, each in an image pinned by digest:
 
-1. `exists` (Cloud SDK 588.0.0-slim): main's source, depth 1; the request decoded only where it is
-   unpadded base64url and the one spelling of its bytes; the key; the drawing id from the lock; the
-   newest key version pinned for the environment (`src/render/word-drawing/keys/<env>/<n>.pem`, less
-   those `revoked.json` lists); and the record looked for by Cloud Storage's JSON API. Found (200),
-   every later step ends at once; not found (404), the build goes on; any other answer fails it.
-   Until PR 3 pins an image and a key, every build ends here, refused.
+1. `exists` (Cloud SDK 588.0.0-slim): main's source, depth 1, cleaned and required clean
+   (`git clean -ffdx`, then nothing untracked or ignored: no extra public key, no module on
+   Python's path); the request decoded only where it is unpadded base64url and the one spelling of
+   its bytes; the key; the drawing id from the lock; the newest key version pinned for the
+   environment (`src/render/word-drawing/keys/<env>/<n>.pem`, less those `revoked.json` lists); and
+   the record looked for by Cloud Storage's JSON API, at most 64 KiB. Found (200), it must be a
+   record this build accepts (`scripts/word-drawing/stored.py`: exactly `{record, signatureBase64}`,
+   the one base64 spelling of a signature that verifies with the pinned key, and a canonical record
+   of this request, environment, key version and image), and then every later step ends at once;
+   anything else at the path fails the build. Not found (404), the build goes on; any other answer
+   fails it. Until PR 3 pins an image and a key, every build ends here, refused.
 2. `pull` (the images build's Docker builder): the image, by the pinned digest.
 3. `parse` (the image, hardened, no network): the request, its canonical JSON exactly, of the
-   recompute request's shape (`word_drawing_build.py request`), before the .docx is read.
+   recompute request's shape, assigning only sections of the document's template, with this
+   build's versions (`word_drawing_build.py request`), before the .docx is read.
 4. `fetch` (Cloud SDK): the .docx at its content address, at most 32 MiB (`curl --max-filesize`,
    then its length), of the SHA-256 the request names.
 5. `draw-1` and `draw-2`, at once (the image, hardened, no network, 2 GiB each):
@@ -760,11 +786,13 @@ is 600 s and its `queueTtl` 300 s. The steps, each in an image pinned by digest:
    fields of this request, made the record with the environment, the commit, the image's digest
    and the key version (a JSON integer), as canonical JSON (`word_drawing_build.py record`).
 7. `sign` (Cloud SDK): the commit is on main's first-parent line, fetched again; Cloud KMS signs the
-   SHA-256 of the record's bytes; the signature is checked against the pinned public key before
-   anything is written (a record that did not verify would hold its path for good); and
-   `{record, signatureBase64}` is written with `ifGenerationMatch=0`. Where an object is there
-   already (412, or 403), it must begin with this record's bytes, or the build fails as a
-   determinism failure.
+   SHA-256 of the record's bytes; `{record, signatureBase64}` is checked by `stored.py`, as any
+   stored object is, before anything is written (a record that did not verify would hold its path
+   for good); and it is written with `ifGenerationMatch=0`. Where an object is there already (412,
+   or 403), `stored.py` must accept it and find it this build's record but for its commit (two
+   builds of one request on either side of a merge differ there alone); otherwise the build fails,
+   naming its own commit and the stored one's, as a planted object or a drawing that is not
+   deterministic.
 
 Cloud Build makes the trigger's push subscription itself (`gcb-<trigger>`, seven days' retention),
 outside Terraform, and deletes it with the trigger (observed).
@@ -898,8 +926,18 @@ is their first run; until then a request ends at `exists`, refused, since nothin
   on CI's host (measured, "Step 1") nor on Cloud Build's (measured, "Step 2"), and the launcher
   runs Chrome without it, so one layer fewer stands in the way.
 - The planner's `cloudbuild.builds.get`, needed to read the trigger, also reads every build's
-  metadata, a drawing build's request among them: the .docx's hash, its section keys and versions,
-  never its text.
+  metadata, so any pull request's plan can read each drawing request as it was published. A request
+  the build accepts holds only the .docx's hash, section keys of the template, counts and this
+  build's versions (`parse` refuses any other); but a publisher could put any 4,000 characters of
+  base64url in one, and the planner could read them, refused or not.
+- Who may publish a request: the producer, and, at project level, the owner, `ema-flow-deployer`
+  (`roles/pubsub.admin`) and Cloud Build's legacy service account. Each can spend build minutes;
+  none can sign.
+- Who may write the record bucket at project level (above): an object planted at a record's path
+  fails every build of that request and is refused by the gate, so it denies that label its record
+  until removed; it cannot be taken for one.
+- Cloud Build's own push subscription (`gcb-<trigger>`) keeps a message it could not hand to a build
+  for seven days and retries it; `queueTtl` bounds only a build already made.
 - A flood of well-formed requests costs build minutes; the backstop is a budget alert.
 - The record does not vouch for the product, the document id (P5) or the approval: only that each
   narrative draws as the .docx was read.

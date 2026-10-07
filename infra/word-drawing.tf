@@ -63,11 +63,13 @@ resource "google_kms_crypto_key_iam_member" "word_drawing_signer" {
   member        = "serviceAccount:${google_service_account.word_drawing.email}"
 }
 
-# The records, at word/<key>/<drawing id>/<key version>.json. Only the drawing identity writes, and
-# only to create: objectCreator and objectViewer, never objectAdmin, so replacing an object (which
-# needs the delete permission) is refused by IAM itself. No versioning, so nothing is kept
-# noncurrent out of a reader's sight. A record lost is drawn again on request; the worker keeps the
-# bytes of each record it uses with the run's evidence.
+# The records, at word/<key>/<drawing id>/<key version>.json. Here only the drawing identity is
+# granted write, and only to create: objectCreator and objectViewer, never objectAdmin, so replacing
+# an object (which needs the delete permission) is refused by IAM itself. Project-level roles let
+# others write it too (the design's "Where it is stored"), so the build verifies any object it finds
+# at a record's path (scripts/word-drawing/stored.py). No versioning, so nothing is kept noncurrent
+# out of a reader's sight. A record lost is drawn again on request; the worker keeps the bytes of
+# each record it uses with the run's evidence.
 resource "google_storage_bucket" "word_drawings" {
   name                        = local.word_drawing_records
   location                    = var.region
@@ -189,8 +191,9 @@ resource "google_cloudbuild_trigger" "word_drawing" {
       ]
     }
 
-    # Step 1, slim: main's checkout, and the record looked for. If it exists, every later step ends
-    # at once.
+    # Step 1, slim: main's checkout, exactly (nothing untracked or ignored survives it: no extra
+    # public key, no module on Python's path), and the record looked for. If it exists, every
+    # later step ends at once. `$$` is Cloud Build's escape for a `$` the shell is to see.
     step {
       id         = "exists"
       name       = local.cloud_sdk_image
@@ -200,6 +203,8 @@ resource "google_cloudbuild_trigger" "word_drawing" {
         "git remote add origin https://github.com/ogbetspp-coder/fhir_real_time_data_exchange.git",
         "git fetch -q --depth=1 origin refs/heads/main",
         "git checkout -q --detach FETCH_HEAD",
+        "git clean -q -ffdx",
+        "test -z \"$$(git status --porcelain --ignored)\"",
         "exec bash scripts/word-drawing/build.sh exists",
       ])]
       env = ["REQUEST=$${_REQUEST}"]

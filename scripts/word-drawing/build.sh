@@ -26,8 +26,10 @@ HARDENING=(--network none --read-only --tmpfs /tmp --shm-size=1g --cap-drop=ALL
 # What the drawing reads from the checkout (scripts/render/word-drawing.mjs, MOUNTS, less the
 # fixtures and the checks), read-only.
 MOUNTS=(zone-a/src label-docx-reader/src qrd/registry fhir/mappings)
-# The worker's cap on an upload (src/certified-word/recompute.ts, MAX_UPLOAD_BYTES).
+# The worker's cap on an upload (src/certified-word/recompute.ts, MAX_UPLOAD_BYTES), and on a
+# record's bytes (the design's "How Zone B verifies it", 64 KiB).
 MAX_DOCX=$((32 * 1024 * 1024))
+MAX_RECORD=$((64 * 1024))
 STORAGE=https://storage.googleapis.com
 KMS=https://cloudkms.googleapis.com/v1
 
@@ -44,6 +46,15 @@ mount() {
 }
 
 token() { gcloud auth print-access-token; }
+
+# Whether the stored object in $1 is a record this build accepts (scripts/word-drawing/stored.py):
+# signed by the pinned key, of this request, environment, key version and image, and, with
+# run/record.json there, this build's record but for its commit. Prints the commit it names.
+accepted() {
+  python3 scripts/word-drawing/stored.py "$1" "${KEYS}/$(<"$RUN/key-version").pem" \
+    "$ENVIRONMENT" "$(<"$RUN/key-version")" "$(<"$RUN/image-digest")" "$(<"$RUN/version")" \
+    "$RUN/request.json" "${@:2}"
+}
 
 # One Cloud Storage or Cloud KMS call: its HTTP status on standard output, its body in $1.
 call() {
@@ -104,14 +115,21 @@ print(lock["version"], lock["imageDigests"][sys.argv[2]] or "")' "$LOCK" "$ENVIR
   [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || fail "no drawing image is pinned for ${ENVIRONMENT}"
   printf '%s/word-drawing@%s' "$IMAGES" "$digest" >"$RUN/image"
   printf '%s' "$digest" >"$RUN/image-digest"
+  printf '%s' "$version" >"$RUN/version"
   key_version >"$RUN/key-version" || fail "no key version is pinned for ${ENVIRONMENT}"
   drawing="$(drawing_id "$digest" "$version")"
   key="$(sha256sum <"$RUN/request.json" | cut -d' ' -f1)"
   object="word/${key}/${drawing}/$(<"$RUN/key-version").json"
   printf '%s' "$object" >"$RUN/object"
-  status="$(call "$RUN/found" "${STORAGE}/storage/v1/b/${RECORDS}/o/${object//\//%2F}")"
+  status="$(call "$RUN/found" --max-filesize "$MAX_RECORD" \
+    "${STORAGE}/storage/v1/b/${RECORDS}/o/${object//\//%2F}?alt=media")" ||
+    fail "the object at ${object} is over 64 KiB, or could not be read"
   case "$status" in
+    # An object on the path is not taken for a record until it is one: anyone who may write the
+    # bucket at project level could have put it there. One that is not ends the build, failed.
     200)
+      accepted "$RUN/found" >/dev/null ||
+        fail "the object at ${object} is not a record this build accepts"
       touch "$RUN/recorded"
       echo "recorded already: ${object}"
       ;;
@@ -169,7 +187,7 @@ record() {
 # Signed with the pinned key version, checked against its pinned public key, and written
 # create-if-absent. Another build's record at the same path must be this record, byte for byte.
 sign() {
-  local commit version digest status stored prefix
+  local commit version digest status stored named
   commit="$(<"$RUN/commit")"
   # Still a first-parent commit of main (R1): fetched again, it is on main's first-parent line.
   git fetch -q --depth=100 origin refs/heads/main
@@ -185,14 +203,14 @@ sign() {
 signed = json.load(open(sys.argv[1]))
 sys.stdout.buffer.write(base64.b64decode(signed["signature"], validate=True))' \
     "$RUN/signed.json" >"$RUN/signature" || fail "signing answered no signature"
-  # RSA-PSS, SHA-256, a 32-byte salt: as Cloud KMS signs, and as the worker will verify.
-  openssl dgst -sha256 -sigopt rsa_padding_mode:pss -sigopt rsa_pss_saltlen:32 \
-    -verify "${KEYS}/${version}.pem" -signature "$RUN/signature" "$RUN/record.json" >/dev/null ||
-    fail "the signature does not verify against the pinned key ${version}"
   # The canonical JSON of {record, signatureBase64}: the record's bytes are canonical already, and
-  # the keys are in order.
-  prefix="{\"record\":$(<"$RUN/record.json"),\"signatureBase64\":\""
-  printf '%s%s"}' "$prefix" "$(base64 -w0 <"$RUN/signature")" >"$RUN/stored.json"
+  # the keys are in order. Checked as any stored object is, before it is written: the signature
+  # against the pinned key (RSA-PSS, SHA-256, a 32-byte salt, as the worker will verify), since a
+  # record that did not verify would hold its path for good.
+  printf '{"record":%s,"signatureBase64":"%s"}' "$(<"$RUN/record.json")" \
+    "$(base64 -w0 <"$RUN/signature")" >"$RUN/stored.json"
+  accepted "$RUN/stored.json" "$RUN/record.json" >/dev/null ||
+    fail "the signed record is not one this build accepts, against the pinned key ${version}"
   stored="$(<"$RUN/object")"
   local at="${STORAGE}/upload/storage/v1/b/${RECORDS}/o?uploadType=media&ifGenerationMatch=0"
   status="$(call "$RUN/written.json" --request POST --header 'Content-Type: application/json' \
@@ -203,13 +221,16 @@ sys.stdout.buffer.write(base64.b64decode(signed["signature"], validate=True))' \
     # replacing needs the delete permission this identity lacks (403): either way the stored
     # record must be this one.
     412 | 403)
-      status="$(call "$RUN/existing.json" \
-        "${STORAGE}/storage/v1/b/${RECORDS}/o/${stored//\//%2F}?alt=media")"
+      status="$(call "$RUN/existing.json" --max-filesize "$MAX_RECORD" \
+        "${STORAGE}/storage/v1/b/${RECORDS}/o/${stored//\//%2F}?alt=media")" ||
+        fail "the object at ${stored} is over 64 KiB, or could not be read"
       [[ "$status" == "200" ]] || fail "reading the existing record answered HTTP ${status}"
-      printf '%s' "$prefix" >"$RUN/prefix"
-      head -c "$(($(wc -c <"$RUN/prefix")))" "$RUN/existing.json" | cmp -s - "$RUN/prefix" ||
-        fail "a different record is stored at ${stored}: the drawing is not deterministic"
-      echo "recorded already, the same record: ${stored}"
+      # Another build's record of this request: the same record but, where the two builds ran on
+      # either side of a merge, for its commit.
+      named="$(accepted "$RUN/existing.json" "$RUN/record.json")" ||
+        fail "the object at ${stored} is not this build's record (this build ran ${commit}):" \
+          "a planted object, or a drawing that is not deterministic"
+      echo "recorded already, the same record, by commit ${named}: ${stored}"
       ;;
     *) fail "writing the record answered HTTP ${status}" ;;
   esac

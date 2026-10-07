@@ -49,8 +49,11 @@ CONDITION="assertion.repository_id=='${REPOSITORY_ID}' && assertion.event_name==
 
 # Read-only, metadata and policy only. Each line is a resource type in infra/ or a call the plan
 # workflow makes; nothing here returns a stored record's content. cloudbuild.builds.get is how a
-# Cloud Build trigger is read (infra/word-drawing.tf); it also reads a build's metadata, whose one
-# value from outside is a drawing request: hashes, section keys and versions, never a label's text.
+# Cloud Build trigger is read (infra/word-drawing.tf), so this script must run before the merge that
+# adds the trigger, or every plan after its deploy fails. It also reads every build's metadata, a
+# drawing request as published among it: one the build accepts holds hashes, section keys, counts
+# and versions, never a label's text, but a publisher could put other text in one
+# (docs/design/certified-word-drawing.md, "Stated residuals").
 PERMISSIONS=(
   resourcemanager.projects.get
   resourcemanager.projects.getIamPolicy

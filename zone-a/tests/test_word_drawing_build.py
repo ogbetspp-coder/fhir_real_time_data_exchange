@@ -62,6 +62,7 @@ def _drawn(request: dict[str, Any], **changed: Any) -> bytes:
 
 def test_a_canonical_request_names_its_docx() -> None:
     assert build.request(_raw(_asked())) == SHA
+    assert build.request(_raw(_asked(assignments={"smpc.4.1": 12}))) == SHA
 
 
 @pytest.mark.parametrize(
@@ -75,6 +76,11 @@ def test_a_canonical_request_names_its_docx() -> None:
         _raw(_asked(document="spc")),  # not the recompute request's shape
         _raw(_asked(assignments={"smpc.1": "3"})),
         _raw(_asked(document=["smpc"])),
+        # Only a section of the template may be assigned, so a key carries no other text.
+        _raw(_asked(assignments={"take.two.tablets": 3})),
+        _raw(_asked(assignments={"pl.1": 3})),
+        _raw(_asked(versions=recompute.versions("smpc") | {"builder": "word-epi/0.0.1"})),
+        _raw(_asked(versions={})),
         b"[" * 100_000,
         b"\xff",
     ],
