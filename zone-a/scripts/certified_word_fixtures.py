@@ -43,10 +43,12 @@ W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 CHANGE = 'w:author="Synthetic" w:date="2024-01-01T00:00:00Z"'
 MARKED = "Synthetic text, not for clinical use."
 BLOCK = "00000000-5979-4e74-8000-"
+NAME = "Synthetic Exampline"
+HOLDER = "Synthetic Holder B.V."
 PRODUCT = {
     "id": f"{BLOCK}0000000000c2",
-    "name": "Synthetic Exampline",
-    "holder": {"id": f"{BLOCK}0000000000c3", "name": "Synthetic Holder B.V."},
+    "name": NAME,
+    "holder": {"id": f"{BLOCK}0000000000c3", "name": HOLDER},
     "euAuthorisationNumbers": ["EU/1/24/9999/001", "EU/1/24/9999/002"],
 }
 
@@ -160,12 +162,12 @@ def _leaflet() -> list[str]:
     holder on its first line. A leaflet states no EU number.
     """
     registry, mapping = recompute._load("pl", ROOT)
-    text = {"pl.6.holder": [_p(PRODUCT["holder"]["name"]), _p("1 Example Street"), _p(MARKED)]}
+    text = {"pl.6.holder": [_p(HOLDER), _p("1 Example Street"), _p(MARKED)]}
     out = [_p("B. PACKAGE LEAFLET"), _p("Package leaflet: Information for the patient"), _p(MARKED)]
     for node in leaflet._nodes(registry, mapping)[1:]:
         lines, prefix = leaflet.forms(node["head"])
         heading = prefix if prefix is not None else sorted(lines, key=len)[-1]
-        out += [_p(heading.replace("X", PRODUCT["name"])), *text.get(node["key"], [_p(MARKED)])]
+        out += [_p(heading.replace("X", NAME)), *text.get(node["key"], [_p(MARKED)])]
     return out
 
 
