@@ -1,6 +1,10 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import path from "node:path";
 
 import { describe, expect, it } from "vitest";
+
+import { copySources, instructions } from "../../scripts/ci/dockerfile.mjs";
 
 // Which merges deploy (docs/foundations.md, E2). A merge that touches only paths nothing deployed
 // is built from skips the deploy. The failure this guards against is the quiet one: a path that
@@ -85,5 +89,29 @@ describe("the deploy trigger", () => {
     for (const file of deployable) {
       expect([file, ignored.some((pattern) => matches(pattern, file))]).toEqual([file, false]);
     }
+  });
+
+  // The worker image builds the certified Word recompute from part of Zone A, the label reader and
+  // the QRD registry (docs/design/certified-word-import.md, D2): of those three folders, a merge
+  // deploys for exactly what the Dockerfile copies, so a change to the recompute always deploys
+  // and a change to anything else there (a test, the label reader's own uv.lock) never does.
+  it("deploys for exactly what the images copy of Zone A, the label reader and the registry", () => {
+    const copied = copySources(instructions(readFileSync("Dockerfile", "utf8"))).map((source) =>
+      path.normalize(source),
+    );
+    const files = execFileSync(
+      "git",
+      ["ls-files", "-z", "--", "zone-a", "label-docx-reader", "qrd"],
+      { encoding: "utf8" },
+    )
+      .split("\0")
+      .filter((file) => file.length > 0);
+    expect(files.length).toBeGreaterThan(100);
+    const wrong = files.filter((file) => {
+      const copy = copied.some((source) => file === source || file.startsWith(`${source}/`));
+      return copy === ignored.some((pattern) => matches(pattern, file));
+    });
+    expect(wrong).toEqual([]);
+    expect(copied).toEqual(expect.arrayContaining(["zone-a/uv.lock", "label-docx-reader/src"]));
   });
 });

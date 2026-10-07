@@ -43,6 +43,11 @@ export const CERTIFIED_WORD_NOT_RECOMPUTED =
 export const CERTIFIED_WORD_DRAWING_MISSING =
   "certified-word-drawing-missing: the sections were recomputed, but no drawing record (D3) vouches for them";
 
+// Whether the gate made the sections again from the upload (D2, D4) and compared, or, where the
+// worker cannot recompute, checked only what a dry run's submission holds. The run's answer and
+// its log carry it, so a dry run's `validated` says which it proves.
+export type CertifiedWordCheck = "recomputed" | "submission-only";
+
 function rejected(issue: string, reason?: SubmissionRefusal): never {
   throw new SubmissionRejectedError("Document submission rejected", [issue], reason);
 }
@@ -97,7 +102,7 @@ export async function verifyCertifiedWordImport(
   mapping: EmaMapping,
   options: Omit<GateOptions, "certifiedWordDryRun" | "recomputedImport"> & { dryRun: boolean },
   sources: CertifiedWordSources | undefined,
-): Promise<DocumentGateResult> {
+): Promise<{ gate: DocumentGateResult; check: CertifiedWordCheck }> {
   // The shape bound comes before the parse, whose refinement hashes the Bundle, as in the other
   // gates: a pathological document is a classified rejection, never a RangeError.
   const structural = documentShapeIssues(input);
@@ -126,10 +131,11 @@ export async function verifyCertifiedWordImport(
   if (sources === undefined) {
     // Its closed code reaches the HTTP caller (src/app.ts).
     if (!options.dryRun) rejected(CERTIFIED_WORD_NOT_RECOMPUTED, "certified-word-not-recomputed");
-    return verifyDocumentSubmission(input, mapping.sourceCodeSystem, {
+    const gate = verifyDocumentSubmission(input, mapping.sourceCodeSystem, {
       allowSyntheticSources: options.allowSyntheticSources,
       ...dryRunProof,
     });
+    return { gate, check: "submission-only" };
   }
   const reportUri = submission.provenance.fidelity.reportUri;
   if (reportUri === undefined)
@@ -185,8 +191,9 @@ export async function verifyCertifiedWordImport(
   }
   // Step 5 (D3) is not built: nothing vouches that Chrome draws the narratives as Word does.
   if (!options.dryRun) rejected(CERTIFIED_WORD_DRAWING_MISSING, "certified-word-drawing-missing");
-  return verifyDocumentSubmission(input, mapping.sourceCodeSystem, {
+  const gate = verifyDocumentSubmission(input, mapping.sourceCodeSystem, {
     allowSyntheticSources: options.allowSyntheticSources,
     ...dryRunProof,
   });
+  return { gate, check: "recomputed" };
 }

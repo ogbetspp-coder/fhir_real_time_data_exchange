@@ -29,7 +29,7 @@ RUN npm prune --omit=dev --ignore-scripts
 # D2): the gate runs `python -m zone_a.recompute` on an uploaded .docx, so the worker carries a
 # Python 3.14 and the zone-a and label-docx packages. uv, pinned by digest, installs the Python
 # (python-build-standalone, a relocatable build that needs only glibc, its archive checked against
-# the SHA-256 uv 0.12.17 carries for it) and both packages, non-editable, into /opt/zone-a from
+# the SHA-256 uv 0.12.17 carries for it: a changed archive is refused) and both packages, non-editable, into /opt/zone-a from
 # zone-a/uv.lock, whose wheels uv checks against the lock's hashes; label-docx, which zone-a's lock
 # names by path, has no dependency of its own (label-docx-reader/pyproject.toml). The build backend
 # is pinned by version (each pyproject.toml's build-constraint-dependencies), not by hash. The
@@ -50,10 +50,13 @@ ENV UV_PYTHON_INSTALL_DIR=/opt/python \
     UV_NO_CACHE=1
 RUN uv python install 3.14.7
 WORKDIR /src
-COPY zone-a/pyproject.toml zone-a/uv.lock zone-a/README.md ./zone-a/
+COPY zone-a/pyproject.toml zone-a/uv.lock ./zone-a/
 COPY zone-a/src ./zone-a/src
-COPY label-docx-reader/pyproject.toml label-docx-reader/README.md ./label-docx-reader/
+COPY label-docx-reader/pyproject.toml ./label-docx-reader/
 COPY label-docx-reader/src ./label-docx-reader/src
+# Each pyproject.toml names a README.md, which is only its package's long description: an empty one
+# stands in, so no image depends on its text (and the deploy skips a README change, deploy.yml).
+RUN touch zone-a/README.md label-docx-reader/README.md
 RUN uv sync --locked --no-dev --no-editable --python 3.14.7 --project zone-a
 
 # The operating system under the Node binary (audit B07, S-1). node:22.22.0-bookworm-slim stopped

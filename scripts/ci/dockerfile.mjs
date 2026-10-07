@@ -26,6 +26,22 @@ export function instructions(text) {
   return joined;
 }
 
+// The repository paths an image is built from: every COPY or ADD source but those of another stage
+// or image (`--from`), as written, in order. A JSON-form instruction is refused rather than misread.
+export function copySources(lines) {
+  const sources = [];
+  for (const { text } of lines) {
+    const match = /^\s*(?:COPY|ADD)\s+(.*)$/i.exec(text);
+    if (match === null) continue;
+    const words = match[1].trim().split(/\s+/);
+    if (words.some((word) => /^--from=/i.test(word))) continue;
+    const paths = words.filter((word) => !word.startsWith("--"));
+    if (paths[0]?.startsWith("[")) throw new Error(`a JSON-form ${text} is not read`);
+    sources.push(...paths.slice(0, -1));
+  }
+  return sources;
+}
+
 // Every `ARG NAME=value`, by name. A name declared twice is refused.
 export function args(lines, name) {
   const found = new Map();

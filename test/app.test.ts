@@ -179,8 +179,9 @@ describe("run API", () => {
     expect(body).not.toContain("Synthetic");
   });
 
-  // A certified Word source is refused when the run is not a dry run, until Zone B recomputes it:
-  // the caller learns that by its closed code, and nothing else (review of #193).
+  // A certified Word source is refused when the run is not a dry run, here, where the worker cannot
+  // recompute it, with `certified-word-not-recomputed`: the caller learns that by its closed code,
+  // and nothing else (review of #193).
   it("gives a certified Word submission's closed code when the run is not a dry run", async () => {
     const [label] = recomputedCases();
     if (label === undefined) throw new Error("no recomputed label");
@@ -206,5 +207,29 @@ describe("run API", () => {
       reason: "certified-word-not-recomputed",
     });
     expect(body).not.toContain("Synthetic");
+  });
+
+  // A dry run's `validated` says what its gate proved (review of #196): here, with no Python
+  // configured, the submission only; test/certified-word/recompute.test.ts has `recomputed`.
+  it("says whether a certified Word dry run was recomputed", async () => {
+    const [label] = recomputedCases();
+    if (label === undefined) throw new Error("no recomputed label");
+    const word = importCertifiedWord(
+      recomputed(label.name),
+      caseRequest(label),
+      mapping,
+      CERTIFIED_WORD_RUN,
+    );
+    const app = createApp({
+      config: configFor({ SUBMISSION_BUCKET: SYNTHETIC_SUBMISSION_BUCKET }),
+      submissionReader: readerReturning(() => word),
+    });
+    const response = await post(app, documentRequest());
+    const body = (await response.json()) as RunResponse & { certifiedWordCheck?: string };
+    expect([response.status, body.status, body.certifiedWordCheck]).toEqual([
+      200,
+      "validated",
+      "submission-only",
+    ]);
   });
 });

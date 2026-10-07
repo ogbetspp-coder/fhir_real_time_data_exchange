@@ -11,9 +11,10 @@ on:
     # scripts/ and workflows/. The quality gate on the pull request still covers test/. The
     # worker image also takes Zone A's and the label reader's code (zone-a/src, label-docx-reader/
     # src, their pyproject.toml and zone-a/uv.lock) and the QRD registry (qrd/registry), which the
-    # certified Word gate's recompute runs on (docs/design/certified-word-import.md, D2): only
-    # their tests, scripts, corpus and documents, and the pinned EMA templates (qrd/sources), are
-    # skipped. labels/ holds the pinned EMA ePIs and their conformance results, read by zone-a/'s
+    # certified Word gate's recompute runs on (docs/design/certified-word-import.md, D2): every
+    # other file of the three folders is skipped below (their tests, scripts, corpus, documents,
+    # version locks and the label reader's own uv.lock, which Dependabot moves weekly), and
+    # test/ci/deploy-trigger.test.ts holds the two lists to what the Dockerfile copies. labels/ holds the pinned EMA ePIs and their conformance results, read by zone-a/'s
     # tests, by the importer's golden vectors (src/authority/vectors.ts, under npm run check) and
     # by the renderer checks (scripts/render/); no image copies it, so nothing deployed reads it.
     # .claude/ and .cursor/ hold coding-assistant settings and hooks, read by editors on a
@@ -27,10 +28,21 @@ on:
       - "agent/**"
       - "zone-a/scripts/**"
       - "zone-a/tests/**"
+      - "zone-a/versions.lock.json"
+      - "zone-a/.python-version"
+      - "zone-a/.gitattributes"
+      - "zone-a/.gitignore"
+      - "zone-a/LICENSE"
       - "label-docx-reader/corpus/**"
       - "label-docx-reader/docs/**"
       - "label-docx-reader/scripts/**"
       - "label-docx-reader/tests/**"
+      - "label-docx-reader/uv.lock"
+      - "label-docx-reader/versions.lock.json"
+      - "label-docx-reader/.python-version"
+      - "label-docx-reader/.gitattributes"
+      - "label-docx-reader/.gitignore"
+      - "label-docx-reader/LICENSE"
       - "qrd/sources/**"
       - "qrd/sources.lock.json"
       - "labels/**"

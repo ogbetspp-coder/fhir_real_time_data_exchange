@@ -14,7 +14,6 @@ import {
   structuralInvariantIssues,
   verifyDocumentSubmission,
   type CanonicalSubmission,
-  type DocumentGateResult,
   type DocumentSubmissionInput,
 } from "../../src/contracts/index.js";
 import { loadEmaMapping, type EmaMapping } from "../../src/fhir/mapping.js";
@@ -64,7 +63,7 @@ function issues(run: () => unknown): string[] {
 function verify(
   input: DocumentSubmissionInput,
   options: { allowSyntheticSources: boolean; dryRun: boolean } = OPTIONS,
-): Promise<DocumentGateResult> {
+) {
   return verifyCertifiedWordImport(input, mapping, options, undefined);
 }
 
@@ -89,9 +88,11 @@ function resealed(submission: CanonicalSubmission): CanonicalSubmission {
 describe("the certified Word gate", () => {
   it("passes a dry run, through every check of the ordinary gate", async () => {
     const input = imported();
-    const gate = await verify(input);
+    const { gate, check } = await verify(input);
     expect(gate.submission).toEqual(input.submission);
     expect(gate.narrativeSections.length).toBe(input.submission.provenance.sections.length);
+    // Where the worker cannot recompute, the answer says the dry run checked the submission only.
+    expect(check).toBe("submission-only");
   });
 
   it("refuses one when DRY_RUN is false, with its closed code", async () => {
@@ -152,7 +153,8 @@ describe("the certified Word gate", () => {
 
   it("is the only way past the ordinary gate, for the very submission it examined", () => {
     const input = imported();
-    const rule = "A certified Word source is accepted only as a dry run until Zone B recomputes it";
+    const rule =
+      "A certified Word source is accepted only as a dry run until its drawing is recorded";
     expect(
       issues(() =>
         verifyDocumentSubmission(input, mapping.sourceCodeSystem, { allowSyntheticSources: true }),

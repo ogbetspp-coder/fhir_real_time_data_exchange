@@ -14,10 +14,14 @@ image. No contract version changes.
    exported); and requires the length and SHA-256 to be the source's. No IAM change: the worker
    already reads the whole bucket, and a prefix condition would refuse the submissions themselves.
 2. **The recompute in the worker (D2).** The worker image (only the worker's target) gains
-   Python 3.14.7 (python-build-standalone, installed by uv 0.12.17 pinned by digest, which checks
-   its archive's SHA-256) and the zone-a and label-docx packages, installed non-editable from
-   `zone-a/uv.lock` (`uv sync --locked --no-dev --no-editable`, wheels checked against the lock's
-   hashes), and `qrd/registry`; it sets `RECOMPUTE_PYTHON` and `ZONE_A_ROOT`, and its build asserts
+   Python 3.14.7 (python-build-standalone, installed by uv 0.12.17 pinned by digest) and the
+   zone-a and label-docx packages, installed non-editable from `zone-a/uv.lock`
+   (`uv sync --locked --no-dev --no-editable`), and `qrd/registry`. Verified here, each with uv
+   0.12.17 on macOS (the same code as the Linux build's): served the Python archive with one byte
+   changed (through `--mirror`), `uv python install 3.14.7` refused it, naming the SHA-256 it
+   expected, which the uv binary carries; the genuine archive installed. A copy of `zone-a/uv.lock`
+   with one wheel's hash changed made `uv sync --locked` refuse that wheel. The package READMEs are
+   not copied: empty ones stand in (they are only the long description); it sets `RECOMPUTE_PYTHON` and `ZONE_A_ROOT`, and its build asserts
    Unicode 16.0.0 (ADR 0003) and that the recompute reads its files there. `zone_a.recompute` reads
    the registry and mapping files under `ZONE_A_ROOT` where it is set, since an installed package is
    in no checkout (`recompute/1.0.0` → `1.1.0`, the same output for the same input). The gate runs
@@ -39,14 +43,14 @@ image. No contract version changes.
 5. **Fixtures**: `zone-a/scripts/certified_word_fixtures.py` also commits each synthetic label
    (`<name>.docx`), which the gate's tests read as the uploads; every committed result moves with
    the recompute's version, and the importer's golden vectors with both versions.
-6. **CI**: the Zone A job runs `test/certified-word/recompute.test.ts` with its own Python
-   (`RECOMPUTE_PYTHON`), and `scripts/check-all.sh` with it; the Images job runs the gate's runner
-   inside the worker image on the committed labels and requires each result byte for byte.
+6. **CI and the image build**: the Zone A job runs `test/certified-word/recompute.test.ts` with its
+   own Python (`RECOMPUTE_PYTHON`, 3.14.7 as the image's), and `scripts/check-all.sh` with it; the
+   Images job and Cloud Build run the gate's runner inside the worker image on the committed labels
+   and require each result byte for byte.
 7. **The deploy trigger** (`.github/workflows/deploy.yml`): the worker image now reads
    `zone-a/src`, `label-docx-reader/src`, their `pyproject.toml`, `zone-a/uv.lock` and
-   `qrd/registry`, so a merge touching only them deploys; only Zone A's and the label reader's
-   tests, scripts, corpus and documents and the QRD sources are still skipped
-   (`test/ci/deploy-trigger.test.ts`). Without this, a recompute change merged alone would leave
+   `qrd/registry`, so a merge touching only them deploys; every other file of those three folders
+   is still skipped (`test/ci/deploy-trigger.test.ts`). Without this, a recompute change merged alone would leave
    the deployed worker on the previous build, which refuses every submission the new one makes.
 
 **Why.** ADR 0006 decision 1's second leg: Zone B makes the sections again from the uploaded bytes
@@ -93,9 +97,40 @@ refused.
 `zone-a/tests/test_certified_word_fixtures.py`; the Images job's run of the recompute in the worker
 image.
 
+**The independent review of #196**, each fixed with a test where code is involved:
+
+1. **High: `.gcloudignore` left out `label-docx-reader/`**, which the worker image copies and
+   `zone-a/uv.lock` names by path, so Cloud Build would have failed at `COPY` on every deploy
+   while CI's Images job, building from the full checkout, passed
+   (`gcloud meta list-files-for-upload .` listed no file of it). Now only its corpus, tests, scripts and
+   documents are left out (the same command lists its `pyproject.toml` and `src/`), and
+   `test/ci/gcloudignore.test.ts` reads `.gcloudignore` with gitignore's semantics (the `ignore`
+   library, now a declared dev dependency at the version eslint already installed; gcloud's
+   `#!include:` expanded) and requires every path the built Dockerfiles copy, every project a
+   copied `uv.lock` names by path, and every path a Cloud Build step reads to survive it. It fails
+   on the old file.
+2. The image Cloud Build builds is now proven: a `worker-recompute-smoke` step runs
+   `scripts/ci/worker-recompute-smoke.sh` on it before anything is pushed, the script CI's Images
+   job runs, which there also runs once on a changed result and must fail.
+3. Fewer needless deploys: of `zone-a/`, `label-docx-reader/` and `qrd/`, a merge deploys for
+   exactly what the Dockerfile copies (`test/ci/deploy-trigger.test.ts` holds both lists to it);
+   the label reader's own `uv.lock`, both `versions.lock.json` and the projects' dot files and
+   licence no longer deploy.
+4. A dry run's answer and completion log carry `certifiedWordCheck`, `recomputed` or
+   `submission-only`.
+5. Every workflow's Python is pinned to 3.14.7, the image's (CI had moved to 3.14.8), and
+   `test/ci/images.test.ts` holds them equal.
+6. `RECOMPUTE_PYTHON` and `ZONE_A_ROOT` must be absolute paths; the ordinary gate's refusal and
+   `GateOptions.certifiedWordDryRun` no longer say Zone B does not recompute ("until its drawing is
+   recorded"); the uv claims above say what was verified.
+7. The design note records what an oversized label does (the instance is killed for memory; the
+   run fails closed), for measurement on the first deploy.
+
 **Not verified here.** Docker is not available on the machine this was written on: the worker
-image's build and its recompute smoke run only in CI's Images job. The recompute's memory on the
-largest labels, inside the worker's 1 GiB with four requests at once, is not measured. Dropping the
+image's build and its recompute smoke run in CI's Images job and, on deploy, in Cloud Build (where
+it has not run yet). The recompute's memory on the largest labels, inside the worker's 1 GiB with
+four requests at once, is not measured. That Cloud Build pushes `images` only after every step has
+passed is its documented behaviour, not tested here. Dropping the
 environment keeps credentials' variables from the subprocess, but on Cloud Run any process in the
 container can reach the metadata server; the recompute opens no socket (it reads the label and the
 committed files only), and nothing but that code stops one.

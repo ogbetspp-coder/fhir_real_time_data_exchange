@@ -50,6 +50,19 @@ steps:
       - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/worker:${_IMAGE_TAG}
       - .
 
+  # The certified Word recompute in the worker image just built (docs/design/certified-word-import.md,
+  # D2), before anything is pushed: the gate's own runner, with the image's Python and no network,
+  # must make again, byte for byte, what `python -m zone_a.recompute` wrote for each committed
+  # synthetic label (the same script as CI's Images job). A failing step fails the build, and
+  # Cloud Build pushes `images` only once every step has passed, so nothing deploys.
+  - id: worker-recompute-smoke
+    name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
+    waitFor: ["build-app-image"]
+    entrypoint: bash
+    args:
+      - scripts/ci/worker-recompute-smoke.sh
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/worker:${_IMAGE_TAG}
+
   - id: pull-validator-cache
     name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
     waitFor: ["-"]

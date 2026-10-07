@@ -267,11 +267,39 @@ and it persists nothing. Where the worker cannot recompute (no bucket or no Pyth
 local run, the official validation set), a dry run checks only what the submission holds (the
 token, the importer, the pages against the record) as before, and any other run is refused with
 `certified-word-not-recomputed`. A submission never passes without both legs: no run that is not a
-dry run passes at all until D3.
+dry run passes at all until D3. The two dry runs say which they were: the run's HTTP answer and its
+completion log line carry the closed field `certifiedWordCheck`, `recomputed` or
+`submission-only` (after the review of #196, which found the two `validated` answers alike).
 
 **The run manifest** is unchanged (6.0.0): it already names the worker's image (`runtime.imageDigest`)
 and, through the extractor token (`parser`), the importer's and every recompute version. Whether a
-dry run recomputed is not recorded; step 6 below records it, with the drawing, as a contract change.
+dry run recomputed is in its answer and log, not in the manifest; step 6 below records it there,
+with the drawing, as a contract change.
+
+**The worker's Python, where it is built and proven.** `RECOMPUTE_PYTHON` and `ZONE_A_ROOT` must be
+absolute paths (the configuration refuses others: the subprocess has no PATH). The image installs
+Python 3.14.7, and every CI workflow pins the same patch (`test/ci/images.test.ts`), so the
+interpreter CI tests is the one that ships. The deploy rebuilds the image in Cloud Build from the
+source `gcloud builds submit` uploads, which `.gcloudignore` filters: the label reader's code is
+uploaded (until the review of #196 it was not, and the build would have failed),
+`test/ci/gcloudignore.test.ts` holds every path an image copies, every project its lock names by
+path and every path a build step reads to surviving that filter, and a Cloud Build step runs the
+recompute on the committed labels inside the image it just built, byte for byte, before anything is
+pushed (`scripts/ci/worker-recompute-smoke.sh`, which CI's Images job also runs, once more on a
+changed result that must fail). A merge deploys for exactly the files of `zone-a/`,
+`label-docx-reader/` and `qrd/` the Dockerfile copies (`test/ci/deploy-trigger.test.ts`).
+
+**Memory: an oversized label fails closed, by killing its instance.** The gate caps what it reads
+(32 MiB of .docx) and what the recompute writes (32 MiB), and the reader caps what a package may
+unpack to (`MAX_PACKAGE_BYTES`, 256 MiB, 20 MiB a part), but not what the Python process holds while
+it reads: its memory counts against the worker container's (1 GiB, four requests at once,
+`infra/run.tf`). A label large enough to exceed it gets the instance killed for memory by Cloud
+Run: the run fails with no answer and nothing is persisted (a certified Word run persists nothing
+yet in any case), and every other request in flight on that instance fails with it, as a crash
+does. Nothing is accepted that should not be; the cost is availability. Not measured: the first
+deploy should record the recompute's peak memory on the largest label at hand (the US prescribing
+information of 9,795 paragraphs) and, if it is near the limit, run one recompute at a time or give
+the worker more memory.
 
 Still to build:
 
@@ -328,6 +356,7 @@ bucket, before the label gateway.
    job runs the gate on the recompute's committed results (no Python there), the Zone A job runs
    the same tests with its own Python through the gate's runner and requires it to make each
    committed result again byte for byte, and the Images job runs the gate's runner inside the
-   worker image on the committed labels, byte for byte.
+   worker image on the committed labels, byte for byte, as Cloud Build does in the image it is
+   about to push (after the review of #196: "The worker's Python, where it is built and proven").
 4. Next: the drawing records (D3); the leaflet through Zone B; and P5's form, which supplies what
    the request says a person confirmed, and the registry that binds the document id.

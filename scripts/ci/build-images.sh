@@ -53,31 +53,24 @@ docker run --rm --network none ema-flow/worker:ci node --input-type=module -e '
   console.log(`worker image: ${packages.length} pinned packages in its two locks`);
 '
 
-# The certified Word recompute in the worker's image (docs/design/certified-word-import.md, D2): the
-# gate's own runner, with the image's Python, its files and no network, makes again what
-# `python -m zone_a.recompute` wrote for each committed synthetic label, byte for byte.
-docker run --rm --network none \
-  --volume "$ROOT/test/fixtures/certified-word/recompute:/fixtures:ro" \
-  ema-flow/worker:ci node --input-type=module -e '
-  const { readFileSync } = await import("node:fs");
-  const { pythonRecompute } = await import("/app/dist/certified-word/recompute.js");
-  const run = pythonRecompute({ python: process.env.RECOMPUTE_PYTHON, root: process.env.ZONE_A_ROOT });
-  const cases = JSON.parse(readFileSync("/fixtures/cases.json", "utf8"));
-  for (const { name, request } of cases) {
-    const outcome = await run(readFileSync(`/fixtures/${name}.docx`), request);
-    const committed = readFileSync(`/fixtures/${name}.json`);
-    const same =
-      "made" in outcome
-        ? Buffer.compare(Buffer.from(outcome.made), committed) === 0
-        : JSON.parse(committed.toString("utf8")).refusal?.code === outcome.refused;
-    if (!same) {
-      console.error(`${name}: the worker image recomputes otherwise than committed`);
-      process.exit(1);
-    }
-  }
-  if (cases.length === 0) process.exit(1);
-  console.log(`worker image: zone_a.recompute made ${cases.length} committed labels again, byte for byte`);
-'
+# The certified Word recompute in the worker's image (docs/design/certified-word-import.md, D2), as
+# Cloud Build runs it before pushing: the gate's own runner makes again, byte for byte, what
+# `python -m zone_a.recompute` wrote for each committed synthetic label. Once more on a copy with
+# one byte of one result changed, which must fail, so a smoke that cannot fail is caught here.
+bash scripts/ci/worker-recompute-smoke.sh ema-flow/worker:ci
+changed="$(mktemp -d)"
+cp -R test/fixtures/certified-word/recompute/. "$changed"
+sed -i 's/"changes":0/"changes":1/' "$changed/smpc.json"
+if cmp -s "$changed/smpc.json" test/fixtures/certified-word/recompute/smpc.json; then
+  echo "The smoke's changed copy is not changed." >&2
+  exit 1
+fi
+if bash scripts/ci/worker-recompute-smoke.sh ema-flow/worker:ci "$changed" 2>/dev/null; then
+  echo "The worker image's recompute smoke passed a changed result." >&2
+  exit 1
+fi
+rm -rf "$changed"
+echo "worker image: the recompute smoke fails on a changed result"
 
 if docker run --rm --network none --entrypoint sh ema-flow/validator:ci -c 'command -v curl || command -v wget'; then
   echo "The validator's runtime image still holds a download tool." >&2

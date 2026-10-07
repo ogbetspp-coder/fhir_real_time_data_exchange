@@ -255,6 +255,17 @@ describe("the upload (D4)", () => {
         undefined,
       ]);
     }
+    // Each an absolute path: the subprocess has no PATH, and its working directory is the root.
+    for (const relative of [
+      { RECOMPUTE_PYTHON: "python3" },
+      { RECOMPUTE_PYTHON: "zone-a/.venv/bin/python" },
+      { ZONE_A_ROOT: "." },
+      { ZONE_A_ROOT: "" },
+    ]) {
+      expect(() => loadConfig(relative), JSON.stringify(relative)).toThrow(
+        "must be an absolute path",
+      );
+    }
     const loaded = loadConfig({ RECOMPUTE_PYTHON: "/opt/zone-a/bin/python", ZONE_A_ROOT: "/app" });
     expect([loaded.RECOMPUTE_PYTHON, loaded.ZONE_A_ROOT]).toEqual([
       "/opt/zone-a/bin/python",
@@ -381,7 +392,9 @@ describe(`the gate, recomputing (${PYTHON === undefined ? "the committed results
     async (name) => {
       const input = uploaded(name);
       const passed = await gate(input);
-      expect(passed.submission).toEqual(input.submission);
+      expect(passed.gate.submission).toEqual(input.submission);
+      // The answer says the dry run made the sections again and compared them.
+      expect(passed.check).toBe("recomputed");
     },
   );
 
@@ -390,7 +403,7 @@ describe(`the gate, recomputing (${PYTHON === undefined ? "the committed results
       ...request,
       approval: { ...request.approval, recordRef: "urn:record:synthetic-01" },
     }));
-    expect((await gate(input)).submission).toEqual(input.submission);
+    expect((await gate(input)).gate.submission).toEqual(input.submission);
   });
 
   it("refuses one that is not a dry run, after the recompute, for want of a drawing", async () => {
@@ -525,7 +538,7 @@ describe(`the gate, recomputing (${PYTHON === undefined ? "the committed results
     const forged = uploaded("smpc", undefined, new TextEncoder().encode(changed));
     // The ordinary gate, which cannot recompute, finds nothing wrong with it.
     expect(
-      (await verifyCertifiedWordImport(forged, mapping, OPTIONS, undefined)).submission,
+      (await verifyCertifiedWordImport(forged, mapping, OPTIONS, undefined)).gate.submission,
     ).toEqual(forged.submission);
     expect((await rejection(gate(forged))).issues).toEqual([
       "The submission is not what the importer makes of the recomputed sections",
@@ -610,7 +623,8 @@ describe(`the gate, recomputing (${PYTHON === undefined ? "the committed results
         { ...config, DRY_RUN: dryRun },
         { certifiedWord: sources() },
       );
-    expect((await run(true)).status).toBe("validated");
+    const dry = await run(true);
+    expect([dry.status, dry.certifiedWordCheck]).toEqual(["validated", "recomputed"]);
     expect((await rejection(run(false))).reason).toBe("certified-word-drawing-missing");
   });
 });

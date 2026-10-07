@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
@@ -154,8 +154,20 @@ describe("the worker and query image", () => {
     );
     expect(worker).toContain("unicodedata.unidata_version");
     expect(readFileSync(".dockerignore", "utf8")).toMatch(/^!zone-a\/uv\.lock$/m);
-    // CI pins the same uv.
+    // CI pins the same uv, and every workflow's Python is the image's, patch and all (review of
+    // #196: CI's "3.14" had moved to 3.14.8 while the image ran 3.14.7).
     expect(readFileSync(".github/workflows/ci.yml", "utf8")).toContain('version: "0.12.17"');
+    const image = /^RUN uv python install (\S+)$/m.exec(dockerfile)?.[1];
+    expect(dockerfile).toContain(`--python ${image ?? ""} --project zone-a`);
+    const workflows = readdirSync(".github/workflows").flatMap((file) =>
+      [
+        ...readFileSync(`.github/workflows/${file}`, "utf8").matchAll(
+          /^\s+python-version: "([^"]+)"$/gm,
+        ),
+      ].map(([, version]) => [file, version]),
+    );
+    expect(workflows.length).toBeGreaterThanOrEqual(5);
+    for (const [file, version] of workflows) expect([file, version]).toEqual([file, image]);
   });
 
   it("leaves the renderer's code out of the build", () => {
@@ -221,6 +233,22 @@ describe("the Cloud Build configuration", () => {
       expect([file, buildkitOnly(readFileSync(file, "utf8"))]).toEqual([file, []]);
     expect(readFileSync("scripts/ci/build-images.sh", "utf8")).toMatch(
       /^export DOCKER_BUILDKIT=0$/m,
+    );
+  });
+
+  // docs/design/certified-word-import.md, D2: the deploy rebuilds the worker in Cloud Build, so the
+  // image that is pushed is proven there, by the script CI's Images job runs (review of #196).
+  it("runs the recompute smoke on the worker it built, before anything is pushed", () => {
+    const smoke = cloudbuildSteps().find(({ id }) => id === "worker-recompute-smoke");
+    expect(smoke?.args).toEqual([
+      "scripts/ci/worker-recompute-smoke.sh",
+      "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/worker:${_IMAGE_TAG}",
+    ]);
+    expect(cloudbuild).toMatch(
+      /- id: worker-recompute-smoke\n(?: {4}.*\n)*? {4}waitFor: \["build-app-image"\]\n {4}entrypoint: bash\n/,
+    );
+    expect(readFileSync("scripts/ci/build-images.sh", "utf8")).toMatch(
+      /^bash scripts\/ci\/worker-recompute-smoke\.sh ema-flow\/worker:ci$/m,
     );
   });
 

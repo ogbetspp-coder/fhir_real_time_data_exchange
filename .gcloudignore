@@ -1,8 +1,14 @@
 # What `gcloud builds submit` (scripts/gcp/deploy.sh, phase_images) leaves out of the source it
 # uploads to Cloud Build. Without this file gcloud ignores .git, .gitignore and what .gitignore
-# names; those three lines keep that, and the label reader, which no image builds from, is added.
+# names; the first three lines keep that. The worker image builds the label reader from its
+# pyproject.toml and src/ (Dockerfile, the python stage; zone-a/uv.lock names it by path), so only
+# the label reader's corpus, tests, scripts and documents are left out.
+# test/ci/gcloudignore.test.ts holds every path an image or a build step reads to surviving this.
 .gcloudignore
 .git
 .gitignore
 #!include:.gitignore
-label-docx-reader/
+label-docx-reader/corpus/
+label-docx-reader/docs/
+label-docx-reader/scripts/
+label-docx-reader/tests/
