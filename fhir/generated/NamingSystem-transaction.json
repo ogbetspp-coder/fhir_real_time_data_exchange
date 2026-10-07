@@ -2,7 +2,7 @@
   "resourceType": "NamingSystem",
   "id": "transaction",
   "url": "https://khs.dev/fhir/NamingSystem/transaction",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "name": "Transaction",
   "title": "Persist transaction",
   "status": "active",

@@ -3,11 +3,43 @@ import path from "node:path";
 
 import { z } from "zod";
 
-// The manifest's name: the basename of the default manifest file and, with the manifest's
+// The SmPC manifest's name: the basename of the default manifest file and, with the manifest's
 // version, the mapping lineage records. The manifest itself names only its version. The
 // generated ConceptMap and StructureMap spell the same name in their own literals
 // (scripts/fhir/generate-artifacts.ts).
 export const EMA_MAPPING_ID = "cap-smpc-en";
+
+// The canonical record's document type (Composition.type), a code system of our own package.
+export const DOCUMENT_TYPE_SYSTEM = "https://khs.dev/fhir/CodeSystem/document-type";
+// The EMA's document type code system, as the pinned EUePI package defines it, and the SPOR form
+// of its URL an authority's published ePI writes.
+export const EMA_DOCUMENT_TYPE_SYSTEM = "http://ema.europa.eu/fhir/CodeSystem/100000155531";
+const EMA_DOCUMENT_TYPE_ALIAS = "https://spor.ema.europa.eu/v1/lists/100000155531/terms/";
+
+// Each document a manifest maps, by the manifest's root key: the manifest's name, and the code and
+// display the EMA's document type code system gives the document (CodeSystem 100000155531 of the
+// pinned EUePI package, which EUEpiCompositionSmPC and EUEpiCompositionPackageLeaflet fix;
+// test/official/profile-slots.test.ts reads all three there). Our own document type code system
+// takes the root key as its code and the same display.
+export const DOCUMENTS = {
+  smpc: {
+    mappingId: EMA_MAPPING_ID,
+    emaCode: "100000155532",
+    display: "Summary of Product Characteristics",
+  },
+  pl: { mappingId: "cap-pl-en", emaCode: "100000155538", display: "Package Leaflet" },
+} as const;
+export type DocumentKey = keyof typeof DOCUMENTS;
+
+function isDocumentKey(key: unknown): key is DocumentKey {
+  return typeof key === "string" && Object.hasOwn(DOCUMENTS, key);
+}
+
+// The document a manifest maps, by its root key; undefined for a manifest of another.
+export function documentOf(mapping: EmaMapping): (typeof DOCUMENTS)[DocumentKey] | undefined {
+  const key = mapping.root.sourceKey;
+  return isDocumentKey(key) ? DOCUMENTS[key] : undefined;
+}
 
 const SectionRuleSchema: z.ZodType<SectionRule> = z.lazy(() =>
   z.object({
@@ -116,7 +148,13 @@ export function duplicateRuleIssues(
 // The mapping as lineage names it: the manifest's id and the version the loaded manifest
 // declares, which is the same `mappingVersion` the run manifest records.
 export function mappingReference(mapping: EmaMapping): string {
-  return `${EMA_MAPPING_ID}#${mapping.mappingVersion}`;
+  return `${mappingId(mapping)}#${mapping.mappingVersion}`;
+}
+
+// The manifest's name, by the document it maps (the SmPC's for a manifest of no known document,
+// as before there was a second).
+export function mappingId(mapping: EmaMapping): string {
+  return documentOf(mapping)?.mappingId ?? EMA_MAPPING_ID;
 }
 
 export async function loadEmaMapping(
@@ -129,4 +167,47 @@ export async function loadEmaMapping(
     throw new Error(`Mapping manifest ${mappingPath} is invalid: ${duplicates.join("; ")}`);
   }
   return mapping;
+}
+
+// Every manifest Zone B carries, one per document: the SmPC's and the package leaflet's.
+export async function loadEmaMappings(): Promise<EmaMapping[]> {
+  return Promise.all(
+    Object.values(DOCUMENTS).map(({ mappingId: id }) =>
+      loadEmaMapping(path.resolve(`fhir/mappings/${id}.json`)),
+    ),
+  );
+}
+
+// The documents a source's Composition.type names: our own code (smpc, pl), or the EMA's, in
+// either form of its URL (an authority import keeps the EMA's). A source read from a store or a
+// submission is not checked against the type, so nothing here is assumed of its shape.
+export function sourceDocumentTypes(bundle: unknown): Set<string> {
+  const entry = (bundle as { entry?: unknown } | null | undefined)?.entry;
+  const first = Array.isArray(entry) ? (entry[0] as { resource?: unknown } | undefined) : undefined;
+  const type = (first?.resource as { type?: { coding?: unknown } } | undefined)?.type;
+  const codings = Array.isArray(type?.coding) ? (type.coding as unknown[]) : [];
+  const named = new Set<string>();
+  for (const coding of codings) {
+    const { system, code } = (coding ?? {}) as { system?: unknown; code?: unknown };
+    if (system === DOCUMENT_TYPE_SYSTEM) {
+      named.add(typeof code === "string" ? code : "");
+    } else if (system === EMA_DOCUMENT_TYPE_SYSTEM || system === EMA_DOCUMENT_TYPE_ALIAS) {
+      const found = Object.entries(DOCUMENTS).find(([, { emaCode }]) => emaCode === code);
+      named.add(found?.[0] ?? "");
+    }
+  }
+  return named;
+}
+
+// The manifest for a source: the one of `mappings` whose document the source's Composition.type
+// names, and no other. A source that names none, or two, or one no manifest maps, has none: it is
+// refused, never mapped by a guess.
+export function mappingFor(
+  bundle: unknown,
+  mappings: readonly EmaMapping[],
+): EmaMapping | undefined {
+  const [only, ...others] = sourceDocumentTypes(bundle);
+  if (only === undefined || others.length > 0) return undefined;
+  const found = mappings.filter((mapping) => mapping.root.sourceKey === only);
+  return found.length === 1 ? found[0] : undefined;
 }

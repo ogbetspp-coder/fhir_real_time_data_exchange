@@ -1,5 +1,14 @@
-import type { EmaMapping, SectionRule } from "../fhir/mapping.js";
-import { GLOBAL_EPI_PROFILE_BASE } from "../fhir/standards.js";
+import {
+  DOCUMENT_TYPE_SYSTEM,
+  documentOf,
+  type EmaMapping,
+  type SectionRule,
+} from "../fhir/mapping.js";
+import {
+  EU_AUTHORISATION_NUMBER_SYSTEM,
+  EU_PRODUCT_NUMBER_SYSTEM,
+  GLOBAL_EPI_PROFILE_BASE,
+} from "../fhir/standards.js";
 import type {
   CompositionSection,
   FhirBundle,
@@ -88,6 +97,14 @@ export function createSyntheticType2Bundle(
   const productUrl = `https://khs.dev/fhir/MedicinalProductDefinition/${product.id}`;
   const organizationUrl = `https://khs.dev/fhir/Organization/${product.organizationId}`;
   const itemUrl = `https://khs.dev/fhir/ManufacturedItemDefinition/${product.itemId}`;
+  const document = documentOf(mapping);
+  if (document === undefined) throw new Error("The mapping maps no document the fixtures build");
+  // The EU numbers the product states, if any: the authorisation's, and its product number.
+  const eu = product.euAuthorisationNumber;
+  const euAuthorisation =
+    eu === undefined ? [] : [{ system: EU_AUTHORISATION_NUMBER_SYSTEM, value: eu }];
+  const euProduct =
+    eu === undefined ? [] : [{ system: EU_PRODUCT_NUMBER_SYSTEM, value: eu.slice(0, -4) }];
 
   const composition: FhirComposition = {
     resourceType: "Composition",
@@ -104,9 +121,9 @@ export function createSyntheticType2Bundle(
     type: {
       coding: [
         {
-          system: "https://khs.dev/fhir/CodeSystem/document-type",
-          code: "smpc",
-          display: "Summary of Product Characteristics",
+          system: DOCUMENT_TYPE_SYSTEM,
+          code: mapping.root.sourceKey,
+          display: document.display,
         },
       ],
     },
@@ -143,7 +160,7 @@ export function createSyntheticType2Bundle(
       resourceType: "MedicinalProductDefinition",
       id: product.id,
       meta: globalEpiProfile("MedicinalProductDefinition"),
-      identifier: syntheticIdentifier("product", product.productIdentifier),
+      identifier: [...syntheticIdentifier("product", product.productIdentifier), ...euProduct],
       type: coded(`${R5}/medicinal-product-type`, "MedicinalProduct", "Medicinal Product"),
       domain: coded(`${R5}/medicinal-product-domain`, "Human", "Human use"),
       status: active(),
@@ -153,7 +170,10 @@ export function createSyntheticType2Bundle(
       resourceType: "RegulatedAuthorization",
       id: product.authorizationId,
       meta: globalEpiProfile("RegulatedAuthorization"),
-      identifier: syntheticIdentifier("authorization", product.marketingAuthorizationNumber),
+      identifier: [
+        ...syntheticIdentifier("authorization", product.marketingAuthorizationNumber),
+        ...euAuthorisation,
+      ],
       subject: [
         {
           reference: productUrl,

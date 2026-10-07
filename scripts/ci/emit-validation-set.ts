@@ -1,11 +1,12 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { loadEmaMapping, type TitleRule } from "../../src/fhir/mapping.js";
+import { loadEmaMappings, type EmaMapping, type TitleRule } from "../../src/fhir/mapping.js";
 import { importPublication } from "../../src/authority/import.js";
 import { importCertifiedWord } from "../../src/certified-word/import.js";
 import {
   RUN as CERTIFIED_WORD_RUN,
+  caseMapping,
   caseRequest,
   recomputed,
   recomputedCases,
@@ -22,7 +23,8 @@ import { toProvenanceResource } from "../../src/fhir/provenance.js";
 import { transformType2ToEma } from "../../src/fhir/transform.js";
 import type { FhirBundle, FhirResource } from "../../src/fhir/types.js";
 import { officialValidationTargets } from "../../src/pipeline.js";
-import { SMOKE_PRODUCT_ID } from "../../src/fixtures/synthetic-products.js";
+import { LEAFLET_PRODUCT_ID, SMOKE_PRODUCT_ID } from "../../src/fixtures/synthetic-products.js";
+import { createSyntheticSubmission } from "../../src/fixtures/synthetic-submission.js";
 import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 
 // Emits the resources the deployed worker sends to the official HL7 validator for a
@@ -46,6 +48,11 @@ import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 // attested submission for the first case, the authority import for the second, each pointing at
 // its case's EMA Bundle and Composition.
 //
+// The package leaflet takes the same two routes (docs/design/pl-structure.md, "Zone B"): the
+// synthetic leaflet product's Type 2 record with every optional section, as its drawn submission
+// carries it, and a certified Word leaflet's Type 1 record, each with its own Provenance, mapped
+// by the leaflet's manifest.
+//
 // A third is the repository's own definitions, fhir/generated/ (the code systems, value sets,
 // extension, ConceptMap and StructureMap the package carries), as committed, against the base R5
 // definitions only: no profile applies to them.
@@ -67,7 +74,14 @@ if (!destinationArg) {
   throw new Error("Usage: tsx scripts/ci/emit-validation-set.ts OUTPUT_DIR");
 }
 
-const mapping = await loadEmaMapping();
+const mappings = await loadEmaMappings();
+const byDocument = (key: string): EmaMapping => {
+  const found = mappings.find(({ root }) => root.sourceKey === key);
+  if (found === undefined) throw new Error(`no ${key} mapping`);
+  return found;
+};
+const mapping = byDocument("smpc");
+const leaflet = byDocument("pl");
 
 type SetEntry = { file: string; resource: FhirResource; profiles: string[] };
 
@@ -95,6 +109,7 @@ function caseOf(
   files: { source: string; suffix: string },
   provenanceOf: ProvenanceOf,
   titles: TitleRule = "template",
+  manifest: EmaMapping = mapping,
 ): SetEntry[] {
   const sourcePreflight = validateCanonicalPreflight(source, graphType);
   if (hasValidationErrors(sourcePreflight)) {
@@ -102,8 +117,8 @@ function caseOf(
       `Canonical ${graphType} preflight failed (${sourcePreflight.issue.length} issues); the worker would refuse this source before official validation`,
     );
   }
-  const target = transformType2ToEma(source, mapping, undefined, titles);
-  const emaPreflight = validateEmaPreflight(target.list, target.documentBundle, mapping, titles);
+  const target = transformType2ToEma(source, manifest, undefined, titles);
+  const emaPreflight = validateEmaPreflight(target.list, target.documentBundle, manifest, titles);
   if (hasValidationErrors(emaPreflight)) {
     throw new Error(
       `EMA structural preflight failed (${emaPreflight.issue.length} issues); the worker would refuse this transform before official validation`,
@@ -115,7 +130,7 @@ function caseOf(
     compositionId: target.documentBundle.entry[0]?.resource.id ?? "",
     ...fetched,
   });
-  return officialValidationTargets(source, target, mapping, provenance).map(
+  return officialValidationTargets(source, target, manifest, provenance).map(
     ({ name, resource, profiles }) => ({
       file: name === "source" ? files.source : `${name}${files.suffix}.json`,
       resource,
@@ -141,14 +156,23 @@ const imported = importPublication(publication.request, publication, mapping, {
 // A certified Word source's Type 1 record (ADR 0006 P4, D1), from the first synthetic label's
 // recompute, with its own Provenance; its titles are carried as written, as the pipeline carries
 // them.
-const [label] = recomputedCases();
-if (label === undefined) throw new Error("no recomputed Word label");
-const word = importCertifiedWord(
-  recomputed(label.name),
-  caseRequest(label),
-  mapping,
-  CERTIFIED_WORD_RUN,
-);
+const wordOf = (name: string) => {
+  const label = recomputedCases().find((found) => found.name === name);
+  if (label === undefined) throw new Error(`no recomputed Word label ${name}`);
+  const made = importCertifiedWord(
+    recomputed(label.name),
+    caseRequest(label),
+    caseMapping(label, mappings),
+    CERTIFIED_WORD_RUN,
+  );
+  return { bundle: made.submission.bundle as unknown as FhirBundle, made };
+};
+const word = wordOf("smpc");
+const wordLeaflet = wordOf("pl");
+const leafletSubmission = createSyntheticSubmission(leaflet, {
+  product: LEAFLET_PRODUCT_ID,
+  optional: true,
+});
 
 const generated = path.resolve("fhir/generated");
 const artifactFiles = (await readdir(generated)).filter((file) => file.endsWith(".json")).sort();
@@ -175,11 +199,27 @@ const set: SetEntry[] = [
     provenanceFixtures.type1,
   ),
   ...caseOf(
-    word.submission.bundle as unknown as FhirBundle,
+    word.bundle,
     "type1",
     { source: "source-certified-word.json", suffix: "-certified-word" },
-    { submission: word.submission, report: word.fidelityReport },
+    { submission: word.made.submission, report: word.made.fidelityReport },
     "as-written",
+  ),
+  ...caseOf(
+    leafletSubmission.submission.bundle as unknown as FhirBundle,
+    "type2",
+    { source: "source-leaflet.json", suffix: "-leaflet" },
+    { submission: leafletSubmission.submission, report: leafletSubmission.fidelityReport },
+    "template",
+    leaflet,
+  ),
+  ...caseOf(
+    wordLeaflet.bundle,
+    "type1",
+    { source: "source-certified-word-leaflet.json", suffix: "-certified-word-leaflet" },
+    { submission: wordLeaflet.made.submission, report: wordLeaflet.made.fidelityReport },
+    "as-written",
+    leaflet,
   ),
   ...artifacts,
 ];

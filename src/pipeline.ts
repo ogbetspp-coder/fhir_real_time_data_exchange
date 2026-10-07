@@ -24,8 +24,13 @@ import {
   validateCanonicalPreflight,
 } from "./fhir/preflight.js";
 import { PROVENANCE_PROFILE, toProvenanceResource } from "./fhir/provenance.js";
-import { sourceIdentifierValue, transformType2ToEma, type EmaPackage } from "./fhir/transform.js";
-import { mappingReference, type EmaMapping } from "./fhir/mapping.js";
+import {
+  TransformationError,
+  sourceIdentifierValue,
+  transformType2ToEma,
+  type EmaPackage,
+} from "./fhir/transform.js";
+import { mappingFor, mappingReference, type EmaMapping } from "./fhir/mapping.js";
 import type { FhirBundle, FhirResource, OperationOutcome } from "./fhir/types.js";
 import {
   EMA_EPI_PACKAGE_ID,
@@ -336,12 +341,32 @@ export function manifestRuntime(config: AppConfig): ManifestRuntime {
   };
 }
 
+// The manifest a source is mapped by: the one given, or of several, the one its document type
+// names (mappingFor), else none.
+function mappingOf(mappings: readonly EmaMapping[], bundle: unknown): EmaMapping | undefined {
+  return mappings.length === 1 ? mappings[0] : mappingFor(bundle, mappings);
+}
+
 export async function runPipeline(
   input: PipelineInput,
-  mapping: EmaMapping,
+  // One manifest, the caller's choice; or every manifest Zone B carries (the SmPC's and the
+  // package leaflet's), of which the source's document type picks one. Either way the crosswalk
+  // refuses a source that says it is another document than its manifest maps.
+  mappings: EmaMapping | readonly EmaMapping[],
   config: AppConfig,
   dependencies: PipelineDependencies = {},
 ): Promise<PipelineResult> {
+  const candidates: readonly EmaMapping[] = "root" in mappings ? [mappings] : mappings;
+  const [fallback] = candidates;
+  if (fallback === undefined) throw new Error("No mapping manifest is loaded");
+  // The gate's manifest, from the record the submission says it carries, before the gate has
+  // proved anything of it; where that names none, the first, so the gate refuses the submission
+  // on its own grounds. Either way it is chosen again below from the record the gate passed.
+  const claimed =
+    input.sourceKind === "document"
+      ? (input.submission as { bundle?: unknown } | null | undefined)?.bundle
+      : input.source;
+  const mapping = mappingOf(candidates, claimed) ?? fallback;
   if (input.runId !== undefined && !Uuid.safeParse(input.runId).success) {
     throw new Error("runId must be a UUID");
   }
@@ -381,6 +406,11 @@ export async function runPipeline(
     source = gate.bundle;
   } else {
     source = input.source;
+  }
+  if (mappingOf(candidates, source) !== mapping) {
+    throw new TransformationError("No mapping carries the source's document", [
+      "Composition.type names no document a loaded mapping maps, or more than one",
+    ]);
   }
 
   const sourcePreflight = validateCanonicalPreflight(source, gate?.submission.graphType ?? "type2");

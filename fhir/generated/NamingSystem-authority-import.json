@@ -2,7 +2,7 @@
   "resourceType": "NamingSystem",
   "id": "authority-import",
   "url": "https://khs.dev/fhir/NamingSystem/authority-import",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "name": "AuthorityImport",
   "title": "Authority import record",
   "status": "active",

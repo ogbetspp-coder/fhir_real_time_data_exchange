@@ -2,7 +2,7 @@
   "resourceType": "NamingSystem",
   "id": "package",
   "url": "https://khs.dev/fhir/NamingSystem/package",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "name": "Package",
   "title": "Synthetic package",
   "status": "active",

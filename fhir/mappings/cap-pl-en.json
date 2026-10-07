@@ -1,5 +1,5 @@
 {
-  "mappingVersion": "1.0.0",
+  "mappingVersion": "1.1.0",
   "sourceCodeSystem": "https://khs.dev/fhir/CodeSystem/canonical-pl-sections",
   "targetCodeSystem": "http://ema.europa.eu/fhir/CodeSystem/200000029659",
   "targetCodeSystemAliases": ["https://spor.ema.europa.eu/v1/lists/200000029659/terms/"],
@@ -29,12 +29,14 @@
         "sourceKey": "pl.2",
         "targetCode": "200000029896",
         "title": "2. What you need to know before you take use X",
+        "display": "2. What you need to know before you [take] [use] X",
         "required": true,
         "children": [
           {
-            "sourceKey": "pl.2.do-not-take",
+            "sourceKey": "pl.2.donottake",
             "targetCode": "200000029897",
             "title": "Do not take use X",
+            "display": "Do not [take] [use] X",
             "required": true
           },
           {
@@ -47,6 +49,7 @@
             "sourceKey": "pl.2.children",
             "targetCode": "200000029899",
             "title": "Children and adolescents",
+            "display": "Children [and adolescents]",
             "required": false
           },
           {
@@ -59,12 +62,14 @@
             "sourceKey": "pl.2.food",
             "targetCode": "200000029901",
             "title": "X with food and , drink and alcohol",
+            "display": "X with [food] [and] [,] [drink] [and] [alcohol]",
             "required": false
           },
           {
             "sourceKey": "pl.2.pregnancy",
             "targetCode": "200000029902",
             "title": "Pregnancy and , breast-feeding and fertility",
+            "display": "Pregnancy [and] [,] breast-feeding [and fertility]",
             "required": true
           },
           {
@@ -85,30 +90,35 @@
         "sourceKey": "pl.3",
         "targetCode": "200000029905",
         "title": "3. How to take use X",
+        "display": "3. How to [take] [use] X",
         "required": true,
         "children": [
           {
             "sourceKey": "pl.3.children",
             "targetCode": "200000029906",
             "title": "Use in children and adolescents",
+            "display": "Use in children [and adolescents]",
             "required": false
           },
           {
-            "sourceKey": "pl.3.too-much",
+            "sourceKey": "pl.3.toomuch",
             "targetCode": "200000029907",
             "title": "If you take use more X than you should",
+            "display": "If you [take] [use] more X than you should",
             "required": false
           },
           {
             "sourceKey": "pl.3.forgotten",
             "targetCode": "200000029908",
             "title": "If you forget to take use X",
+            "display": "If you forget to [take] [use] X",
             "required": false
           },
           {
             "sourceKey": "pl.3.stopping",
             "targetCode": "200000029909",
             "title": "If you stop taking using X",
+            "display": "If you stop [taking] [using] X",
             "required": false
           }
         ]
@@ -123,6 +133,7 @@
             "sourceKey": "pl.4.children",
             "targetCode": "200000029911",
             "title": "Additional side effects in children and adolescents",
+            "display": "Additional side effects in children [and adolescents]",
             "required": false
           },
           {
@@ -167,10 +178,11 @@
             "sourceKey": "pl.6.revised",
             "targetCode": "200000029919",
             "title": "This leaflet was last revised in {MM/YYYY}{month YYYY}.",
+            "display": "This leaflet was last revised in [{MM/YYYY}][{month YYYY}].",
             "required": true
           },
           {
-            "sourceKey": "pl.6.other-sources",
+            "sourceKey": "pl.6.othersources",
             "targetCode": "200000029920",
             "title": "Other sources of information",
             "required": false

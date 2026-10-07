@@ -1,0 +1,323 @@
+{
+  "resourceType": "ConceptMap",
+  "id": "canonical-to-ema-cap-pl-en",
+  "url": "https://khs.dev/fhir/ConceptMap/canonical-to-ema-cap-pl-en",
+  "version": "1.1.0",
+  "name": "CanonicalToEmaCapPlEnglish",
+  "title": "Canonical package leaflet sections to EMA CAP package leaflet English QRD sections",
+  "status": "active",
+  "experimental": true,
+  "description": "Deterministic terminology map. It maps section identifiers only and does not generate or alter regulated narrative. Every section slot of the EMA profile EUQRD-CAP-template-new-Package-Leaflet-en has a key here: each of the template's own sections maps equivalent to its EMA code, and a slot the crosswalk does not carry is noMap, its reason in the source code system's definition of the key.",
+  "sourceScopeCanonical": "https://khs.dev/fhir/ValueSet/canonical-pl-sections",
+  "targetScopeCanonical": "http://ema.europa.eu/fhir/ValueSet/EUepiplqrdcodesVs",
+  "group": [
+    {
+      "source": "https://khs.dev/fhir/CodeSystem/canonical-pl-sections",
+      "target": "http://ema.europa.eu/fhir/CodeSystem/200000029659",
+      "element": [
+        {
+          "code": "pl",
+          "display": "PACKAGE LEAFLET",
+          "target": [
+            {
+              "code": "200000029894",
+              "display": "PACKAGE LEAFLET",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.1",
+          "display": "1. What X is and what it is used for",
+          "target": [
+            {
+              "code": "200000029895",
+              "display": "1. What X is and what it is used for",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.2",
+          "display": "2. What you need to know before you take use X",
+          "target": [
+            {
+              "code": "200000029896",
+              "display": "2. What you need to know before you [take] [use] X",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.2.donottake",
+          "display": "Do not take use X",
+          "target": [
+            {
+              "code": "200000029897",
+              "display": "Do not [take] [use] X",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.2.warnings",
+          "display": "Warnings and precautions",
+          "target": [
+            {
+              "code": "200000029898",
+              "display": "Warnings and precautions",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.2.children",
+          "display": "Children and adolescents",
+          "target": [
+            {
+              "code": "200000029899",
+              "display": "Children [and adolescents]",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.2.medicines",
+          "display": "Other medicines and X",
+          "target": [
+            {
+              "code": "200000029900",
+              "display": "Other medicines and X",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.2.food",
+          "display": "X with food and , drink and alcohol",
+          "target": [
+            {
+              "code": "200000029901",
+              "display": "X with [food] [and] [,] [drink] [and] [alcohol]",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.2.pregnancy",
+          "display": "Pregnancy and , breast-feeding and fertility",
+          "target": [
+            {
+              "code": "200000029902",
+              "display": "Pregnancy [and] [,] breast-feeding [and fertility]",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.2.driving",
+          "display": "Driving and using machines",
+          "target": [
+            {
+              "code": "200000029903",
+              "display": "Driving and using machines",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.2.excipients",
+          "display": "X contains {name the excipient(s)}",
+          "target": [
+            {
+              "code": "200000029904",
+              "display": "X contains {name the excipient(s)}",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.3",
+          "display": "3. How to take use X",
+          "target": [
+            {
+              "code": "200000029905",
+              "display": "3. How to [take] [use] X",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.3.children",
+          "display": "Use in children and adolescents",
+          "target": [
+            {
+              "code": "200000029906",
+              "display": "Use in children [and adolescents]",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.3.toomuch",
+          "display": "If you take use more X than you should",
+          "target": [
+            {
+              "code": "200000029907",
+              "display": "If you [take] [use] more X than you should",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.3.forgotten",
+          "display": "If you forget to take use X",
+          "target": [
+            {
+              "code": "200000029908",
+              "display": "If you forget to [take] [use] X",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.3.stopping",
+          "display": "If you stop taking using X",
+          "target": [
+            {
+              "code": "200000029909",
+              "display": "If you stop [taking] [using] X",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.4",
+          "display": "4. Possible side effects",
+          "target": [
+            {
+              "code": "200000029910",
+              "display": "4. Possible side effects",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.4.children",
+          "display": "Additional side effects in children and adolescents",
+          "target": [
+            {
+              "code": "200000029911",
+              "display": "Additional side effects in children [and adolescents]",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.4.reporting",
+          "display": "Reporting of side effects",
+          "target": [
+            {
+              "code": "200000029912",
+              "display": "Reporting of side effects",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.5",
+          "display": "5. How to store X",
+          "target": [
+            {
+              "code": "200000029913",
+              "display": "5. How to store X",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.6",
+          "display": "6. Contents of the pack and other information",
+          "target": [
+            {
+              "code": "200000029914",
+              "display": "6. Contents of the pack and other information",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.6.contents",
+          "display": "What X contains",
+          "target": [
+            {
+              "code": "200000029915",
+              "display": "What X contains",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.6.appearance",
+          "display": "What X looks like and contents of the pack",
+          "target": [
+            {
+              "code": "200000029916",
+              "display": "What X looks like and contents of the pack",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.6.holder",
+          "display": "Marketing Authorisation Holder and Manufacturer",
+          "target": [
+            {
+              "code": "200000029917",
+              "display": "Marketing Authorisation Holder and Manufacturer",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.6.revised",
+          "display": "This leaflet was last revised in {MM/YYYY}{month YYYY}.",
+          "target": [
+            {
+              "code": "200000029919",
+              "display": "This leaflet was last revised in [{MM/YYYY}][{month YYYY}].",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.6.othersources",
+          "display": "Other sources of information",
+          "target": [
+            {
+              "code": "200000029920",
+              "display": "Other sources of information",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.6.professionals",
+          "display": "The following information is intended for healthcare professionals only:",
+          "target": [
+            {
+              "code": "200000029921",
+              "display": "The following information is intended for healthcare professionals only:",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pl.custom.h3",
+          "display": "Custom subsection (level H3)",
+          "noMap": true
+        }
+      ]
+    }
+  ]
+}

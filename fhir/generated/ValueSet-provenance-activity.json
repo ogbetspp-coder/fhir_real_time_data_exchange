@@ -2,7 +2,7 @@
   "resourceType": "ValueSet",
   "id": "provenance-activity",
   "url": "https://khs.dev/fhir/ValueSet/provenance-activity",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "status": "active",
   "experimental": true,
   "name": "ProvenanceActivityAll",
@@ -12,7 +12,7 @@
     "include": [
       {
         "system": "https://khs.dev/fhir/CodeSystem/provenance-activity",
-        "version": "0.5.0"
+        "version": "0.6.0"
       }
     ]
   }

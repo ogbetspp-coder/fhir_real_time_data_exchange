@@ -1,0 +1,140 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "canonical-pl-sections",
+  "url": "https://khs.dev/fhir/CodeSystem/canonical-pl-sections",
+  "version": "1.1.0",
+  "status": "active",
+  "experimental": true,
+  "name": "CanonicalPlSections",
+  "title": "Canonical package leaflet sections",
+  "description": "The canonical package leaflet section keys of the mapping manifest (fhir/mappings/cap-pl-en.json), each with its QRD heading, nested as the sections are, and the keys of the EMA profile's slots the crosswalk does not carry (the manifest's unmapped list, each with its reason). A key identifies a section of the canonical record; it is not a clinical concept.",
+  "caseSensitive": true,
+  "valueSet": "https://khs.dev/fhir/ValueSet/canonical-pl-sections",
+  "hierarchyMeaning": "part-of",
+  "content": "complete",
+  "concept": [
+    {
+      "code": "pl",
+      "display": "PACKAGE LEAFLET",
+      "concept": [
+        {
+          "code": "pl.1",
+          "display": "1. What X is and what it is used for"
+        },
+        {
+          "code": "pl.2",
+          "display": "2. What you need to know before you take use X",
+          "concept": [
+            {
+              "code": "pl.2.donottake",
+              "display": "Do not take use X"
+            },
+            {
+              "code": "pl.2.warnings",
+              "display": "Warnings and precautions"
+            },
+            {
+              "code": "pl.2.children",
+              "display": "Children and adolescents"
+            },
+            {
+              "code": "pl.2.medicines",
+              "display": "Other medicines and X"
+            },
+            {
+              "code": "pl.2.food",
+              "display": "X with food and , drink and alcohol"
+            },
+            {
+              "code": "pl.2.pregnancy",
+              "display": "Pregnancy and , breast-feeding and fertility"
+            },
+            {
+              "code": "pl.2.driving",
+              "display": "Driving and using machines"
+            },
+            {
+              "code": "pl.2.excipients",
+              "display": "X contains {name the excipient(s)}"
+            }
+          ]
+        },
+        {
+          "code": "pl.3",
+          "display": "3. How to take use X",
+          "concept": [
+            {
+              "code": "pl.3.children",
+              "display": "Use in children and adolescents"
+            },
+            {
+              "code": "pl.3.toomuch",
+              "display": "If you take use more X than you should"
+            },
+            {
+              "code": "pl.3.forgotten",
+              "display": "If you forget to take use X"
+            },
+            {
+              "code": "pl.3.stopping",
+              "display": "If you stop taking using X"
+            }
+          ]
+        },
+        {
+          "code": "pl.4",
+          "display": "4. Possible side effects",
+          "concept": [
+            {
+              "code": "pl.4.children",
+              "display": "Additional side effects in children and adolescents"
+            },
+            {
+              "code": "pl.4.reporting",
+              "display": "Reporting of side effects"
+            }
+          ]
+        },
+        {
+          "code": "pl.5",
+          "display": "5. How to store X"
+        },
+        {
+          "code": "pl.6",
+          "display": "6. Contents of the pack and other information",
+          "concept": [
+            {
+              "code": "pl.6.contents",
+              "display": "What X contains"
+            },
+            {
+              "code": "pl.6.appearance",
+              "display": "What X looks like and contents of the pack"
+            },
+            {
+              "code": "pl.6.holder",
+              "display": "Marketing Authorisation Holder and Manufacturer"
+            },
+            {
+              "code": "pl.6.revised",
+              "display": "This leaflet was last revised in {MM/YYYY}{month YYYY}."
+            },
+            {
+              "code": "pl.6.othersources",
+              "display": "Other sources of information"
+            },
+            {
+              "code": "pl.6.professionals",
+              "display": "The following information is intended for healthcare professionals only:"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "pl.custom.h3",
+      "display": "Custom subsection (level H3)",
+      "definition": "Not carried by the crosswalk (EMA code 200000044346): A custom subsection carries its author's own heading and may occur any number of times under one section (the profile's Blanksubsections slices, 0..*). Zone A carries the template's own sections only, each once and under the label's heading; a custom subsection's text stays in the section it stands in."
+    }
+  ]
+}

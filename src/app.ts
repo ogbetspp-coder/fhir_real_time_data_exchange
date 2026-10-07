@@ -2,7 +2,7 @@ import { Hono } from "hono";
 
 import { loadConfig, type AppConfig } from "./config.js";
 import { RunRequestSchema, SubmissionRejectedError } from "./contracts/index.js";
-import { loadEmaMapping } from "./fhir/mapping.js";
+import { loadEmaMappings, type EmaMapping } from "./fhir/mapping.js";
 import { OfficialValidatorError } from "./fhir/official-validator.js";
 import { TransformationError } from "./fhir/transform.js";
 import type { FhirBundle } from "./fhir/types.js";
@@ -105,6 +105,13 @@ export function pipelineFailure(failure: Error): { reason: string; status: 409 |
   return { reason, status: FAILURE_STATUS[reason] ?? 500 };
 }
 
+// The SmPC's manifest, which the smoke product's fixture is built with.
+function smpcMapping(mappings: readonly EmaMapping[]): EmaMapping {
+  const found = mappings.find((mapping) => mapping.root.sourceKey === "smpc");
+  if (found === undefined) throw new Error("The SmPC mapping is not loaded");
+  return found;
+}
+
 export type AppOverrides = {
   config?: AppConfig;
   submissionReader?: SubmissionReader;
@@ -118,7 +125,8 @@ type AppEnvironment = { Variables: { runId?: string } };
 export function createApp(overrides: AppOverrides = {}): Hono<AppEnvironment> {
   const app = new Hono<AppEnvironment>();
   const config = overrides.config ?? loadConfig();
-  const mappingPromise = loadEmaMapping();
+  // Every manifest Zone B carries; a run's source picks its own by its document type.
+  const mappingsPromise = loadEmaMappings();
   const submissionReader =
     overrides.submissionReader ??
     (config.SUBMISSION_BUCKET === undefined ? undefined : new GcsSubmissionReader(config));
@@ -169,7 +177,7 @@ export function createApp(overrides: AppOverrides = {}): Hono<AppEnvironment> {
     // under the same runId as the pipeline they feed.
     const runId = request.runId ?? crypto.randomUUID();
     context.set("runId", runId);
-    const mapping = await mappingPromise;
+    const mappings = await mappingsPromise;
     let input: PipelineInput;
 
     if (request.source === "fixture") {
@@ -180,7 +188,7 @@ export function createApp(overrides: AppOverrides = {}): Hono<AppEnvironment> {
       input = {
         runId,
         sourceKind: "fixture",
-        source: createSyntheticType2Bundle(mapping, { product: SMOKE_PRODUCT_ID }),
+        source: createSyntheticType2Bundle(smpcMapping(mappings), { product: SMOKE_PRODUCT_ID }),
         sourceResource: `fixture:${SMOKE_PRODUCT_ID}`,
       };
     } else if (request.source === "healthcare-api") {
@@ -205,7 +213,7 @@ export function createApp(overrides: AppOverrides = {}): Hono<AppEnvironment> {
 
     const result = await runPipeline(
       input,
-      mapping,
+      mappings,
       config,
       overrides.approvals === undefined ? {} : { approvals: overrides.approvals },
     );

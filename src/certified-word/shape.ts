@@ -63,15 +63,16 @@ export const CertifiedWordRequestSchema = z.strictObject({
   // The ePI this label's part is a version of: our id, confirmed once, never derived from the
   // label's position in a file.
   documentId: OurId,
-  // The canonical product: our ids, the name and holder exactly as chosen from sections 1 and 7,
-  // and every EU authorisation number section 8 states, in `zone_a.product`'s strict form.
+  // The canonical product: our ids, the name and holder exactly as chosen from the label (an
+  // SmPC's sections 1 and 7, a leaflet's section 1 heading and section 6), and every EU
+  // authorisation number an SmPC's section 8 states, in `zone_a.product`'s strict form; a leaflet
+  // states none, and the importer refuses an SmPC with none.
   product: z.strictObject({
     id: OurId,
     name: LabelText,
     holder: z.strictObject({ id: OurId, name: LabelText }),
     euAuthorisationNumbers: z
       .array(z.string().regex(new RegExp(EU_AUTHORISATION_NUMBER_PATTERN)))
-      .min(1)
       .max(200),
   }),
   // The approval placeholder, as a drawn source's: an attestation by an opaque principal.
@@ -88,8 +89,8 @@ export type CertifiedWordRequest = z.infer<typeof CertifiedWordRequestSchema>;
 
 // One section as `zone_a.word_epi` writes it: its title is its heading line; its narrative is
 // null and its page empty where it draws nothing. A result holds no refused section: the recompute
-// refuses the whole instead. Its key is the registry's (a leaflet's may hold a hyphen); the
-// mapping's tree decides which the importer carries.
+// refuses the whole instead. Its key is the registry's; the mapping's tree decides which the
+// importer carries.
 const SectionKey = z.string().regex(/^[a-z0-9]+(?:[.-][a-z0-9]+)*$/);
 const SectionSchema = z.strictObject({
   key: SectionKey,

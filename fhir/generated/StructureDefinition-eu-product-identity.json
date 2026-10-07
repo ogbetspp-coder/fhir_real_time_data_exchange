@@ -2,7 +2,7 @@
   "resourceType": "StructureDefinition",
   "id": "eu-product-identity",
   "url": "https://khs.dev/fhir/StructureDefinition/eu-product-identity",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "name": "EuProductIdentity",
   "title": "EU product identity of an ePI document",
   "status": "active",

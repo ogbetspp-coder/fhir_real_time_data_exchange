@@ -1,0 +1,19 @@
+{
+  "resourceType": "ValueSet",
+  "id": "canonical-pl-sections",
+  "url": "https://khs.dev/fhir/ValueSet/canonical-pl-sections",
+  "version": "1.1.0",
+  "status": "active",
+  "experimental": true,
+  "name": "CanonicalPlSectionsAll",
+  "title": "Canonical package leaflet sections: all codes",
+  "description": "Every code of https://khs.dev/fhir/CodeSystem/canonical-pl-sections.",
+  "compose": {
+    "include": [
+      {
+        "system": "https://khs.dev/fhir/CodeSystem/canonical-pl-sections",
+        "version": "1.1.0"
+      }
+    ]
+  }
+}

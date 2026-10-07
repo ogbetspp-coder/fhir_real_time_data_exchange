@@ -145,7 +145,7 @@ def test_the_leaflet_build_refuses_a_mapping_title_the_template_does_not_have() 
     template = load_source(QRD / "sources", "qrd-product-information-template-version-104_en.docx")
     mapping = json.loads(json.dumps(LEAFLET_MAPPING))
     mapping["root"]["children"][1]["children"][0]["title"] = "Do not take X"
-    with pytest.raises(RegistryError, match=r"pl\.2\.do-not-take: 0 template paragraphs"):
+    with pytest.raises(RegistryError, match=r"pl\.2\.donottake: 0 template paragraphs"):
         build_pl(template, mapping)
 
 

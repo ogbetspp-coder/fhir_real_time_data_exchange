@@ -2,7 +2,7 @@
   "resourceType": "NamingSystem",
   "id": "administrable-product",
   "url": "https://khs.dev/fhir/NamingSystem/administrable-product",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "name": "AdministrableProduct",
   "title": "Synthetic administrable product",
   "status": "active",

@@ -131,7 +131,7 @@
   },
   {
     "name": "pl",
-    "about": "a package leaflet: Zone B does not carry one yet",
+    "about": "a package leaflet the importer carries",
     "request": {
       "document": "pl",
       "view": null,
@@ -143,7 +143,7 @@
         "format": "label-docx-json/1.18.1",
         "structurer": "pl-structure/1.0.0",
         "registryVersion": "1.3.0",
-        "mappingVersion": "1.0.0",
+        "mappingVersion": "1.1.0",
         "builder": "word-epi/1.3.2"
       }
     },
@@ -155,10 +155,7 @@
         "id": "00000000-5979-4e74-8000-0000000000c3",
         "name": "Synthetic Holder B.V."
       },
-      "euAuthorisationNumbers": [
-        "EU/1/24/9999/001",
-        "EU/1/24/9999/002"
-      ]
+      "euAuthorisationNumbers": []
     }
   }
 ]

@@ -154,13 +154,18 @@ def _jump(key: str, blocks: list[str]) -> list[str]:
 
 
 def _leaflet() -> list[str]:
-    """A leaflet with every required section's heading in the template's words."""
+    """A leaflet with every required section's heading in the template's words.
+
+    The product's name stands for X in every heading; section 6's holder section names the
+    holder on its first line. A leaflet states no EU number.
+    """
     registry, mapping = recompute._load("pl", ROOT)
+    text = {"pl.6.holder": [_p(PRODUCT["holder"]["name"]), _p("1 Example Street"), _p(MARKED)]}
     out = [_p("B. PACKAGE LEAFLET"), _p("Package leaflet: Information for the patient"), _p(MARKED)]
     for node in leaflet._nodes(registry, mapping)[1:]:
         lines, prefix = leaflet.forms(node["head"])
         heading = prefix if prefix is not None else sorted(lines, key=len)[-1]
-        out += [_p(heading.replace("X", "Exampline")), _p(MARKED)]
+        out += [_p(heading.replace("X", PRODUCT["name"])), *text.get(node["key"], [_p(MARKED)])]
     return out
 
 
@@ -189,12 +194,7 @@ def _cases() -> list[tuple[str, str, list[str], dict[str, Any]]]:
             plain | {"assignments": {"smpc.4.1": _index(assigned, "4.1 Indications")}},
         ),
         ("smpc-refused", "an SmPC the recompute refuses: a tab in 4.2", _smpc(_jump), plain),
-        (
-            "pl",
-            "a package leaflet: Zone B does not carry one yet",
-            _leaflet(),
-            plain | {"document": "pl"},
-        ),
+        ("pl", "a package leaflet the importer carries", _leaflet(), plain | {"document": "pl"}),
     ]
 
 
@@ -228,7 +228,10 @@ def render() -> dict[str, bytes]:
                 "about": about,
                 "request": request,
                 "documentId": f"{BLOCK}{position + 0xD0:012x}",
-                "product": PRODUCT,
+                # A leaflet states no EU number, so a person confirms none for it.
+                "product": PRODUCT | {"euAuthorisationNumbers": []}
+                if asked["document"] == "pl"
+                else PRODUCT,
             }
         )
     files["cases.json"] = (json.dumps(cases, indent=2, ensure_ascii=False) + "\n").encode("utf-8")

@@ -2,7 +2,7 @@
   "resourceType": "CodeSystem",
   "id": "approver-role",
   "url": "https://khs.dev/fhir/CodeSystem/approver-role",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "status": "active",
   "experimental": true,
   "name": "ApproverRole",
