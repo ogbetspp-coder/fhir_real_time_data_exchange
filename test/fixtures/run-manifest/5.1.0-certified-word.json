@@ -1,0 +1,137 @@
+{
+  "schemaVersion": "5.1.0",
+  "runId": "00000000-0000-4000-8000-00000000c003",
+  "startedAt": "2026-10-07T01:24:23.121Z",
+  "completedAt": "2026-10-07T01:24:23.138Z",
+  "status": "validated",
+  "dryRun": true,
+  "source": {
+    "kind": "document",
+    "resource": "gs://synthetic-submissions/smpc.submission.json",
+    "hash": "7b72cb739a07c99ae21d505b5943d63f30cd8f4c2e40dfb9dc138284858a6e6a"
+  },
+  "standards": {
+    "fhir": "5.0.0",
+    "globalEpiPackage": "hl7.fhir.uv.emedicinal-product-info#1.0.0",
+    "emaPackage": "EUePI#1.0.0",
+    "qrdTemplate": "10.4",
+    "mappingVersion": "1.4.0",
+    "packages": [
+      {
+        "package": "hl7.fhir.uv.emedicinal-product-info#1.0.0",
+        "sha256": "c997673388d2c53bd7dad43777a7589443e4d27f56a661a90aa0638bbce1cf3a"
+      },
+      {
+        "package": "EUePI#1.0.0",
+        "sha256": "19fb9fbf55c6bb3819c78d427acac1e3e5b96b50c1045d80e70c94f09566bd80"
+      },
+      {
+        "package": "hl7.terminology.r5#7.3.0",
+        "sha256": "c2ee6bccc9d0130d0a90db5967e7adbf9dd175df7a3351c531642c3dce102d10"
+      },
+      {
+        "package": "hl7.fhir.uv.extensions.r5#5.3.0",
+        "sha256": "f1039cac888d79ebd29878d7debe5e647ffe7ed962a9033da095258a03a06105"
+      },
+      {
+        "package": "dev.khs.fhir.epi#0.4.0",
+        "sha256": "add2311a9de6abc2db2d2b8b85f0f48e83a48f2a191ca8ce29e3def65c61d90d"
+      },
+      {
+        "package": "hl7.fhir.r5.core#5.0.0",
+        "sha256": "74b27cd1bfce9e80eaceac431edf230b0945a443564fbf5512f82e5fa50a80d4"
+      },
+      {
+        "package": "hl7.fhir.xver-extensions#0.1.0",
+        "sha256": "f3bb9fa2083402e88a02b41f433655274e8a1cca563211c8f7ba6fd0badf537a"
+      },
+      {
+        "package": "hl7.terminology#7.3.0",
+        "sha256": "8318f87cdcb44a6dfc5c197ca569c9b0499b06f45522324bfc4b4b810d51d4b9"
+      },
+      {
+        "package": "hl7.terminology.r5#5.0.0",
+        "sha256": "0716450a0ee1fc452794c163c395782f5ebe4ecf177b426e20782dcfe3250906"
+      },
+      {
+        "package": "hl7.terminology.r5#6.2.0",
+        "sha256": "4b492a0721d96f8c848142b581b1c87b58d427c358ec4b04be059d1b13d0d894"
+      },
+      {
+        "package": "hl7.terminology.r5#7.1.0",
+        "sha256": "473303108b5607aad7b910581739e8bbf3e61a625ed9e739c66e0ca597d4aefe"
+      },
+      {
+        "package": "hl7.fhir.uv.extensions.r5#1.0.0",
+        "sha256": "b60edfadff29ef16a5a253083f33b1c6f83646b3cda1691745453162edbd86b9"
+      },
+      {
+        "package": "hl7.fhir.uv.extensions.r5#5.2.0",
+        "sha256": "e02fc6eff0f37c1611a35aa93ef9aaa3b55ab7371a5c96f4d2a5834106a13170"
+      }
+    ]
+  },
+  "validation": {
+    "preflightErrors": 0,
+    "officialValidationExecuted": false,
+    "officialProfileErrors": 0,
+    "cloudValidationExecuted": false,
+    "cloudProfileErrors": 0,
+    "profiles": [
+      "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Bundle-uv-epi",
+      "https://khs.dev/fhir/StructureDefinition/eu-product-identity",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiList",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiBundle",
+      "https://khs.dev/fhir/StructureDefinition/eu-product-identity",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiComposition",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiCompositionSmPC",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiCompositionCAP",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUQRD-CAP-template-new-SmPC-en",
+      "http://hl7.org/fhir/StructureDefinition/Provenance"
+    ]
+  },
+  "transformation": {
+    "inputHash": "7b72cb739a07c99ae21d505b5943d63f30cd8f4c2e40dfb9dc138284858a6e6a",
+    "outputHash": "c93273af03d61b76e7d3bfa25ac0031230bc60e7a937bb0da257ceeca4126852",
+    "decisions": 32
+  },
+  "runtime": {
+    "sourceCommit": "development",
+    "imageDigest": "development",
+    "validatorImageDigest": "development",
+    "workflowRevision": "development"
+  },
+  "ingestion": {
+    "submissionId": "00000000-0000-4000-8000-00000000c001",
+    "contractVersion": "2.1.0",
+    "sourceKind": "certified-word",
+    "graphType": "type1",
+    "allowSyntheticSources": true,
+    "sourceDocumentSha256": "f86f053e901356ba58a0cfa3ecc0be8d0b9a5c3bb3feb86bf8b87347f4fbee09",
+    "extractionRunId": "00000000-0000-4000-8000-00000000c002",
+    "parser": "certified-word@e4cef9180f6afc261e0443b9a39f36261fdea684e3951736c4eb285514752618",
+    "fidelity": {
+      "status": "passed",
+      "normalizationVersion": "fidelity-norm/3.3.0",
+      "sectionsChecked": 32,
+      "sectionsMatched": 32,
+      "reportSha256": "d53fcc8d94aadb1fd93234291f7df69fda10d1f8f0d616a8b0b97d631c689c23",
+      "narrativeBindingSha256": "0a8277c642f0cd81dca1437b45c1cab7f8eb1d4c60d947c4410cd42d8ea66505",
+      "coverage": {
+        "pageCodePoints": 1458,
+        "bodyCodePoints": 1458,
+        "coveredCodePoints": 1458,
+        "uncoveredGaps": 0
+      }
+    },
+    "approval": {
+      "approverId": "urn:approver:synthetic-01",
+      "approverRole": "content-reviewer",
+      "approvedAt": "2026-10-06T11:59:00Z",
+      "method": "api-attestation",
+      "meaning": "reviewed-fidelity-and-structure",
+      "approvedContentSha256": "bab370f2333a9dc6f7c78d1c2fd6489c17e14f611e241e7d2e9fc5969c5b43c9"
+    },
+    "provenanceResourceId": "bc1ef7cb-dd6c-5158-adbb-133de8d2c5d5"
+  }
+}

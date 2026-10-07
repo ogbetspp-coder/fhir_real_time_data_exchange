@@ -3,6 +3,13 @@ import { readdirSync, readFileSync } from "node:fs";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { importPublication } from "../src/authority/import.js";
+import { importCertifiedWord } from "../src/certified-word/import.js";
+import {
+  RUN as CERTIFIED_WORD_RUN,
+  caseRequest,
+  recomputed,
+  recomputedCases,
+} from "../src/certified-word/vectors.js";
 import { syntheticPublication } from "../src/authority/synthetic.js";
 import type { CanonicalSubmission } from "../src/contracts/index.js";
 import type { FidelityReport } from "../src/fidelity/index.js";
@@ -342,6 +349,23 @@ describe("the package's naming systems", () => {
       );
     }
     persist(imported.submission.bundle as unknown as FhirBundle, []);
+    // A certified Word source's record, and its Provenance (ADR 0006 P4, D1).
+    const [label] = recomputedCases();
+    if (label === undefined) throw new Error("no recomputed label");
+    const word = importCertifiedWord(
+      recomputed(label.name),
+      caseRequest(label),
+      mapping,
+      CERTIFIED_WORD_RUN,
+    );
+    persist(word.submission.bundle as unknown as FhirBundle, []);
+    khsSystems(
+      toProvenanceResource(word.submission, word.fidelityReport, {
+        bundleId: "b",
+        compositionId: "c",
+      }),
+      written,
+    );
 
     const named = new Map(
       readdirSync("fhir/generated")

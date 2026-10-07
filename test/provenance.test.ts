@@ -195,7 +195,7 @@ describe("an authority import's Provenance", () => {
     const mixed = { ...asImport(submission), approval: submission.approval };
 
     expect(() => toProvenanceResource(mixed, fidelityReport, OUTPUT)).toThrow(
-      /An attested approval has a drawn source/,
+      /An attested approval has a drawn or a certified Word source/,
     );
   });
 });

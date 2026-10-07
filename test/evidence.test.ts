@@ -73,7 +73,7 @@ describe("transformation ledger row", () => {
     const row = await documentRow();
 
     expect(row.source_kind).toBe("document");
-    expect(row.contract_version).toBe("2.0.0");
+    expect(row.contract_version).toBe("2.1.0");
     expect(row.fidelity_status).toBe("passed");
     expect(row.ingestion_source_hash).toBe(drawn(submission).sha256);
     expect(row.approval_hash).toBe(submission.approval.approvedContentSha256);

@@ -1,0 +1,20 @@
+{
+  "resourceType": "NamingSystem",
+  "id": "certified-word",
+  "url": "https://khs.dev/fhir/NamingSystem/certified-word",
+  "version": "0.4.0",
+  "name": "CertifiedWord",
+  "title": "Certified Word record",
+  "status": "active",
+  "kind": "identifier",
+  "experimental": true,
+  "date": "2026-10-06",
+  "description": "A certified Word source's canonical record (ADR 0006): the Bundle's identifier, certified-word: and our id for the ePI the label is a version of; and the Composition's, the same followed by :composition.",
+  "uniqueId": [
+    {
+      "type": "uri",
+      "value": "https://khs.dev/fhir/identifier/certified-word",
+      "preferred": true
+    }
+  ]
+}

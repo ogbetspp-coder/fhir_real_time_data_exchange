@@ -24,7 +24,7 @@ words, and every code it assigns must cite a terminology lookup. Its output is a
 submission is written to the submission bucket and named to `POST /v1/runs` as
 `{uri, sha256}`; `src/gcp/submission-reader.ts` resolves that pointer and the two it contains
 (fidelity report, extracted text), reading only from the configured bucket, capping object
-size, and hash-checking every part. Status: the contract (`CanonicalSubmission` 2.0.0), the
+size, and hash-checking every part. Status: the contract (`CanonicalSubmission` 2.1.0), the
 ingress gate, the reader, the `document` route, and the Workflows `document` branch exist; no
 Zone A service produces submissions yet. The producers are `src/fixtures/synthetic-submission.ts`
 (a synthetic drawn document) and, for an authority's published ePI,
@@ -95,6 +95,21 @@ the agent. The importer's T removes presentation only where it cannot change wha
 (`docs/design/authority-import-t.md`). Each of the five real labels pinned in `labels/ema-epi/`
 is refused at a recorded stage (`test/fixtures/authority/vectors.json`), and an import that gets
 past T is refused at `rendering`, since the renderer gate supplies no evidence yet.
+
+### Certified Word labels
+
+A company's Word label (ADR 0006; `docs/design/certified-word-import.md`) is a third source kind,
+`certified-word`. Zone A reads it with the label reader, finds its QRD sections and writes each
+section's narrative and page (`python -m zone_a.recompute`); the importer (`src/certified-word/`,
+pure TypeScript) turns that result and what a person confirmed (the ePI's document id, the
+canonical product, its name and holder chosen from the label's sections 1 and 7, its EU
+authorisation numbers from section 8, and the approval) into a Type 1 submission. Narratives,
+pages and titles come only from the recompute; a section's title is its label's heading line,
+which the crosswalk and the EMA preflight carry as written. The source pins the uploaded .docx,
+the recompute's request and every version it names; the extractor is `certified-word/` and the
+SHA-256 of those versions. Until the worker runs the recompute itself (D2), the gate accepts a
+certified Word submission only as a dry run and refuses it when `DRY_RUN` is false
+(`certified-word-not-recomputed`).
 
 ### Renderer gate
 
@@ -316,12 +331,13 @@ narrative rests — while `fidelity-report`, `ingestion-provenance`, `provenance
 manifest, and the BigQuery ledger row never do. FHIR payloads and narrative are not written to Cloud
 Logging.
 
-The signed manifest is `RunManifest` 5.0.0; every earlier version stays readable, and
+The signed manifest is `RunManifest` 5.1.0; every earlier version stays readable, and
 `src/contracts/run-manifest.ts` says what each changed. It is signed before the FHIR transaction,
 names the transaction it authorises (`authorised`), and names every FHIR package the validator
 loaded by hash and the validator's image digest; only the ledger row says `persisted`. A `document`
-run's ingestion block records the source kind (`drawn` or `authority-publication`), the graph type,
-whether the deployment accepted synthetic content (`allowSyntheticSources`), the approval as
+run's ingestion block records the source kind (`drawn`, `authority-publication` or
+`certified-word`), the graph type, whether the deployment accepted synthetic content
+(`allowSyntheticSources`), the approval as
 either union member, and, for an authority import, the importer version and each file the gate
 fetched (URL, SHA-256, length, fetch time). The FHIR Provenance's id derives from the source
 identifier value and the submission id, one per approval; its targets are the record's

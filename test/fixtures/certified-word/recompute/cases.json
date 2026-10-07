@@ -1,0 +1,164 @@
+[
+  {
+    "name": "smpc",
+    "about": "an SmPC the importer carries",
+    "request": {
+      "document": "smpc",
+      "view": null,
+      "part": 0,
+      "assignments": {},
+      "versions": {
+        "recompute": "recompute/1.0.0",
+        "reader": "docx-reader/1.31.0",
+        "format": "label-docx-json/1.18.1",
+        "structurer": "smpc-structure/1.3.0",
+        "registryVersion": "1.3.0",
+        "mappingVersion": "1.4.0",
+        "builder": "word-epi/1.3.2"
+      }
+    },
+    "documentId": "00000000-5979-4e74-8000-0000000000d0",
+    "product": {
+      "id": "00000000-5979-4e74-8000-0000000000c2",
+      "name": "Synthetic Exampline",
+      "holder": {
+        "id": "00000000-5979-4e74-8000-0000000000c3",
+        "name": "Synthetic Holder B.V."
+      },
+      "euAuthorisationNumbers": [
+        "EU/1/24/9999/001",
+        "EU/1/24/9999/002"
+      ]
+    }
+  },
+  {
+    "name": "smpc-tracked",
+    "about": "an SmPC with tracked changes, every one accepted",
+    "request": {
+      "document": "smpc",
+      "view": "accepted",
+      "part": 0,
+      "assignments": {},
+      "versions": {
+        "recompute": "recompute/1.0.0",
+        "reader": "docx-reader/1.31.0",
+        "format": "label-docx-json/1.18.1",
+        "structurer": "smpc-structure/1.3.0",
+        "registryVersion": "1.3.0",
+        "mappingVersion": "1.4.0",
+        "builder": "word-epi/1.3.2"
+      }
+    },
+    "documentId": "00000000-5979-4e74-8000-0000000000d1",
+    "product": {
+      "id": "00000000-5979-4e74-8000-0000000000c2",
+      "name": "Synthetic Exampline",
+      "holder": {
+        "id": "00000000-5979-4e74-8000-0000000000c3",
+        "name": "Synthetic Holder B.V."
+      },
+      "euAuthorisationNumbers": [
+        "EU/1/24/9999/001",
+        "EU/1/24/9999/002"
+      ]
+    }
+  },
+  {
+    "name": "smpc-assigned",
+    "about": "an SmPC whose 4.1 heading a person assigned: its title is carried as written",
+    "request": {
+      "document": "smpc",
+      "view": null,
+      "part": 0,
+      "assignments": {
+        "smpc.4.1": 12
+      },
+      "versions": {
+        "recompute": "recompute/1.0.0",
+        "reader": "docx-reader/1.31.0",
+        "format": "label-docx-json/1.18.1",
+        "structurer": "smpc-structure/1.3.0",
+        "registryVersion": "1.3.0",
+        "mappingVersion": "1.4.0",
+        "builder": "word-epi/1.3.2"
+      }
+    },
+    "documentId": "00000000-5979-4e74-8000-0000000000d2",
+    "product": {
+      "id": "00000000-5979-4e74-8000-0000000000c2",
+      "name": "Synthetic Exampline",
+      "holder": {
+        "id": "00000000-5979-4e74-8000-0000000000c3",
+        "name": "Synthetic Holder B.V."
+      },
+      "euAuthorisationNumbers": [
+        "EU/1/24/9999/001",
+        "EU/1/24/9999/002"
+      ]
+    }
+  },
+  {
+    "name": "smpc-refused",
+    "about": "an SmPC the recompute refuses: a tab in 4.2",
+    "request": {
+      "document": "smpc",
+      "view": null,
+      "part": 0,
+      "assignments": {},
+      "versions": {
+        "recompute": "recompute/1.0.0",
+        "reader": "docx-reader/1.31.0",
+        "format": "label-docx-json/1.18.1",
+        "structurer": "smpc-structure/1.3.0",
+        "registryVersion": "1.3.0",
+        "mappingVersion": "1.4.0",
+        "builder": "word-epi/1.3.2"
+      }
+    },
+    "documentId": "00000000-5979-4e74-8000-0000000000d3",
+    "product": {
+      "id": "00000000-5979-4e74-8000-0000000000c2",
+      "name": "Synthetic Exampline",
+      "holder": {
+        "id": "00000000-5979-4e74-8000-0000000000c3",
+        "name": "Synthetic Holder B.V."
+      },
+      "euAuthorisationNumbers": [
+        "EU/1/24/9999/001",
+        "EU/1/24/9999/002"
+      ]
+    }
+  },
+  {
+    "name": "pl",
+    "about": "a package leaflet: Zone B does not carry one yet",
+    "request": {
+      "document": "pl",
+      "view": null,
+      "part": 0,
+      "assignments": {},
+      "versions": {
+        "recompute": "recompute/1.0.0",
+        "reader": "docx-reader/1.31.0",
+        "format": "label-docx-json/1.18.1",
+        "structurer": "pl-structure/1.0.0",
+        "registryVersion": "1.3.0",
+        "mappingVersion": "1.0.0",
+        "builder": "word-epi/1.3.2"
+      }
+    },
+    "documentId": "00000000-5979-4e74-8000-0000000000d4",
+    "product": {
+      "id": "00000000-5979-4e74-8000-0000000000c2",
+      "name": "Synthetic Exampline",
+      "holder": {
+        "id": "00000000-5979-4e74-8000-0000000000c3",
+        "name": "Synthetic Holder B.V."
+      },
+      "euAuthorisationNumbers": [
+        "EU/1/24/9999/001",
+        "EU/1/24/9999/002"
+      ]
+    }
+  }
+]

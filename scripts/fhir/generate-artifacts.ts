@@ -52,7 +52,7 @@ await mkdir(output, { recursive: true });
 const mapping = await loadEmaMapping();
 
 const PACKAGE_NAME = "dev.khs.fhir.epi";
-const PACKAGE_VERSION = "0.3.0";
+const PACKAGE_VERSION = "0.4.0";
 const PACKAGE_FILE = `${PACKAGE_NAME}.tgz`;
 const CANONICAL = KHS_CANONICAL;
 
@@ -290,6 +290,24 @@ const identifierSystems: { system: string; title: string; description: string; r
       title: "Authority import record",
       description:
         "An authority import's canonical record: the Bundle's identifier, authority-import:, the authority's segment, a colon and the authority's id for the document; and the Composition's, the same followed by :composition.",
+    },
+    {
+      system: `${CANONICAL}/identifier/certified-word`,
+      title: "Certified Word record",
+      description:
+        "A certified Word source's canonical record (ADR 0006): the Bundle's identifier, certified-word: and our id for the ePI the label is a version of; and the Composition's, the same followed by :composition.",
+    },
+    {
+      system: `${CANONICAL}/identifier/canonical-product`,
+      title: "Canonical product",
+      description:
+        "Our own id for a medicinal product a person confirmed from its label, above each regulator's identifiers for it (ADR 0006 decision 5).",
+    },
+    {
+      system: `${CANONICAL}/identifier/canonical-organization`,
+      title: "Canonical organisation",
+      description:
+        "Our own id for a marketing authorisation holder a person confirmed from a label (ADR 0006 decision 5).",
     },
     {
       system: `${CANONICAL}/identifier/type2-document`,

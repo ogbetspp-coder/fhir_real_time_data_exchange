@@ -10,13 +10,20 @@ import type { FidelityReport } from "../../src/fidelity/index.js";
 import { loadEmaMapping, type EmaMapping } from "../../src/fhir/mapping.js";
 import { toProvenanceResource } from "../../src/fhir/provenance.js";
 import { transformType2ToEma } from "../../src/fhir/transform.js";
-import type { FhirResource } from "../../src/fhir/types.js";
+import type { FhirBundle, FhirResource } from "../../src/fhir/types.js";
+import { importCertifiedWord } from "../../src/certified-word/import.js";
+import {
+  RUN as CERTIFIED_WORD_RUN,
+  caseRequest,
+  recomputed,
+  recomputedCases,
+} from "../../src/certified-word/vectors.js";
 import { SMOKE_PRODUCT_ID } from "../../src/fixtures/synthetic-products.js";
 import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 import { officialValidationTargets } from "../../src/pipeline.js";
 
 // The set CI's "Official validation" job validates (scripts/ci/emit-validation-set.ts) is the
-// pipeline's own list of targets (officialValidationTargets), for each of its two cases, and not a
+// pipeline's own list of targets (officialValidationTargets), for each of its three cases, and not a
 // copy of it: until audit B15 the script restated the profile and the four resources by hand, so
 // a resource the pipeline began validating would have left the gate green on the old set. Each
 // case's targets end with the Provenance a document run persists, built from the contract
@@ -103,14 +110,46 @@ describe("the official validation set", () => {
     expect(provenance.activity.coding[0]?.code).toBe("authority-import");
   });
 
+  // ADR 0006 P4, D1: a certified Word source's record, its titles carried as written.
+  it("is the same targets for a certified Word source's Type 1 record and its Provenance", () => {
+    const [label] = recomputedCases();
+    if (label === undefined) throw new Error("no recomputed Word label");
+    const word = importCertifiedWord(
+      recomputed(label.name),
+      caseRequest(label),
+      mapping,
+      CERTIFIED_WORD_RUN,
+    );
+    const source = word.submission.bundle as unknown as FhirBundle;
+    const transformed = transformType2ToEma(source, mapping, undefined, "as-written");
+    const targets = officialValidationTargets(source, transformed, mapping, {
+      resourceType: "Provenance",
+    });
+    expect(entries.slice(2 * targets.length, 3 * targets.length)).toEqual(
+      targets.map(({ name, resource, profiles }) => ({
+        file: name === "source" ? "source-certified-word.json" : `${name}-certified-word.json`,
+        resourceType: resource.resourceType,
+        profiles,
+      })),
+    );
+    const emitted = JSON.parse(
+      readFileSync(path.join(output, "source-certified-word.json"), "utf8"),
+    ) as FhirResource;
+    expect(emitted).toEqual(source);
+    const provenance = JSON.parse(
+      readFileSync(path.join(output, "provenance-certified-word.json"), "utf8"),
+    ) as { activity: { coding: { code: string }[] } };
+    expect(provenance.activity.coding[0]?.code).toBe("structuring");
+  });
+
   it("adds the repository's own definitions, against no profile, and nothing else", () => {
     const artifacts = readdirSync("fhir/generated")
       .filter((file) => file.endsWith(".json"))
       .sort();
-    expect(entries.slice(10).map(({ file, profiles }) => ({ file, profiles }))).toEqual(
+    expect(entries.slice(15).map(({ file, profiles }) => ({ file, profiles }))).toEqual(
       artifacts.map((file) => ({ file, profiles: [] })),
     );
-    expect(entries).toHaveLength(10 + artifacts.length);
+    expect(entries).toHaveLength(15 + artifacts.length);
   });
 
   it("restates no profile of its own", () => {

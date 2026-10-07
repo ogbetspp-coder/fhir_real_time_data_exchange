@@ -45,13 +45,18 @@ def _count_objects(node: Any) -> tuple[int, int]:
     """Closed and open object schemas anywhere in a JSON Schema document.
 
     Closed is ``additionalProperties: false``; open is any other object schema (the generator
-    emits ``additionalProperties: {}`` for a Zod ``looseObject``).
+    emits ``additionalProperties: {}`` for a Zod ``looseObject``), but a map: one whose every
+    property is held to a schema of its own (a Zod ``record``, ``propertyNames`` and a non-empty
+    ``additionalProperties``), which is a typed ``dict`` field, not a model.
     """
     closed = 0
     open_ = 0
     if isinstance(node, dict):
-        if node.get("type") == "object":
-            if node.get("additionalProperties") is False:
+        extra = node.get("additionalProperties")
+        if node.get("type") == "object" and "propertyNames" in node and extra:
+            pass
+        elif node.get("type") == "object":
+            if extra is False:
                 closed += 1
             else:
                 open_ += 1

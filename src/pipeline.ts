@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { AppConfig } from "./config.js";
 import {
   AUTHORITY_IMPORT_PREFIX,
+  CERTIFIED_WORD_PREFIX,
   CANONICAL_SUBMISSION_VERSION,
   DEVELOPMENT_RUNTIME,
   RUN_MANIFEST_VERSION,
@@ -45,6 +46,7 @@ import {
 import { GcpLineagePublisher } from "./gcp/lineage.js";
 import { defaultFetcher, type AuthorityFetcher } from "./authority/fetch.js";
 import { verifyAuthorityImport, type AuthorityGateResult } from "./authority/gate.js";
+import { verifyCertifiedWordImport } from "./certified-word/gate.js";
 import { sha256Bytes } from "./authority/import.js";
 import { approvalLinkProvenance } from "./approval/link.js";
 import { recordFacts } from "./approval/review.js";
@@ -207,13 +209,11 @@ type DocumentInput = Extract<PipelineInput, { sourceKind: "document" }>;
 // What the gate learnt about an authority import: the fetched files and the importer that ran.
 type AuthorityRun = Omit<AuthorityGateResult, "gate">;
 
-// Whether a submission, before it is parsed, says it is an authority's publication: only that
-// decides which gate it goes through; the gate itself parses and checks everything.
-function claimsAuthoritySource(submission: unknown): boolean {
-  const kind = (
-    submission as { provenance?: { sourceDocument?: { kind?: unknown } } } | null | undefined
-  )?.provenance?.sourceDocument?.kind;
-  return kind === "authority-publication";
+// The source kind a submission, before it is parsed, says it has: only that decides which gate it
+// goes through; the gate itself parses and checks everything.
+function claimedSourceKind(submission: unknown): unknown {
+  return (submission as { provenance?: { sourceDocument?: { kind?: unknown } } } | null | undefined)
+    ?.provenance?.sourceDocument?.kind;
 }
 
 async function documentGate(
@@ -225,7 +225,16 @@ async function documentGate(
 ): Promise<{ gate: DocumentGateResult; authority?: AuthorityRun }> {
   const options = { allowSyntheticSources: config.ALLOW_SYNTHETIC_SOURCES };
   try {
-    if (claimsAuthoritySource(input.submission)) {
+    const claimed = claimedSourceKind(input.submission);
+    if (claimed === "certified-word") {
+      return {
+        gate: verifyCertifiedWordImport(input, mapping.sourceCodeSystem, {
+          ...options,
+          dryRun: config.DRY_RUN,
+        }),
+      };
+    }
+    if (claimed === "authority-publication") {
       const fetcher =
         dependencies.authorityFetcher ?? defaultFetcher(mapping, config.ALLOW_SYNTHETIC_SOURCES);
       const { gate, ...authority } = await verifyAuthorityImport(
@@ -376,6 +385,17 @@ export async function runPipeline(
   ) {
     throw new Error("Source identifier is in the reserved authority-import namespace");
   }
+  // So is the certified-word namespace: only a submission its gate passed may carry it.
+  const sourceKind = gate?.submission.provenance.sourceDocument.kind;
+  if (
+    sourceKind !== "certified-word" &&
+    sourceIdentifierValue(source).startsWith(CERTIFIED_WORD_PREFIX)
+  ) {
+    throw new Error("Source identifier is in the reserved certified-word namespace");
+  }
+  // A certified Word source's titles are its label's heading lines, carried as written: the
+  // crosswalk does not put the template's title in their place (ADR 0006 decision 4, D6).
+  const titles = sourceKind === "certified-word" ? "as-written" : "template";
 
   // The standards the manifest names, read from the locks the image ships before anything is
   // written (only the document gate, whose authority fetch reads, runs before): a missing or
@@ -390,8 +410,13 @@ export async function runPipeline(
     packages,
   };
 
-  const transformed = transformType2ToEma(source, mapping, QRD_TEMPLATE_VERSION);
-  const emaPreflight = validateEmaPreflight(transformed.list, transformed.documentBundle, mapping);
+  const transformed = transformType2ToEma(source, mapping, QRD_TEMPLATE_VERSION, titles);
+  const emaPreflight = validateEmaPreflight(
+    transformed.list,
+    transformed.documentBundle,
+    mapping,
+    titles,
+  );
   if (hasValidationErrors(emaPreflight)) {
     log("warning", "EMA preflight rejected", {
       runId,

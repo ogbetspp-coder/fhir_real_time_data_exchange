@@ -71,6 +71,12 @@ export type SectionRule = {
 
 export type EmaMapping = z.infer<typeof MappingSchema>;
 
+// Which title a target section takes: the source's where the QRD template permits it, else the
+// template's; or, for a certified Word source, the source's as written (ADR 0006 decision 4,
+// docs/design/certified-word-import.md, D6): its label's heading line, a heading the label team
+// accepted included, never replaced by the template's. The crosswalk and the EMA preflight read it.
+export type TitleRule = "template" | "as-written";
+
 // Every heading a rule permits: its title first, then the QRD template's shorter forms.
 export function permittedTitles(rule: SectionRule): string[] {
   return [rule.title, ...(rule.alternativeTitles ?? [])];

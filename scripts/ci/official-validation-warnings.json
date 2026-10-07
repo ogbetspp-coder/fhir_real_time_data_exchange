@@ -372,6 +372,66 @@
     "reason": "Best practice only: the Provenance carries hashes, identifiers and codes, and no narrative, by design (src/fhir/provenance.ts)."
   },
   {
+    "file": "source-certified-word.json",
+    "location": "Bundle.entry[1].resource/*MedicinalProductDefinition/e8fc9d0c-ddce-5b3e-a236-47e51280cd4b*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "Best practice only: the certified Word importer writes no Resource.text."
+  },
+  {
+    "file": "source-certified-word.json",
+    "location": "Bundle.entry[2].resource/*Organization/a40fc8d3-cf5b-560d-a08a-c256ba84e274*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "Best practice only: the certified Word importer writes no Resource.text."
+  },
+  {
+    "file": "ema-list-certified-word.json",
+    "location": "List",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against European Medicines Regulatory Network (EMRN) Electronic Product Information (ePI) Implementation Guide v1.0.0",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-bundle-certified-word.json",
+    "location": "Bundle.entry[0].resource/*Composition/e8ff08be-9667-54e3-a4b8-9acc19089ead*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-bundle-certified-word.json",
+    "location": "Bundle.entry[1].resource/*MedicinalProductDefinition/5bebcbd0-07d6-5be7-ac48-1520b8c3a04b*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Base FHIR Standard",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-bundle-certified-word.json",
+    "location": "Bundle.entry[2].resource/*Organization/ab03ec28-53e1-5ad3-ad82-dde1edd5953c*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Base FHIR Standard",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-bundle-certified-word.json",
+    "location": "Bundle.entry[3].resource/*RegulatedAuthorization/581566fa-39c0-51fe-a9b4-58614a9246d8*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-bundle-certified-word.json",
+    "location": "Bundle.entry[4].resource/*RegulatedAuthorization/887877e4-7e90-5772-a41a-1e3b6ea15285*/",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Electronic Medicinal Product Information (ePI) FHIR Implementation Guide v1.0.0",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "ema-composition-certified-word.json",
+    "location": "Composition",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against European Medicines Regulatory Network (EMRN) Electronic Product Information (ePI) Implementation Guide v1.0.0",
+    "reason": "Best practice only: the transform writes no Resource.text, which would be generated text."
+  },
+  {
+    "file": "provenance-certified-word.json",
+    "location": "Provenance",
+    "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation), validating against Base FHIR Standard",
+    "reason": "Best practice only: the Provenance carries hashes, identifiers and codes, and no narrative, by design (src/fhir/provenance.ts)."
+  },
+  {
     "file": "StructureDefinition-ext-approval-content-sha256.json",
     "location": "StructureDefinition.differential.element[3].type[0].code",
     "message": "The value provided ('string') was not found in the value set 'Element Definition Types' (http://hl7.org/fhir/ValueSet/elementdefinition-types|5.0.0), and a code should come from this value set unless it has no suitable code (note that the validator cannot judge what is suitable)  (error message = Cannot invoke \"String.equals(Object)\" because \"system\" is null), validating against Base FHIR Standard",

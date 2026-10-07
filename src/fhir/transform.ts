@@ -6,6 +6,7 @@ import {
   permittedTitles,
   type EmaMapping,
   type SectionRule,
+  type TitleRule,
 } from "./mapping.js";
 import {
   EMA_EU_NUMBER_SYSTEM,
@@ -273,6 +274,7 @@ function mapSection(
   targetPath: string,
   decisions: MappingDecision[],
   issues: string[],
+  titles: TitleRule,
 ): CompositionSection | undefined {
   const matches = index.get(rule.sourceKey) ?? [];
   if (matches.length === 0) {
@@ -346,18 +348,24 @@ function mapSection(
       `${targetPath}.section[${children.length}]`,
       decisions,
       issues,
+      titles,
     );
     if (target !== undefined) children.push(target);
   }
 
   const heading: unknown = (match.section as { title?: unknown }).title;
-  const sourceTitle = typeof heading === "string" ? heading : undefined;
+  const sourceTitle = typeof heading === "string" && heading.length > 0 ? heading : undefined;
+  if (titles === "as-written" && sourceTitle === undefined) {
+    issues.push(`Source section ${rule.sourceKey} has no title to carry as written`);
+  }
   const target: CompositionSection = {
     id: stableUuid("ema-qrd-section", rule.sourceKey),
     // The heading the source carries when the QRD template permits it (a label may omit a
-    // heading's optional wording); otherwise the manifest's.
+    // heading's optional wording), or always where the rule is as written; otherwise the
+    // manifest's.
     title:
-      sourceTitle !== undefined && permittedTitles(rule).includes(sourceTitle)
+      sourceTitle !== undefined &&
+      (titles === "as-written" || permittedTitles(rule).includes(sourceTitle))
         ? sourceTitle
         : rule.title,
     code: {
@@ -655,6 +663,7 @@ export function transformType2ToEma(
   sourceBundle: FhirBundle,
   mapping: EmaMapping,
   qrdTemplateVersion = QRD_TEMPLATE_VERSION,
+  titles: TitleRule = "template",
 ): EmaPackage {
   if (sourceBundle.type !== "document") {
     throw new TransformationError("Source ePI must be a document Bundle", [
@@ -678,6 +687,7 @@ export function transformType2ToEma(
     "Composition.section[0]",
     decisions,
     issues,
+    titles,
   );
   issues.push(...sourceSectionIssues(sections, mapping));
 

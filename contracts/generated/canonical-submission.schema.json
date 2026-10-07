@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://khs.dev/contracts/canonical-submission/2.0.0/schema.json",
+  "$id": "https://khs.dev/contracts/canonical-submission/2.1.0/schema.json",
   "$ref": "#/$defs/CanonicalSubmission",
   "$defs": {
     "CanonicalSubmission": {
@@ -8,7 +8,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "2.0.0"
+          "const": "2.1.0"
         },
         "submissionId": {
           "$ref": "#/$defs/Uuid"
@@ -177,6 +177,9 @@
         },
         {
           "$ref": "#/$defs/AuthoritySourceDocument"
+        },
+        {
+          "$ref": "#/$defs/CertifiedWordSourceDocument"
         }
       ]
     },
@@ -488,6 +491,168 @@
       "type": "string",
       "pattern": "^Composition(?:\\.section\\[[0-9]{1,4}\\]){1,16}$"
     },
+    "CertifiedWordSourceDocument": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "certified-word"
+        },
+        "mediaType": {
+          "type": "string",
+          "const": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        },
+        "document": {
+          "type": "object",
+          "properties": {
+            "sha256": {
+              "$ref": "#/$defs/Sha256Hex"
+            },
+            "byteLength": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "filename": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._ -]{0,254}$"
+            },
+            "storageUri": {
+              "$ref": "#/$defs/StorageUri"
+            }
+          },
+          "required": ["sha256", "byteLength", "filename", "storageUri"],
+          "additionalProperties": false
+        },
+        "recompute": {
+          "$ref": "#/$defs/RecomputeRequest"
+        },
+        "changes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sectionPages": {
+          "minItems": 1,
+          "maxItems": 2000,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "key": {
+                "$ref": "#/$defs/SourceKey"
+              },
+              "code": {
+                "$ref": "#/$defs/Token"
+              }
+            },
+            "required": ["page", "key", "code"],
+            "additionalProperties": false
+          }
+        },
+        "extractedText": {
+          "$ref": "#/$defs/ExtractedTextRef"
+        }
+      },
+      "required": [
+        "kind",
+        "mediaType",
+        "document",
+        "recompute",
+        "changes",
+        "sectionPages",
+        "extractedText"
+      ],
+      "additionalProperties": false,
+      "description": "A Word label the label reader read exactly, made into sections by Zone A's recompute (ADR 0006, docs/design/certified-word-import.md)."
+    },
+    "RecomputeRequest": {
+      "type": "object",
+      "properties": {
+        "document": {
+          "type": "string",
+          "enum": ["smpc", "pl"]
+        },
+        "view": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": ["accepted", "original"]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "part": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "assignments": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/SourceKey"
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "versions": {
+          "$ref": "#/$defs/RecomputeVersions"
+        }
+      },
+      "required": ["document", "view", "part", "assignments", "versions"],
+      "additionalProperties": false
+    },
+    "SourceKey": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:\\.[a-z0-9]+)*$",
+      "description": "Canonical SmPC section identifier from the mapping manifest, e.g. smpc.4.2.posology."
+    },
+    "RecomputeVersions": {
+      "type": "object",
+      "properties": {
+        "recompute": {
+          "$ref": "#/$defs/Token"
+        },
+        "reader": {
+          "$ref": "#/$defs/Token"
+        },
+        "format": {
+          "$ref": "#/$defs/Token"
+        },
+        "structurer": {
+          "$ref": "#/$defs/Token"
+        },
+        "registryVersion": {
+          "$ref": "#/$defs/Token"
+        },
+        "mappingVersion": {
+          "$ref": "#/$defs/Token"
+        },
+        "builder": {
+          "$ref": "#/$defs/Token"
+        }
+      },
+      "required": [
+        "recompute",
+        "reader",
+        "format",
+        "structurer",
+        "registryVersion",
+        "mappingVersion",
+        "builder"
+      ],
+      "additionalProperties": false
+    },
     "ExtractionTooling": {
       "type": "object",
       "properties": {
@@ -593,11 +758,6 @@
       },
       "required": ["sourceKey", "spans", "narrativeDivSha256", "normalizedTextSha256"],
       "additionalProperties": false
-    },
-    "SourceKey": {
-      "type": "string",
-      "pattern": "^[a-z0-9]+(?:\\.[a-z0-9]+)*$",
-      "description": "Canonical SmPC section identifier from the mapping manifest, e.g. smpc.4.2.posology."
     },
     "SourceSpan": {
       "type": "object",

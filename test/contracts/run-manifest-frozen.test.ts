@@ -14,6 +14,7 @@ import {
   RunManifestV2Schema,
   RunManifestV3Schema,
   RunManifestV4Schema,
+  RunManifestV5Schema,
 } from "../../src/contracts/index.js";
 import { manifestRuntime } from "../../src/pipeline.js";
 
@@ -24,8 +25,10 @@ import { manifestRuntime } from "../../src/pipeline.js";
 // test/fixtures/run-manifest/ holds, per version, the dry-run manifest of a fixture
 // run and (from 1.1.0, when the document source arrived) of a document run over the synthetic
 // submission, each emitted by that version's code: 1.0.0 at 499e2b2, 1.1.0 at dd78a14, 2.0.0 at
-// 2a035f3 (#113), 3.0.0 at 95e7207 (#128), 4.0.0 at 9b4cb2a, 5.0.0 at this change. They are never
-// regenerated: each is the evidence that its version reads what that code wrote.
+// 2a035f3 (#113), 3.0.0 at 95e7207 (#128), 4.0.0 at 9b4cb2a, 5.0.0 at 430939f, 5.1.0 at the change
+// that made `certified-word` a source kind, with a dry run of a certified Word submission beside
+// them (`5.1.0-certified-word.json`). They are never regenerated: each is the evidence that its
+// version reads what that code wrote.
 //
 // Those are dry runs, which carry no persistence block. `*.synthetic.json` beside them are
 // persist-mode manifests of the frozen versions (review of #148, part A L5), each derived from its
@@ -43,6 +46,7 @@ const BY_VERSION: Record<string, z.ZodType> = {
   "2.0.0": RunManifestV2Schema,
   "3.0.0": RunManifestV3Schema,
   "4.0.0": RunManifestV4Schema,
+  "5.0.0": RunManifestV5Schema,
   [RUN_MANIFEST_VERSION]: RunManifestSchema,
 };
 
@@ -76,6 +80,7 @@ describe("the run manifest's released versions", () => {
       "2.0.0",
       "3.0.0",
       "4.0.0",
+      "5.0.0",
     ]);
     for (const { file, version, manifest } of persisted) {
       const schema = BY_VERSION[version];
@@ -111,6 +116,25 @@ describe("the run manifest's released versions", () => {
       }
       expect([file, AnyRunManifestSchema.safeParse(manifest).success]).toEqual([file, true]);
     }
+  });
+
+  // 5.1.0 (ADR 0006 P4, D1): a certified Word source's run, which 5.0.0 never wrote.
+  it("reads a certified Word source's dry run in 5.1.0 only", () => {
+    const found = emitted().find(
+      ({ file }) => file === `${RUN_MANIFEST_VERSION}-certified-word.json`,
+    );
+    if (found === undefined) throw new Error("no certified Word manifest");
+    const ingestion = found.manifest.ingestion as Record<string, unknown>;
+    expect([ingestion.sourceKind, ingestion.graphType, ingestion.contractVersion]).toEqual([
+      "certified-word",
+      "type1",
+      "2.1.0",
+    ]);
+    expect(RunManifestSchema.safeParse(found.manifest).success).toBe(true);
+    const asV5 = { ...found.manifest, schemaVersion: "5.0.0" };
+    expect(RunManifestV5Schema.safeParse(asV5).success).toBe(false);
+    const asV5Contract = { ...asV5, ingestion: { ...ingestion, contractVersion: "2.0.0" } };
+    expect(RunManifestV5Schema.safeParse(asV5Contract).success).toBe(false);
   });
 
   it("builds the old versions from nothing live", () => {
@@ -196,7 +220,7 @@ describe("the rules between a manifest's fields, in every version that has them"
     })),
   };
 
-  it.each(["1.1.0", "2.0.0", "3.0.0", "4.0.0", RUN_MANIFEST_VERSION])(
+  it.each(["1.1.0", "2.0.0", "3.0.0", "4.0.0", "5.0.0", RUN_MANIFEST_VERSION])(
     "%s: a document run, and only one, carries an ingestion block",
     (version) => {
       const schema = BY_VERSION[version];
@@ -211,7 +235,7 @@ describe("the rules between a manifest's fields, in every version that has them"
     },
   );
 
-  it.each(["2.0.0", "3.0.0", "4.0.0", RUN_MANIFEST_VERSION])(
+  it.each(["2.0.0", "3.0.0", "4.0.0", "5.0.0", RUN_MANIFEST_VERSION])(
     "%s: an authority import, and only one, records what Zone B fetched",
     (version) => {
       const schema = BY_VERSION[version];
@@ -234,7 +258,7 @@ describe("the rules between a manifest's fields, in every version that has them"
     },
   );
 
-  it.each(["4.0.0", RUN_MANIFEST_VERSION])(
+  it.each(["4.0.0", "5.0.0", RUN_MANIFEST_VERSION])(
     "%s: the named packages are pinned, each once",
     (version) => {
       const schema = BY_VERSION[version];

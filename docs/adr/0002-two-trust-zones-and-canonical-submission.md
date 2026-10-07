@@ -388,3 +388,51 @@ the 2026-09-24 amendment above states; the contract does not change.
   every RegulatedAuthorization states the same ones, and the product's one EU product number as
   `ext-epi-eu-number`. The EMA Composition's identifier is one per version, derived from the source
   identifier and its content; every id stays as before.
+
+## Amendment (2026-10-06, ADR 0006: a certified Word source)
+
+ADR 0006 admits a company's Word label that the label reader read exactly, structured by the QRD
+template's headings and made into sections by `zone_a.recompute`. The design is
+`docs/design/certified-word-import.md` (D1, D2, D6); this section states what it changes here.
+
+**The contract is `CanonicalSubmission` 2.1.0** (`ingestion-provenance` 2.1.0). Every 2.0.0
+submission is refused. `provenance.sourceDocument` gains a third member, `certified-word`: the
+uploaded .docx (SHA-256, length, file name, storage URI), the request the recompute made the
+sections with (the document, the view, the part, the assigned headings and every version the
+recompute names), the number of tracked changes the view settled, one page per section
+(`sectionPages`) and the page text.
+
+**The ingress invariants above, amended:**
+
+- **Invariant 7.** A `certified-word` source carries a `type1` graph, an attestation (the approval
+  placeholder a drawn source has), the extractor `certified-word` whose version is the SHA-256 of
+  the canonical JSON of the recompute's versions (the token `certified-word/<hash>`), no model or
+  prompt template, and the mapping its recompute used as its terminology service.
+- **Invariant 10.** A synthetic certified Word submission's identifier value is `certified-word:`
+  and a document id in the reserved block (`00000000-5979-4e74-8000-`), and every narrative that
+  carries text carries the marker; a non-synthetic one carries none of these.
+- **Invariant 11.** A certified Word source is admitted only once Zone B has made its sections
+  again from its bytes (D2) and the renderer gate has drawn them (D3). Neither is built, so the
+  gate accepts one only as a dry run: `src/certified-word/gate.ts` refuses it when `DRY_RUN` is
+  false (`certified-word-not-recomputed`), and the ordinary gate accepts it only with
+  `GateOptions.certifiedWordDryRun` bound to its hash, set only there. Nothing it makes is
+  persisted.
+- **Invariant 12.** Its page text has one page per section, each wholly body, and every page no
+  narrative covers is blank, as an authority import's.
+- **Invariant 13.** An identifier value beginning `certified-word:` is written only by its
+  importer, as exactly `certified-word:` and the ePI's document id; every other source kind and
+  route refuses it.
+
+**The transform and the preflights.** A certified Word source's section titles are its label's
+heading lines, carried as written: the crosswalk does not put the template's title in their place
+and the EMA preflight does not hold them to it (ADR 0006 decision 4). Every other source keeps
+the template's rule.
+
+**Evidence.** `RunManifest` moves to 5.1.0 (its ingestion block's `sourceKind` may be
+`certified-word`, and `contractVersion` follows 2.1.0); 5.0.0 stays readable. The FHIR Provenance
+of an attested certified Word source has activity `structuring`, the attester, and the .docx by
+its SHA-256.
+
+**Not yet:** the invariant for D4's bytes (Zone B reads the .docx from the submissions bucket
+under its own identity and requires the pinned hash and length), the recompute (D2) and the
+drawing records (D3), each with the change that builds it.

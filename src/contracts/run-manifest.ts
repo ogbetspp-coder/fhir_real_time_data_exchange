@@ -21,12 +21,13 @@ import {
   RunManifestV2Schema,
   RunManifestV3Schema,
   RunManifestV4Schema,
+  RunManifestV5Schema,
 } from "./run-manifest-frozen.js";
 
 // Evidence schema for the signed run manifest (AGENTS.md: "update the mapping manifest and
-// evidence schema together"). Versions 1.0.0, 1.1.0, 2.0.0, 3.0.0 and 4.0.0 stay readable through
-// `AnyRunManifestSchema`, each frozen in ./run-manifest-frozen.ts from copies of its own parts, so
-// that no change here or to a live primitive changes what an old version accepts.
+// evidence schema together"). Versions 1.0.0, 1.1.0, 2.0.0, 3.0.0, 4.0.0 and 5.0.0 stay readable
+// through `AnyRunManifestSchema`, each frozen in ./run-manifest-frozen.ts from copies of its own
+// parts, so that no change here or to a live primitive changes what an old version accepts.
 //
 // Since 3.0.0 a manifest is signed BEFORE the FHIR transaction, so a persist-mode manifest cannot
 // say the run persisted: its status is `authorised`, and it names the exact transaction it
@@ -58,8 +59,13 @@ import {
 // only one, carries an ingestion block; an authority import, and only one, records what Zone B
 // fetched (src/contracts/json-schema.ts, REFINEMENTS). A major: 4.0.0 accepted values 5.0.0
 // refuses.
+//
+// 5.1.0 (ADR 0006 P4, D1): the ingestion block's `sourceKind` may be `certified-word`, and its
+// `contractVersion` follows `CanonicalSubmission` 2.1.0, as it follows the submission's version
+// in every release. A minor, as the submission's is: the new source kind refuses nothing that 5.0.0
+// accepted of a 2.1.0 run, and a 5.0.0 manifest stays readable as 5.0.0.
 
-export const RUN_MANIFEST_VERSION = "5.0.0";
+export const RUN_MANIFEST_VERSION = "5.1.0";
 
 const ManifestPackageSchema = z
   .strictObject({ package: PackageRef, sha256: Sha256Hex })
@@ -170,7 +176,7 @@ export const IngestionEvidenceSchema = z
   .strictObject({
     submissionId: Uuid,
     contractVersion: z.literal(CANONICAL_SUBMISSION_VERSION),
-    sourceKind: z.enum(["drawn", "authority-publication"]),
+    sourceKind: z.enum(["drawn", "authority-publication", "certified-word"]),
     graphType: GraphType,
     // Whether the deployment accepted synthetic content when this run passed its gate (D7).
     allowSyntheticSources: z.boolean(),
@@ -260,6 +266,7 @@ export const AnyRunManifestSchema = z.union([
   RunManifestV2Schema,
   RunManifestV3Schema,
   RunManifestV4Schema,
+  RunManifestV5Schema,
   RunManifestSchema,
 ]);
 
@@ -269,6 +276,7 @@ export {
   RunManifestV2Schema,
   RunManifestV3Schema,
   RunManifestV4Schema,
+  RunManifestV5Schema,
   type RunManifestV1,
 } from "./run-manifest-frozen.js";
 export type RunManifest = z.infer<typeof RunManifestSchema>;

@@ -285,5 +285,12 @@ recommendations ... the rest you are authorized to do as well"); each reading is
 - **The package leaflet** (2026-10-06, owner decision 8): `zone_a.leaflet` (`pl-structure/1.0.0`)
   finds a leaflet's sections, `zone_a.word_epi` builds them unchanged; see
   `docs/design/pl-structure.md` for what it carries on the EMA's published Word leaflets.
+- **P4, in part** (2026-10-06, `docs/design/certified-word-import.md`, "Progress"):
+  `zone_a.recompute`, the one function the producer and Zone B's gate run (D2's function); the
+  `certified-word` source kind (`CanonicalSubmission` 2.1.0) and its importer
+  (`src/certified-word/`), a Type 1 graph of the confirmed product with the titles carried as
+  written; the ADR 0001 and ADR 0002 amendments. The gate accepts one only as a dry run until it
+  runs the recompute itself.
 - **Still to do:** in the reader (P1), floating tables, frames, right-to-left tables and page
-  breaks reported in place of the scan; P2, P4 and P5.
+  breaks reported in place of the scan; P2; in P4, the worker's recompute (D2), the upload path
+  (D4) and the drawing records (D3); P5.

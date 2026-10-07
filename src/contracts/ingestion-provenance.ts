@@ -25,7 +25,9 @@ import {
 // union on a required `kind`. That change, and two tightenings before it, were published under
 // 1.0.0's `$id`; `contracts/versions.lock.json` now refuses a changed schema under a version it
 // has recorded.
-export const INGESTION_PROVENANCE_VERSION = "2.0.0";
+// 2.1.0 (ADR 0006 P4, D1): `sourceDocument` gains a third variant, `certified-word`. A minor: a new
+// member of a discriminated union refuses nothing that parsed before.
+export const INGESTION_PROVENANCE_VERSION = "2.1.0";
 
 export const MediaType = z
   .enum([
@@ -157,8 +159,72 @@ export const AuthoritySourceDocumentSchema = z
       "An authority's published ePI, which Zone B fetches itself and re-imports (docs/design/authority-import-contract.md).",
   });
 
+// Every version that decides a recompute of a certified Word source, as `zone_a.recompute`'s
+// `versions()` names them: the recompute, the label reader and its output format, the structurer,
+// the QRD registry, the mapping and the page and narrative builder. A new one is a new contract.
+export const RecomputeVersionsSchema = z
+  .strictObject({
+    recompute: Token,
+    reader: Token,
+    format: Token,
+    structurer: Token,
+    registryVersion: Token,
+    mappingVersion: Token,
+    builder: Token,
+  })
+  .meta({ id: "RecomputeVersions" });
+
+// What the recompute was asked (zone_a.recompute; docs/design/certified-word-import.md, D1, D2):
+// the document, the view a person named for a label with tracked changes, which SmPC or leaflet
+// of the file (counted from 0), the headings a person assigned (section key to paragraph index),
+// and every version. Zone B makes the sections again from the bytes with this request.
+export const RecomputeRequestSchema = z
+  .strictObject({
+    document: z.enum(["smpc", "pl"]),
+    view: z.enum(["accepted", "original"]).nullable(),
+    part: Count,
+    assignments: z.record(SourceKey, Count),
+    versions: RecomputeVersionsSchema,
+  })
+  .meta({ id: "RecomputeRequest" });
+
+// A company's Word label, read exactly by the label reader and made into sections by Zone A
+// (ADR 0006; docs/design/certified-word-import.md, D1). Zone B makes them again from the uploaded
+// bytes (D2): until it can, the gate accepts one only as a dry run.
+export const CertifiedWordSourceDocumentSchema = z
+  .strictObject({
+    kind: z.literal("certified-word"),
+    mediaType: z.literal("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    // The .docx as uploaded (D4).
+    document: z.strictObject({
+      sha256: Sha256Hex,
+      byteLength: PositiveInt,
+      filename: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._ -]{0,254}$/),
+      storageUri: StorageUri,
+    }),
+    recompute: RecomputeRequestSchema,
+    // The tracked changes the named view settled (0 for a label without any).
+    changes: Count,
+    // One page per section, in the order the recompute gives them (the template's, a parent
+    // before its children), each with its key and the EMA code the recompute gave it.
+    sectionPages: z
+      .array(z.strictObject({ page: PositiveInt, key: SourceKey, code: Token }))
+      .min(1)
+      .max(2_000),
+    extractedText: ExtractedTextRefSchema,
+  })
+  .meta({
+    id: "CertifiedWordSourceDocument",
+    description:
+      "A Word label the label reader read exactly, made into sections by Zone A's recompute (ADR 0006, docs/design/certified-word-import.md).",
+  });
+
 export const SourceDocumentSchema = z
-  .discriminatedUnion("kind", [DrawnSourceDocumentSchema, AuthoritySourceDocumentSchema])
+  .discriminatedUnion("kind", [
+    DrawnSourceDocumentSchema,
+    AuthoritySourceDocumentSchema,
+    CertifiedWordSourceDocumentSchema,
+  ])
   .meta({ id: "SourceDocument" });
 
 export const ToolVersionSchema = z
@@ -349,6 +415,8 @@ export const ApprovalSchema = z
 export type SourceDocument = z.infer<typeof SourceDocumentSchema>;
 export type DrawnSourceDocument = z.infer<typeof DrawnSourceDocumentSchema>;
 export type AuthoritySourceDocument = z.infer<typeof AuthoritySourceDocumentSchema>;
+export type CertifiedWordSourceDocument = z.infer<typeof CertifiedWordSourceDocumentSchema>;
+export type RecomputeRequest = z.infer<typeof RecomputeRequestSchema>;
 export type ImportRequest = z.infer<typeof ImportRequestSchema>;
 export type AttestedApproval = z.infer<typeof AttestedApprovalSchema>;
 export type AuthorityApproval = z.infer<typeof AuthorityApprovalSchema>;
