@@ -11,7 +11,12 @@ libraries" (steps 0–8). Roadmap item 2, phase 1 build steps 2 to 5 of `docs/de
   the data of its versioned Provenance's signature. `review-record`: what the approver is shown
   (D6), which the signer renders into the one review file the statement's `reviewSha256` covers.
   The statement carries the `approve` kind only; the design's amendment of 2026-10-06 says why
-  `request` is not in 1.0.0.
+  `request` is not in 1.0.0. After the security review of #191, and before either was released,
+  the statement gained `documentBundleSha256` (the whole published record, so the approval covers
+  structure as well as narrative) and the review its structured facts (`documentBundleSha256`,
+  `product`: name, identifiers, holders, authorisations); both were relocked as 1.0.0, which `main`
+  has never published (ADR 0002's amendment of 2026-09-28: a version main never published is locked
+  to what it publishes).
 - `QUERY_TOOLS_VERSION` moves from `4.1.0` to `5.0.0`, a **major**: `QueryErrorCode` gains
   `not-approved`; `SectionContent` and `ProvenanceDetail` gain an optional `approval`
   (`ApprovalCitation`: the statement's hash, kind, meaning and sequence, the approver's subject,
@@ -25,7 +30,9 @@ libraries" (steps 0–8). Roadmap item 2, phase 1 build steps 2 to 5 of `docs/de
 **Classification.** ADR 0002, "Versioning": enum additions on a field a client branches on are
 major. `query-tools`' added fields are optional, so with the query service's
 `APPROVAL_VERIFICATION` off (the default) every answer it gives is one 4.1.0 also accepts: no
-answer carries `approval` and none is `not-approved`. With it on, every answer carries `approval`,
+answer carries `approval` and none is `not-approved`. What does change with it off: audit records
+say `contractVersion` 5.0.0, and `tools/list` advertises the optional `approval` and the
+`not-approved` code. With it on, every answer carries `approval`,
 which a 4.1.0 reader refuses (its objects are strict).
 
 **Impact assessment (step 0).**
@@ -45,7 +52,8 @@ which a 4.1.0 reader refuses (its objects are strict).
 publishes as before (`approval_enforcement` off); the deploy creates the HSM key, the heads bucket
 and the signer, all inert. 2. Approve the demonstration documents through the signer (the design's
 step 6). 3. In one change: turn `approval_enforcement` on and publish the approved documents, redeploy
-the agent from `main` (5.0.0), and turn `query_approval_verification` on.
+the agent from `main` (5.0.0), and turn `query_approval_verification` on (the design's step-6
+runbook). With enforcement on, a persisted fixture run is refused, so the deploy's smoke run skips.
 
 **Steps 1–6.** 1: the version literals above. 2: `npm run contracts:generate`,
 `npm run contracts:fixtures`, `npm run contracts:lock -- --record` this file, and

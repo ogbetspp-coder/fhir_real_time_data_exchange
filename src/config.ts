@@ -37,8 +37,6 @@ const EnabledRunSources = z
 // KMS with an opaque error, after the run's other work is done. Checked at startup instead.
 const KMS_KEY_VERSION =
   /^projects\/[^/]+\/locations\/[^/]+\/keyRings\/[^/]+\/cryptoKeys\/[^/]+\/cryptoKeyVersions\/[^/]+$/;
-// A crypto key, whose versions a reader trusts: the approval key (docs/design/approval.md, D4).
-const KMS_KEY = /^projects\/[^/]+\/locations\/[^/]+\/keyRings\/[^/]+\/cryptoKeys\/[^/]+$/;
 
 const ConfigSchema = z
   .object({
@@ -90,13 +88,14 @@ const ConfigSchema = z
       .default("off")
       .transform((value) => value === "on"),
     // When it is on: the environment every statement it accepts names, the heads bucket it reads
-    // the head from, and the approval key whose versions it trusts.
+    // the head from, and the one approval key version it trusts (a statement signed by any other
+    // version, of this key or another, is refused).
     APPROVAL_ENVIRONMENT: ApprovalEnvironment.optional(),
     APPROVAL_HEADS_BUCKET: optionalNonEmpty,
-    APPROVAL_SIGNING_KEY: z
+    APPROVAL_SIGNING_KEY_VERSION: z
       .string()
       .trim()
-      .regex(KMS_KEY, "APPROVAL_SIGNING_KEY must name a crypto key, not a version")
+      .regex(KMS_KEY_VERSION, "APPROVAL_SIGNING_KEY_VERSION must name a crypto key version")
       .optional(),
     // The code and the images a run manifest names (`runtime`, run manifest 5.0.0), each in its
     // own grammar: infra/run.tf sets the commit (`service_version`, which scripts/gcp/deploy.sh
@@ -140,13 +139,11 @@ const ConfigSchema = z
       "TRANSFORMATION_LEDGER_DATASET",
     ] as const;
 
-    // With APPROVAL_ENFORCEMENT on, a persisted document run is always verified against its
-    // approval: there is no unapproved document publication, and no deployment that cannot check.
-    const documentRuns = (value.ENABLED_RUN_SOURCES ?? RUN_SOURCES).includes("document");
-    const approval =
-      value.APPROVAL_ENFORCEMENT && documentRuns
-        ? (["APPROVAL_ENVIRONMENT", "APPROVAL_HEADS_BUCKET", "APPROVAL_SIGNING_KEY"] as const)
-        : [];
+    // With APPROVAL_ENFORCEMENT on, every persisted run is verified against its approval: there is
+    // no unapproved publication, and no deployment that cannot check.
+    const approval = value.APPROVAL_ENFORCEMENT
+      ? (["APPROVAL_ENVIRONMENT", "APPROVAL_HEADS_BUCKET", "APPROVAL_SIGNING_KEY_VERSION"] as const)
+      : [];
 
     for (const key of [...required, ...approval]) {
       if (value[key] === undefined) {

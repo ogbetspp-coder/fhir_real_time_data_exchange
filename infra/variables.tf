@@ -404,7 +404,7 @@ variable "signer_image" {
 }
 
 variable "kms_approval_key_version" {
-  description = "Version of approval-signing-hsm (keys.tf) the signer signs with. Cloud KMS does not rotate asymmetric signing keys, so this changes only when a new version is created by hand; readers trust every version of the key (D4)."
+  description = "Version of approval-signing-hsm (keys.tf) the signer signs with, and the one version the worker and the query service trust: a statement signed by any other version is refused, so a new or compromised version is never trusted silently. Cloud KMS does not rotate asymmetric signing keys; moving to a new version makes every statement signed by the old one untrusted until it is approved again (docs/design/approval.md, the amendment of 2026-10-06)."
   type        = string
   default     = "1"
 
@@ -417,14 +417,16 @@ variable "kms_approval_key_version" {
 variable "approvers" {
   description = <<-EOT
     The approver map (docs/design/approval.md, D2): each approver's Google subject (the `sub` of
-    their ID token, never an e-mail address) to their role and the e-mail address their verified
-    token must carry. The signer reads the role from here and names the map's hash in every
+    their ID token, never an e-mail address) to their role, their display name (recorded with
+    every approval they make; a Google ID token carries no name without the profile scope, so it
+    is set here) and the e-mail address their verified token must carry. The signer reads the role from here and names the map's hash in every
     statement; each address is granted read on the evidence bucket's `reviews/` only, so the
     approver can open a review. Empty, the default: nobody can approve. A change to it is a change
     record (Infrastructure and controls, "Approver map").
   EOT
   type = map(object({
     role  = string
+    name  = string
     email = string
   }))
   default = {}
@@ -435,9 +437,10 @@ variable "approvers" {
       can(regex("^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$", sub)) &&
       !startswith(sub, "accounts.google.com:") &&
       contains(["content-reviewer", "qa-reviewer"], approver.role) &&
+      can(regex("^[^<>\n\r\t]{1,200}$", approver.name)) &&
       can(regex("^[a-z0-9._%+-]{1,64}@[a-z0-9-]+(\\.[a-z0-9-]+)+$", approver.email))
     ])
-    error_message = "Each approver is keyed by a bare Google subject (an opaque id, not accounts.google.com:<id> and not an e-mail address), with role content-reviewer or qa-reviewer and a lower-case e-mail address."
+    error_message = "Each approver is keyed by a bare Google subject (an opaque id, not accounts.google.com:<id> and not an e-mail address), with role content-reviewer or qa-reviewer, a display name of 1 to 200 characters without markup or line breaks, and a lower-case e-mail address."
   }
 }
 

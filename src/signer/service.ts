@@ -267,7 +267,7 @@ function reviewCard(deps: SignerDeps, ref: SubmissionRef, prepared: Prepared): u
 async function approve(
   deps: SignerDeps,
   parameters: Record<string, string>,
-  verified: { approver: { sub: string; email: string; name: string }; userTokenSha256: string },
+  verified: { approver: { sub: string; email: string }; userTokenSha256: string },
 ): Promise<{ body: unknown; event: string; statementSha256?: string }> {
   const ref = SubmissionRefSchema.safeParse({
     uri: parameters.submissionUri,

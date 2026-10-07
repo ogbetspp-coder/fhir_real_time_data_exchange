@@ -63,7 +63,6 @@ export function buildSignerApp(
   google: OAuth2Client = new OAuth2Client(),
 ): Hono {
   const keyVersion = config.APPROVAL_SIGNING_KEY_VERSION;
-  const signingKey = keyVersion.slice(0, keyVersion.indexOf("/cryptoKeyVersions/"));
   return createSignerApp({
     environment: config.ENVIRONMENT,
     mapping,
@@ -80,7 +79,7 @@ export function buildSignerApp(
     heads: new GcsApprovalObjects(config.APPROVAL_HEADS_BUCKET),
     evidence: new GcsApprovalObjects(config.EVIDENCE_BUCKET),
     evidenceBucket: config.EVIDENCE_BUCKET,
-    keys: kmsKeySource(signingKey, kms),
+    keys: kmsKeySource(keyVersion, kms),
     sign: kmsSigner(kms, keyVersion),
     signer: { imageDigest: config.IMAGE_DIGEST, keyVersion },
     endpointUrl: config.ADDON_ENDPOINT_URL,

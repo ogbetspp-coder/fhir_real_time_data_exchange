@@ -91,7 +91,9 @@ export function approvableRecord(
 
 export function approvers(): ApproverMap {
   return parseApproverMap(
-    JSON.stringify({ [SUBJECT]: { role: "content-reviewer", email: EMAIL } }),
+    JSON.stringify({
+      [SUBJECT]: { role: "content-reviewer", name: "Synthetic Approver", email: EMAIL },
+    }),
   );
 }
 
@@ -110,6 +112,7 @@ export function statementFor(
     submissionId: facts.submissionId,
     approvedContentSha256: facts.approvedContentSha256,
     mappingVersion: facts.mappingVersion,
+    documentBundleSha256: facts.documentBundleSha256,
     sections: facts.sections,
     reviewSha256: "b".repeat(64),
     approver: { sub: SUBJECT, role: "content-reviewer", approverMapSha256: approvers().sha256 },

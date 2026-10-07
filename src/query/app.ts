@@ -900,11 +900,11 @@ export function approvalSources(
   reader: Pick<HealthcareFhirReader, "readProvenance">,
 ): ApprovalSources | undefined {
   if (!config.APPROVAL_VERIFICATION) return undefined;
-  const { APPROVAL_ENVIRONMENT, APPROVAL_HEADS_BUCKET, APPROVAL_SIGNING_KEY } = config;
+  const { APPROVAL_ENVIRONMENT, APPROVAL_HEADS_BUCKET, APPROVAL_SIGNING_KEY_VERSION } = config;
   if (
     APPROVAL_ENVIRONMENT === undefined ||
     APPROVAL_HEADS_BUCKET === undefined ||
-    APPROVAL_SIGNING_KEY === undefined
+    APPROVAL_SIGNING_KEY_VERSION === undefined
   ) {
     throw new Error("APPROVAL_VERIFICATION needs its environment, heads bucket and key");
   }
@@ -913,7 +913,7 @@ export function approvalSources(
     environment: APPROVAL_ENVIRONMENT,
     readProvenance: (id, signal) => reader.readProvenance(id, signal),
     heads: (signal) => heads.withSignal(signal),
-    keys: kmsKeySource(APPROVAL_SIGNING_KEY),
+    keys: kmsKeySource(APPROVAL_SIGNING_KEY_VERSION),
   };
 }
 

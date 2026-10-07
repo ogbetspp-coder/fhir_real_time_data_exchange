@@ -271,19 +271,24 @@ async function verifiedApproval(
 ): Promise<VerifiedStatement> {
   const environment = config.APPROVAL_ENVIRONMENT;
   const bucket = config.APPROVAL_HEADS_BUCKET;
-  const signingKey = config.APPROVAL_SIGNING_KEY;
-  if (environment === undefined || bucket === undefined || signingKey === undefined) {
+  const keyVersion = config.APPROVAL_SIGNING_KEY_VERSION;
+  if (environment === undefined || bucket === undefined || keyVersion === undefined) {
     throw new Error("Approval verification is not configured");
   }
   const approvals = dependencies.approvals ?? {
     heads: new GcsApprovalObjects(bucket),
-    keys: kmsKeySource(signingKey),
+    keys: kmsKeySource(keyVersion),
   };
   const facts = recordFacts(gate, transformed, mapping);
   const head = await readHead(approvals.heads, approvals.keys, facts.document);
   if (typeof head === "string") throw new ApprovalRefusedError(head);
   const { document, sections, mappingVersion, approvedContentSha256, submissionId } = facts;
-  const mismatch = checkStatement(head.statement, { environment, document, mappingVersion });
+  const mismatch = checkStatement(head.statement, {
+    environment,
+    document,
+    mappingVersion,
+    documentBundleSha256: facts.documentBundleSha256,
+  });
   if (mismatch !== undefined) throw new ApprovalRefusedError(mismatch);
   // The head names another submission or other content: this one is not the document's current
   // approved text.
@@ -325,6 +330,12 @@ export async function runPipeline(
   // source the deployment disabled: a no-synthetic deployment never signs fixture content.
   if (!config.ENABLED_RUN_SOURCES.includes(input.sourceKind)) {
     throw new Error("Run source is disabled");
+  }
+  // With APPROVAL_ENFORCEMENT on, every persisted run publishes under a verified head approval,
+  // and only a document run has a submission an approval can name: the ungated sources (fixture,
+  // healthcare-api) persist nothing, refused before any read or write.
+  if (config.APPROVAL_ENFORCEMENT && !config.DRY_RUN && input.sourceKind !== "document") {
+    throw new ApprovalRefusedError("ungated-source");
   }
   const runId = input.runId ?? randomUUID();
   const startedAt = new Date().toISOString();

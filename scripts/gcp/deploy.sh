@@ -1268,7 +1268,7 @@ phase_smoke() {
     break
   done
 
-  # 0: persisted; 3: source disabled, skip; 1: anything else. Non-JSON bodies (Cloud Run's own
+  # 0: persisted; 3: source disabled, or refused under approval enforcement, skip; 1: anything else. Non-JSON bodies (Cloud Run's own
   # 401/403/404 pages) yield no fields, and no body text is ever printed.
   verdict=0
   python3 - "$http_code" "$body_file" <<'PY' || verdict=$?
@@ -1294,6 +1294,9 @@ if isinstance(validation, dict):
 print(f"HTTP {code}: {json.dumps(fields, sort_keys=True)}")
 if code == "422" and fields.get("error") == "source-disabled":
     print("::notice title=Smoke run skipped::the worker's run-source allowlist (enabled_run_sources) excludes fixture, so no fixture run was attempted; this is the allowlist working as configured.")
+    sys.exit(3)
+if code == "422" and fields.get("error") == "not-approved" and fields.get("reason") == "ungated-source":
+    print("::notice title=Smoke run skipped::approval enforcement is on (approval_enforcement), so no unsigned fixture run may persist (docs/design/approval.md); this is enforcement working as configured.")
     sys.exit(3)
 if code == "200" and fields.get("status") == "persisted":
     print(f"Smoke run persisted: runId={fields.get('runId')} targetBundleId={fields.get('targetBundleId')}")

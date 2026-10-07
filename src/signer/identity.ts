@@ -15,8 +15,10 @@ import { sha256Utf8 } from "../lib/hash.js";
 //   the add-on's service account;
 // - the user ID token, `authorizationEventObject.userIdToken`: "An end user ID token", verified
 //   against "the client ID that was created" for the add-on (the Marketplace SDK's HTTP
-//   Deployments tab, Authorization Resource, OAuth Client Id). Its `sub` is the approver; its
-//   `email` and `name` are recorded with the approval, for people (D2).
+//   Deployments tab, Authorization Resource, OAuth Client Id). Its `sub` is the approver and its
+//   verified `email` must be the approver map's. Nothing else of it is used: a Google ID token
+//   carries `name` only with the profile scope, so the name recorded with an approval is the
+//   approver map's (src/approval/approve.ts).
 //
 // The interface below is what the rest of the signer depends on. Build step 1's spike tests the
 // one implementation against the real products; the tests here use locally generated keys.
@@ -107,11 +109,9 @@ export function googleAddOnIdentity(options: AddOnIdentityOptions): ApproverIden
       const age = now() / 1_000 - issuedAt;
       if (!(age <= USER_TOKEN_MAX_AGE_SECONDS)) return "user-token-stale";
       if (user.email_verified !== true) return "user-email-unverified";
-      const { sub, email, name } = user;
-      if (typeof sub !== "string" || typeof email !== "string" || typeof name !== "string") {
-        return "user-claims-missing";
-      }
-      return { approver: { sub, email, name }, userTokenSha256: sha256Utf8(userToken) };
+      const { sub, email } = user;
+      if (typeof sub !== "string" || typeof email !== "string") return "user-claims-missing";
+      return { approver: { sub, email }, userTokenSha256: sha256Utf8(userToken) };
     },
   };
 }

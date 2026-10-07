@@ -479,9 +479,11 @@ not a mode of the worker. It is tested under `test/query/` and deployed in `dev`
 
 - **Signed approvals.** With `APPROVAL_VERIFICATION` on (`query_approval_verification`, off by
   default), every answer is verified against the signed statement linked to the version it serves,
-  every served section is re-hashed against it, and a version without a valid approval is
-  `not-approved` (`query-tools` 5.0.0; `docs/design/approval.md`, D9 and the amendment of
-  2026-10-06). Off, every answer is as `query-tools` 4.1.0's.
+  the whole stored Bundle and every served section are re-hashed against it, and a version without
+  a valid approval is `not-approved` (`query-tools` 5.0.0; `docs/design/approval.md`, D9 and the
+  amendment of 2026-10-06). Off, no answer carries `approval` and none is `not-approved`; audit
+  records say `contractVersion` 5.0.0, and `tools/list` advertises the optional `approval` and the
+  `not-approved` code.
 
 ## Approval signer
 
@@ -510,9 +512,11 @@ event.
   digest, named in every statement it signs. Only the add-on's service account may invoke it
   (`approval_addon_service_account`, empty by default).
 - **The worker's side.** With `APPROVAL_ENFORCEMENT` on (`approval_enforcement`, off by default
-  until the design's step 6), a persisted `document` run publishes only under its document's
-  verified head statement and links the version it wrote to it after the commit
-  (`docs/design/approval.md`, D5 and D8); off, it publishes as before. The worker holds read on the heads bucket and `roles/cloudkms.publicKeyViewer` on the
+  until the design's step 6), every persisted run needs a verified head: a `fixture` or
+  `healthcare-api` run is refused, and a `document` run publishes only under its document's head
+  statement, whole published record included, and links the version it wrote to it after the commit
+  (`docs/design/approval.md`, D5 and D8); off, it publishes as before. Every reader trusts exactly one
+  approval key version (`kms_approval_key_version`). The worker holds read on the heads bucket and `roles/cloudkms.publicKeyViewer` on the
   approval key, and cannot sign or write an approval.
 
 ## Scale and failure behavior

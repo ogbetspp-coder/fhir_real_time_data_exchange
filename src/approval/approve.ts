@@ -31,6 +31,10 @@ export function normaliseSubject(subject: string): string {
 
 const ApproverEntrySchema = z.strictObject({
   role: ApproverRole,
+  // The approver's display name, recorded with every approval they make, for people (D2). Set by
+  // the owner with the map: a Google ID token carries a name only with the profile scope, which the
+  // add-on does not ask for, so the name is not taken from the token.
+  name: ApprovalStatementSchema.shape.manifestation.shape.name,
   // The address the approver's verified token must carry, and the member the review download is
   // granted to (infra/signer.tf). Lower case, as Google writes it.
   email: ApprovalStatementSchema.shape.manifestation.shape.email.regex(/^[^A-Z]+$/),
@@ -45,7 +49,7 @@ export type ApproverMap = {
 };
 
 // The server-side approver map (D2), a Terraform variable until the entitlement store holds it:
-// `{ "<Google subject>": { "role": "content-reviewer", "email": "…" } }`. A key that is not a
+// `{ "<Google subject>": { "role": "content-reviewer", "name": "…", "email": "…" } }`. A key that is not a
 // subject, two keys for one person, or an unknown field fails startup: a map that cannot be read
 // exactly approves no one.
 export function parseApproverMap(json: string): ApproverMap {
@@ -62,8 +66,9 @@ export function parseApproverMap(json: string): ApproverMap {
 
 // --- the decision ---------------------------------------------------------------------------------
 
-// A person as Google asserted them: the verified identity token's claims (src/signer/identity.ts).
-export type VerifiedApprover = { sub: string; email: string; name: string };
+// A person as Google asserted them: the verified identity token's subject and verified e-mail
+// (src/signer/identity.ts). Their name comes from the approver map.
+export type VerifiedApprover = { sub: string; email: string };
 
 export type ApprovalRequest = {
   environment: ApprovalEnvironment;
@@ -114,13 +119,14 @@ export function decideApproval(request: ApprovalRequest): ApprovalStatement | Si
     submissionId: review.submissionId,
     approvedContentSha256: review.approvedContentSha256,
     mappingVersion: review.mappingVersion,
+    documentBundleSha256: review.documentBundleSha256,
     sections: review.sections.map(({ sourceKey, narrativeDivSha256 }) => ({
       sourceKey,
       narrativeDivSha256,
     })),
     reviewSha256: request.rebuiltReviewSha256,
     approver: { sub: subject, role: entry.role, approverMapSha256: request.approvers.sha256 },
-    manifestation: { name: request.approver.name, email: entry.email },
+    manifestation: { name: entry.name, email: entry.email },
     meaning: review.meaning,
     signedAt: request.signedAt,
     signer: request.signer,

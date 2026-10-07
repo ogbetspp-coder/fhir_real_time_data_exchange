@@ -156,14 +156,18 @@ describe("the approval key's public keys", () => {
     };
   }
 
-  it("trusts only versions of its own key, and fetches each once", async () => {
+  // The one configured version, never another version of the same key: a new or compromised
+  // version is not trusted until the configuration names it.
+  it("trusts only the configured key version, and fetches it once", async () => {
     const kms = client({});
-    const keys = kmsKeySource(KEY, kms as never);
+    const keys = kmsKeySource(`${KEY}/cryptoKeyVersions/1`, kms as never);
     expect(await keys(`${KEY}/cryptoKeyVersions/1`)).toBeDefined();
     expect(await keys(`${KEY}/cryptoKeyVersions/1`)).toBeDefined();
     expect(kms.calls).toEqual([`${KEY}/cryptoKeyVersions/1`]);
+    expect(await keys(`${KEY}/cryptoKeyVersions/2`)).toBeUndefined();
     expect(await keys(`${KEY}-other/cryptoKeyVersions/1`)).toBeUndefined();
     expect(await keys(KEY)).toBeUndefined();
+    expect(kms.calls).toHaveLength(1);
   });
 
   it.each([
@@ -173,7 +177,7 @@ describe("the approval key's public keys", () => {
     ["no key", { pem: undefined }, "no public key"],
   ])("refuses %s, and asks again next time", async (_case, answer, message) => {
     const kms = client(answer);
-    const keys = kmsKeySource(KEY, kms as never);
+    const keys = kmsKeySource(`${KEY}/cryptoKeyVersions/1`, kms as never);
     await expect(keys(`${KEY}/cryptoKeyVersions/1`)).rejects.toThrow(message);
     await expect(keys(`${KEY}/cryptoKeyVersions/1`)).rejects.toThrow(message);
     expect(kms.calls).toHaveLength(2);

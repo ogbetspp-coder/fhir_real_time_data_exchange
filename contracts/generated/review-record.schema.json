@@ -26,6 +26,72 @@
           "type": "string",
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*#[0-9]+\\.[0-9]+\\.[0-9]+$"
         },
+        "documentBundleSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "product": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "identifiers": {
+              "maxItems": 50,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "system": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  }
+                },
+                "required": ["value"],
+                "additionalProperties": false
+              }
+            },
+            "holders": {
+              "maxItems": 50,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              }
+            },
+            "authorisations": {
+              "maxItems": 50,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "system": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  }
+                },
+                "required": ["value"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["name", "identifiers", "holders", "authorisations"],
+          "additionalProperties": false
+        },
         "source": {
           "type": "object",
           "properties": {
@@ -146,6 +212,8 @@
         "approvedContentSha256",
         "document",
         "mappingVersion",
+        "documentBundleSha256",
+        "product",
         "source",
         "fidelity",
         "meaning",

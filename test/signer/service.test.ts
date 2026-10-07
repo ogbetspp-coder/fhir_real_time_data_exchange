@@ -87,7 +87,7 @@ function harness(overrides: Partial<SignerDeps> = {}): Harness {
         const token = `user-token-${String(clicks)}`;
         tokens.push(token);
         return Promise.resolve({
-          approver: { sub: SUBJECT, email: EMAIL, name: "Synthetic Approver" },
+          approver: { sub: SUBJECT, email: EMAIL },
           userTokenSha256: sha256Utf8(token),
         });
       },
@@ -313,7 +313,7 @@ describe("an approval", () => {
       identity: {
         verify: () =>
           Promise.resolve({
-            approver: { sub: SUBJECT, email: EMAIL, name: "Synthetic Approver" },
+            approver: { sub: SUBJECT, email: EMAIL },
             userTokenSha256: sha256Utf8("the same token"),
           }),
       },
@@ -386,7 +386,7 @@ describe("who may ask", () => {
       identity: {
         verify: () =>
           Promise.resolve({
-            approver: { sub: "1", email: "someone@khs.dev", name: "Someone" },
+            approver: { sub: "1", email: "someone@khs.dev" },
             userTokenSha256: "0".repeat(64),
           }),
       },

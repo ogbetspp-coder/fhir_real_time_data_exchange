@@ -143,20 +143,16 @@ export class GcsApprovalObjects implements StoredObjects {
   }
 }
 
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-// The public keys of one approval key, by version, fetched once each and kept for the process's
-// life: a version's public key never changes. A version of any other key is untrusted (D4: each
-// environment trusts only its own key's versions). The algorithm, the version and the PEM's
-// checksum are checked, as Cloud KMS's data-integrity guidelines ask.
+// The public key of the one approval key version a reader trusts, fetched once and kept for the
+// process's life: a version's public key never changes. Any other version, of this key or another,
+// is untrusted (D4, and the amendment of 2026-10-06): a new or compromised version is never trusted
+// silently; trusting it is a configuration change (kms_approval_key_version). The algorithm, the
+// version and the PEM's checksum are checked, as Cloud KMS's data-integrity guidelines ask.
 export function kmsKeySource(
-  signingKey: string,
+  trustedVersion: string,
   client: Pick<KeyManagementServiceClient, "getPublicKey"> = new KeyManagementServiceClient(),
 ): KeySource {
-  const versions = new RegExp(`^${escapeRegExp(signingKey)}/cryptoKeyVersions/[0-9]{1,9}$`);
-  const cache = new Map<string, Promise<KeyObject>>();
+  let cached: Promise<KeyObject> | undefined;
   const fetchKey = async (keyVersion: string): Promise<KeyObject> => {
     const [response] = await client.getPublicKey({ name: keyVersion });
     const pem = response.pem;
@@ -173,14 +169,15 @@ export function kmsKeySource(
     return approvalPublicKey(pem);
   };
   return async (keyVersion) => {
-    if (!versions.test(keyVersion)) return undefined;
-    let key = cache.get(keyVersion);
-    if (key === undefined) {
-      key = fetchKey(keyVersion);
-      cache.set(keyVersion, key);
+    if (keyVersion !== trustedVersion) return undefined;
+    if (cached === undefined) {
+      const key = fetchKey(keyVersion);
+      cached = key;
       // A failed fetch is not kept: the next request asks again.
-      key.catch(() => cache.delete(keyVersion));
+      key.catch(() => {
+        if (cached === key) cached = undefined;
+      });
     }
-    return key;
+    return cached;
   };
 }

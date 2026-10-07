@@ -62,14 +62,14 @@
       "version": "1.0.0",
       "$id": "https://khs.dev/contracts/approval-statement/1.0.0/schema.json",
       "file": "approval-statement.schema.json",
-      "sha256": "9424ca39301436e7de61934d986cdc83fb0ddc321e579d17a7de2c03833f055a"
+      "sha256": "ebcbc12f84d6c08683646ef1e5881a83ec5aa44df08b8d32aa3ce2a5febe5f71"
     },
     {
       "name": "review-record",
       "version": "1.0.0",
       "$id": "https://khs.dev/contracts/review-record/1.0.0/schema.json",
       "file": "review-record.schema.json",
-      "sha256": "35fc6b88c157bb7845ba28e836d9ebfac56000823884c317586d866d0ffdfc2b"
+      "sha256": "4291f85c5c51cca2f40fde6336987bcf8e3ac2bda3c6a5c6483c1f258a3c8219"
     }
   ]
 }

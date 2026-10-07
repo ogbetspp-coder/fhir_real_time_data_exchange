@@ -21,6 +21,7 @@ import {
   chooseHead,
   headObjectName,
   headPrefix,
+  publishedDocumentSha256,
   publishedSections,
   readHead,
   signedStatementBytes,
@@ -243,6 +244,15 @@ describe("a document's head", () => {
     heads.objects.set(headObjectName(document, 2), signedStatementBytes(signed));
     expect(await readHead(heads, trustedKeys, document)).toBe("malformed-head");
 
+    // An entry read under a name that is not where its own sequence would be stored.
+    expect(
+      checkHeadEntry(
+        { name: `${headPrefix(document)}000000000001`, sequence: 2 },
+        document,
+        await verifyWithKeys(signedStatementBytes(signed), trustedKeys),
+      ),
+    ).toBe("malformed-head");
+
     const garbage = new MemoryHeads();
     garbage.objects.set(headObjectName(document, 1), "not json");
     expect(await readHead(garbage, trustedKeys, document)).toBe("malformed-head");
@@ -271,6 +281,87 @@ describe("a document's head", () => {
   });
 });
 
+// The approval covers the whole published record, structure as well as narrative: a store writer
+// who keeps the narrative and changes the product's name or an authorisation number in a new
+// version does not have the approved record.
+describe("the published record a statement names", () => {
+  it("is the crosswalk's Bundle without what the store assigns, and nothing else is left out", () => {
+    const bundle = structuredClone(first.transformed.documentBundle);
+    const hash = publishedDocumentSha256(bundle);
+    expect(first.facts.documentBundleSha256).toBe(hash);
+    // What the store adds on every write does not move it.
+    const stored = {
+      ...bundle,
+      meta: { ...(bundle.meta ?? {}), versionId: "7", lastUpdated: "2026-10-07T00:00:00Z" },
+    };
+    expect(publishedDocumentSha256(stored)).toBe(hash);
+    expect(publishedDocumentSha256({ ...bundle, meta: { versionId: "1" } })).toBe(
+      publishedDocumentSha256({ ...bundle, meta: undefined }),
+    );
+    // Anything else does: the product's name, with every narrative unchanged.
+    const renamed = structuredClone(stored);
+    const product = renamed.entry.find(
+      ({ resource }) => resource.resourceType === "MedicinalProductDefinition",
+    )?.resource as { name: { productName: string }[] } | undefined;
+    if (product === undefined) throw new Error("no product");
+    product.name[0] = { productName: "Another product" };
+    expect(publishedDocumentSha256(renamed)).not.toBe(hash);
+    const signed = verified(signedStatementBytes(signStatement(statementFor(first.facts))));
+    expect(
+      checkStatement(signed.statement, {
+        environment: "dev",
+        documentBundleSha256: publishedDocumentSha256(renamed),
+      }),
+    ).toBe("other-record");
+  });
+
+  it("keeps a meta value the store does not assign, and reads any meta shape", () => {
+    const bundle = structuredClone(first.transformed.documentBundle);
+    expect(publishedDocumentSha256({ ...bundle, meta: { profile: ["p"], versionId: "1" } })).toBe(
+      publishedDocumentSha256({ ...bundle, meta: { profile: ["p"] } }),
+    );
+    expect(publishedDocumentSha256({ ...bundle, meta: { profile: ["p"] } })).not.toBe(
+      publishedDocumentSha256({ ...bundle, meta: { profile: ["q"] } }),
+    );
+    expect(publishedDocumentSha256({ ...bundle, meta: ["x"] })).not.toBe(
+      publishedDocumentSha256({ ...bundle, meta: undefined }),
+    );
+  });
+
+  it("reads the product facts as stated, and refuses a record that names no product", () => {
+    const transformed = structuredClone(first.transformed);
+    const product = transformed.documentBundle.entry.find(
+      ({ resource }) => resource.resourceType === "MedicinalProductDefinition",
+    )?.resource as Record<string, unknown> | undefined;
+    const authorisation = transformed.documentBundle.entry.find(
+      ({ resource }) => resource.resourceType === "RegulatedAuthorization",
+    )?.resource as Record<string, unknown> | undefined;
+    if (product === undefined || authorisation === undefined) throw new Error("no product");
+    product.identifier = [{ value: "X" }, { system: 5, value: "Y" }, null, { system: "s" }];
+    authorisation.holder = { reference: "urn:uuid:nowhere" };
+    authorisation.identifier = "not a list";
+    const facts = recordFacts(first.gate, transformed, mapping);
+    expect(facts.product.identifiers).toEqual([{ value: "X" }, { value: "Y" }]);
+    expect(facts.product.holders).toEqual([]);
+    expect(facts.product.authorisations).toEqual([]);
+    product.name = "not a list";
+    expect(() => recordFacts(first.gate, transformed, mapping)).toThrow(/names no product/);
+  });
+
+  it("shows its structured facts in the review, and its hash", () => {
+    const review = buildReview("dev", first.gate, first.facts, undefined);
+    expect(review.documentBundleSha256).toBe(first.facts.documentBundleSha256);
+    expect(review.product.name.length).toBeGreaterThan(0);
+    const html = renderReview(review);
+    expect(html).toContain(review.product.name);
+    expect(html).toContain(review.documentBundleSha256);
+    for (const { value } of [...review.product.identifiers, ...review.product.authorisations]) {
+      expect(html).toContain(value);
+    }
+    for (const holder of review.product.holders) expect(html).toContain(holder);
+  });
+});
+
 describe("the sections a statement names", () => {
   it("are every published narrative, in the mapping's order, hashed as the store will hold them", () => {
     const composition = first.transformed.documentBundle.entry[0]?.resource;
@@ -284,6 +375,15 @@ describe("the sections a statement names", () => {
     for (const { sourceKey, narrativeDivSha256 } of first.facts.sections) {
       expect(narrativeDivSha256).toBe(submitted.get(sourceKey));
     }
+  });
+
+  it("cannot describe a record that carries one section's narrative twice", () => {
+    const composition = structuredClone(first.transformed.documentBundle.entry[0]?.resource);
+    if (composition === undefined || !isComposition(composition)) throw new Error("no Composition");
+    const [section] = composition.section;
+    if (section === undefined) throw new Error("no section");
+    composition.section.push(structuredClone(section));
+    expect(publishedSections(composition.section, mapping)).toBeUndefined();
   });
 
   it("cannot describe a record with a narrative section the mapping does not name", () => {
@@ -340,7 +440,9 @@ describe("the review", () => {
         signStatement(statementFor(first.facts, { sections: [...first.facts.sections, extra] })),
       ),
     );
-    expect(buildReview("dev", first.gate, first.facts, head).removed).toEqual([extra]);
+    const review = buildReview("dev", first.gate, first.facts, head);
+    expect(review.removed).toEqual([extra]);
+    expect(renderReview(review)).toContain("Removed since the current approval");
   });
 
   // A stale review: built against an older head, it does not hash as the review rebuilt now.
@@ -389,14 +491,22 @@ describe("the approver map", () => {
   it("normalises IAP's subject form to the ID token's", () => {
     expect(normaliseSubject(`accounts.google.com:${SUBJECT}`)).toBe(SUBJECT);
     const map = parseApproverMap(
-      JSON.stringify({ [`accounts.google.com:${SUBJECT}`]: { role: "qa-reviewer", email: EMAIL } }),
+      JSON.stringify({
+        [`accounts.google.com:${SUBJECT}`]: {
+          role: "qa-reviewer",
+          name: "Q. Reviewer",
+          email: EMAIL,
+        },
+      }),
     );
     expect(map.entries.get(SUBJECT)?.role).toBe("qa-reviewer");
-    expect(map.sha256).toBe(sha256({ [SUBJECT]: { role: "qa-reviewer", email: EMAIL } }));
+    expect(map.sha256).toBe(
+      sha256({ [SUBJECT]: { role: "qa-reviewer", name: "Q. Reviewer", email: EMAIL } }),
+    );
   });
 
   it("refuses one person under two keys, an e-mail as a key, a capitalised address or an unknown field", () => {
-    const entry = { role: "content-reviewer", email: EMAIL };
+    const entry = { role: "content-reviewer", name: "Synthetic Approver", email: EMAIL };
     expect(() =>
       parseApproverMap(
         JSON.stringify({ [SUBJECT]: entry, [`accounts.google.com:${SUBJECT}`]: entry }),
@@ -412,6 +522,13 @@ describe("the approver map", () => {
     expect(() =>
       parseApproverMap(JSON.stringify({ [SUBJECT]: { ...entry, role: "admin" } })),
     ).toThrow();
+    // The name is the map's, required, and plain text.
+    expect(() =>
+      parseApproverMap(JSON.stringify({ [SUBJECT]: { role: "content-reviewer", email: EMAIL } })),
+    ).toThrow();
+    expect(() =>
+      parseApproverMap(JSON.stringify({ [SUBJECT]: { ...entry, name: "<b>x</b>" } })),
+    ).toThrow();
   });
 });
 
@@ -423,7 +540,7 @@ describe("the signer's decision", () => {
       environment: "dev",
       kind: "approve",
       reviewSha256: hash,
-      approver: { sub: SUBJECT, email: EMAIL, name: "Synthetic Approver" },
+      approver: { sub: SUBJECT, email: EMAIL },
       approvers: approvers(),
       review,
       rebuiltReviewSha256: hash,
@@ -467,13 +584,11 @@ describe("the signer's decision", () => {
   });
 
   it("refuses an unmapped subject, and a mapped one whose verified address is not the map's", () => {
-    expect(decideApproval(request({ approver: { sub: "1", email: EMAIL, name: "Someone" } }))).toBe(
+    expect(decideApproval(request({ approver: { sub: "1", email: EMAIL } }))).toBe(
       "unmapped-approver",
     );
     expect(
-      decideApproval(
-        request({ approver: { sub: SUBJECT, email: "someone.else@khs.dev", name: "Someone" } }),
-      ),
+      decideApproval(request({ approver: { sub: SUBJECT, email: "someone.else@khs.dev" } })),
     ).toBe("approver-email-mismatch");
   });
 

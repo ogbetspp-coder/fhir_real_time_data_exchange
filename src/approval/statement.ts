@@ -35,10 +35,12 @@ export type ApprovalRefusal =
   | "other-submission"
   | "other-content"
   | "other-mapping"
+  | "other-record"
   | "section-mismatch"
   | "no-head"
   | "malformed-head"
-  | "not-head";
+  | "not-head"
+  | "ungated-source";
 
 export class ApprovalRefusedError extends Error {
   public override readonly name = "ApprovalRefusedError";
@@ -155,6 +157,7 @@ export type StatementExpectation = {
   submissionId?: string;
   approvedContentSha256?: string;
   mappingVersion?: string;
+  documentBundleSha256?: string;
   sections?: readonly ApprovedSection[];
 };
 
@@ -180,6 +183,12 @@ export function checkStatement(
     statement.mappingVersion !== expected.mappingVersion
   ) {
     return "other-mapping";
+  }
+  if (
+    expected.documentBundleSha256 !== undefined &&
+    statement.documentBundleSha256 !== expected.documentBundleSha256
+  ) {
+    return "other-record";
   }
   if (expected.sections !== undefined && sha256(statement.sections) !== sha256(expected.sections)) {
     return "section-mismatch";
@@ -224,6 +233,26 @@ export function checkHeadEntry(
   if (documentKey(verified.statement.document) !== documentKey(document)) return "malformed-head";
   if (verified.statement.sequence !== head.sequence) return "malformed-head";
   return verified;
+}
+
+// --- the whole published record ---------------------------------------------------------------------
+
+// The SHA-256 of an EMA document Bundle as published: its canonical JSON without the two values the
+// store assigns on every write, `meta.versionId` and `meta.lastUpdated` (and `meta` itself when
+// nothing else is left in it). The signer hashes the crosswalk's output so; the query service hashes
+// the stored Bundle so and requires the statement's value. A store that changed anything else in
+// the Bundle makes the version `not-approved`: a false refusal, never a false approval.
+export function publishedDocumentSha256(bundle: unknown): string {
+  const copy = structuredClone(bundle) as Record<string, unknown>;
+  const meta = copy.meta;
+  if (meta !== null && typeof meta === "object" && !Array.isArray(meta)) {
+    const rest = { ...(meta as Record<string, unknown>) };
+    delete rest.versionId;
+    delete rest.lastUpdated;
+    if (Object.keys(rest).length === 0) delete copy.meta;
+    else copy.meta = rest;
+  }
+  return sha256(copy);
 }
 
 // --- the sections a statement names ---------------------------------------------------------------

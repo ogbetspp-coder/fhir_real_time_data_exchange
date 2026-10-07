@@ -235,15 +235,19 @@ identity, and shares only pure libraries with the worker.
   off until the demonstration documents are approved through the signer:
   `docs/design/approval.md`, step 6), every tool verifies, before it answers, the signed statement
   linked to the version it read (D5, D9): it reads the link by id, verifies the signature against the
-  environment's approval key, re-hashes every section against the statement, and reads the
-  document's head. A version without a valid approval, or whose sections do not re-hash, is
-  `not-approved`; a plain request whose newest version is not the head's is `not-approved`; a named
-  version a later approval supersedes is answered and marked `superseded`. `get_section` and
+  one trusted approval key version, re-hashes the whole stored Bundle (without `meta.versionId` and
+  `meta.lastUpdated`) and every section against the statement, and reads the document's head. A
+  version without a valid approval, or whose record or sections do not re-hash, is `not-approved`; a
+  plain request whose newest version is not the head's is `not-approved`; a named version a later
+  approval supersedes is answered and marked `superseded`, once the head entry at its own sequence
+  has been read and is its statement. `get_section` and
   `get_provenance` carry `approval` (the statement's hash, the approver's subject, role, name and
   e-mail, the time and meaning of the signature), `get_provenance` names the statement's approver,
   and the audit record `approverSub` and `statementSha256`. Each verification is three store reads
-  beyond the Bundle, so `find_product` scans at most 50 entitled documents. With it off, every
-  answer is as 4.1.0's, and the rule below ("An approval is stated only for the current version")
+  beyond the Bundle, so `find_product` scans at most 50 entitled documents. With it off, no answer
+  carries `approval` and none is `not-approved`, so every answer is one 4.1.0 also accepts (audit
+  records say `contractVersion` 5.0.0, and `tools/list` advertises the new optional fields), and the
+  rule below ("An approval is stated only for the current version")
   is the one in force.
 - **Image.** `cloudbuild.images.yaml` builds `Dockerfile --target query` and publishes it as the
   `query` path of the shared `ema-flow` Artifact Registry repository

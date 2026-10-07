@@ -57,10 +57,13 @@ beforeAll(async () => {
   bundleId = one.facts.document.emaBundleId;
 });
 
+// The version as the store would hold it: what was written, with the version and write time the
+// store assigns added to its meta.
 function stored(record: ApprovableRecord, versionId: string): FhirBundle {
+  const bundle = structuredClone(record.transformed.documentBundle);
   return {
-    ...structuredClone(record.transformed.documentBundle),
-    meta: { versionId, lastUpdated: `2026-10-0${versionId}T09:00:00.000Z` },
+    ...bundle,
+    meta: { ...bundle.meta, versionId, lastUpdated: `2026-10-0${versionId}T09:00:00.000Z` },
   };
 }
 
@@ -273,6 +276,35 @@ describe("a version without a valid approval", () => {
     await expectNotApproved(w);
   });
 
+  // The exploit the security review of #191 described: the narrative kept, the product's name
+  // changed in a new version, and a link carrying the head's bytes written for it.
+  it("is not-approved when the stored record's structure is not the approved record's", async () => {
+    const w = world();
+    const document = w.documents.get(bundleId);
+    const product = document?.bundle.entry.find(
+      ({ resource }) => resource.resourceType === "MedicinalProductDefinition",
+    )?.resource as { name: { productName: string }[] } | undefined;
+    if (product === undefined) throw new Error("no product");
+    product.name[0] = { productName: "Synthetic Paracetamol 1000 mg tablets" };
+    await expectNotApproved(w);
+  });
+
+  // A statement validly signed that never became the head at its sequence (it lost a race) is not
+  // an approval, even for a named version a later head supersedes.
+  it("is not-approved when a named version's statement was never its sequence's head", async () => {
+    const w = world();
+    const loser = signStatement(statementFor(one.facts, { reviewSha256: "d".repeat(64) }));
+    const link = approvalLinkProvenance(bundleId, "1", loser);
+    w.provenances.set(link.id ?? "", link);
+    const h = await connect(w);
+    const answer = await callTool(h, "get_section", {
+      bundleId,
+      versionId: "1",
+      sourceKey: SECTION,
+    });
+    expect([answer.isError, answer.text]).toEqual([true, "not-approved"]);
+  });
+
   it("is not-approved when its link was signed by another key, or names another environment", async () => {
     for (const forged of [
       signStatement(statementFor(two.facts, { sequence: 2 }), otherKeys().privateKey),
@@ -356,7 +388,8 @@ describe("the setting", () => {
       APPROVAL_VERIFICATION: "on",
       APPROVAL_ENVIRONMENT: "dev",
       APPROVAL_HEADS_BUCKET: "heads",
-      APPROVAL_SIGNING_KEY: "projects/p/locations/l/keyRings/r/cryptoKeys/approval-signing-hsm",
+      APPROVAL_SIGNING_KEY_VERSION:
+        "projects/p/locations/l/keyRings/r/cryptoKeys/approval-signing-hsm/cryptoKeyVersions/1",
     });
     const read: string[] = [];
     const sources = approvalSources(on, {

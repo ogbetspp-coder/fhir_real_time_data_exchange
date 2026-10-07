@@ -168,8 +168,8 @@ resource "google_cloud_run_v2_service" "query" {
         value = google_storage_bucket.approval_heads.name
       }
       env {
-        name  = "APPROVAL_SIGNING_KEY"
-        value = google_kms_crypto_key.approval_signing_hsm.id
+        name  = "APPROVAL_SIGNING_KEY_VERSION"
+        value = local.approval_signing_key_version
       }
     }
   }

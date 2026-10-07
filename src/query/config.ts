@@ -60,14 +60,16 @@ export const QueryConfigSchema = z
       .enum(["on", "off"])
       .default("off")
       .transform((value) => value === "on"),
-    // When it is on: the environment the statements must name, the heads bucket, and the approval
-    // key whose versions are trusted.
+    // When it is on: the environment the statements must name, the heads bucket, and the one
+    // approval key version trusted (any other version, of this key or another, is refused).
     APPROVAL_ENVIRONMENT: ApprovalEnvironment.optional(),
     APPROVAL_HEADS_BUCKET: z.string().trim().min(1).max(256).optional(),
-    APPROVAL_SIGNING_KEY: z
+    APPROVAL_SIGNING_KEY_VERSION: z
       .string()
       .trim()
-      .regex(/^projects\/[^/]+\/locations\/[^/]+\/keyRings\/[^/]+\/cryptoKeys\/[^/]+$/)
+      .regex(
+        /^projects\/[^/]+\/locations\/[^/]+\/keyRings\/[^/]+\/cryptoKeys\/[^/]+\/cryptoKeyVersions\/[0-9]+$/,
+      )
       .optional(),
   })
   .superRefine((value, context) => {
@@ -75,7 +77,7 @@ export const QueryConfigSchema = z
     for (const key of [
       "APPROVAL_ENVIRONMENT",
       "APPROVAL_HEADS_BUCKET",
-      "APPROVAL_SIGNING_KEY",
+      "APPROVAL_SIGNING_KEY_VERSION",
     ] as const) {
       if (value[key] === undefined) {
         context.addIssue({

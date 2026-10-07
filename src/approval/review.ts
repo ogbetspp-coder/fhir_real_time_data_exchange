@@ -13,6 +13,7 @@ import type { EmaPackage } from "../fhir/transform.js";
 import { isComposition, type CompositionSection } from "../fhir/types.js";
 import { sha256, sha256Utf8, stableUuid } from "../lib/hash.js";
 import {
+  publishedDocumentSha256,
   publishedSections,
   type StatementExpectation,
   type VerifiedStatement,
@@ -29,7 +30,55 @@ import {
 // same, from its own gate and crosswalk, and requires the statement to name them.
 export type RecordFacts = Required<Omit<StatementExpectation, "environment">> & {
   sectionsById: ReadonlyMap<string, CompositionSection>;
+  product: ReviewRecord["product"];
 };
+
+type Identifier = { system?: string; value: string };
+
+function identifiersOf(resource: Record<string, unknown> | undefined): Identifier[] {
+  const identifiers = resource?.identifier;
+  return (Array.isArray(identifiers) ? identifiers : []).flatMap((identifier: unknown) => {
+    const { system, value } = (identifier ?? {}) as { system?: unknown; value?: unknown };
+    if (typeof value !== "string") return [];
+    return [typeof system === "string" ? { system, value } : { value }];
+  });
+}
+
+// What the published record states about the product, read from the crosswalk's output: the
+// product's name and identifiers, its authorisations' identifiers (the EU authorisation numbers
+// among them), and the holders they name. The approval covers these through the statement's
+// documentBundleSha256; the review shows them so the approver sees what they attest.
+function productFacts(bundle: EmaPackage["documentBundle"]): ReviewRecord["product"] {
+  const entries = bundle.entry.map(({ fullUrl, resource }) => ({
+    fullUrl,
+    resource,
+  }));
+  const of = (type: string) => entries.filter(({ resource }) => resource.resourceType === type);
+  const product = of("MedicinalProductDefinition")[0]?.resource;
+  const names = product?.name;
+  const name = Array.isArray(names)
+    ? (names[0] as { productName?: unknown } | undefined)?.productName
+    : undefined;
+  if (typeof name !== "string") throw new Error("The published record names no product");
+  const authorisations = of("RegulatedAuthorization");
+  const holders = [
+    ...new Set(
+      authorisations.flatMap(({ resource }) => {
+        const reference = (resource.holder as { reference?: unknown } | undefined)?.reference;
+        const holder = entries.find(
+          (entry) => entry.fullUrl === reference && entry.resource.resourceType === "Organization",
+        )?.resource.name;
+        return typeof holder === "string" ? [holder] : [];
+      }),
+    ),
+  ];
+  return {
+    name,
+    identifiers: identifiersOf(product),
+    holders,
+    authorisations: authorisations.flatMap(({ resource }) => identifiersOf(resource)),
+  };
+}
 
 export function recordFacts(
   gate: DocumentGateResult,
@@ -64,8 +113,10 @@ export function recordFacts(
     submissionId: gate.submission.submissionId,
     approvedContentSha256: sha256(approvedContent(gate.submission)),
     mappingVersion: mappingReference(mapping),
+    documentBundleSha256: publishedDocumentSha256(transformed.documentBundle),
     sections,
     sectionsById,
+    product: productFacts(transformed.documentBundle),
   };
 }
 
@@ -104,6 +155,8 @@ export function buildReview(
     approvedContentSha256: facts.approvedContentSha256,
     document: facts.document,
     mappingVersion: facts.mappingVersion,
+    documentBundleSha256: facts.documentBundleSha256,
+    product: facts.product,
     source: { sha256: source.sha256, mediaType: source.mediaType },
     fidelity: {
       status: report.status,
@@ -176,6 +229,15 @@ export function renderReview(record: ReviewRecord): string {
     row("Submission", record.submissionId),
     row("Approved content SHA-256", record.approvedContentSha256),
     row("Mapping", record.mappingVersion),
+    row("Product", record.product.name),
+    ...record.product.identifiers.map(({ system, value }) =>
+      row("Product identifier", `${system ?? "(no system)"}|${value}`),
+    ),
+    ...record.product.holders.map((holder) => row("Marketing authorisation holder", holder)),
+    ...record.product.authorisations.map(({ system, value }) =>
+      row("Authorisation", `${system ?? "(no system)"}|${value}`),
+    ),
+    row("Published record SHA-256", record.documentBundleSha256),
     row("Source document SHA-256", record.source.sha256),
     row("Source document type", record.source.mediaType),
     row(
@@ -214,7 +276,7 @@ export function renderReview(record: ReviewRecord): string {
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     `<title>Approval review ${escape(record.submissionId)}</title><style>${STYLE}</style></head><body>`,
     "<h1>Approval review</h1>",
-    `<p>Approving signs this statement: <strong>${escape(APPROVAL_MEANING_TEXT)}</strong> It is not the regulatory approval of the label.</p>`,
+    `<p>Approving signs this statement: <strong>${escape(APPROVAL_MEANING_TEXT)}</strong> It is not the regulatory approval of the label. It covers the whole published record: the facts below, and every section's text, as they hash to the published record's SHA-256.</p>`,
     `<dl>${facts}</dl>`,
     sections,
     removed,

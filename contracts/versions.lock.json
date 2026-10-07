@@ -26,7 +26,7 @@
   "approval-statement": {
     "1.0.0": [
       {
-        "sha256": "1d6cd56b763f4433ff2c16f4cde4a0097530894f9e97588a0735f3c985bfced0",
+        "sha256": "dc179556da716244468fbaffcfbb9e6ea02281354b6be331c10d7c118f2c680d",
         "record": "docs/validation/changes/2026-10-06-signed-approvals-query-tools-5-0-0.md"
       }
     ]
@@ -144,7 +144,7 @@
   "review-record": {
     "1.0.0": [
       {
-        "sha256": "2f573526b338614ad0f149780ae59d612f3cb7fde0f145c2e926499bc818d270",
+        "sha256": "9bd5a016d6ba7c8d4447b9bd2d4f3405a301a8988b7ed0014a46b5ef9cde0691",
         "record": "docs/validation/changes/2026-10-06-signed-approvals-query-tools-5-0-0.md"
       }
     ]

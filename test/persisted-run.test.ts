@@ -28,6 +28,7 @@ import {
   signStatement,
   statementFor,
   trustedKeys,
+  KEY_VERSION,
 } from "./support/approval.js";
 
 // A persisted run (DRY_RUN=false) with every Google client and both validators replaced, so what
@@ -515,15 +516,14 @@ describe("a persisted run's commit order", () => {
 // verified head statement, then links the stored version to it (D5). Evidence asked for: an
 // unsigned submission refused; the same content signed, published, with its versioned Provenance.
 describe("a persisted document run's approval", () => {
-  const APPROVAL_SIGNING_KEY =
-    "projects/p/locations/europe-west4/keyRings/evidence/cryptoKeys/approval-signing-hsm";
+  const APPROVAL_SIGNING_KEY_VERSION = KEY_VERSION;
   // The deployment with APPROVAL_ENFORCEMENT on, as the design's step 6 sets it.
   const enforcing = (): AppConfig => ({
     ...config,
     APPROVAL_ENFORCEMENT: true,
     APPROVAL_ENVIRONMENT: "dev",
     APPROVAL_HEADS_BUCKET: "approval-heads",
-    APPROVAL_SIGNING_KEY,
+    APPROVAL_SIGNING_KEY_VERSION,
   });
 
   function documentRun(
@@ -570,7 +570,7 @@ describe("a persisted document run's approval", () => {
     expect(state.objects.has("approval-link")).toBe(false);
   });
 
-  it("is off unless set, and on needs its environment, heads bucket and key", () => {
+  it("is off unless set, and on needs its environment, heads bucket and key version", () => {
     const environment = {
       NODE_ENV: "test",
       DRY_RUN: "false",
@@ -586,7 +586,11 @@ describe("a persisted document run's approval", () => {
       TRANSFORMATION_LEDGER_DATASET: "ledger",
     };
     expect(loadConfig(environment).APPROVAL_ENFORCEMENT).toBe(false);
-    for (const key of ["APPROVAL_ENVIRONMENT", "APPROVAL_HEADS_BUCKET", "APPROVAL_SIGNING_KEY"]) {
+    for (const key of [
+      "APPROVAL_ENVIRONMENT",
+      "APPROVAL_HEADS_BUCKET",
+      "APPROVAL_SIGNING_KEY_VERSION",
+    ]) {
       expect(() => loadConfig({ ...environment, APPROVAL_ENFORCEMENT: "on" })).toThrow(
         `${key} is required when DRY_RUN=false`,
       );
@@ -596,21 +600,74 @@ describe("a persisted document run's approval", () => {
       APPROVAL_ENFORCEMENT: "on",
       APPROVAL_ENVIRONMENT: "dev",
       APPROVAL_HEADS_BUCKET: "approval-heads",
-      APPROVAL_SIGNING_KEY,
+      APPROVAL_SIGNING_KEY_VERSION,
     };
     expect(loadConfig(on).APPROVAL_ENFORCEMENT).toBe(true);
-    // A deployment that runs no document source needs none of it.
-    expect(
+    // Whichever sources the deployment runs: with enforcement on, every persisted run is checked.
+    expect(() =>
       loadConfig({
         ...environment,
         APPROVAL_ENFORCEMENT: "on",
         ALLOW_SYNTHETIC_SOURCES: "true",
         ENABLED_RUN_SOURCES: "fixture",
-      }).APPROVAL_ENFORCEMENT,
-    ).toBe(true);
+      }),
+    ).toThrow("APPROVAL_HEADS_BUCKET is required when DRY_RUN=false");
+    // One key version is trusted, never a whole key.
     expect(() =>
-      loadConfig({ ...on, APPROVAL_SIGNING_KEY: `${APPROVAL_SIGNING_KEY}/cryptoKeyVersions/1` }),
-    ).toThrow(/must name a crypto key, not a version/);
+      loadConfig({
+        ...on,
+        APPROVAL_SIGNING_KEY_VERSION: APPROVAL_SIGNING_KEY_VERSION.split("/cryptoKeyVersions/")[0],
+      }),
+    ).toThrow(/must name a crypto key version/);
+  });
+
+  // An ungated source has no submission an approval can name: with enforcement on it persists
+  // nothing, refused before any read or write.
+  it.each(["fixture", "healthcare-api"] as const)(
+    "refuses a persisted %s run while APPROVAL_ENFORCEMENT is on",
+    async (sourceKind) => {
+      await expect(
+        runPipeline(
+          sourceKind === "fixture"
+            ? {
+                runId: crypto.randomUUID(),
+                sourceKind,
+                source: createSyntheticType2Bundle(mapping),
+                sourceResource: "fixture",
+              }
+            : {
+                runId: crypto.randomUUID(),
+                sourceKind,
+                source: createSyntheticType2Bundle(mapping),
+                sourceResource: "Bundle/b",
+              },
+          mapping,
+          enforcing(),
+        ),
+      ).rejects.toEqual(new ApprovalRefusedError("ungated-source"));
+      expect(kinds()).toEqual([]);
+      expect(state.executed).toEqual([]);
+    },
+  );
+
+  it("answers a refused fixture run not-approved over HTTP, writing nothing", async () => {
+    const response = await createApp({ config: enforcing() }).request("/v1/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ source: "fixture", runId: crypto.randomUUID() }),
+    });
+    expect([response.status, await response.json()]).toEqual([
+      422,
+      { error: "not-approved", reason: "ungated-source" },
+    ]);
+    expect(state.executed).toEqual([]);
+  });
+
+  it("refuses a head that approved another published record", async () => {
+    await expect(
+      documentRun(approvedHeads({ documentBundleSha256: "9".repeat(64) })),
+    ).rejects.toEqual(new ApprovalRefusedError("other-record"));
+    expect(state.executed).toEqual([]);
   });
 
   it("publishes under the signed head, then links the version the transaction wrote", async () => {

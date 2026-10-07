@@ -72,14 +72,10 @@ function verifier(overrides: { addOnServiceAccount?: string; oauthClientId?: str
 }
 
 describe("the approver's identity, as Google asserts it", () => {
-  it("is the user token's subject, e-mail and name, once both tokens verify", async () => {
+  it("is the user token's subject and verified e-mail, once both tokens verify", async () => {
     const user = userToken();
     expect(await verifier().verify(systemToken(), user)).toEqual({
-      approver: {
-        sub: "109876543210987654321",
-        email: "approver@khs.dev",
-        name: "Synthetic Approver",
-      },
+      approver: { sub: "109876543210987654321", email: "approver@khs.dev" },
       userTokenSha256: sha256Utf8(user),
     });
   });
@@ -143,14 +139,17 @@ describe("the approver's identity, as Google asserts it", () => {
     ).toBe("user-token-stale");
   });
 
-  it("refuses a user whose e-mail is unverified, or whose name or e-mail is absent", async () => {
+  it("refuses a user whose e-mail is unverified or absent, and needs no name", async () => {
     const check = verifier();
     expect(await check.verify(systemToken(), userToken({ email_verified: false }))).toBe(
       "user-email-unverified",
     );
-    expect(await check.verify(systemToken(), userToken({ name: undefined }))).toBe(
-      "user-claims-missing",
-    );
+    // A token without the profile scope carries no name; the name is the approver map's.
+    const nameless = userToken({ name: undefined });
+    expect(await check.verify(systemToken(), nameless)).toEqual({
+      approver: { sub: "109876543210987654321", email: "approver@khs.dev" },
+      userTokenSha256: sha256Utf8(nameless),
+    });
     expect(await check.verify(systemToken(), userToken({ email: undefined }))).toBe(
       "user-claims-missing",
     );

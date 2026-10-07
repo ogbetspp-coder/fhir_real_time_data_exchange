@@ -118,6 +118,12 @@ export const ApprovalStatementSchema = z
     // As the ingress gate recomputes it: { schemaVersion, graphType, bundle, provenance }.
     approvedContentSha256: Sha256Hex,
     mappingVersion: MappingVersion,
+    // The whole EMA document Bundle the crosswalk will publish, narrative and structure (product,
+    // identifiers, holder, authorisations): the SHA-256 of its canonical JSON without what the
+    // store assigns on every write, `meta.versionId` and `meta.lastUpdated`
+    // (src/approval/statement.ts, publishedDocumentSha256). The query service re-hashes the stored
+    // Bundle the same way on every answer.
+    documentBundleSha256: Sha256Hex,
     // Every published section with narrative, in the mapping's order.
     sections: z.array(ApprovedSectionSchema).min(1).max(200),
     // SHA-256 of the review file's bytes, exactly as the approver was shown it (D6).
@@ -129,7 +135,8 @@ export const ApprovalStatementSchema = z
       // SHA-256 of the canonical JSON of the approver map the role was read from.
       approverMapSha256: Sha256Hex,
     }),
-    // From the same verified token, for people; never an id (D2).
+    // For people, never an id (D2): the name the approver map gives the person, and the e-mail
+    // their verified token carries, which the map's must equal.
     manifestation: z.strictObject({ name: DisplayName, email: EmailAddress }),
     meaning: ApprovalStatementMeaning,
     // The signer's clock.
@@ -161,6 +168,12 @@ export const SignedApprovalStatementSchema = z
 
 // --- the review ------------------------------------------------------------------------------
 
+// An identifier as the published record states it, shown to the approver.
+const ReviewIdentifierSchema = z.strictObject({
+  system: z.string().min(1).max(256).optional(),
+  value: z.string().min(1).max(300),
+});
+
 export const ReviewSectionChange = z
   .enum(["added", "changed", "unchanged"])
   .meta({ id: "ReviewSectionChange" });
@@ -173,6 +186,16 @@ export const ReviewRecordSchema = z
     approvedContentSha256: Sha256Hex,
     document: ApprovalDocumentSchema,
     mappingVersion: MappingVersion,
+    // The published record's structure, as the crosswalk will publish it, and its whole hash
+    // (the statement's documentBundleSha256): what the approver attests besides the narrative.
+    documentBundleSha256: Sha256Hex,
+    product: z.strictObject({
+      name: z.string().min(1).max(300),
+      identifiers: z.array(ReviewIdentifierSchema).max(50),
+      // Every marketing authorisation holder the record's authorisations name.
+      holders: z.array(z.string().min(1).max(300)).max(50),
+      authorisations: z.array(ReviewIdentifierSchema).max(50),
+    }),
     // The source document the record was drawn from, by hash.
     source: z.strictObject({
       sha256: Sha256Hex,

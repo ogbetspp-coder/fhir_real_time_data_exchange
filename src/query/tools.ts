@@ -45,12 +45,15 @@ import {
 import {
   isComposition,
   type CompositionSection,
+  type FhirBundle,
   type FhirComposition,
   type FhirResource,
 } from "../fhir/types.js";
 import { approvalLinkBytes, approvalLinkId } from "../approval/link.js";
 import {
   checkStatement,
+  headObjectName,
+  publishedDocumentSha256,
   publishedSections,
   readHead,
   verifyWithKeys,
@@ -281,6 +284,8 @@ function narrativeOf(section: CompositionSection): SectionNarrative | undefined 
 // --- document loading --------------------------------------------------------------------------
 
 type LoadedDocument = {
+  // The stored Bundle as read, which a verified approval's documentBundleSha256 must hash.
+  bundle: FhirBundle;
   composition: FhirComposition;
   document: DocumentRef;
   entries: { fullUrl: string; resource: Record<string, unknown> }[];
@@ -338,6 +343,7 @@ async function loadDocument<T>(
   if (!document.success) return fail<T>(tool, "unavailable", { bundleId: selector.bundleId });
 
   return {
+    bundle,
     composition: first,
     document: document.data,
     entries: bundle.entry.map(({ fullUrl, resource }) => ({
@@ -396,7 +402,8 @@ async function versionStanding(
 // --- the approval a version carries (query-tools 5.0.0) ---------------------------------------------
 
 // The store reads one verification makes: the linked Provenance, the head's listing and the head's
-// entry (docs/design/approval.md, D9 as amended: "the linked Provenance, one listing and the head").
+// entry (docs/design/approval.md, D9 as amended: "the linked Provenance, one listing and the head");
+// a version a later head supersedes takes one more, its own sequence's entry.
 export const APPROVAL_READS = 3;
 
 export type VerifiedVersion = { citation: ApprovalCitation; statement: VerifiedStatement };
@@ -456,10 +463,17 @@ async function verifyVersion<T>(
   ) {
     return notApproved();
   }
+  // The whole stored Bundle, narrative and structure, must be the record the person approved
+  // (the statement's documentBundleSha256), and every section with narrative must re-hash to the
+  // statement's (D9).
   const sections = publishedSections(loaded.composition.section, context.mapping);
   if (
     sections === undefined ||
-    checkStatement(statement, { environment: approvals.environment, sections }) !== undefined
+    checkStatement(statement, {
+      environment: approvals.environment,
+      sections,
+      documentBundleSha256: publishedDocumentSha256(loaded.bundle),
+    }) !== undefined
   ) {
     return notApproved();
   }
@@ -483,6 +497,13 @@ async function verifyVersion<T>(
     return { citation: citationOf(verified, undefined), statement: verified };
   // A later approval of the same document is the head: this version is not its current text.
   if (!named || head.statement.sequence <= statement.sequence) return notApproved();
+  // And this statement was that document's head at its own sequence: a valid signature on a
+  // statement that never became a head (one that lost a race) is not an approval.
+  if (!context.readBudget.take()) return fail<T>(tool, "unavailable", at);
+  const own = await storeRead(context, () =>
+    source.read(headObjectName(statement.document, statement.sequence)),
+  );
+  if (own !== verified.bytes) return notApproved();
   return { citation: citationOf(verified, head.statementSha256), statement: verified };
 }
 
