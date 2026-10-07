@@ -4,6 +4,7 @@ import {
   CERTIFIED_WORD_PREFIX,
   CERTIFIED_WORD_SYNTHETIC_BLOCK,
   approvedContent,
+  certifiedWordExtractorRecord,
   type CanonicalBundle,
   type CanonicalSubmission,
   type CertifiedWordSourceDocument,
@@ -42,6 +43,12 @@ import {
 // nothing is added, reordered or reworded. The producer runs it on the recompute it ran; Zone B's
 // gate will run the recompute again on the uploaded bytes and this again on its result, and
 // require the same submission (D2). It reads no clock, no locale and no network.
+
+// The importer's version: with the recompute's versions it names the extractor (ADR 0006 decision
+// 6), and it is locked to the hash of this directory's code and of its golden vectors
+// (importer.lock.json, `npm run certified-word:lock`), so a change of what it makes changes it.
+export const IMPORTER_VERSION = "1.0.0";
+export const CERTIFIED_WORD_IMPORTER = `certified-word-import/${IMPORTER_VERSION}`;
 
 export const CERTIFIED_WORD_IDENTIFIER_SYSTEM = "https://khs.dev/fhir/identifier/certified-word";
 // Our own ids for the product and its holder, a person's confirmation (ADR 0006 decision 5).
@@ -111,10 +118,14 @@ function codePoints(text: string): number {
   return Array.from(text).length;
 }
 
-// ADR 0002 invariant 7's extractor token for this kind: the SHA-256 of the canonical JSON of every
-// version the recompute names (ADR 0006 decision 6).
+// ADR 0002 invariant 7's extractor token for this kind: `certified-word/` and the SHA-256 of the
+// canonical JSON of this importer and every version the recompute names (ADR 0006 decision 6).
 export function certifiedWordExtractor(versions: RecomputeResult["versions"]): string {
-  return `${CERTIFIED_WORD_IMPORTER_NAME}/${sha256(versions)}`;
+  const record = certifiedWordExtractorRecord({
+    importer: CERTIFIED_WORD_IMPORTER,
+    recompute: { versions },
+  });
+  return `${CERTIFIED_WORD_IMPORTER_NAME}/${sha256(record)}`;
 }
 
 function readRequest(request: unknown): CertifiedWordRequest {
@@ -165,9 +176,20 @@ function checkBinding(
   if (result.document !== asked.document) refuse("binding", "other-document");
   if (result.view !== asked.view) refuse("binding", "other-view");
   if (result.part !== asked.part) refuse("binding", "other-part");
-  for (const [key, paragraph] of Object.entries(asked.assignments)) {
-    const section = result.sections.find((candidate) => candidate.key === key);
-    if (section?.heading !== paragraph) refuse("binding", "assignment-not-applied");
+  // The headings the structure says a person assigned are exactly the request's, both ways: an
+  // assignment the request names that the result did not apply, and one the result applied that
+  // the request does not name, each refuse.
+  const assigned = structure.sections.filter(({ status }) => status === "assigned");
+  const asks = Object.entries(asked.assignments);
+  if (
+    assigned.length !== asks.length ||
+    asks.some(
+      ([key, paragraph]) =>
+        !assigned.some((section) => section.key === key && section.heading === paragraph) ||
+        result.sections.find((section) => section.key === key)?.heading !== paragraph,
+    )
+  ) {
+    refuse("binding", "assignments-differ");
   }
   if (DOCUMENT_TYPES[result.document] === undefined) refuse("binding", "document-not-carried");
   if (mapping.root.sourceKey !== result.document) refuse("binding", "mapping-of-another-document");
@@ -200,11 +222,14 @@ function placeSections(sections: RecomputedSection[], mapping: EmaMapping): Plac
   return placed;
 }
 
-// A title is the label's heading line as the recompute gives it (D6): one line of plain text,
-// carried as written, an assigned heading included.
+// A title is the label's heading line as the recompute gives it (D6): one line of plain text that
+// draws something, carried as written, an assigned heading included.
 function checkTitles(placed: Placed[]): void {
   for (const { section } of placed) {
-    if (section.title.length === 0 || /[\p{Cc}\p{Cf}\p{Cs}]/u.test(section.title)) {
+    if (
+      section.title.trim().length === 0 ||
+      /[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u.test(section.title)
+    ) {
       refuse("titles", "title-not-one-line");
     }
   }
@@ -250,25 +275,44 @@ function checkNarratives(placed: Placed[]): Page[] {
 }
 
 // An EU authorisation number standing alone on section 8's page: after a line's start, a space, a
-// tab or one of ",;:(", and before its end, a space, a tab or one of ",;:.()" (`zone_a.product`'s
-// strict form, with the page's own separators; a run of presentations is not one).
-const EU_NUMBER = /(?<=^|[ \t,;:(])EU\/1\/[0-9]{2}\/[0-9]{3,4}\/[0-9]{3}(?=$|[ \t,;:.()])/gmu;
+// tab or one of ",;:(", and before its end, a space, a tab, one of ",;:()", or a full stop that ends
+// the line or comes before whitespace (`zone_a.product`'s strict form, with the page's own
+// separators; a run of presentations is not one, nor "001.3").
+const EU_NUMBER =
+  /(?<=^|[ \t,;:(])EU\/1\/[0-9]{2}\/[0-9]{3,4}\/[0-9]{3}(?=$|[ \t,;:()]|\.(?:$|\s))/gmu;
+// Anything that could be the start of one, in any case and with any space inside "EU/": each must
+// be the start of a number read, or the section states a number the strict form does not read.
+const EU_START = /E\s*U\s*\//giu;
 
-// The product a person confirmed is this label's (ADR 0006 decision 5): its name is the text of a
-// line of section 1, its holder of a line of section 7, and its EU authorisation numbers exactly
-// those section 8 states, each standing alone, with no other "EU/" there.
+// The first line of a section's page (a page begins with a line feed), or "" for an empty page.
+function firstLine(page: string): string {
+  return page.split("\n").find((line) => line.length > 0) ?? "";
+}
+
+// The product a person confirmed is this label's (ADR 0006 decision 5):
+// - its name begins section 1's first line and ends where a word does (the line's end or
+//   whitespace follows it), and does not end in punctuation ("BRUKINSA" of "BRUKINSA 80 mg hard
+//   capsules", never a part of a word, a later word or the whole line's sentence);
+// - its holder is section 7's first line, exactly;
+// - its EU authorisation numbers are exactly those section 8 states, each standing alone, with no
+//   other "EU/" there, in any case or spacing.
 function checkProduct(placed: Placed[], product: CertifiedWordRequest["product"]): void {
   const page = (key: string): string =>
     placed.find(({ section }) => section.key === key)?.section.page ?? "";
-  const onALine = (text: string, key: string): boolean =>
-    page(key)
-      .split("\n")
-      .some((line) => line.includes(text));
-  if (!onALine(product.name, "smpc.1")) refuse("product", "name-not-in-section-1");
-  if (!onALine(product.holder.name, "smpc.7")) refuse("product", "holder-not-in-section-7");
+  const { name } = product;
+  const title = firstLine(page("smpc.1"));
+  const after = title.slice(name.length);
+  if (!title.startsWith(name) || !(after === "" || /^\s/u.test(after)) || /\p{P}$/u.test(name)) {
+    refuse("product", "name-not-in-section-1");
+  }
+  if (firstLine(page("smpc.7")) !== product.holder.name) {
+    refuse("product", "holder-not-in-section-7");
+  }
   const numbers = page("smpc.8");
   const found = [...numbers.matchAll(EU_NUMBER)];
-  if (found.length !== numbers.split("EU/").length - 1) refuse("product", "eu-number-unread");
+  if (found.length !== [...numbers.matchAll(EU_START)].length) {
+    refuse("product", "eu-number-unread");
+  }
   const stated = new Set(found.map(([number]) => number));
   const confirmed = new Set(product.euAuthorisationNumbers);
   if (stated.size !== confirmed.size || [...stated].some((number) => !confirmed.has(number))) {
@@ -530,6 +574,7 @@ export function importCertifiedWord(
       storageUri: request.upload.storageUri,
     },
     recompute: request.recompute,
+    importer: CERTIFIED_WORD_IMPORTER,
     changes: result.changes,
     sectionPages: pages.map(({ page, section }) => ({
       page,
@@ -547,7 +592,10 @@ export function importCertifiedWord(
     extraction: {
       extractionRunId: run.extractionRunId,
       serviceVersion: run.serviceVersion,
-      parser: { name: CERTIFIED_WORD_IMPORTER_NAME, version: sha256(result.versions) },
+      parser: {
+        name: CERTIFIED_WORD_IMPORTER_NAME,
+        version: extractor.slice(`${CERTIFIED_WORD_IMPORTER_NAME}/`.length),
+      },
       terminologyService: {
         name: EMA_MAPPING_ID,
         version: mapping.mappingVersion,

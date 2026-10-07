@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://khs.dev/contracts/canonical-submission/2.1.0/schema.json",
+  "$id": "https://khs.dev/contracts/canonical-submission/3.0.0/schema.json",
   "$ref": "#/$defs/CanonicalSubmission",
   "$defs": {
     "CanonicalSubmission": {
@@ -8,7 +8,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "2.1.0"
+          "const": "3.0.0"
         },
         "submissionId": {
           "$ref": "#/$defs/Uuid"
@@ -527,6 +527,9 @@
         "recompute": {
           "$ref": "#/$defs/RecomputeRequest"
         },
+        "importer": {
+          "$ref": "#/$defs/Token"
+        },
         "changes": {
           "type": "integer",
           "minimum": 0,
@@ -564,6 +567,7 @@
         "mediaType",
         "document",
         "recompute",
+        "importer",
         "changes",
         "sectionPages",
         "extractedText"

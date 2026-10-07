@@ -3,17 +3,17 @@
   "contracts": [
     {
       "name": "canonical-submission",
-      "version": "2.1.0",
-      "$id": "https://khs.dev/contracts/canonical-submission/2.1.0/schema.json",
+      "version": "3.0.0",
+      "$id": "https://khs.dev/contracts/canonical-submission/3.0.0/schema.json",
       "file": "canonical-submission.schema.json",
-      "sha256": "40f5b0c23753ea46943949e9717246522afe85e45688fdebd77d31925d768ea7"
+      "sha256": "72127912d7937b40fbbad385ce6722afd86366b2fe59d442f6db5c51981d17d8"
     },
     {
       "name": "ingestion-provenance",
-      "version": "2.1.0",
-      "$id": "https://khs.dev/contracts/ingestion-provenance/2.1.0/schema.json",
+      "version": "3.0.0",
+      "$id": "https://khs.dev/contracts/ingestion-provenance/3.0.0/schema.json",
       "file": "ingestion-provenance.schema.json",
-      "sha256": "b40b3ec8616b5a1cf4564025dfc282e988f63ababb922428f03851db7fb15ea1"
+      "sha256": "7e6fbc02a33a23f403645fbae38f3065b06af1c8c44fd93ca085d3cf4ddce1ba"
     },
     {
       "name": "fidelity-report",
@@ -52,10 +52,10 @@
     },
     {
       "name": "run-manifest",
-      "version": "5.1.0",
-      "$id": "https://khs.dev/contracts/run-manifest/5.1.0/schema.json",
+      "version": "6.0.0",
+      "$id": "https://khs.dev/contracts/run-manifest/6.0.0/schema.json",
       "file": "run-manifest.schema.json",
-      "sha256": "6f5fda6760e5639aab3c371e55076291d4c767782b16c80c2bcd847248a8ade2"
+      "sha256": "7770901c2bc101d4a65eb7d8a40516fdc1bf60accd421c7411ceb3a85413e17a"
     },
     {
       "name": "approval-statement",

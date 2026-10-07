@@ -20,7 +20,7 @@ HASH = "a" * 64
 
 def _manifest(**overrides: Any) -> dict[str, Any]:
     manifest: dict[str, Any] = {
-        "schemaVersion": "5.1.0",
+        "schemaVersion": "6.0.0",
         "source": {"kind": "fixture", "resource": "fixture:test", "hash": HASH},
         "runId": "33333333-3333-4333-a333-333333333333",
         "startedAt": "2026-09-27T00:00:00Z",

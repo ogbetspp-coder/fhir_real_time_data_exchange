@@ -1,8 +1,8 @@
 {
-  "schemaVersion": "5.1.0",
+  "schemaVersion": "6.0.0",
   "runId": "00000000-0000-4000-8000-00000000c003",
-  "startedAt": "2026-10-07T01:24:23.121Z",
-  "completedAt": "2026-10-07T01:24:23.138Z",
+  "startedAt": "2026-10-07T02:30:41.923Z",
+  "completedAt": "2026-10-07T02:30:41.946Z",
   "status": "validated",
   "dryRun": true,
   "source": {
@@ -103,19 +103,19 @@
   },
   "ingestion": {
     "submissionId": "00000000-0000-4000-8000-00000000c001",
-    "contractVersion": "2.1.0",
+    "contractVersion": "3.0.0",
     "sourceKind": "certified-word",
     "graphType": "type1",
     "allowSyntheticSources": true,
     "sourceDocumentSha256": "f86f053e901356ba58a0cfa3ecc0be8d0b9a5c3bb3feb86bf8b87347f4fbee09",
     "extractionRunId": "00000000-0000-4000-8000-00000000c002",
-    "parser": "certified-word@e4cef9180f6afc261e0443b9a39f36261fdea684e3951736c4eb285514752618",
+    "parser": "certified-word@bcd44c4c36f79a8515d7b24e49c523db5fc44dc12f94e1dabe97438b7cc9183e",
     "fidelity": {
       "status": "passed",
       "normalizationVersion": "fidelity-norm/3.3.0",
       "sectionsChecked": 32,
       "sectionsMatched": 32,
-      "reportSha256": "d53fcc8d94aadb1fd93234291f7df69fda10d1f8f0d616a8b0b97d631c689c23",
+      "reportSha256": "7dde15f7479d0bc4de755c3eda91c835e4e402c560ed82b04f6005ccedbfebcd",
       "narrativeBindingSha256": "0a8277c642f0cd81dca1437b45c1cab7f8eb1d4c60d947c4410cd42d8ea66505",
       "coverage": {
         "pageCodePoints": 1458,
@@ -130,7 +130,7 @@
       "approvedAt": "2026-10-06T11:59:00Z",
       "method": "api-attestation",
       "meaning": "reviewed-fidelity-and-structure",
-      "approvedContentSha256": "bab370f2333a9dc6f7c78d1c2fd6489c17e14f611e241e7d2e9fc5969c5b43c9"
+      "approvedContentSha256": "9b3ae94e77928cabeb100778cc2d356ca4b2aa4a907af4bdb79f912f572151c8"
     },
     "provenanceResourceId": "bc1ef7cb-dd6c-5158-adbb-133de8d2c5d5"
   }

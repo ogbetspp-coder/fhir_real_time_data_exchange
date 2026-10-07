@@ -25,9 +25,10 @@ import {
 // union on a required `kind`. That change, and two tightenings before it, were published under
 // 1.0.0's `$id`; `contracts/versions.lock.json` now refuses a changed schema under a version it
 // has recorded.
-// 2.1.0 (ADR 0006 P4, D1): `sourceDocument` gains a third variant, `certified-word`. A minor: a new
-// member of a discriminated union refuses nothing that parsed before.
-export const INGESTION_PROVENANCE_VERSION = "2.1.0";
+// 3.0.0 (ADR 0006 P4, D1): `sourceDocument` gains a third variant, `certified-word`. A major under
+// ADR 0002's rule ("Enum additions on fields that Zone B branches on are major"): Zone B branches
+// on `kind` (the gate, the pipeline, the run manifest's `sourceKind`).
+export const INGESTION_PROVENANCE_VERSION = "3.0.0";
 
 export const MediaType = z
   .enum([
@@ -203,6 +204,10 @@ export const CertifiedWordSourceDocumentSchema = z
       storageUri: StorageUri,
     }),
     recompute: RecomputeRequestSchema,
+    // The TypeScript importer that made the record from the recompute's result
+    // (`certified-word-import/<version>`, src/certified-word/importer.lock.json). With the
+    // recompute's versions it names the extractor, so a change to either changes the token.
+    importer: Token,
     // The tracked changes the named view settled (0 for a label without any).
     changes: Count,
     // One page per section, in the order the recompute gives them (the template's, a parent

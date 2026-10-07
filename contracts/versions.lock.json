@@ -56,9 +56,9 @@
         "record": "docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md"
       }
     ],
-    "2.1.0": [
+    "3.0.0": [
       {
-        "sha256": "41821184229ded94fddeda74a92a5c8cdb1746db98919413aaaf7cab65e3c064",
+        "sha256": "7109c8f6595527912e8d0bbff2c5bc19562e227353d07712cc92f8bdb1112a67",
         "record": "docs/validation/changes/2026-10-06-certified-word-source-kind.md"
       }
     ]
@@ -104,9 +104,9 @@
         "record": "docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md"
       }
     ],
-    "2.1.0": [
+    "3.0.0": [
       {
-        "sha256": "3453e1b881ca132d6d40d27d734bbfc3f94f9913af770541688ca6682e69c281",
+        "sha256": "6a425e74de2215abbba0bc700cc2b5482d8d5ccd116535bdb920b31a0e9872af",
         "record": "docs/validation/changes/2026-10-06-certified-word-source-kind.md"
       }
     ]
@@ -204,9 +204,9 @@
         "record": "docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md"
       }
     ],
-    "5.1.0": [
+    "6.0.0": [
       {
-        "sha256": "fdb917f976013c3b866b2c7270c3c6c94023cc3c3949cf5589138bacf1d34a36",
+        "sha256": "826f296ae286868c2bd9ffd312ee074dd21af0c7baaab476fe64ac5ebfd9eea2",
         "record": "docs/validation/changes/2026-10-06-certified-word-source-kind.md"
       }
     ]

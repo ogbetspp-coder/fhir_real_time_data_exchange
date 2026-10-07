@@ -5,7 +5,9 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   CANONICAL_ORGANIZATION_SYSTEM,
   CANONICAL_PRODUCT_SYSTEM,
+  CERTIFIED_WORD_IMPORTER,
   CertifiedWordRefusedError,
+  IMPORTER_VERSION,
   certifiedWordExtractor,
   importCertifiedWord,
 } from "../../src/certified-word/import.js";
@@ -118,20 +120,25 @@ describe("what the importer makes of a recomputed Word label", () => {
     ]);
   });
 
-  it("names the extractor by the hash of every version the recompute names", () => {
+  it("names the extractor by the hash of the importer and every version the recompute names", () => {
     const { submission, sourceText } = imported("smpc");
     const versions = result("smpc").versions as Record<string, string>;
-    const extractor = `certified-word/${sha256(versions)}`;
+    const record = { importer: CERTIFIED_WORD_IMPORTER, recompute: versions };
+    const extractor = `certified-word/${sha256(record)}`;
+    expect(CERTIFIED_WORD_IMPORTER).toBe(`certified-word-import/${IMPORTER_VERSION}`);
     expect(certifiedWordExtractor(versions as never)).toBe(extractor);
     expect(sourceText.extractorVersion).toBe(extractor);
     const source = submission.provenance.sourceDocument;
     if (source.kind !== "certified-word") throw new Error("not a certified Word source");
+    expect(source.importer).toBe(CERTIFIED_WORD_IMPORTER);
     expect(source.extractedText.extractorVersion).toBe(extractor);
     expect(source.recompute.versions).toEqual(versions);
     expect(submission.provenance.extraction.parser).toEqual({
       name: "certified-word",
-      version: sha256(versions),
+      version: sha256(record),
     });
+    // Another importer, the same recompute: another extractor (review of #193).
+    expect(sha256({ ...record, importer: "certified-word-import/0.0.0" })).not.toBe(sha256(record));
   });
 
   it("pins the uploaded bytes, the request and the view's changes", () => {
@@ -217,6 +224,14 @@ describe("what the importer refuses, by stage", () => {
       { ...request, documentId: request.documentId.toUpperCase() },
       { ...request, product: { ...product, name: "" } },
       { ...request, product: { ...product, name: "Synthetic\tExampline" } },
+      // Whitespace at an end is never what a person chose from the label (review of #193).
+      { ...request, product: { ...product, name: "Synthetic Exampline " } },
+      { ...request, product: { ...product, name: "\u00a0Synthetic Exampline" } },
+      { ...request, product: { ...product, name: "Synthetic\u2028Exampline" } },
+      {
+        ...request,
+        product: { ...product, holder: { ...product.holder, name: "Synthetic Holder B.V. " } },
+      },
       { ...request, product: { ...product, euAuthorisationNumbers: ["EU/1/24/9999/001-002"] } },
       { ...request, product: { ...product, euAuthorisationNumbers: ["EU/1/24/9999"] } },
       { ...request, approval: { ...request.approval, approverId: "a person@example.org" } },
@@ -281,11 +296,24 @@ describe("what the importer refuses, by stage", () => {
       [
         json,
         { ...request, recompute: { ...request.recompute, assignments: { "smpc.4.1": 3 } } },
-        "assignment-not-applied",
+        "assignments-differ",
       ],
     ];
     for (const [changed, asked, reason] of cases) {
       expect(refusedWith(changed, asked)).toBe(`binding: ${reason}`);
+    }
+    // The headings a person assigned are bound both ways (review of #193): a result made with
+    // {"smpc.4.1": 12} is not the one a request naming none, or another, names.
+    const assigned = caseRequest(found("smpc-assigned"));
+    const assignedResult = recomputed("smpc-assigned");
+    expect(refusal(() => imported("smpc-assigned"))).toBe("imported");
+    for (const assignments of [{}, { "smpc.4.2": 15 }, { "smpc.4.1": 12, "smpc.4.2": 15 }]) {
+      expect(
+        refusedWith(assignedResult, {
+          ...assigned,
+          recompute: { ...assigned.recompute, assignments },
+        }),
+      ).toBe("binding: assignments-differ");
     }
     // A leaflet: Zone B carries the SmPC only.
     expect(refusal(() => imported("pl"))).toBe("binding: document-not-carried");
@@ -322,7 +350,15 @@ describe("what the importer refuses, by stage", () => {
 
   it("a title that is not one line of plain text", () => {
     const { json, request } = smpc();
-    for (const title of ["", "4.1 Therapeutic\nindications", "4.1\u00adTherapeutic"]) {
+    for (const title of [
+      "",
+      " ",
+      "\u00a0",
+      "4.1 Therapeutic\nindications",
+      "4.1\u00adTherapeutic",
+      "4.1 Therapeutic\u2028indications",
+      "4.1 Therapeutic\u2029indications",
+    ]) {
       const list = sections(json).map((entry) =>
         entry.key === "smpc.4.1" ? { ...entry, title } : entry,
       );
@@ -379,16 +415,41 @@ describe("what the importer refuses, by stage", () => {
       ...request,
       product: { ...product, ...change },
     });
-    expect(refusedWith(json, asked({ name: "SYNTHETIC EXAMPLINE" }))).toBe(
-      "product: name-not-in-section-1",
-    );
-    // Text of the label, but across two of its lines.
-    expect(refusedWith(json, asked({ name: "tablets Synthetic text" }))).toBe(
-      "product: name-not-in-section-1",
-    );
-    expect(
-      refusedWith(json, asked({ holder: { ...product.holder, name: "Synthetic Holder BV" } })),
-    ).toBe("product: holder-not-in-section-7");
+    // The name begins section 1's first line ("Synthetic Exampline 10 mg film-coated tablets") and
+    // ends where a word does, not in punctuation; anything else is not the name a person chose
+    // (review of #193: each of these imported when the name was checked as a substring).
+    for (const name of [
+      "SYNTHETIC EXAMPLINE",
+      "Synthetic Exampli",
+      "Synthetic Exampline 10 mg film-coated tablet",
+      "mg",
+      "10 mg film-coated tablets",
+      "Synthetic text, not for clinical use.",
+      "Synthetic text",
+      "tablets Synthetic text",
+      "Synthetic Exampline 10 mg film-coated tablets,",
+    ]) {
+      expect([name, refusedWith(json, asked({ name }))]).toEqual([
+        name,
+        "product: name-not-in-section-1",
+      ]);
+    }
+    for (const name of ["Synthetic", "Synthetic Exampline 10 mg film-coated tablets"]) {
+      expect([name, refusedWith(json, asked({ name }))]).toEqual([name, "imported"]);
+    }
+    // The holder is section 7's first line, exactly.
+    for (const name of [
+      "Synthetic Holder BV",
+      "Synthetic Holder B.V",
+      "Holder B",
+      "1 Example Street",
+      "Synthetic Holder",
+    ]) {
+      expect([name, refusedWith(json, asked({ holder: { ...product.holder, name } }))]).toEqual([
+        name,
+        "product: holder-not-in-section-7",
+      ]);
+    }
     expect(refusedWith(json, asked({ euAuthorisationNumbers: ["EU/1/24/9999/001"] }))).toBe(
       "product: eu-numbers-differ",
     );
@@ -398,44 +459,48 @@ describe("what the importer refuses, by stage", () => {
         asked({ euAuthorisationNumbers: [...product.euAuthorisationNumbers, "EU/1/24/9999/003"] }),
       ),
     ).toBe("product: eu-numbers-differ");
-    // Section 8 states a number the strict form does not read: a run, or one run into a word.
-    for (const page of [
-      "\nEU/1/24/9999/001-002\n",
-      "\nEU/1/24/9999/001\nEU/1/24/9999/002\nSee EU/1/24/9999/003x\n",
-    ]) {
-      const changed = {
-        ...json,
-        sections: sections(json).map((entry) =>
-          entry.key === "smpc.8"
-            ? {
-                ...entry,
-                page,
-                narrative: `<div xmlns="http://www.w3.org/1999/xhtml">${page
-                  .trim()
-                  .split("\n")
-                  .map((line) => `<p>${line}</p>`)
-                  .join("")}</div>`,
-              }
-            : entry,
-        ),
-      };
-      expect(refusedWith(changed, request)).toBe("product: eu-number-unread");
-    }
-    // A number standing after a comma or in brackets is read.
-    const listed = "\nEU/1/24/9999/001, (EU/1/24/9999/002).\n";
-    const read = {
+    const withSection8 = (page: string): Json => ({
       ...json,
       sections: sections(json).map((entry) =>
         entry.key === "smpc.8"
           ? {
               ...entry,
-              page: listed,
-              narrative: `<div xmlns="http://www.w3.org/1999/xhtml"><p>${listed.trim()}</p></div>`,
+              page,
+              narrative: `<div xmlns="http://www.w3.org/1999/xhtml">${page
+                .trim()
+                .split("\n")
+                .map((line) => `<p>${line}</p>`)
+                .join("")}</div>`,
             }
           : entry,
       ),
-    };
-    expect(refusedWith(read, request)).toBe("imported");
+    });
+    // Section 8 states a number the strict form does not read: a run, one run into a word, one in
+    // another case or spacing, or one a full stop runs into (review of #193).
+    for (const extra of [
+      "EU/1/24/9999/001-002",
+      "See EU/1/24/9999/003x",
+      "eu/1/24/9999/003",
+      "Eu/1/24/9999/003",
+      "EU /1/24/9999/003",
+      "E U/1/24/9999/003",
+      "EU\u00a0/1/24/9999/003",
+      "EU/1/24/9999/001.3",
+      "XEU/1/24/9999/003",
+    ]) {
+      const page = `\nEU/1/24/9999/001\nEU/1/24/9999/002\n${extra}\n`;
+      expect([extra, refusedWith(withSection8(page), request)]).toEqual([
+        extra,
+        "product: eu-number-unread",
+      ]);
+    }
+    // A number after a comma or in brackets, or one a full stop ends, is read.
+    for (const page of [
+      "\nEU/1/24/9999/001, (EU/1/24/9999/002).\n",
+      "\nEU/1/24/9999/001.\nEU/1/24/9999/002. Synthetic text\n",
+    ]) {
+      expect([page, refusedWith(withSection8(page), request)]).toEqual([page, "imported"]);
+    }
   });
 
   it("keeps the committed results as the zone-a script wrote them", () => {

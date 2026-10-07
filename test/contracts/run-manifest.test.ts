@@ -114,7 +114,7 @@ describe("run manifest contract", () => {
     expect(parsed.success).toBe(true);
     expect(manifest.schemaVersion).toBe(RUN_MANIFEST_VERSION);
     expect(manifest.source.kind).toBe("document");
-    expect(manifest.ingestion?.contractVersion).toBe("2.1.0");
+    expect(manifest.ingestion?.contractVersion).toBe("3.0.0");
   });
 
   it("rejects a document run without an ingestion block", () => {

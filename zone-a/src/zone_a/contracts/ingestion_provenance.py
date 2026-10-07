@@ -391,6 +391,7 @@ class CertifiedWordSourceDocument(ContractModel):
     mediaType: Literal["application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
     document: Document
     recompute: RecomputeRequest
+    importer: Token
     changes: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
     sectionPages: Annotated[list[SectionPage1], Field(max_length=2000, min_length=1)]
     extractedText: ExtractedTextRef

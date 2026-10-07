@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://khs.dev/contracts/ingestion-provenance/2.1.0/schema.json",
+  "$id": "https://khs.dev/contracts/ingestion-provenance/3.0.0/schema.json",
   "$ref": "#/$defs/IngestionProvenance",
   "$defs": {
     "IngestionProvenance": {
@@ -395,6 +395,9 @@
         "recompute": {
           "$ref": "#/$defs/RecomputeRequest"
         },
+        "importer": {
+          "$ref": "#/$defs/Token"
+        },
         "changes": {
           "type": "integer",
           "minimum": 0,
@@ -432,6 +435,7 @@
         "mediaType",
         "document",
         "recompute",
+        "importer",
         "changes",
         "sectionPages",
         "extractedText"

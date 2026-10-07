@@ -42,6 +42,7 @@
     "authority:vectors": "tsx scripts/authority/generate-vectors.ts",
     "authority:lock": "tsx scripts/authority/lock.ts",
     "certified-word:vectors": "tsx scripts/certified-word/generate-vectors.ts",
+    "certified-word:lock": "tsx scripts/certified-word/lock.ts",
     "renderer:image": "docker build --file Dockerfile.renderer --tag renderer:local .",
     "renderer:smoke": "node scripts/render/run.mjs scripts/render/smoke.ts",
     "renderer:record": "node scripts/render/run.mjs scripts/render/record.ts --check",

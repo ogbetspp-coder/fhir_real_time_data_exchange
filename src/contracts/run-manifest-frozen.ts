@@ -9,7 +9,7 @@ import { z } from "zod";
 // real manifests each version's own code emitted (test/fixtures/run-manifest/).
 //
 // The copies are the grammars as they stand at 5.0.0 (5.0.0's own, from `GitCommit` on, as they
-// stood when 5.1.0 was released), and every run that ever completed was
+// stood when 6.0.0 was released), and every run that ever completed was
 // validated under them: they reached their present form on 2026-09-19 (1a70910, where `HttpUrl`
 // stopped being `z.url()`) and 2026-09-28 (#145, which respelt `\d` as `[0-9]`, the same language),
 // and no run had completed before 2026-09-20 (docs/validation/README.md, "Official validation

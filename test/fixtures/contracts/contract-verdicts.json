@@ -8320,7 +8320,7 @@
       "base": "contracts/run-request.json",
       "mutation": "sha256 newline",
       "path": ["submissionRef", "sha256"],
-      "value": "912f1c92063d8456440cd333213cbd534e33e589b3b93c3b8233c1c454c65463\n",
+      "value": "6d1fcb86e29979f20c1a00797c7de5cbfbd75c61102662b4278691abb31e2a9c\n",
       "accepted": false
     },
     {
@@ -8333,14 +8333,14 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.1.0-fixture.json",
+      "base": "run-manifest/6.0.0-fixture.json",
       "mutation": "unchanged",
       "path": [],
       "accepted": true
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.1.0-fixture.json",
+      "base": "run-manifest/6.0.0-fixture.json",
       "mutation": "sourceCommit not a commit id",
       "path": ["runtime", "sourceCommit"],
       "value": "local",
@@ -8348,7 +8348,7 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.1.0-fixture.json",
+      "base": "run-manifest/6.0.0-fixture.json",
       "mutation": "imageDigest upper case",
       "path": ["runtime", "imageDigest"],
       "value": "sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -8356,7 +8356,7 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.1.0-fixture.json",
+      "base": "run-manifest/6.0.0-fixture.json",
       "mutation": "dryRun as a string",
       "path": ["dryRun"],
       "value": "true",
@@ -8364,7 +8364,7 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.1.0-fixture.json",
+      "base": "run-manifest/6.0.0-fixture.json",
       "mutation": "officialValidationExecuted as a number",
       "path": ["validation", "officialValidationExecuted"],
       "value": 0,
@@ -8372,7 +8372,7 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.1.0-fixture.json",
+      "base": "run-manifest/6.0.0-fixture.json",
       "mutation": "preflightErrors as a boolean",
       "path": ["validation", "preflightErrors"],
       "value": false,
@@ -8380,7 +8380,7 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.1.0-fixture.json",
+      "base": "run-manifest/6.0.0-fixture.json",
       "mutation": "qrdTemplate with a space",
       "path": ["standards", "qrdTemplate"],
       "value": "10.4 ",
@@ -8388,12 +8388,12 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.1.0-fixture.json",
+      "base": "run-manifest/6.0.0-fixture.json",
       "mutation": "a fixture run with an ingestion block",
       "path": ["ingestion"],
       "value": {
         "submissionId": "4b1d2c3e-5f60-4a71-8b92-0c1d2e3f4a5b",
-        "contractVersion": "2.1.0",
+        "contractVersion": "3.0.0",
         "sourceKind": "drawn",
         "graphType": "type2",
         "allowSyntheticSources": true,
@@ -8420,7 +8420,7 @@
           "approvedAt": "2026-09-19T00:00:00Z",
           "method": "api-attestation",
           "meaning": "reviewed-fidelity-and-structure",
-          "approvedContentSha256": "f6dc1547a1966badcc12b75913f63f402bda653220a3e45a0d21d4b536fdf2aa"
+          "approvedContentSha256": "bee82adb2ad640c6d397360e4110a8fc9eae53c05803476397692748a6663164"
         },
         "provenanceResourceId": "cabf3a37-fd9f-50f7-ab33-3ce39360ab90"
       },
@@ -8428,14 +8428,14 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.1.0-document.json",
+      "base": "run-manifest/6.0.0-document.json",
       "mutation": "unchanged",
       "path": [],
       "accepted": true
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.1.0-document.json",
+      "base": "run-manifest/6.0.0-document.json",
       "mutation": "a document run without its ingestion block",
       "path": ["ingestion"],
       "delete": true,
@@ -8443,7 +8443,7 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.1.0-document.json",
+      "base": "run-manifest/6.0.0-document.json",
       "mutation": "a drawn source that records an authority fetch",
       "path": ["ingestion", "authority"],
       "value": {
@@ -8467,7 +8467,7 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.1.0-document.json",
+      "base": "run-manifest/6.0.0-document.json",
       "mutation": "modelId null",
       "path": ["ingestion", "modelId"],
       "value": null,

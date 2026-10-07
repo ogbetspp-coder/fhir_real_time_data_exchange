@@ -238,8 +238,10 @@ def main() -> int:
     parser.add_argument("--check", action="store_true")
     files = render()
     if parser.parse_args().check:
-        current = {path.name: path.read_text(encoding="utf-8") for path in TARGET.glob("*")}
-        if current != files:
+        # Bytes, not text: a text read folds a carriage return into a line feed, and the TypeScript
+        # tests read the bytes.
+        current = {path.name: path.read_bytes() for path in TARGET.glob("*")}
+        if current != {name: content.encode("utf-8") for name, content in files.items()}:
             sys.stderr.write(f"{TARGET} is out of date; run this script\n")
             return 1
         return 0
@@ -247,7 +249,7 @@ def main() -> int:
     for stale in {path.name for path in TARGET.glob("*")} - set(files):
         (TARGET / stale).unlink()
     for name, content in files.items():
-        (TARGET / name).write_text(content, encoding="utf-8")
+        (TARGET / name).write_bytes(content.encode("utf-8"))
     return 0
 
 

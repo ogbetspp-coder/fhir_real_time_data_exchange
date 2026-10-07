@@ -287,7 +287,7 @@ recommendations ... the rest you are authorized to do as well"); each reading is
   `docs/design/pl-structure.md` for what it carries on the EMA's published Word leaflets.
 - **P4, in part** (2026-10-06, `docs/design/certified-word-import.md`, "Progress"):
   `zone_a.recompute`, the one function the producer and Zone B's gate run (D2's function); the
-  `certified-word` source kind (`CanonicalSubmission` 2.1.0) and its importer
+  `certified-word` source kind (`CanonicalSubmission` 3.0.0) and its importer
   (`src/certified-word/`), a Type 1 graph of the confirmed product with the titles carried as
   written; the ADR 0001 and ADR 0002 amendments. The gate accepts one only as a dry run until it
   runs the recompute itself.

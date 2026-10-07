@@ -789,7 +789,8 @@ and the attestation names their index (R1).
 `AuthorityFetchSchema` gains `authority` and `rendering: { gateVersion, gateSha256, recordSha256,
 contactsAcknowledged }`, the latter required when `authority` is not `synthetic` or something is
 withheld, and absent otherwise. `RUN_MANIFEST_VERSION` moves a major (the next after main's 5.0.0),
-with the withheld note's fields and the submission's 3.0.0 (`contractVersion` follows it, D13); the
+with the withheld note's fields and the submission's next major, 4.0.0 (a certified Word source took
+3.0.0 and the run manifest's 6.0.0 on 2026-10-06; `contractVersion` follows it, D13); the
 version it replaces is frozen in `AnyRunManifestSchema`, as every earlier one is, and a manifest
 fixture of it is read through it in a test. The FHIR Provenance carries `rendering.recordSha256`,
 the `request` statement's hash and, per section, the number of contacts acknowledged; the attested

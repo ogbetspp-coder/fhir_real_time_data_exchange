@@ -65,7 +65,7 @@ describe("pipeline", () => {
     expect(result.status).toBe("validated");
     expect(result.artifactUris).toEqual([]);
     expect(result.evidence.signature).toBeUndefined();
-    expect(result.evidence.manifest.schemaVersion).toBe("5.1.0");
+    expect(result.evidence.manifest.schemaVersion).toBe("6.0.0");
     expect(result.evidence.manifest.validation.preflightErrors).toBe(0);
     expect(result.evidence.manifest.validation.officialValidationExecuted).toBe(false);
     expect(result.evidence.manifest.validation.officialProfileErrors).toBe(0);
@@ -129,7 +129,7 @@ describe("pipeline", () => {
     const { manifest } = result.evidence;
 
     expect(result.status).toBe("validated");
-    expect(manifest.schemaVersion).toBe("5.1.0");
+    expect(manifest.schemaVersion).toBe("6.0.0");
     expect(manifest.source.kind).toBe("document");
     expect(manifest.transformation.decisions).toBe(32);
     // Zone B determinism: the document path must publish exactly what the fixture path publishes.
@@ -137,7 +137,7 @@ describe("pipeline", () => {
       fixture.evidence.manifest.transformation.outputHash,
     );
     expect(manifest.ingestion?.submissionId).toBe(submission.submissionId);
-    expect(manifest.ingestion?.contractVersion).toBe("2.1.0");
+    expect(manifest.ingestion?.contractVersion).toBe("3.0.0");
     expect(manifest.ingestion?.parser).toBe("synthetic-extractor@1.0.0");
     expect(manifest.ingestion?.fidelity.status).toBe("passed");
     expect(manifest.ingestion?.fidelity.coverage.pageCodePoints).toBeGreaterThan(

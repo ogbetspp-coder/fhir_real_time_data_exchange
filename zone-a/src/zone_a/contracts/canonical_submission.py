@@ -506,6 +506,7 @@ class CertifiedWordSourceDocument(ContractModel):
     mediaType: Literal["application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
     document: Document
     recompute: RecomputeRequest
+    importer: Token
     changes: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
     sectionPages: Annotated[list[SectionPage1], Field(max_length=2000, min_length=1)]
     extractedText: ExtractedTextRef
@@ -532,7 +533,7 @@ class IngestionProvenance(ContractModel):
 
 class CanonicalSubmission(ContractModel):
     model_config = ConfigDict(extra="forbid")
-    schemaVersion: Literal["2.1.0"]
+    schemaVersion: Literal["3.0.0"]
     submissionId: Uuid
     createdAt: IsoDateTime
     graphType: GraphType

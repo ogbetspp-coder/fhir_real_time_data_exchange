@@ -9,9 +9,29 @@ import { readFileSync } from "node:fs";
 export const LOCK = "src/authority/importer.lock.json";
 export const VECTORS = "test/fixtures/authority/vectors.json";
 
+// An importer whose version is locked to its code, data and vectors: the authority importer, and
+// the certified Word importer (src/certified-word/, the same rule, its own lock).
+export type ImporterLock = { directory: string; lock: string; vectors: string; shared: string[] };
+
 // T reads with the fidelity scanner's own tokens, entities, list markers and invisible code points
 // (docs/design/authority-import-t.md, T1), so a change there changes the importer too.
 const SHARED = ["src/fidelity/normalize.ts", "src/fidelity/xhtml.ts"];
+
+export const AUTHORITY_LOCK: ImporterLock = {
+  directory: "src/authority",
+  lock: LOCK,
+  vectors: VECTORS,
+  shared: SHARED,
+};
+
+// The certified Word importer checks narratives with the same scanner and reads the recompute's
+// bytes with the authority's strict JSON reader.
+export const CERTIFIED_WORD_LOCK: ImporterLock = {
+  directory: "src/certified-word",
+  lock: "src/certified-word/importer.lock.json",
+  vectors: "test/fixtures/certified-word/vectors.json",
+  shared: [...SHARED, "src/authority/json.ts"],
+};
 
 // git's output; any failure throws (the lock fails closed on a git it cannot read).
 function git(args: string[], cwd?: string): string {
@@ -29,33 +49,33 @@ function nulSeparated(output: string): string[] {
 
 // The files the lock hashes, in order: what git tracks under src/authority, so a file only on one
 // machine (an editor's or the OS's) never changes the hash, and the shared fidelity files.
-export function lockedFiles(): string[] {
-  const tracked = nulSeparated(git(["ls-files", "-z", "--", "src/authority"]))
-    .filter((file) => file !== LOCK)
+export function lockedFiles(of: ImporterLock = AUTHORITY_LOCK): string[] {
+  const tracked = nulSeparated(git(["ls-files", "-z", "--", of.directory]))
+    .filter((file) => file !== of.lock)
     .sort();
-  return [...tracked, ...SHARED];
+  return [...tracked, ...of.shared];
 }
 
 // Files under src/authority git does not track and does not ignore: the importer could load one,
 // and the lock would not hash it, so the test and `authority:lock` refuse while any exists.
-export function untrackedImporterFiles(): string[] {
+export function untrackedImporterFiles(of: ImporterLock = AUTHORITY_LOCK): string[] {
   return nulSeparated(
-    git(["ls-files", "-z", "--others", "--exclude-standard", "--", "src/authority"]),
+    git(["ls-files", "-z", "--others", "--exclude-standard", "--", of.directory]),
   ).sort();
 }
 
 export type LockEntry = { sourceSha256: string; vectorsSha256: string };
 
-export function lockHashes(): LockEntry {
+export function lockHashes(of: ImporterLock = AUTHORITY_LOCK): LockEntry {
   const source = createHash("sha256");
-  for (const file of lockedFiles()) {
+  for (const file of lockedFiles(of)) {
     source.update(`${file}\0`);
     source.update(readFileSync(file));
     source.update("\0");
   }
   return {
     sourceSha256: source.digest("hex"),
-    vectorsSha256: createHash("sha256").update(readFileSync(VECTORS)).digest("hex"),
+    vectorsSha256: createHash("sha256").update(readFileSync(of.vectors)).digest("hex"),
   };
 }
 
@@ -79,18 +99,19 @@ export function resolveBase(base: string, cwd?: string): string | undefined {
 // history is cut short.
 export function releasedEntries(
   commit: string,
+  of: ImporterLock = AUTHORITY_LOCK,
 ): { version: string; entry: LockEntry; commit: string }[] {
   if (git(["rev-parse", "--is-shallow-repository"]).trim() === "true") {
     throw new Error(
       "the importer lock reads main's whole history; fetch it (git fetch --unshallow)",
     );
   }
-  const commits = git(["log", "--first-parent", "--format=%H", commit, "--", LOCK])
+  const commits = git(["log", "--first-parent", "--format=%H", commit, "--", of.lock])
     .split("\n")
     .filter((line) => line.length > 0);
   return commits.flatMap((released) => {
-    if (git(["ls-tree", "--name-only", released, "--", LOCK]).trim() === "") return [];
-    const lock = JSON.parse(git(["show", `${released}:${LOCK}`])) as Record<string, LockEntry>;
+    if (git(["ls-tree", "--name-only", released, "--", of.lock]).trim() === "") return [];
+    const lock = JSON.parse(git(["show", `${released}:${of.lock}`])) as Record<string, LockEntry>;
     return Object.entries(lock).map(([version, entry]) => ({ version, entry, commit: released }));
   });
 }

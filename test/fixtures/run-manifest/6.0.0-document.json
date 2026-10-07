@@ -1,13 +1,13 @@
 {
-  "schemaVersion": "5.1.0",
-  "runId": "00000000-0000-4000-8000-00000000f001",
-  "startedAt": "2026-10-07T01:24:23.028Z",
-  "completedAt": "2026-10-07T01:24:23.039Z",
+  "schemaVersion": "6.0.0",
+  "runId": "00000000-0000-4000-8000-00000000d001",
+  "startedAt": "2026-10-07T02:30:41.887Z",
+  "completedAt": "2026-10-07T02:30:41.900Z",
   "status": "validated",
   "dryRun": true,
   "source": {
-    "kind": "fixture",
-    "resource": "fixture:synthetic-type2-smpc",
+    "kind": "document",
+    "resource": "gs://synthetic-submissions/synthetic-submission.json",
     "hash": "e95421e1d5de87f5e637edb5900487ab0bd5cc6942e0861c629d129f03836490"
   },
   "standards": {
@@ -86,7 +86,8 @@
       "http://ema.europa.eu/fhir/StructureDefinition/EUEpiComposition",
       "http://ema.europa.eu/fhir/StructureDefinition/EUEpiCompositionSmPC",
       "http://ema.europa.eu/fhir/StructureDefinition/EUEpiCompositionCAP",
-      "http://ema.europa.eu/fhir/StructureDefinition/EUQRD-CAP-template-new-SmPC-en"
+      "http://ema.europa.eu/fhir/StructureDefinition/EUQRD-CAP-template-new-SmPC-en",
+      "http://hl7.org/fhir/StructureDefinition/Provenance"
     ]
   },
   "transformation": {
@@ -99,5 +100,38 @@
     "imageDigest": "development",
     "validatorImageDigest": "development",
     "workflowRevision": "development"
+  },
+  "ingestion": {
+    "submissionId": "4b1d2c3e-5f60-4a71-8b92-0c1d2e3f4a5b",
+    "contractVersion": "3.0.0",
+    "sourceKind": "drawn",
+    "graphType": "type2",
+    "allowSyntheticSources": true,
+    "sourceDocumentSha256": "c226c77c373a69ba2a0e131298356e48916601fabdf85cb58d87a516c14674b4",
+    "extractionRunId": "7c8d9e0f-1a2b-4c3d-9e4f-5a6b7c8d9e0f",
+    "parser": "synthetic-extractor@1.0.0",
+    "fidelity": {
+      "status": "passed",
+      "normalizationVersion": "fidelity-norm/3.3.0",
+      "sectionsChecked": 32,
+      "sectionsMatched": 32,
+      "reportSha256": "9522996f89d165c566f356105ac2a322dfae35baa950a02449d067e88b7ec141",
+      "narrativeBindingSha256": "dbc8cf153c23e248a34c79d2bb6176030b2b206646e92060ac9c7ce6e7b786dd",
+      "coverage": {
+        "pageCodePoints": 2433,
+        "bodyCodePoints": 2187,
+        "coveredCodePoints": 2155,
+        "uncoveredGaps": 0
+      }
+    },
+    "approval": {
+      "approverId": "urn:reviewer:synthetic-01",
+      "approverRole": "content-reviewer",
+      "approvedAt": "2026-09-19T00:00:00Z",
+      "method": "api-attestation",
+      "meaning": "reviewed-fidelity-and-structure",
+      "approvedContentSha256": "bee82adb2ad640c6d397360e4110a8fc9eae53c05803476397692748a6663164"
+    },
+    "provenanceResourceId": "cabf3a37-fd9f-50f7-ab33-3ce39360ab90"
   }
 }

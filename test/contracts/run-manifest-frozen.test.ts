@@ -25,9 +25,9 @@ import { manifestRuntime } from "../../src/pipeline.js";
 // test/fixtures/run-manifest/ holds, per version, the dry-run manifest of a fixture
 // run and (from 1.1.0, when the document source arrived) of a document run over the synthetic
 // submission, each emitted by that version's code: 1.0.0 at 499e2b2, 1.1.0 at dd78a14, 2.0.0 at
-// 2a035f3 (#113), 3.0.0 at 95e7207 (#128), 4.0.0 at 9b4cb2a, 5.0.0 at 430939f, 5.1.0 at the change
+// 2a035f3 (#113), 3.0.0 at 95e7207 (#128), 4.0.0 at 9b4cb2a, 5.0.0 at 430939f, 6.0.0 at the change
 // that made `certified-word` a source kind, with a dry run of a certified Word submission beside
-// them (`5.1.0-certified-word.json`). They are never regenerated: each is the evidence that its
+// them (`6.0.0-certified-word.json`). They are never regenerated: each is the evidence that its
 // version reads what that code wrote.
 //
 // Those are dry runs, which carry no persistence block. `*.synthetic.json` beside them are
@@ -118,8 +118,8 @@ describe("the run manifest's released versions", () => {
     }
   });
 
-  // 5.1.0 (ADR 0006 P4, D1): a certified Word source's run, which 5.0.0 never wrote.
-  it("reads a certified Word source's dry run in 5.1.0 only", () => {
+  // 6.0.0 (ADR 0006 P4, D1): a certified Word source's run, which 5.0.0 never wrote.
+  it("reads a certified Word source's dry run in 6.0.0 only", () => {
     const found = emitted().find(
       ({ file }) => file === `${RUN_MANIFEST_VERSION}-certified-word.json`,
     );
@@ -128,7 +128,7 @@ describe("the run manifest's released versions", () => {
     expect([ingestion.sourceKind, ingestion.graphType, ingestion.contractVersion]).toEqual([
       "certified-word",
       "type1",
-      "2.1.0",
+      "3.0.0",
     ]);
     expect(RunManifestSchema.safeParse(found.manifest).success).toBe(true);
     const asV5 = { ...found.manifest, schemaVersion: "5.0.0" };

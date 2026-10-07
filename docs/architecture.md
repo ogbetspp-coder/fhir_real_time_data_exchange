@@ -24,7 +24,7 @@ words, and every code it assigns must cite a terminology lookup. Its output is a
 submission is written to the submission bucket and named to `POST /v1/runs` as
 `{uri, sha256}`; `src/gcp/submission-reader.ts` resolves that pointer and the two it contains
 (fidelity report, extracted text), reading only from the configured bucket, capping object
-size, and hash-checking every part. Status: the contract (`CanonicalSubmission` 2.1.0), the
+size, and hash-checking every part. Status: the contract (`CanonicalSubmission` 3.0.0), the
 ingress gate, the reader, the `document` route, and the Workflows `document` branch exist; no
 Zone A service produces submissions yet. The producers are `src/fixtures/synthetic-submission.ts`
 (a synthetic drawn document) and, for an authority's published ePI,
@@ -106,10 +106,11 @@ canonical product, its name and holder chosen from the label's sections 1 and 7,
 authorisation numbers from section 8, and the approval) into a Type 1 submission. Narratives,
 pages and titles come only from the recompute; a section's title is its label's heading line,
 which the crosswalk and the EMA preflight carry as written. The source pins the uploaded .docx,
-the recompute's request and every version it names; the extractor is `certified-word/` and the
-SHA-256 of those versions. Until the worker runs the recompute itself (D2), the gate accepts a
-certified Word submission only as a dry run and refuses it when `DRY_RUN` is false
-(`certified-word-not-recomputed`).
+the recompute's request and every version it names, and the importer's own version; the extractor
+is `certified-word/` and the SHA-256 of the importer's and the recompute's versions. Until the
+worker runs the recompute itself (D2), the gate accepts a certified Word submission only as a dry
+run and refuses it when `DRY_RUN` is false, telling the caller so by the closed code
+`certified-word-not-recomputed`.
 
 ### Renderer gate
 
@@ -331,7 +332,7 @@ narrative rests — while `fidelity-report`, `ingestion-provenance`, `provenance
 manifest, and the BigQuery ledger row never do. FHIR payloads and narrative are not written to Cloud
 Logging.
 
-The signed manifest is `RunManifest` 5.1.0; every earlier version stays readable, and
+The signed manifest is `RunManifest` 6.0.0; every earlier version stays readable, and
 `src/contracts/run-manifest.ts` says what each changed. It is signed before the FHIR transaction,
 names the transaction it authorises (`authorised`), and names every FHIR package the validator
 loaded by hash and the validator's image digest; only the ledger row says `persisted`. A `document`

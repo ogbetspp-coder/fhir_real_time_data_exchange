@@ -290,7 +290,7 @@ class Approval(RootModel[AttestedApproval | AuthorityApproval]):
 class IngestionEvidence(ContractModel):
     model_config = ConfigDict(extra="forbid")
     submissionId: Uuid
-    contractVersion: Literal["2.1.0"]
+    contractVersion: Literal["3.0.0"]
     sourceKind: SourceKind
     graphType: GraphType
     allowSyntheticSources: StrictBool
@@ -307,7 +307,7 @@ class IngestionEvidence(ContractModel):
 
 class AuthorisedRunManifest(ContractModel):
     model_config = ConfigDict(extra="forbid")
-    schemaVersion: Literal["5.1.0"]
+    schemaVersion: Literal["6.0.0"]
     source: Source1
     runId: Uuid
     startedAt: IsoDateTime
@@ -324,7 +324,7 @@ class AuthorisedRunManifest(ContractModel):
 
 class ValidatedRunManifest(ContractModel):
     model_config = ConfigDict(extra="forbid")
-    schemaVersion: Literal["5.1.0"]
+    schemaVersion: Literal["6.0.0"]
     source: Source
     runId: Uuid
     startedAt: IsoDateTime

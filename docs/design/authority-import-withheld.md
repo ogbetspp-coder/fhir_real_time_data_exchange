@@ -267,13 +267,13 @@ went to a certified Word source, ADR 0006):
 
 ### W7. Versions
 
-- `CanonicalSubmission`'s next major, 3.0.0 unless item 2's lands first (ADR 0002's rule: fields required for an authority import, and
+- `CanonicalSubmission`'s next major, 4.0.0 (a certified Word source took 3.0.0 on 2026-10-06, ADR 0006) (ADR 0002's rule: fields required for an authority import, and
   enums the gate branches on): the request's `renderEvidence`, `acknowledgedContacts` (the renderer
   note's R5) and `withheld`, the source record's `withheldSections` and `rendering`,
   `Composition.status` `partial`, `SectionProvenanceSchema.spans` allowing none for a withheld
-  section. `schemaVersion` is a literal, so a 2.0.0 submission does not read as 3.0.0: 2.0.0
-  authority imports (dry runs only; none approved) are re-imported, and 2.0.0 drawn and synthetic
-  submissions are refused as 1.0.0's were at 2.0.0.
+  section. `schemaVersion` is a literal, so a 3.0.0 submission does not read as 4.0.0: 3.0.0
+  authority imports (dry runs only; none approved) are re-imported, and 3.0.0 drawn and synthetic
+  submissions are refused as 2.0.0's were at 3.0.0.
 - `ApprovalStatement` 1.0.0, new with item 2, including the `request` kind and its meaning codes
   (`docs/design/approval.md`),
   and version 1.0.0 of our `withheld-reason` CodeSystem and `ext-record-incomplete` extension, defined
@@ -291,7 +291,7 @@ went to a certified Word source, ADR 0006):
   a withheld section's `emptyReason` and notice and checks `Composition.status` (its precedent: 1.2.0
   to 1.3.0).
 - `fidelity-norm/3.4.0` and the fidelity report's next major (W5: `SectionStatus` `withheld`,
-  `summary.withheld`, `sectionsWithheld`); the run manifest's next major after 5.0.0 (the renderer
+  `summary.withheld`, `sectionsWithheld`); the run manifest's next major after 6.0.0 (the renderer
   note's R10: the version it replaces frozen in `AnyRunManifestSchema`, with deep copies of its
   `AuthorityFetch`, `IngestionFidelity` and `Approval` schemas, read in a test with an authority
   import's dry-run manifest); the ledger's schema; the

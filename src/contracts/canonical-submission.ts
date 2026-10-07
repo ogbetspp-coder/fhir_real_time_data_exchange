@@ -21,11 +21,13 @@ import {
   CanonicalBundleSchema,
   LooseCompositionSchema,
   type CanonicalBundle,
+  type LooseSection,
 } from "./canonical-bundle.js";
 
-// 2.1.0 (ADR 0006 P4, D1): the `certified-word` source kind (ingestion-provenance 2.1.0). A minor:
-// a new member of the source union refuses nothing that parsed before.
-export const CANONICAL_SUBMISSION_VERSION = "2.1.0";
+// 3.0.0 (ADR 0006 P4, D1): the `certified-word` source kind (ingestion-provenance 3.0.0). A major
+// under ADR 0002's rule: Zone B branches on the source's `kind`. The renderer gate's and the
+// withheld design's change, which reserved 3.0.0, takes the next major.
+export const CANONICAL_SUBMISSION_VERSION = "3.0.0";
 
 // Type 2: the full product graph. Type 1: a text-only record whose product identity comes from
 // the authority's index for an authority import (docs/design/authority-import-contract.md, D9),
@@ -48,6 +50,15 @@ export const SYNTHETIC_PREFIX = "synthetic-";
 export const CERTIFIED_WORD_IMPORTER_NAME = "certified-word";
 export const CERTIFIED_WORD_PREFIX = "certified-word:";
 export const CERTIFIED_WORD_SYNTHETIC_BLOCK = "00000000-5979-4e74-8000-";
+// The composite extractor record of a certified Word source (ADR 0006 decision 6): the TypeScript
+// importer and every version the recompute names. Its SHA-256 is the extractor's version.
+export function certifiedWordExtractorRecord(source: {
+  importer: string;
+  recompute: { versions: Record<string, string> };
+}): { importer: string; recompute: Record<string, string> } {
+  return { importer: source.importer, recompute: source.recompute.versions };
+}
+
 const CERTIFIED_WORD_IDENTIFIER =
   /^certified-word:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -152,14 +163,17 @@ function sourceIssues(submission: CanonicalSubmission): string[] {
   }
 
   // ADR 0002 invariant 7, as ADR 0006 amends it: a type1 graph, an attestation, and the extractor
-  // `certified-word` whose version is the hash of every version the recompute names.
+  // `certified-word` whose version is the hash of the importer and every version the recompute
+  // names (certifiedWordExtractorRecord).
   if (source.kind === "certified-word") {
     if (graphType !== "type1") issues.push("A certified Word source carries a type1 graph");
     if (parser.name !== CERTIFIED_WORD_IMPORTER_NAME) {
       issues.push(`A certified Word source's extractor is ${CERTIFIED_WORD_IMPORTER_NAME}`);
     }
-    if (parser.version !== sha256(source.recompute.versions)) {
-      issues.push("A certified Word source's extractor version is the hash of the recompute's");
+    if (parser.version !== sha256(certifiedWordExtractorRecord(source))) {
+      issues.push(
+        "A certified Word source's extractor version is the hash of its importer and recompute",
+      );
     }
     if (extraction.model !== undefined || extraction.promptTemplate !== undefined) {
       issues.push("A certified Word import uses no model and no prompt template");
@@ -295,10 +309,15 @@ export const CanonicalSubmissionSchema = CanonicalSubmissionBase.superRefine(
     "Approved hand-off from Zone A structuring to Zone B publishing. Zone B recomputes every hash and re-executes the fidelity check before transforming anything.",
 });
 
+// A refusal the HTTP caller learns by its closed code (src/app.ts); every other rejection says only
+// that the submission was rejected.
+export type SubmissionRefusal = "certified-word-not-recomputed";
+
 export class SubmissionRejectedError extends Error {
   public constructor(
     message: string,
     public readonly issues: string[],
+    public readonly reason?: SubmissionRefusal,
   ) {
     super(message);
     this.name = "SubmissionRejectedError";
@@ -478,6 +497,39 @@ function syntheticIssues(
   return issues;
 }
 
+// A certified Word source's pages are its record's sections (fidelity §7): page i is the record's
+// i-th section in pre-order, keyed as `sectionPages` says, and every narrative's span is on its own
+// section's page. The narrative binding proves each narrative's words; this proves which page they
+// are on, which the importer gives and Zone B's recompute (D2) will make again.
+function certifiedWordPageIssues(
+  source: CanonicalSubmission["provenance"]["sourceDocument"],
+  sections: LooseSection[],
+  provenance: CanonicalSubmission["provenance"]["sections"],
+  sourceCodeSystem: string,
+): string[] {
+  if (source.kind !== "certified-word") return [];
+  const keys: (string | undefined)[] = [];
+  const walk = (list: LooseSection[]): void => {
+    for (const section of list) {
+      const codes = (section.code?.coding ?? []).filter(
+        ({ system }) => system === sourceCodeSystem,
+      );
+      keys.push(codes.length === 1 ? codes[0]?.code : undefined);
+      walk(section.section ?? []);
+    }
+  };
+  walk(sections);
+  const paged = source.sectionPages.map(({ key }) => key);
+  if (keys.length !== paged.length || keys.some((key, at) => key !== paged[at])) {
+    return ["sourceDocument.sectionPages are not the record's sections in order"];
+  }
+  return provenance.some(({ sourceKey, spans }) =>
+    spans.some(({ page }) => paged[page - 1] !== sourceKey),
+  )
+    ? ["A section's span is not on its own section's page"]
+    : [];
+}
+
 // A structured source, and a certified Word source, has one page per section, each wholly body
 // (fidelity §7; docs/design/authority-import-contract.md, D4).
 function structuredPageIssues(
@@ -600,6 +652,14 @@ export function verifyDocumentSubmission(
   }
 
   issues.push(...syntheticIssues(submission, narrativeSections, options));
+  issues.push(
+    ...certifiedWordPageIssues(
+      submission.provenance.sourceDocument,
+      composition.data.section,
+      submission.provenance.sections,
+      sourceCodeSystem,
+    ),
+  );
   const identifier = submission.bundle.identifier.value;
   const source = submission.provenance.sourceDocument;
   if (source.kind !== "authority-publication" && identifier.startsWith(AUTHORITY_IMPORT_PREFIX)) {

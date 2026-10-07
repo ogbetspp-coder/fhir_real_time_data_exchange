@@ -79,7 +79,7 @@ describe("canonical submission contract", () => {
     const parsed = CanonicalSubmissionSchema.safeParse(fixture.submission);
 
     expect(parsed.success).toBe(true);
-    expect(fixture.submission.schemaVersion).toBe("2.1.0");
+    expect(fixture.submission.schemaVersion).toBe("3.0.0");
     expect(fixture.submission.provenance.fidelity.status).toBe("passed");
     expect(() =>
       verifyDocumentSubmission(

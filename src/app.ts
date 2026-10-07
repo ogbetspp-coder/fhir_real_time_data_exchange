@@ -257,8 +257,17 @@ export function createApp(overrides: AppOverrides = {}): Hono<AppEnvironment> {
         stage: "http",
         errorType: error.name,
         errorCount: error.issues.length,
+        ...(error.reason === undefined ? {} : { reason: error.reason }),
       });
-      return context.json({ error: "submission-rejected", errorType: error.name }, 422);
+      // A closed refusal code, where the gate gave one, so the caller learns why; never an issue.
+      return context.json(
+        {
+          error: "submission-rejected",
+          errorType: error.name,
+          ...(error.reason === undefined ? {} : { reason: error.reason }),
+        },
+        422,
+      );
     }
     if (error instanceof ApprovalRefusedError) {
       // A closed code (src/approval/statement.ts, ApprovalRefusal), so the caller learns why.

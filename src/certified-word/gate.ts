@@ -9,6 +9,7 @@ import {
   type GateOptions,
 } from "../contracts/index.js";
 import { sha256 } from "../lib/hash.js";
+import { CERTIFIED_WORD_IMPORTER } from "./import.js";
 
 // Zone B's gate for a certified Word source (docs/design/certified-word-import.md, D2). Zone B
 // does not yet make the sections again from the uploaded bytes: the worker cannot run the Python
@@ -44,10 +45,21 @@ export function verifyCertifiedWordImport(
     verifyDocumentSubmission(input, sourceCodeSystem, options);
     return rejected("Canonical submission is invalid");
   }
-  if (parsed.data.provenance.sourceDocument.kind !== "certified-word") {
-    return rejected("Not a certified Word import");
+  const source = parsed.data.provenance.sourceDocument;
+  if (source.kind !== "certified-word") return rejected("Not a certified Word import");
+  // Its closed code reaches the HTTP caller (src/app.ts).
+  if (!options.dryRun) {
+    throw new SubmissionRejectedError(
+      "Document submission rejected",
+      [CERTIFIED_WORD_NOT_RECOMPUTED],
+      "certified-word-not-recomputed",
+    );
   }
-  if (!options.dryRun) return rejected(CERTIFIED_WORD_NOT_RECOMPUTED);
+  // The gate will make the record again with the importer it runs (D2), so a submission another
+  // version made is refused, as the authority gate refuses one.
+  if (source.importer !== CERTIFIED_WORD_IMPORTER) {
+    return rejected("The submission was made by another importer version than the gate runs");
+  }
   return verifyDocumentSubmission(input, sourceCodeSystem, {
     allowSyntheticSources: options.allowSyntheticSources,
     certifiedWordDryRun: { submissionSha256: sha256(parsed.data) },

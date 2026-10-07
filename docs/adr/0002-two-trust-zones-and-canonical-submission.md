@@ -278,14 +278,16 @@ every request is (invariant 2); before PR 5 lifts the dry run it is bound to an 
 
 ## Amendment (2026-09-25, the renderer gate's review)
 
-_Decided, not implemented: `CanonicalSubmission` is still 2.0.0. The run manifest has since moved
-to 5.0.0 for other reasons, so the bump below becomes the next major, with the current one
-frozen._
+_Decided, not implemented. The contract and the run manifest have since moved for other reasons
+(the run manifest to 5.0.0, then, with a certified Word source, `CanonicalSubmission` and
+`ingestion-provenance` to 3.0.0 and the run manifest to 6.0.0; 2026-10-06), so the bumps below
+become the next majors: `CanonicalSubmission` 4.0.0 and the run manifest's after 6.0.0, with the
+current one frozen._
 
 `docs/design/authority-import-renderer.md` (R5) and `docs/design/authority-import-withheld.md`
 (owner decisions of 2026-09-25) change the contract of an authority import:
 
-- **`CanonicalSubmission` 3.0.0**, a major under this ADR's rule (fields required for an authority
+- **`CanonicalSubmission` 3.0.0** (now 4.0.0: the note above), a major under this ADR's rule (fields required for an authority
   import; enums the gate branches on): the request's `renderEvidence`, `acknowledgedContacts` and
   `withheld`, and the source record's `rendering` and `withheldSections`, are approved content,
   covered by `approvedContentSha256` (invariant 2) as the request is. The run manifest moves to 3.0.0
@@ -395,30 +397,36 @@ ADR 0006 admits a company's Word label that the label reader read exactly, struc
 template's headings and made into sections by `zone_a.recompute`. The design is
 `docs/design/certified-word-import.md` (D1, D2, D6); this section states what it changes here.
 
-**The contract is `CanonicalSubmission` 2.1.0** (`ingestion-provenance` 2.1.0). Every 2.0.0
-submission is refused. `provenance.sourceDocument` gains a third member, `certified-word`: the
-uploaded .docx (SHA-256, length, file name, storage URI), the request the recompute made the
-sections with (the document, the view, the part, the assigned headings and every version the
-recompute names), the number of tracked changes the view settled, one page per section
+**The contract is `CanonicalSubmission` 3.0.0** (`ingestion-provenance` 3.0.0), majors under this
+ADR's rule, since Zone B branches on the source's `kind`; the renderer gate's change above, which
+had reserved 3.0.0, takes 4.0.0. Every 2.0.0 submission is refused.
+`provenance.sourceDocument` gains a third member, `certified-word`: the uploaded .docx (SHA-256,
+length, file name, storage URI), the request the recompute made the sections with (the document,
+the view, the part, the assigned headings and every version the recompute names), the TypeScript
+importer's version, the number of tracked changes the view settled, one page per section
 (`sectionPages`) and the page text.
 
 **The ingress invariants above, amended:**
 
 - **Invariant 7.** A `certified-word` source carries a `type1` graph, an attestation (the approval
   placeholder a drawn source has), the extractor `certified-word` whose version is the SHA-256 of
-  the canonical JSON of the recompute's versions (the token `certified-word/<hash>`), no model or
-  prompt template, and the mapping its recompute used as its terminology service.
+  the canonical JSON of the importer's version and the recompute's versions (the token
+  `certified-word/<hash>`, so neither side changes under the same token), no model or prompt
+  template, and the mapping its recompute used as its terminology service. The gate refuses a
+  submission another importer version made.
 - **Invariant 10.** A synthetic certified Word submission's identifier value is `certified-word:`
   and a document id in the reserved block (`00000000-5979-4e74-8000-`), and every narrative that
   carries text carries the marker; a non-synthetic one carries none of these.
 - **Invariant 11.** A certified Word source is admitted only once Zone B has made its sections
   again from its bytes (D2) and the renderer gate has drawn them (D3). Neither is built, so the
   gate accepts one only as a dry run: `src/certified-word/gate.ts` refuses it when `DRY_RUN` is
-  false (`certified-word-not-recomputed`), and the ordinary gate accepts it only with
+  false, telling the HTTP caller so by the closed code `certified-word-not-recomputed`, and the
+  ordinary gate accepts it only with
   `GateOptions.certifiedWordDryRun` bound to its hash, set only there. Nothing it makes is
   persisted.
 - **Invariant 12.** Its page text has one page per section, each wholly body, and every page no
-  narrative covers is blank, as an authority import's.
+  narrative covers is blank, as an authority import's; page i is the record's i-th section in
+  pre-order, keyed as `sectionPages` says, and each narrative's span is on its own section's page.
 - **Invariant 13.** An identifier value beginning `certified-word:` is written only by its
   importer, as exactly `certified-word:` and the ePI's document id; every other source kind and
   route refuses it.
@@ -428,8 +436,9 @@ heading lines, carried as written: the crosswalk does not put the template's tit
 and the EMA preflight does not hold them to it (ADR 0006 decision 4). Every other source keeps
 the template's rule.
 
-**Evidence.** `RunManifest` moves to 5.1.0 (its ingestion block's `sourceKind` may be
-`certified-word`, and `contractVersion` follows 2.1.0); 5.0.0 stays readable. The FHIR Provenance
+**Evidence.** `RunManifest` moves to 6.0.0, a major (its ingestion block's `sourceKind` may be
+`certified-word`, which Zone B and the Zone A verifier branch on, and `contractVersion` follows
+3.0.0); 5.0.0 stays readable. The FHIR Provenance
 of an attested certified Word source has activity `structuring`, the attester, and the .docx by
 its SHA-256.
 

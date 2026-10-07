@@ -21,13 +21,17 @@ import { EU_AUTHORISATION_NUMBER_PATTERN } from "../fhir/standards.js";
 // refuses.
 
 // A label's own text as a person chose it, never retyped (ADR 0006 decision 5): one line of it,
-// with no control, format or lone surrogate code point, as short as the gate keeps strings outside
-// a narrative.
+// with no control, format, line or paragraph separator or lone surrogate code point and no
+// whitespace at either end, as short as the gate keeps strings outside a narrative.
 const LabelText = z
   .string()
   .min(1)
   .max(300)
-  .refine((value) => !/[\p{Cc}\p{Cf}\p{Cs}]/u.test(value), "a control or format character");
+  .refine(
+    (value) => !/[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u.test(value),
+    "a control or format character",
+  )
+  .refine((value) => value.trim() === value, "whitespace at an end");
 
 // Our own ids, as the record's identifier value and the gate write them: a lower-case UUID.
 const OurId = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
@@ -86,7 +90,7 @@ const SectionSchema = z.strictObject({
 });
 
 // `zone_a.recompute`'s result. The structure is the structurer's own record: only what binds it
-// to the versions and that it is ready is read.
+// to the versions, that it is ready, and which headings a person assigned are read.
 export const RecomputeResultSchema = z.strictObject({
   versions: RecomputeVersionsSchema,
   source: z.strictObject({ sha256: Sha256Hex, bytes: PositiveInt }),
@@ -100,6 +104,9 @@ export const RecomputeResultSchema = z.strictObject({
     registryVersion: Token,
     mappingVersion: Token,
     ready: z.literal(true),
+    sections: z
+      .array(z.looseObject({ key: SectionKey, status: z.string(), heading: Count.nullable() }))
+      .max(2_000),
   }),
   sections: z.array(SectionSchema).min(1).max(2_000),
 });

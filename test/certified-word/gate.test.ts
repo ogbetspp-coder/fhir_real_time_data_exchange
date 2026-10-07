@@ -10,6 +10,7 @@ import { RUN, caseRequest, recomputed, recomputedCases } from "../../src/certifi
 import {
   SubmissionRejectedError,
   approvedContent,
+  certifiedWordExtractorRecord,
   structuralInvariantIssues,
   verifyDocumentSubmission,
   type CanonicalSubmission,
@@ -85,12 +86,62 @@ describe("the certified Word gate", () => {
     ).toEqual([CERTIFIED_WORD_NOT_RECOMPUTED]);
   });
 
+  it("refuses a submission another version of the importer made", () => {
+    const input = imported();
+    const source = input.submission.provenance.sourceDocument;
+    if (source.kind !== "certified-word") throw new Error("not a certified Word source");
+    // A whole submission another importer made: its token names that importer, and every hash
+    // holds, so only the gate's own version check refuses it.
+    const importer = "certified-word-import/0.0.0";
+    const version = sha256(certifiedWordExtractorRecord({ ...source, importer }));
+    const extractorVersion = `certified-word/${version}`;
+    const other = resealed({
+      ...input.submission,
+      provenance: {
+        ...input.submission.provenance,
+        sourceDocument: {
+          ...source,
+          importer,
+          extractedText: { ...source.extractedText, extractorVersion },
+        },
+        extraction: {
+          ...input.submission.provenance.extraction,
+          parser: { name: "certified-word", version },
+        },
+      },
+    });
+    expect(structuralInvariantIssues(other)).toEqual([]);
+    expect(
+      issues(() =>
+        verifyCertifiedWordImport(
+          { ...input, submission: other },
+          mapping.sourceCodeSystem,
+          OPTIONS,
+        ),
+      ),
+    ).toEqual(["The submission was made by another importer version than the gate runs"]);
+  });
+
+  it("gives the HTTP caller its closed code when DRY_RUN is false", () => {
+    try {
+      verifyCertifiedWordImport(imported(), mapping.sourceCodeSystem, {
+        ...OPTIONS,
+        dryRun: false,
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(SubmissionRejectedError);
+      expect((error as SubmissionRejectedError).reason).toBe("certified-word-not-recomputed");
+      return;
+    }
+    throw new Error("not refused");
+  });
+
   it("refuses what is not a certified Word submission, or not a submission", () => {
     const drawn = createSyntheticSubmission(mapping);
     expect(
       issues(() => verifyCertifiedWordImport(drawn, mapping.sourceCodeSystem, OPTIONS)),
     ).toEqual(["Not a certified Word import"]);
-    const invalid = { ...imported(), submission: { schemaVersion: "2.1.0" } };
+    const invalid = { ...imported(), submission: { schemaVersion: "3.0.0" } };
     expect(
       issues(() => verifyCertifiedWordImport(invalid, mapping.sourceCodeSystem, OPTIONS)).length,
     ).toBeGreaterThan(0);
@@ -174,7 +225,7 @@ describe("a certified Word source's ingress rules", () => {
       [{ ...submission, graphType: "type2" }, "A certified Word source carries a type1 graph"],
       [
         withExtraction({ parser: { ...extraction.parser, version: "1.0.0" } }),
-        "A certified Word source's extractor version is the hash of the recompute's",
+        "A certified Word source's extractor version is the hash of its importer and recompute",
       ],
       [
         withExtraction({ model: { provider: "p", id: "m" } }),
@@ -213,6 +264,12 @@ describe("a certified Word source's ingress rules", () => {
     for (const [changed, issue] of cases) {
       expect(structuralInvariantIssues(resealed(changed))).toContain(issue);
     }
+    // Another importer named under the same token (review of #193).
+    expect(
+      structuralInvariantIssues(resealed(withSource({ importer: "certified-word-import/0.0.0" }))),
+    ).toContain(
+      "A certified Word source's extractor version is the hash of its importer and recompute",
+    );
     const renamed = withExtraction({ parser: { ...extraction.parser, name: "other" } });
     expect(structuralInvariantIssues(resealed(renamed))).toContain(
       "A certified Word source's extractor is certified-word",
@@ -286,6 +343,42 @@ describe("a certified Word source's ingress rules", () => {
     expect(found(shifted)).toContain("Page 2 of a structured source is not wholly body");
     expect(found(text.pages.slice(0, -1))).toContain(
       "A structured source has one page per section",
+    );
+    // Page i is the record's i-th section (review of #193): two keys swapped, or a span on another
+    // section's page, refuse.
+    const pageIssues = (sectionPages: typeof source.sectionPages, spanPage?: number): string[] => {
+      const submission = resealed({
+        ...input.submission,
+        provenance: {
+          ...input.submission.provenance,
+          sourceDocument: { ...source, sectionPages },
+          sections: input.submission.provenance.sections.map((section, at) =>
+            at === 0 && spanPage !== undefined
+              ? { ...section, spans: section.spans.map((span) => ({ ...span, page: spanPage })) }
+              : section,
+          ),
+        },
+      });
+      return issues(() =>
+        verifyDocumentSubmission({ ...input, submission }, mapping.sourceCodeSystem, {
+          allowSyntheticSources: true,
+          certifiedWordDryRun: { submissionSha256: sha256(submission) },
+        }),
+      );
+    };
+    expect(pageIssues(source.sectionPages)).toEqual([]);
+    const swapped = source.sectionPages.map((page, at) =>
+      at === 1
+        ? { ...page, key: source.sectionPages[2]?.key ?? "" }
+        : at === 2
+          ? { ...page, key: source.sectionPages[1]?.key ?? "" }
+          : page,
+    );
+    expect(pageIssues(swapped)).toContain(
+      "sourceDocument.sectionPages are not the record's sections in order",
+    );
+    expect(pageIssues(source.sectionPages, 3)).toContain(
+      "A section's span is not on its own section's page",
     );
     // A heading over its subsections has the empty page: one that draws something is refused.
     const heading = source.sectionPages.find(({ key }) => key === "smpc.4")?.page;

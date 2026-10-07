@@ -60,12 +60,12 @@ import {
 // fetched (src/contracts/json-schema.ts, REFINEMENTS). A major: 4.0.0 accepted values 5.0.0
 // refuses.
 //
-// 5.1.0 (ADR 0006 P4, D1): the ingestion block's `sourceKind` may be `certified-word`, and its
-// `contractVersion` follows `CanonicalSubmission` 2.1.0, as it follows the submission's version
-// in every release. A minor, as the submission's is: the new source kind refuses nothing that 5.0.0
-// accepted of a 2.1.0 run, and a 5.0.0 manifest stays readable as 5.0.0.
+// 6.0.0 (ADR 0006 P4, D1): the ingestion block's `sourceKind` may be `certified-word`, a value
+// Zone B and the Zone A verifier branch on, and its `contractVersion` follows `CanonicalSubmission`
+// 3.0.0, so 6.0.0 refuses the 2.0.0 that 5.0.0 accepted. A major under ADR 0002's rule ("Enum
+// additions on fields that Zone B branches on are major"); 5.0.0 stays readable as 5.0.0.
 
-export const RUN_MANIFEST_VERSION = "5.1.0";
+export const RUN_MANIFEST_VERSION = "6.0.0";
 
 const ManifestPackageSchema = z
   .strictObject({ package: PackageRef, sha256: Sha256Hex })

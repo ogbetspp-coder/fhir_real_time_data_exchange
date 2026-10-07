@@ -30,8 +30,8 @@ def _script() -> ModuleType:
 
 def test_the_committed_results_are_what_this_build_writes() -> None:
     script = _script()
-    committed = {path.name: path.read_text(encoding="utf-8") for path in script.TARGET.glob("*")}
-    assert committed == script.render()
+    committed = {path.name: path.read_bytes() for path in script.TARGET.glob("*")}
+    assert committed == {name: text.encode("utf-8") for name, text in script.render().items()}
 
 
 def test_each_result_is_the_commands_and_the_labels_are_synthetic() -> None:
@@ -68,6 +68,13 @@ def test_a_drifted_file_fails_the_check(tmp_path: Path, monkeypatch: pytest.Monk
     (tmp_path / "stale.json").unlink()
     assert script.main() == 0
     (tmp_path / "smpc.json").write_text("{}\n", encoding="utf-8")
+    assert script.main() == 1
+    # A carriage return a text read would fold away is drift too (review of #193).
+    monkeypatch.setattr("sys.argv", ["certified_word_fixtures.py"])
+    assert script.main() == 0
+    written = (tmp_path / "smpc.json").read_bytes()
+    (tmp_path / "smpc.json").write_bytes(written.replace(b"\n", b"\r\n"))
+    monkeypatch.setattr("sys.argv", ["certified_word_fixtures.py", "--check"])
     assert script.main() == 1
     monkeypatch.setattr("sys.argv", ["certified_word_fixtures.py"])
     (tmp_path / "stale.json").write_text("{}\n", encoding="utf-8")

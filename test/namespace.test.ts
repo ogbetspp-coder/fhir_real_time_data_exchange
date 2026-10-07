@@ -199,6 +199,31 @@ describe("run namespaces", () => {
     ).rejects.toThrow("Source identifier is in the reserved authority-import namespace");
   });
 
+  // ADR 0002 invariant 13, as ADR 0006 amends it: `certified-word:` is written only by its importer
+  // (review of #193).
+  it.each([
+    ["fixture", "fixture:test"],
+    ["healthcare-api", "Bundle/synthetic"],
+  ] as const)("refuses the certified-word namespace on the %s route", async (kind, resource) => {
+    const config = loadConfig({ DRY_RUN: "true", ALLOW_SYNTHETIC_SOURCES: "true" });
+    const source = withIdentifier(
+      createSyntheticType2Bundle(mapping),
+      "certified-word:00000000-5979-4e74-8000-0000000000d0",
+    );
+    await expect(
+      runPipeline(
+        {
+          runId: "00000000-0000-4000-8000-00000000000c",
+          source,
+          sourceKind: kind,
+          sourceResource: resource,
+        },
+        mapping,
+        config,
+      ),
+    ).rejects.toThrow("Source identifier is in the reserved certified-word namespace");
+  });
+
   it("refuses a meta element but the store's own and the profiles", () => {
     const tagged = createSyntheticType2Bundle(mapping);
     tagged.meta = {
