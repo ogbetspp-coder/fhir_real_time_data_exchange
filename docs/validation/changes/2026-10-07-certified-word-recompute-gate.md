@@ -42,6 +42,12 @@ image. No contract version changes.
 6. **CI**: the Zone A job runs `test/certified-word/recompute.test.ts` with its own Python
    (`RECOMPUTE_PYTHON`), and `scripts/check-all.sh` with it; the Images job runs the gate's runner
    inside the worker image on the committed labels and requires each result byte for byte.
+7. **The deploy trigger** (`.github/workflows/deploy.yml`): the worker image now reads
+   `zone-a/src`, `label-docx-reader/src`, their `pyproject.toml`, `zone-a/uv.lock` and
+   `qrd/registry`, so a merge touching only them deploys; only Zone A's and the label reader's
+   tests, scripts, corpus and documents and the QRD sources are still skipped
+   (`test/ci/deploy-trigger.test.ts`). Without this, a recompute change merged alone would leave
+   the deployed worker on the previous build, which refuses every submission the new one makes.
 
 **Why.** ADR 0006 decision 1's second leg: Zone B makes the sections again from the uploaded bytes
 itself, rather than trusting Zone A's (ADR 0002). The owner decided D2 (a) and D4's narrow path on
@@ -60,7 +66,7 @@ itself, rather than trusting Zone A's (ADR 0002). The owner decided D2 (a) and D
   this gate (another importer version, or a request naming versions this build does not have). None
   is persisted, so no evidence is affected; the run manifest fixture `6.0.0-certified-word.json`
   stays the evidence of its version, never regenerated.
-- Infrastructure: no Terraform change; no IAM change (above).
+- Infrastructure: no Terraform change; no IAM change (above). More merges deploy (step 7).
 
 **Steps 1–7.** 1: the versions above. 2: `uv run --frozen python scripts/certified_word_fixtures.py`
 and `scripts/lock_versions.py` in `zone-a/`; `npm run certified-word:vectors` and

@@ -8,12 +8,14 @@ on:
     # every deploy rebuilds three images, re-imports the profiles and publishes a smoke run, and
     # 41 of them ran in two days, most for documentation. Nothing deployed is built from these
     # paths — the images take src/, fhir/, package files and Dockerfiles; the deploy takes infra/,
-    # scripts/ and workflows/. The quality gate on the pull request still covers test/. qrd/
-    # holds the pinned EMA templates and the registry built from them, read only by zone-a/.
-    # labels/ holds the pinned EMA ePIs and their conformance results, read by zone-a/, by the
-    # importer's golden vectors (src/authority/vectors.ts, under npm run check) and by the
-    # renderer checks (scripts/render/); no image copies it, so nothing deployed reads it.
-    # label-docx-reader/ is the label reader, with its own gate; no image or deploy step reads it.
+    # scripts/ and workflows/. The quality gate on the pull request still covers test/. The
+    # worker image also takes Zone A's and the label reader's code (zone-a/src, label-docx-reader/
+    # src, their pyproject.toml and zone-a/uv.lock) and the QRD registry (qrd/registry), which the
+    # certified Word gate's recompute runs on (docs/design/certified-word-import.md, D2): only
+    # their tests, scripts, corpus and documents, and the pinned EMA templates (qrd/sources), are
+    # skipped. labels/ holds the pinned EMA ePIs and their conformance results, read by zone-a/'s
+    # tests, by the importer's golden vectors (src/authority/vectors.ts, under npm run check) and
+    # by the renderer checks (scripts/render/); no image copies it, so nothing deployed reads it.
     # .claude/ and .cursor/ hold coding-assistant settings and hooks, read by editors on a
     # developer's machine and never by a build or the deploy.
     # workflow_dispatch below deploys on demand whatever changed.
@@ -23,9 +25,14 @@ on:
       - "LICENSE"
       - "test/**"
       - "agent/**"
-      - "zone-a/**"
-      - "label-docx-reader/**"
-      - "qrd/**"
+      - "zone-a/scripts/**"
+      - "zone-a/tests/**"
+      - "label-docx-reader/corpus/**"
+      - "label-docx-reader/docs/**"
+      - "label-docx-reader/scripts/**"
+      - "label-docx-reader/tests/**"
+      - "qrd/sources/**"
+      - "qrd/sources.lock.json"
       - "labels/**"
       - ".github/CODEOWNERS"
       - ".github/dependabot.yml"

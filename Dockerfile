@@ -93,9 +93,9 @@ FROM runtime AS signer
 CMD ["node", "dist/signer/server.js"]
 
 # Last, so a build without --target is the worker, as it always was. It alone carries the Python
-# and the registry and mapping files the recompute reads (fhir/mappings, above, and qrd/registry),
-# read-only to the service, which runs it as `-I -m zone_a.recompute` with ZONE_A_ROOT the app's
-# directory; the build asserts the Unicode version ADR 0003 pins and that the recompute reads its
+# and the registry and mapping files the recompute reads (fhir/mappings, above, and qrd/registry;
+# the Python and the registry are root's, read-only to the service), which the gate runs as
+# `-I -m zone_a.recompute` with ZONE_A_ROOT the app's directory; the build asserts the Unicode version ADR 0003 pins and that the recompute reads its
 # files there. CI's Images job runs it on the committed synthetic labels (scripts/ci/build-images.sh).
 FROM runtime AS worker
 COPY --from=python /opt/python /opt/python

@@ -31,6 +31,13 @@ const deployable = [
   "tsconfig.build.json",
   ".github/workflows/deploy.yml",
   ".gcloudignore",
+  // The worker's recompute (docs/design/certified-word-import.md, D2).
+  "zone-a/src/zone_a/recompute.py",
+  "zone-a/pyproject.toml",
+  "zone-a/uv.lock",
+  "label-docx-reader/src/label_docx/reader.py",
+  "label-docx-reader/pyproject.toml",
+  "qrd/registry/cap-smpc-en-10.4.json",
 ];
 
 function matches(pattern: string, file: string): boolean {
@@ -49,16 +56,19 @@ function matches(pattern: string, file: string): boolean {
 }
 
 describe("the deploy trigger", () => {
-  it("skips merges that touch only documentation, tests, the agent, Zone A, the label reader, the QRD registry or assistant settings", () => {
+  it("skips merges that touch only documentation, tests, the agent, Zone A's and the label reader's tests and scripts, the QRD sources or assistant settings", () => {
     expect(ignored.length).toBeGreaterThan(5);
     for (const file of [
       "docs/foundations.md",
       "README.md",
       "test/ci/x.test.ts",
       "agent/src/a.py",
-      "label-docx-reader/src/label_docx/reader.py",
+      "zone-a/tests/test_recompute.py",
+      "zone-a/scripts/certified_word_fixtures.py",
+      "label-docx-reader/tests/test_reader.py",
+      "label-docx-reader/corpus/README.md",
       ".github/workflows/label-docx-reader.yml",
-      "qrd/registry/cap-smpc-en-10.4.json",
+      "qrd/sources/cap-smpc-en-10.4.docx",
       "qrd/sources.lock.json",
       "labels/ema-epi/sources/brukinsa-smpc-en.json",
       "labels/ema-epi/checks/brukinsa-smpc-en.json",
