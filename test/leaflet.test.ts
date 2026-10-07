@@ -1,3 +1,6 @@
+import { readdirSync } from "node:fs";
+import path from "node:path";
+
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { pipelineFailure } from "../src/app.js";
@@ -9,6 +12,7 @@ import {
   DOCUMENT_TYPE_SYSTEM,
   EMA_DOCUMENT_TYPE_SYSTEM,
   LEAFLET_TITLES_NOT_CARRIED,
+  loadEmaMapping,
   loadEmaMappings,
   mappingFor,
   mappingReference,
@@ -322,13 +326,20 @@ describe("a Type 1 package leaflet record", () => {
 
 describe("the canonical section keys", () => {
   // Every key a submission names is a contract SourceKey (src/contracts/common.ts), whose grammar
-  // has no hyphen: the leaflet's keys are all in it. Two optional SmPC keys of mapping 1.4.0 are
-  // not, so no submission can carry those sections yet; they are listed here so that the list
-  // cannot grow unseen (docs/design/pl-structure.md, "Zone B").
-  it("are contract source keys, but for two optional SmPC sections", () => {
-    const outside = (mapping: EmaMapping): string[] =>
-      keys(mapping.root).filter((key) => !SourceKey.safeParse(key).success);
-    expect(outside(leaflet)).toEqual([]);
-    expect(outside(smpc)).toEqual(["smpc.4.6.breast-feeding", "smpc.5.2.pk-pd"]);
+  // has no hyphen; a manifest key outside it is a section no submission can carry. So every key of
+  // every manifest in fhir/mappings/, its rules' and its unmapped slots', must be one. SmPC
+  // mapping 1.4.0 had two that were not (smpc.4.6.breast-feeding, smpc.5.2.pk-pd; 1.5.0 renamed
+  // them), as leaflet mapping 1.0.0 had three.
+  it("are contract source keys, in every manifest", async () => {
+    const files = readdirSync("fhir/mappings").filter((file) => file.endsWith(".json"));
+    expect(files).toEqual(expect.arrayContaining(["cap-pl-en.json", "cap-smpc-en.json"]));
+    for (const file of files) {
+      const mapping = await loadEmaMapping(path.resolve("fhir/mappings", file));
+      const all = [
+        ...keys(mapping.root),
+        ...(mapping.unmapped ?? []).map((slot) => slot.sourceKey),
+      ];
+      expect([file, all.filter((key) => !SourceKey.safeParse(key).success)]).toEqual([file, []]);
+    }
   });
 });

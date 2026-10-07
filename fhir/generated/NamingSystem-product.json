@@ -2,7 +2,7 @@
   "resourceType": "NamingSystem",
   "id": "product",
   "url": "https://khs.dev/fhir/NamingSystem/product",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "name": "Product",
   "title": "Synthetic product",
   "status": "active",

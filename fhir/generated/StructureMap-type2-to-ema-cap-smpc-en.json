@@ -2,7 +2,7 @@
   "resourceType": "StructureMap",
   "id": "type2-to-ema-cap-smpc-en",
   "url": "https://khs.dev/fhir/StructureMap/type2-to-ema-cap-smpc-en",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "name": "Type2ToEmaCapSmpcEnglish",
   "title": "HL7 Global ePI Type 2 to EMA CAP SmPC English",
   "status": "active",
@@ -1136,7 +1136,7 @@
                   "element": "coding",
                   "variable": "coding",
                   "condition": "system = 'https://khs.dev/fhir/CodeSystem/canonical-smpc-sections'",
-                  "check": "('smpc' | 'smpc.1' | 'smpc.2' | 'smpc.2.1' | 'smpc.2.2' | 'smpc.2.excipients' | 'smpc.3' | 'smpc.4' | 'smpc.4.1' | 'smpc.4.2' | 'smpc.4.2.posology' | 'smpc.4.2.posology.paediatric' | 'smpc.4.2.administration' | 'smpc.4.2.administration.precautions' | 'smpc.4.3' | 'smpc.4.4' | 'smpc.4.4.traceability' | 'smpc.4.4.paediatric' | 'smpc.4.5' | 'smpc.4.5.paediatric' | 'smpc.4.6' | 'smpc.4.6.pregnancy' | 'smpc.4.6.breast-feeding' | 'smpc.4.6.fertility' | 'smpc.4.7' | 'smpc.4.8' | 'smpc.4.8.paediatric' | 'smpc.4.8.reporting' | 'smpc.4.9' | 'smpc.4.9.paediatric' | 'smpc.5' | 'smpc.5.1' | 'smpc.5.1.mechanism' | 'smpc.5.1.effects' | 'smpc.5.1.efficacy' | 'smpc.5.1.paediatric' | 'smpc.5.2' | 'smpc.5.2.absorption' | 'smpc.5.2.distribution' | 'smpc.5.2.biotransformation' | 'smpc.5.2.elimination' | 'smpc.5.2.linearity' | 'smpc.5.2.pk-pd' | 'smpc.5.3' | 'smpc.5.3.era' | 'smpc.6' | 'smpc.6.1' | 'smpc.6.2' | 'smpc.6.3' | 'smpc.6.4' | 'smpc.6.5' | 'smpc.6.6' | 'smpc.6.6.paediatric' | 'smpc.7' | 'smpc.8' | 'smpc.9' | 'smpc.10' | 'smpc.11' | 'smpc.12') contains code"
+                  "check": "('smpc' | 'smpc.1' | 'smpc.2' | 'smpc.2.1' | 'smpc.2.2' | 'smpc.2.excipients' | 'smpc.3' | 'smpc.4' | 'smpc.4.1' | 'smpc.4.2' | 'smpc.4.2.posology' | 'smpc.4.2.posology.paediatric' | 'smpc.4.2.administration' | 'smpc.4.2.administration.precautions' | 'smpc.4.3' | 'smpc.4.4' | 'smpc.4.4.traceability' | 'smpc.4.4.paediatric' | 'smpc.4.5' | 'smpc.4.5.paediatric' | 'smpc.4.6' | 'smpc.4.6.pregnancy' | 'smpc.4.6.breastfeeding' | 'smpc.4.6.fertility' | 'smpc.4.7' | 'smpc.4.8' | 'smpc.4.8.paediatric' | 'smpc.4.8.reporting' | 'smpc.4.9' | 'smpc.4.9.paediatric' | 'smpc.5' | 'smpc.5.1' | 'smpc.5.1.mechanism' | 'smpc.5.1.effects' | 'smpc.5.1.efficacy' | 'smpc.5.1.paediatric' | 'smpc.5.2' | 'smpc.5.2.absorption' | 'smpc.5.2.distribution' | 'smpc.5.2.biotransformation' | 'smpc.5.2.elimination' | 'smpc.5.2.linearity' | 'smpc.5.2.pkpd' | 'smpc.5.3' | 'smpc.5.3.era' | 'smpc.6' | 'smpc.6.1' | 'smpc.6.2' | 'smpc.6.3' | 'smpc.6.4' | 'smpc.6.5' | 'smpc.6.6' | 'smpc.6.6.paediatric' | 'smpc.7' | 'smpc.8' | 'smpc.9' | 'smpc.10' | 'smpc.11' | 'smpc.12') contains code"
                 }
               ],
               "rule": [

@@ -2,7 +2,7 @@
   "resourceType": "NamingSystem",
   "id": "authorization",
   "url": "https://khs.dev/fhir/NamingSystem/authorization",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "name": "Authorization",
   "title": "Synthetic authorisation",
   "status": "active",

@@ -24,6 +24,7 @@ import { transformType2ToEma } from "../../src/fhir/transform.js";
 import type { FhirBundle, FhirResource } from "../../src/fhir/types.js";
 import { officialValidationTargets } from "../../src/pipeline.js";
 import { SMOKE_PRODUCT_ID } from "../../src/fixtures/synthetic-products.js";
+import { createSyntheticSubmission } from "../../src/fixtures/synthetic-submission.js";
 import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 
 // Emits the resources the deployed worker sends to the official HL7 validator for a
@@ -51,6 +52,10 @@ import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 // leaflet's Type 1 record, mapped by the leaflet's manifest, its titles as written, with its own
 // Provenance. Zone B carries a leaflet only so: a Type 2 leaflet, under the template's titles, is
 // refused.
+//
+// A fifth is the drawn SmPC with every optional section of the template (mapping 1.5.0, which
+// keyed Breast-feeding and the pharmacokinetic/pharmacodynamic relationship inside the contract's
+// SourceKey), as a document run sends it: the attested submission's record and its Provenance.
 //
 // A third is the repository's own definitions, fhir/generated/ (the code systems, value sets,
 // extension, ConceptMap and StructureMap the package carries), as committed, against the base R5
@@ -160,6 +165,7 @@ const wordOf = (name: string) => {
   );
   return { bundle: made.submission.bundle as unknown as FhirBundle, made };
 };
+const optional = createSyntheticSubmission(mapping, { product: SMOKE_PRODUCT_ID, optional: true });
 const word = wordOf("smpc");
 const wordLeaflet = wordOf("pl");
 
@@ -201,6 +207,12 @@ const set: SetEntry[] = [
     { submission: wordLeaflet.made.submission, report: wordLeaflet.made.fidelityReport },
     "as-written",
     leaflet,
+  ),
+  ...caseOf(
+    optional.submission.bundle as unknown as FhirBundle,
+    "type2",
+    { source: "source-type2-optional.json", suffix: "-optional" },
+    { submission: optional.submission, report: optional.fidelityReport },
   ),
   ...artifacts,
 ];

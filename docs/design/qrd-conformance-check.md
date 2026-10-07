@@ -4,7 +4,7 @@
   `labels/ema-epi/sources.lock.json` (five)
 - Date: 2026-09-23; updated 2026-09-28 (`qrd-check/1.2.0`, `epi-reader/1.2.0`) and 2026-10-04
   (`qrd-check/1.3.0`, the label reader's `epi-reader/1.3.0`); the checks on record are of
-  `qrd-check/1.6.0`, `epi-reader/1.3.8` and mapping 1.4.0 (`labels/ema-epi/checks/`)
+  `qrd-check/1.6.0`, `epi-reader/1.3.8` and mapping 1.5.0 (`labels/ema-epi/checks/`)
 - Related: `docs/design/qrd-registry.md` (the registry it checks against), `docs/roadmap.md`
   item 8, `AGENTS.md` (the scoped exception for authority-published ePI)
 

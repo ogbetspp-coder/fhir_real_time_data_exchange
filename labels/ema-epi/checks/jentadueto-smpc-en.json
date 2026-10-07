@@ -7,7 +7,7 @@
   "format": "label-epi-json/1.11.14",
   "inputs": {
     "registrySha256": "dcfab25158f67252222c6dfc95c915b9715683611523656971d590f8a171667c",
-    "mappingSha256": "bbde1bbb6b1997525beac800bbe9bd9b601a10216303f5f7d456f537067700f6"
+    "mappingSha256": "9ba09319770c6f363b25baa78c37e72d5a2ebb05e5c16b8693b2fa38e2d286da"
   },
   "checker": "qrd-check/1.6.0",
   "template": {
@@ -19,7 +19,7 @@
     "language": "en"
   },
   "registryVersion": "1.3.0",
-  "mappingVersion": "1.4.0",
+  "mappingVersion": "1.5.0",
   "document": {
     "title": "Jentadueto",
     "date": "2024-04-22"

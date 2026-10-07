@@ -244,7 +244,10 @@ slots (codes 200000044333 and 200000044347, 44 slots) as `unmapped`, with the re
 carries the template's own sections only, each once, so it refuses a section with their keys.
 `test/official/profile-slots.test.ts` reads the profile from the pinned EUePI package in CI and fails
 on any slot that is neither. The ConceptMap publishes the rules as `equivalent` and the unmapped
-slots as `noMap`.
+slots as `noMap`. Every key, a rule's or an unmapped slot's, is a contract `SourceKey` (no hyphen),
+or no submission could carry its section: mapping 1.5.0 renamed the two of 1.4.0 that were not,
+Breast-feeding's and the pharmacokinetic/pharmacodynamic relationship's (`smpc.4.6.breastfeeding`,
+`smpc.5.2.pkpd`), and `test/leaflet.test.ts` holds every key of every manifest to it.
 
 The package leaflet has its own manifest, `fhir/mappings/cap-pl-en.json` (mapping 1.1.0): the
 EMA's profile `EUQRD-CAP-template-new-Package-Leaflet-en` written out, 27 rules, 17 of them

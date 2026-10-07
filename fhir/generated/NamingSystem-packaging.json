@@ -2,7 +2,7 @@
   "resourceType": "NamingSystem",
   "id": "packaging",
   "url": "https://khs.dev/fhir/NamingSystem/packaging",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "name": "Packaging",
   "title": "Synthetic packaging",
   "status": "active",

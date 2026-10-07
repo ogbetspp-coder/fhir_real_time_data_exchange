@@ -10,7 +10,7 @@ import {
 import type { EmaMapping } from "../src/fhir/mapping.js";
 import { loadEmaMapping } from "../src/fhir/mapping.js";
 import { TransformationError } from "../src/fhir/transform.js";
-import type { FhirComposition } from "../src/fhir/types.js";
+import type { CompositionSection, FhirComposition } from "../src/fhir/types.js";
 import { createSyntheticSubmission } from "../src/fixtures/synthetic-submission.js";
 import { createSyntheticType2Bundle } from "../src/fixtures/synthetic.js";
 import { sha256 } from "../src/lib/hash.js";
@@ -154,6 +154,49 @@ describe("pipeline", () => {
         : ingestionApproval?.approverId,
     ).toBe(attested(submission).approverId);
     expect(() => RunManifestSchema.parse(manifest)).not.toThrow();
+  });
+
+  // Every optional section of the template, Breast-feeding and the pharmacokinetic/pharmacodynamic
+  // relationship among them: mapping 1.4.0 keyed those two outside the contract's SourceKey, so the
+  // submission could not be made (createSyntheticSubmission checks it as the gate does).
+  it("publishes an approved submission with every optional section of the template", async () => {
+    const { submission, fidelityReport, sourceText } = createSyntheticSubmission(mapping, {
+      optional: true,
+    });
+    const keys = (sections: CompositionSection[] = []): (string | undefined)[] =>
+      sections.flatMap(({ code, section }) => [code.coding?.[0]?.code, ...keys(section)]);
+    expect(keys(composition(submission).section)).toEqual(
+      expect.arrayContaining(["smpc.4.6.breastfeeding", "smpc.5.2.pkpd"]),
+    );
+    const fixture = await runPipeline(
+      {
+        runId: FIXTURE_RUN_ID,
+        source: createSyntheticType2Bundle(mapping, { optional: true }),
+        sourceKind: "fixture",
+        sourceResource: "fixture:test",
+      },
+      mapping,
+      config,
+    );
+    const result = await runPipeline(
+      {
+        runId: DOCUMENT_RUN_ID,
+        sourceKind: "document",
+        submission,
+        fidelityReport,
+        sourceText,
+        sourceResource: "document:synthetic-smpc",
+      },
+      mapping,
+      config,
+    );
+    expect(result.status).toBe("validated");
+    // A decision for each of the template's 59 sections, and the EMA Bundle the fixture route
+    // makes from the same sections.
+    expect(result.evidence.manifest.transformation.decisions).toBe(59);
+    expect(result.evidence.manifest.transformation.outputHash).toBe(
+      fixture.evidence.manifest.transformation.outputHash,
+    );
   });
 
   it("rejects a tampered approval hash before any transformation", async () => {

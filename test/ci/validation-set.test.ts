@@ -19,11 +19,12 @@ import {
   recomputedCases,
 } from "../../src/certified-word/vectors.js";
 import { SMOKE_PRODUCT_ID } from "../../src/fixtures/synthetic-products.js";
+import { createSyntheticSubmission } from "../../src/fixtures/synthetic-submission.js";
 import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 import { officialValidationTargets } from "../../src/pipeline.js";
 
 // The set CI's "Official validation" job validates (scripts/ci/emit-validation-set.ts) is the
-// pipeline's own list of targets (officialValidationTargets), for each of its four cases, and not a
+// pipeline's own list of targets (officialValidationTargets), for each of its five cases, and not a
 // copy of it: until audit B15 the script restated the profile and the four resources by hand, so
 // a resource the pipeline began validating would have left the gate green on the old set. Each
 // case's targets end with the Provenance a document run persists, built from the contract
@@ -189,14 +190,49 @@ describe("the official validation set", () => {
     ).toBe(false);
   });
 
+  // Every optional section of the template (mapping 1.5.0 keyed Breast-feeding and the
+  // pharmacokinetic/pharmacodynamic relationship inside the contract's SourceKey): the drawn,
+  // attested submission's record and its Provenance.
+  it("is the same targets for a drawn SmPC with every optional section and its Provenance", () => {
+    const { submission, fidelityReport } = createSyntheticSubmission(mapping, {
+      product: SMOKE_PRODUCT_ID,
+      optional: true,
+    });
+    const source = submission.bundle as unknown as FhirBundle;
+    const transformed = transformType2ToEma(source, mapping);
+    const provenance = toProvenanceResource(submission, fidelityReport, {
+      bundleId: transformed.documentBundle.id ?? "",
+      compositionId: transformed.documentBundle.entry[0]?.resource.id ?? "",
+    });
+    const targets = officialValidationTargets(source, transformed, mapping, provenance);
+    const named = (name: string): string =>
+      name === "source" ? "source-type2-optional.json" : `${name}-optional.json`;
+    expect(entries.slice(4 * targets.length, 5 * targets.length)).toEqual(
+      targets.map(({ name, resource, profiles }) => ({
+        file: named(name),
+        resourceType: resource.resourceType,
+        profiles,
+      })),
+    );
+    for (const { name, resource } of targets) {
+      const emitted = JSON.parse(
+        readFileSync(path.join(output, named(name)), "utf8"),
+      ) as FhirResource;
+      expect([name, emitted]).toEqual([name, resource]);
+    }
+    expect(transformed.mappingDecisions.map(({ sourceKey }) => sourceKey)).toEqual(
+      expect.arrayContaining(["smpc.4.6.breastfeeding", "smpc.5.2.pkpd"]),
+    );
+  });
+
   it("adds the repository's own definitions, against no profile, and nothing else", () => {
     const artifacts = readdirSync("fhir/generated")
       .filter((file) => file.endsWith(".json"))
       .sort();
-    expect(entries.slice(20).map(({ file, profiles }) => ({ file, profiles }))).toEqual(
+    expect(entries.slice(25).map(({ file, profiles }) => ({ file, profiles }))).toEqual(
       artifacts.map((file) => ({ file, profiles: [] })),
     );
-    expect(entries).toHaveLength(20 + artifacts.length);
+    expect(entries).toHaveLength(25 + artifacts.length);
   });
 
   it("restates no profile of its own", () => {

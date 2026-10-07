@@ -1,5 +1,5 @@
 {
-  "mappingVersion": "1.4.0",
+  "mappingVersion": "1.5.0",
   "sourceCodeSystem": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
   "targetCodeSystem": "http://ema.europa.eu/fhir/CodeSystem/200000029659",
   "targetCodeSystemAliases": ["https://spor.ema.europa.eu/v1/lists/200000029659/terms/"],
@@ -158,7 +158,7 @@
                 "required": false
               },
               {
-                "sourceKey": "smpc.4.6.breast-feeding",
+                "sourceKey": "smpc.4.6.breastfeeding",
                 "targetCode": "200000029813",
                 "title": "Breast-feeding",
                 "required": false
@@ -289,7 +289,7 @@
                 "required": false
               },
               {
-                "sourceKey": "smpc.5.2.pk-pd",
+                "sourceKey": "smpc.5.2.pkpd",
                 "targetCode": "200000029833",
                 "title": "Pharmacokinetic/pharmacodynamic relationship(s)",
                 "required": false
