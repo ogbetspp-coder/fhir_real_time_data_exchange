@@ -3,8 +3,8 @@
 _Roadmap item 2. Design, 2026-09-22. It was revised once after an independent adversarial review
 (validation, security and engineering lenses), amended on 2026-09-25 for an authority import's
 request statement after that amendment's own reviews (roadmap 3a's PR 3c design), and is reviewed
-again before any of it runs. Phase 1's build steps 2 to 5 are built (2026-10-06), with the query
-service's verification off until step 6; the amendment of 2026-10-06 records, as proposed, the
+again before any of it runs. Phase 1's build steps 2 to 5 are built (2026-10-06), with the pipeline's
+enforcement and the query service's verification both off until step 6; the amendment of 2026-10-06 records, as proposed, the
 mechanics they settle. Step 1 (the add-on, in the owner's Workspace console) and step 6 (the
 migration) are not done._
 
@@ -633,8 +633,10 @@ and verifies its own signature with the key's public key before it writes the he
 every version of their own environment's key and no other key (D4), and fetch each version's public
 key once per process.
 
-**The pipeline (D5, flow step 6).** A persisted `document` run publishes only under its document's
-head: the run reads the head (no change to the run request: the head is the one statement that may
+**The pipeline (D5, flow step 6).** Enforcement is a setting, `APPROVAL_ENFORCEMENT`
+(`approval_enforcement`), off by default, so that merging this changes nothing the running system
+does: until step 6 a document run publishes as before, reads no head and writes no link. With it on,
+a persisted `document` run publishes only under its document's head: the run reads the head (no change to the run request: the head is the one statement that may
 publish), verifies it, and requires its environment, document, submission, approved content, mapping
 and sections to be the run's, before anything is validated, signed or written; anything else is
 refused with a closed code (`not-approved` at HTTP, 422). A dry run persists nothing and is not
@@ -651,7 +653,9 @@ proposed follow-up.
 
 **The query service (D9).** Verification is a setting, `APPROVAL_VERIFICATION`
 (`query_approval_verification`), off by default, so that merging this cannot turn the live
-demonstration documents `not-approved` before step 6. With it on: for the version it serves, the
+demonstration documents `not-approved` before step 6. Step 6 turns it and the pipeline's
+`APPROVAL_ENFORCEMENT` on in one change. While both are off, a deploy creates the HSM key, the heads
+bucket and the signer, all inert: nothing calls the signer, and nothing reads the heads or the key. With it on: for the version it serves, the
 service reads the link by id, verifies the statement against the environment's keys, re-hashes every
 section, and reads the head (the link, the head's listing and its entry: three reads beyond the
 Bundle; `get_provenance` adds the ingestion Provenance by its deterministic id). The open question of

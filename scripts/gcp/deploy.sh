@@ -271,12 +271,14 @@ tf_deploy_vars() {
     # is the Terraform default, false.
     -var="allow_synthetic_sources=${ALLOW_SYNTHETIC_SOURCES:-false}"
     # Signed approvals (docs/design/approval.md): the approver map, the Workspace add-on that may
-    # call the signer, and whether the query service verifies every answer. Repository variables;
-    # unset are the Terraform defaults: nobody approves, nothing calls the signer, and the query
-    # service does not verify.
+    # call the signer, whether the worker publishes a document only under its approval, and whether
+    # the query service verifies every answer. Repository variables; unset are the Terraform
+    # defaults: nobody approves, nothing calls the signer, and neither the worker nor the query
+    # service checks an approval.
     -var="approvers=${approvers_json}"
     -var="approval_addon_service_account=${APPROVAL_ADDON_SERVICE_ACCOUNT:-}"
     -var="approval_addon_oauth_client_id=${APPROVAL_ADDON_OAUTH_CLIENT_ID:-}"
+    -var="approval_enforcement=${APPROVAL_ENFORCEMENT:-false}"
     -var="query_approval_verification=${QUERY_APPROVAL_VERIFICATION:-false}"
   )
 }

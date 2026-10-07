@@ -222,10 +222,6 @@ beforeAll(async () => {
     KMS_MANIFEST_KEY:
       "projects/p/locations/europe-west4/keyRings/evidence/cryptoKeys/manifest-signing/cryptoKeyVersions/1",
     TRANSFORMATION_LEDGER_DATASET: "ledger",
-    APPROVAL_ENVIRONMENT: "dev",
-    APPROVAL_HEADS_BUCKET: "approval-heads",
-    APPROVAL_SIGNING_KEY:
-      "projects/p/locations/europe-west4/keyRings/evidence/cryptoKeys/approval-signing-hsm",
   });
 });
 
@@ -379,7 +375,6 @@ describe("a persisted run's commit order", () => {
       },
       mapping,
       config,
-      { approvals: approvedHeads() },
     );
 
     const [sent] = state.executed;
@@ -520,6 +515,17 @@ describe("a persisted run's commit order", () => {
 // verified head statement, then links the stored version to it (D5). Evidence asked for: an
 // unsigned submission refused; the same content signed, published, with its versioned Provenance.
 describe("a persisted document run's approval", () => {
+  const APPROVAL_SIGNING_KEY =
+    "projects/p/locations/europe-west4/keyRings/evidence/cryptoKeys/approval-signing-hsm";
+  // The deployment with APPROVAL_ENFORCEMENT on, as the design's step 6 sets it.
+  const enforcing = (): AppConfig => ({
+    ...config,
+    APPROVAL_ENFORCEMENT: true,
+    APPROVAL_ENVIRONMENT: "dev",
+    APPROVAL_HEADS_BUCKET: "approval-heads",
+    APPROVAL_SIGNING_KEY,
+  });
+
   function documentRun(
     approvals: ReturnType<typeof approvedHeads> | { heads: MemoryHeads; keys: typeof trustedKeys },
   ) {
@@ -534,10 +540,78 @@ describe("a persisted document run's approval", () => {
         sourceResource: `document:${"0".repeat(64)}`,
       },
       mapping,
-      config,
+      enforcing(),
       { approvals },
     );
   }
+
+  // Off, the default until step 6: a document run publishes as before, reads no head and writes
+  // no link, whatever the heads bucket holds.
+  it("publishes as before and links nothing while APPROVAL_ENFORCEMENT is off", async () => {
+    const { submission, fidelityReport, sourceText } = createSyntheticSubmission(mapping);
+    const heads = new MemoryHeads();
+    const result = await runPipeline(
+      {
+        runId: crypto.randomUUID(),
+        sourceKind: "document",
+        submission,
+        fidelityReport,
+        sourceText,
+        sourceResource: `document:${"0".repeat(64)}`,
+      },
+      mapping,
+      config,
+      { approvals: { heads, keys: trustedKeys } },
+    );
+    expect(config.APPROVAL_ENFORCEMENT).toBe(false);
+    expect(result.status).toBe("persisted");
+    expect(state.linked).toEqual([]);
+    expect(kinds()).not.toContain("link");
+    expect(state.objects.has("approval-link")).toBe(false);
+  });
+
+  it("is off unless set, and on needs its environment, heads bucket and key", () => {
+    const environment = {
+      NODE_ENV: "test",
+      DRY_RUN: "false",
+      GOOGLE_CLOUD_PROJECT: "synthetic-project",
+      HEALTHCARE_DATASET_ID: "dataset",
+      SOURCE_FHIR_STORE_ID: "source",
+      TARGET_FHIR_STORE_ID: "target",
+      EVIDENCE_BUCKET: "evidence",
+      FHIR_VALIDATOR_URL: "http://validator.invalid",
+      FHIR_ANALYTICS_DATASET: "analytics",
+      KMS_MANIFEST_KEY:
+        "projects/p/locations/europe-west4/keyRings/evidence/cryptoKeys/manifest-signing/cryptoKeyVersions/1",
+      TRANSFORMATION_LEDGER_DATASET: "ledger",
+    };
+    expect(loadConfig(environment).APPROVAL_ENFORCEMENT).toBe(false);
+    for (const key of ["APPROVAL_ENVIRONMENT", "APPROVAL_HEADS_BUCKET", "APPROVAL_SIGNING_KEY"]) {
+      expect(() => loadConfig({ ...environment, APPROVAL_ENFORCEMENT: "on" })).toThrow(
+        `${key} is required when DRY_RUN=false`,
+      );
+    }
+    const on = {
+      ...environment,
+      APPROVAL_ENFORCEMENT: "on",
+      APPROVAL_ENVIRONMENT: "dev",
+      APPROVAL_HEADS_BUCKET: "approval-heads",
+      APPROVAL_SIGNING_KEY,
+    };
+    expect(loadConfig(on).APPROVAL_ENFORCEMENT).toBe(true);
+    // A deployment that runs no document source needs none of it.
+    expect(
+      loadConfig({
+        ...environment,
+        APPROVAL_ENFORCEMENT: "on",
+        ALLOW_SYNTHETIC_SOURCES: "true",
+        ENABLED_RUN_SOURCES: "fixture",
+      }).APPROVAL_ENFORCEMENT,
+    ).toBe(true);
+    expect(() =>
+      loadConfig({ ...on, APPROVAL_SIGNING_KEY: `${APPROVAL_SIGNING_KEY}/cryptoKeyVersions/1` }),
+    ).toThrow(/must name a crypto key, not a version/);
+  });
 
   it("publishes under the signed head, then links the version the transaction wrote", async () => {
     const approvals = approvedHeads();
@@ -574,7 +648,7 @@ describe("a persisted document run's approval", () => {
           sourceResource: `document:${"0".repeat(64)}`,
         },
         mapping,
-        { ...config, APPROVAL_HEADS_BUCKET: undefined },
+        { ...enforcing(), APPROVAL_HEADS_BUCKET: undefined },
       ),
     ).rejects.toThrow("Approval verification is not configured");
     expect(kinds()).toEqual([]);
@@ -641,7 +715,7 @@ describe("a persisted document run's approval", () => {
   it("answers not-approved over HTTP, with the closed reason, and writes nothing", async () => {
     const parts = createSyntheticSubmission(mapping);
     const app = createApp({
-      config,
+      config: enforcing(),
       submissionReader: { read: () => Promise.resolve(parts) },
       approvals: { heads: new MemoryHeads(), keys: trustedKeys },
     });

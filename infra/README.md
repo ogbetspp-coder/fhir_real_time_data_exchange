@@ -103,6 +103,7 @@ Set by `deploy.sh` on every plan and apply unless marked "default".
 | `approvers`                       | `APPROVERS_JSON` (default `{}`: nobody approves)                                          | Approver map: Google subject to role and e-mail (docs/design/approval.md, D2)                                              |
 | `approval_addon_service_account`  | `APPROVAL_ADDON_SERVICE_ACCOUNT` (default empty: nothing calls the signer)                | The Workspace add-on's service account: run.invoker on the signer, and the system ID token's email                         |
 | `approval_addon_oauth_client_id`  | `APPROVAL_ADDON_OAUTH_CLIENT_ID` (default empty: the signer refuses every event)          | The add-on's OAuth client id: the user ID token's audience                                                                 |
+| `approval_enforcement`            | `APPROVAL_ENFORCEMENT` (default `false`)                                                  | Whether the worker publishes a document only under its verified head approval, and links the version to it                 |
 | `query_approval_verification`     | `QUERY_APPROVAL_VERIFICATION` (default `false`)                                           | Whether the query service verifies every answer's signed approval (`not-approved` without one)                             |
 
 Each variable's full description, validation and reasoning are in `variables.tf`.

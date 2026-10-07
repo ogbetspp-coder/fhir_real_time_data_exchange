@@ -164,9 +164,15 @@ resource "google_cloud_run_v2_service" "worker" {
         name  = "FHIR_VALIDATOR_URL"
         value = "http://localhost:8090"
       }
-      # A document run publishes only under the document's verified head statement
-      # (docs/design/approval.md, D8): the environment statements must name, the heads bucket, and
-      # the approval key whose versions it trusts.
+      # Whether a document run publishes only under the document's verified head statement and
+      # links the version it wrote to it (docs/design/approval.md, D5 and D8): off until the
+      # demonstration documents are approved through the signer (var.approval_enforcement). Then the
+      # environment statements must name, the heads bucket, and the approval key whose versions it
+      # trusts.
+      env {
+        name  = "APPROVAL_ENFORCEMENT"
+        value = var.approval_enforcement ? "on" : "off"
+      }
       env {
         name  = "APPROVAL_ENVIRONMENT"
         value = var.environment

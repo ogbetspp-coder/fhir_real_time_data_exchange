@@ -80,9 +80,17 @@ const ConfigSchema = z
       .regex(KMS_KEY_VERSION, "KMS_MANIFEST_KEY must name a crypto key version")
       .optional(),
     FHIR_VALIDATOR_URL: z.url().optional(),
-    // A document run publishes only under the document's signed head statement
-    // (docs/design/approval.md, D8 and D5): the environment every statement it accepts names, the
-    // heads bucket it reads the head from, and the approval key whose versions it trusts.
+    // Whether a persisted document run publishes only under the document's signed head statement,
+    // and links the version it wrote to it (docs/design/approval.md, D8 and D5). Off by default, and
+    // off in every deploy until the demonstration documents are approved through the signer (the
+    // design's step 6, which turns this and the query service's verification on together): with it
+    // on, a document run without a valid head approval is refused `not-approved`.
+    APPROVAL_ENFORCEMENT: z
+      .enum(["on", "off"])
+      .default("off")
+      .transform((value) => value === "on"),
+    // When it is on: the environment every statement it accepts names, the heads bucket it reads
+    // the head from, and the approval key whose versions it trusts.
     APPROVAL_ENVIRONMENT: ApprovalEnvironment.optional(),
     APPROVAL_HEADS_BUCKET: optionalNonEmpty,
     APPROVAL_SIGNING_KEY: z
@@ -132,12 +140,13 @@ const ConfigSchema = z
       "TRANSFORMATION_LEDGER_DATASET",
     ] as const;
 
-    // A persisted document run is always verified against its approval: there is no unapproved
-    // document publication.
+    // With APPROVAL_ENFORCEMENT on, a persisted document run is always verified against its
+    // approval: there is no unapproved document publication, and no deployment that cannot check.
     const documentRuns = (value.ENABLED_RUN_SOURCES ?? RUN_SOURCES).includes("document");
-    const approval = documentRuns
-      ? (["APPROVAL_ENVIRONMENT", "APPROVAL_HEADS_BUCKET", "APPROVAL_SIGNING_KEY"] as const)
-      : [];
+    const approval =
+      value.APPROVAL_ENFORCEMENT && documentRuns
+        ? (["APPROVAL_ENVIRONMENT", "APPROVAL_HEADS_BUCKET", "APPROVAL_SIGNING_KEY"] as const)
+        : [];
 
     for (const key of [...required, ...approval]) {
       if (value[key] === undefined) {

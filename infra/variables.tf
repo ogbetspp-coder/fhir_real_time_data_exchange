@@ -463,6 +463,12 @@ variable "approval_addon_oauth_client_id" {
   }
 }
 
+variable "approval_enforcement" {
+  description = "Whether the worker publishes a document run only under its document's verified head approval, and links the version it wrote to it (docs/design/approval.md, D5 and D8). Off by default: turning it on refuses every document run without a valid approval, so it is turned on with query_approval_verification, in the migration of the demonstration documents (the design's step 6)."
+  type        = bool
+  default     = false
+}
+
 variable "query_approval_verification" {
   description = "Whether the query service verifies, on every answer, the signed approval linked to the version it serves (docs/design/approval.md, D9; query-tools 5.0.0). Off by default: turning it on makes every version without a valid approval not-approved, so it is turned on only with the migration of the demonstration documents and the agent (the design's step 6)."
   type        = bool

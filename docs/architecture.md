@@ -509,9 +509,10 @@ event.
   key role (`test/infra/signer-identity.test.ts`). Its image is `Dockerfile --target signer`, by
   digest, named in every statement it signs. Only the add-on's service account may invoke it
   (`approval_addon_service_account`, empty by default).
-- **The worker's side.** A persisted `document` run publishes only under its document's verified
-  head statement and links the version it wrote to it after the commit (`docs/design/approval.md`,
-  D5 and D8). The worker holds read on the heads bucket and `roles/cloudkms.publicKeyViewer` on the
+- **The worker's side.** With `APPROVAL_ENFORCEMENT` on (`approval_enforcement`, off by default
+  until the design's step 6), a persisted `document` run publishes only under its document's
+  verified head statement and links the version it wrote to it after the commit
+  (`docs/design/approval.md`, D5 and D8); off, it publishes as before. The worker holds read on the heads bucket and `roles/cloudkms.publicKeyViewer` on the
   approval key, and cannot sign or write an approval.
 
 ## Scale and failure behavior

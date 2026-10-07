@@ -142,47 +142,19 @@ describe("a persist-mode configuration", () => {
     KMS_MANIFEST_KEY:
       "projects/p/locations/europe-west4/keyRings/evidence/cryptoKeys/manifest-signing/cryptoKeyVersions/1",
     TRANSFORMATION_LEDGER_DATASET: "ledger",
-    APPROVAL_ENVIRONMENT: "dev",
-    APPROVAL_HEADS_BUCKET: "approval-heads",
-    APPROVAL_SIGNING_KEY:
-      "projects/p/locations/europe-west4/keyRings/evidence/cryptoKeys/approval-signing-hsm",
   };
 
   it("starts with a signing key and a ledger dataset", () => {
     expect(loadConfig(PERSIST).DRY_RUN).toBe(false);
   });
 
-  // A deployment that runs no document source publishes nothing a person approves, so it needs no
-  // approval configuration (docs/design/approval.md, D8).
-  it("needs no approval configuration when the document source is off", () => {
-    const environment: Record<string, string> = Object.fromEntries(
-      Object.entries(PERSIST).filter(([name]) => !name.startsWith("APPROVAL_")),
-    );
-    expect(
-      loadConfig({
-        ...environment,
-        ALLOW_SYNTHETIC_SOURCES: "true",
-        ENABLED_RUN_SOURCES: "fixture",
-      }).DRY_RUN,
-    ).toBe(false);
-    expect(() =>
-      loadConfig({
-        ...PERSIST,
-        APPROVAL_SIGNING_KEY: `${PERSIST.APPROVAL_SIGNING_KEY}/cryptoKeyVersions/1`,
-      }),
-    ).toThrow(/must name a crypto key, not a version/);
-  });
-
-  it.each([
-    "KMS_MANIFEST_KEY",
-    "TRANSFORMATION_LEDGER_DATASET",
-    "APPROVAL_ENVIRONMENT",
-    "APPROVAL_HEADS_BUCKET",
-    "APPROVAL_SIGNING_KEY",
-  ] as const)("does not start without %s", (key) => {
-    const environment: Record<string, string> = Object.fromEntries(
-      Object.entries(PERSIST).filter(([name]) => name !== key),
-    );
-    expect(() => loadConfig(environment)).toThrow(`${key} is required when DRY_RUN=false`);
-  });
+  it.each(["KMS_MANIFEST_KEY", "TRANSFORMATION_LEDGER_DATASET"] as const)(
+    "does not start without %s",
+    (key) => {
+      const environment: Record<string, string> = Object.fromEntries(
+        Object.entries(PERSIST).filter(([name]) => name !== key),
+      );
+      expect(() => loadConfig(environment)).toThrow(`${key} is required when DRY_RUN=false`);
+    },
+  );
 });

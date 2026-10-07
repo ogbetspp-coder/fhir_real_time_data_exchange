@@ -396,10 +396,12 @@ export async function runPipeline(
     throw new Error("The EMA document Bundle and Composition require ids");
   }
 
-  // A persisted document run publishes only under the document's verified head statement, checked
-  // before anything is validated, signed or written. A dry run persists nothing and is not asked.
+  // With APPROVAL_ENFORCEMENT on, a persisted document run publishes only under the document's
+  // verified head statement, checked before anything is validated, signed or written, and links
+  // the version it wrote to it after the commit. A dry run persists nothing and is not asked. Off
+  // (the default until the design's step 6), a document run publishes as it did before.
   const approval =
-    gate === undefined || config.DRY_RUN
+    gate === undefined || config.DRY_RUN || !config.APPROVAL_ENFORCEMENT
       ? undefined
       : await verifiedApproval(gate, transformed, mapping, config, dependencies);
   const provenanceResource =

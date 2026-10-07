@@ -76,10 +76,6 @@ describe("lineage", () => {
       KMS_MANIFEST_KEY:
         "projects/p/locations/europe-west4/keyRings/evidence/cryptoKeys/manifest-signing/cryptoKeyVersions/1",
       TRANSFORMATION_LEDGER_DATASET: "ledger",
-      APPROVAL_ENVIRONMENT: "dev",
-      APPROVAL_HEADS_BUCKET: "approval-heads",
-      APPROVAL_SIGNING_KEY:
-        "projects/p/locations/europe-west4/keyRings/evidence/cryptoKeys/approval-signing-hsm",
     });
 
     const result = await runPipeline(

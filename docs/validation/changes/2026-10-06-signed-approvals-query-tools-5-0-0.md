@@ -41,9 +41,11 @@ which a 4.1.0 reader refuses (its objects are strict).
   is turned on (deploy order, below).
 - No approved hash, fidelity vector or authority vector moves; the run manifest is unchanged.
 
-**Deploy order.** 1. Merge: the service answers as before (verification off). 2. Approve the
-demonstration documents through the signer and publish them (the design's step 6). 3. Redeploy the
-agent from `main` (5.0.0), then turn `query_approval_verification` on, in one change.
+**Deploy order.** 1. Merge: the service answers as before (verification off), and the worker
+publishes as before (`approval_enforcement` off); the deploy creates the HSM key, the heads bucket
+and the signer, all inert. 2. Approve the demonstration documents through the signer (the design's
+step 6). 3. In one change: turn `approval_enforcement` on and publish the approved documents, redeploy
+the agent from `main` (5.0.0), and turn `query_approval_verification` on.
 
 **Steps 1–6.** 1: the version literals above. 2: `npm run contracts:generate`,
 `npm run contracts:fixtures`, `npm run contracts:lock -- --record` this file, and
