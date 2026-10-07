@@ -110,10 +110,23 @@ COMPONENTS: dict[str, Component] = {
             "src/zone_a/fidelity/xhtml.py",
         ),
     ),
+    # The drawing record's fields (python -m zone_a.drawing) are decided by these and by the
+    # versions its request names (the recompute's, the reader's, the structurer's, the builder's):
+    # canonical JSON and its hashes, the recompute's written bytes, the statements the structurer
+    # skips (qrd/check.py, under no version of its own) and the reader's thresholds the browser
+    # check marks by (epi.py). tests/test_versions_lock.py holds this list to what it imports.
     "word-drawing": Component(
         "zone_a.drawing",
         "DRAWING_VERSION",
-        ("src/zone_a/drawing.py", "src/zone_a/word_epi.py", f"{_LABEL_DOCX}/browser.py"),
+        (
+            "src/zone_a/drawing.py",
+            "src/zone_a/word_epi.py",
+            f"{_LABEL_DOCX}/browser.py",
+            "src/zone_a/recompute.py",
+            "src/zone_a/canonical_json.py",
+            "src/zone_a/qrd/check.py",
+            f"{_LABEL_DOCX}/epi.py",
+        ),
     ),
     "product": Component(
         "zone_a.product", "PRODUCT_VERSION", ("src/zone_a/product.py", "src/zone_a/structure.py")

@@ -129,6 +129,9 @@ def test_the_command_writes_the_fields_or_nothing(
         b"\xff",
         b"{",
         b"NaN",
+        # Nested too deep for the JSON parser, and for canonical JSON though not the parser.
+        b"[" * 100_000 + b"]" * 100_000,
+        b"[" * 2_000 + b"]" * 2_000,
     ):
         assert _main(monkeypatch, capsys, [label], wrong) == (1, "", "refused: request\n")
     assert _main(monkeypatch, capsys, [str(tmp_path / "none.docx")], raw) == (

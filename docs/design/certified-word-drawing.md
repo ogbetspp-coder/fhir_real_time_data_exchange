@@ -1,8 +1,8 @@
 # The drawing record: Zone B's proof that Chrome draws a certified Word label as it was read (ADR 0006 P4, D3)
 
 - Status: proposed 2026-10-07; revised the same day after an independent review of #197, whose
-  recommendations the owner said to go ahead on. Build order step 1 measured and PR 1 built the
-  same day ("Step 1: measured, and PR 1 as built", below); PR 2 to 4 not
+  recommendations the owner said to go ahead on. Build order step 1 partly measured and PR 1
+  built the same day ("Step 1: measured, and PR 1 as built", below); PR 2 to 4 are not built
 - Implements: `docs/design/certified-word-import.md` D3 (a), the owner's choice of 2026-10-06
   ("extend the renderer gate's attested records"), and that note's "The gate", steps 5 and 6
 - Fits: `docs/design/authority-import-renderer.md` R1 (attested records), frozen, its architecture
@@ -367,7 +367,8 @@ it, is gone: neither names the other.
   outputs agree falsely. An escape from the container as well reaches the build machine, its
   metadata server, and so the drawing identity's token, which can sign a false record and read
   every uploaded label. This is the residual of running Chrome on producer-supplied bytes; the
-  hardening above is what stands in the way (Chrome's own sandbox cannot start in it: "Step 1");
+  hardening above is what stands in the way (Chrome's own sandbox could not start on CI's host,
+  and the launcher runs Chrome without it: "Step 1");
 - what it can do today without D3, it still can: assert an approval, which is an attestation until
   `approval.md`'s signed approvals are enforced.
 
@@ -559,7 +560,8 @@ and fonts; R1's trust root.
 ## Step 1: measured, and PR 1 as built (2026-10-07)
 
 **Where it was measured.** The Mac this was built on (Apple M2, 8 GB) has no container runtime,
-and the EMA corpus must not leave it, so step 1 was split in two:
+and the EMA corpus must not leave it, so step 1 was split in two, and is only partly done (what it
+has not measured is listed at the end of this section):
 
 - **The corpus, on the Mac.** Each label was drawn through `zone_a.drawing` itself, one at a time,
   in two Chromes: chrome-headless-shell 154.0.8037.57 for macOS (the image's Chrome for Testing
@@ -567,14 +569,23 @@ and the EMA corpus must not leave it, so step 1 was split in two:
 - **The image, in CI.** The `Word drawing` job builds it on ubuntu-24.04 (x86_64, Docker) and runs
   it hardened on the committed fixtures.
 
+The corpus harness is committed: `zone-a/scripts/word_drawing_corpus.py` (`parity`, `repeat` and
+`summary`). It writes counts, codes and times only, and names a label by its position in its folder,
+never by its name. The counts below were made first by a scratch script, and then again with this
+harness, from the code committed here, with the same results: 131 SmPCs and 110 leaflets that build,
+4,649 sections, every comparison equal, and 1,080 runs over 27 labels, each exiting 0 with one
+output per label.
+
 **Parity on the corpus.** Reads are by the accepted view where a label is tracked (187 of 241
 parts). "Builds" means with no heading left for a person and not refused whole by the builder (20
 more SmPCs and 2 leaflets are ready but refused whole: a floating table, a character scale, a page
 break between words).
 
 - **SmPCs:** 296 files. 131 SmPCs build and were drawn: 3,277 narratives, 4.5 million characters of
-  markup. 11 carry every section. "What exists" above counted 130; the one more here is not
-  investigated.
+  markup. 11 carry every section. "What exists" above counted 130. No counting rule tried here
+  gives 130: per SmPC it is 131; counting only files whose every SmPC builds gives 128; adding the
+  SmPCs the builder refuses whole gives 151. The earlier count's script was not kept, so the
+  difference is unexplained.
 - **Leaflets:** 286 files. 110 build and were drawn: 1,372 narratives. 12 carry every section.
 - **Every one of the 4,649 sections agrees in both Chromes.** Chrome's raw answers are byte for byte
   the same in both Chromes for all 241 parts. Those answers are each section's text, each text
@@ -584,7 +595,11 @@ break between words).
   (`zone-a/tests/test_word_epi.py`, `test_drawing_record.py`), not by the corpus.
 
 **The window and the fonts.** The shell drew every part again at 375 by 812 pixels and a device
-pixel ratio of 2, and gave the same raw answers on all 241 parts. The fonts were macOS's for the
+pixel ratio of 2, and gave the same raw answers on all 241 parts. It did so through a launcher the
+harness writes (`window_launcher`), which runs the shell with `--window-size=375,812` and
+`--force-device-scale-factor=2` before `label_docx.browser`'s own switches; the reader is not
+changed. A page drawn through that launcher reports 375 by 812 at a ratio of 2, and 800 by 600 at 1
+without it. The fonts were macOS's for the
 corpus. The image's pinned fonts were measured on the fixtures in CI only. There, all six (the five
 Word-made SmPCs and the QRD template) gave raw answers byte for byte those of Google Chrome's
 recording on macOS, and every section agreed. The corpus in the Linux image, with its pinned fonts,
@@ -609,14 +624,18 @@ parses it, and by its XML parser, as XHTML. The two trees were the same every ti
 The check finds the seeded differences it should: an HTML-closed `p`, a `pre`'s first line feed, a
 CDATA section, an entity XML lacks, and text after the root.
 
-**Chrome's sandbox in the hardened container.** It cannot start. The container was Docker on
-ubuntu-24.04, with its default seccomp profile, every capability dropped and no new privileges.
+**Chrome's sandbox in the hardened container.** It cannot start there. The container was Docker
+on ubuntu-24.04, with its default seccomp profile, every capability dropped and no new privileges.
 There chrome-headless-shell 154.0.8037.57 ended at once with
-`FATAL:...zygote_host_impl_linux.cc:129] No usable sandbox!` (CI run 37651573909). So the launcher
-adds `--no-sandbox`, as the renderer gate runs Chrome, and the stated residual holds: one layer
-fewer stands between a label built to attack Chrome and the container's isolation. Loosening the
-container so that the sandbox could start (a seccomp profile admitting user namespaces) was not
-tried. It trades one layer for another, and that trade is the owner's to weigh.
+`FATAL:...zygote_host_impl_linux.cc:129] No usable sandbox! If you are running on Ubuntu 23.10+ or
+another Linux distro that has disabled unprivileged user namespaces with AppArmor, ...` (CI run
+37651573909). The message points at the host: ubuntu-24.04 restricts unprivileged user namespaces
+through AppArmor, a policy of the runner rather than of the container's flags. So a seccomp profile
+admitting user namespaces would not by itself let the sandbox start on such a host; that was not
+tried, and loosening the host is not this design's to do. The launcher adds `--no-sandbox`, as the
+renderer gate runs Chrome, and the stated residual holds: one layer fewer stands between a label
+built to attack Chrome and the container's isolation. Whether Cloud Build's hosts allow the
+sandbox is for PR 2 to measure.
 
 **Time and memory on the M2.** One label ran at a time, but the Mac was swapping throughout, so the
 tails are loose: the slowest check, 8.5 s, took 2.6 s when repeated.
@@ -670,20 +689,23 @@ tails are loose: the slowest check, 8.5 s, took 2.6 s when repeated.
    since nothing the deploy ships reads a drawing yet. It is not yet a required check, which only
    the owner can add.
 
-**Left for PR 2, which needs the cloud:**
+**Not measured, so left for PR 2 (each needs the cloud, or a machine with a container runtime
+where the corpus may go):**
 
+- **The corpus in the Linux image:** parity, with its pinned fonts, on every SmPC and leaflet that
+  builds; and time and memory per label there. In the image, CI measured the fixtures only.
 - **The image on Cloud Build's machines.** An e2-standard-2 runs on an Intel or an AMD CPU, so the
   image runs twice on each, and every output must be byte for byte the CI run's.
 - **e2-standard-2 timings:** per label, for the slowest read, and for the whole build. The build's
   timeout and the two containers' memory are set from them.
-- **The corpus in the Linux image**, with its pinned fonts, on a machine with a container runtime
-  where the corpus may go.
+- **Chrome's sandbox on Cloud Build's hosts** (below: on GitHub's it cannot start).
 - **The trigger's tests:** payload binding, the CEL filter, `actAs` and the inline clone.
 
 ## Build order, each change reviewed on its own
 
-1. **Measure first** (done 2026-10-07, below; the corpus with the pinned build of
-   chrome-headless-shell for macOS, since the Mac it ran on has no container runtime), with nothing
+1. **Measure first** (partly done 2026-10-07, above, in "Step 1": the corpus with the pinned
+   build of chrome-headless-shell for macOS, since the Mac it ran on has no container runtime, and
+   the image on the fixtures in CI; what remains is listed there and goes to PR 2), with nothing
    merged: build the `word-drawing` image locally from a scratch copy of the target. In it, measure:
    - **parity:** the same verdicts as Google Chrome on the five Word-made SmPCs, the synthetic
      certified Word fixtures (SmPC and leaflet), and the EMA's SmPCs and leaflets that build;
@@ -723,8 +745,9 @@ tails are loose: the slowest check, 8.5 s, took 2.6 s when repeated.
   a reader uses.
 - An exploit in the drawing container could make both drawings agree falsely; an escape from the
   container reaches the build machine's metadata server and the drawing identity's token, which can
-  sign and can read every upload. Chrome's own sandbox cannot start in the hardened container
-  (measured, "Step 1"), so one layer fewer stands in the way.
+  sign and can read every upload. Chrome's own sandbox could not start in the hardened container
+  on CI's host (measured, "Step 1"), and the launcher runs Chrome without it, so one layer fewer
+  stands in the way.
 - A flood of well-formed requests costs build minutes; the backstop is a budget alert.
 - The record does not vouch for the product, the document id (P5) or the approval: only that each
   narrative draws as the .docx was read.

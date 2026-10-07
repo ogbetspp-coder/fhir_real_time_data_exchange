@@ -288,7 +288,8 @@ def main(argv: list[str] | None = None) -> int:
         # Its canonical JSON exactly, the bytes whose hash keys the record: no repeated key.
         if canonical_json(request).encode("utf-8") != raw:
             return _fail("refused: request")
-    except ValueError, CanonicalJsonError:
+    # A request nested too deep for the parser or for canonical JSON is refused, not a traceback.
+    except ValueError, CanonicalJsonError, RecursionError:
         return _fail("refused: request")
     try:
         data = Path(args[0]).read_bytes()

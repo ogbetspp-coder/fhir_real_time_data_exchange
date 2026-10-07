@@ -34,7 +34,9 @@ describe("the word-drawing image", () => {
 
   it("installs the worker's Python with the worker's uv, and only the interpreter", () => {
     const worker = readFileSync("Dockerfile", "utf8");
-    const uv = /^FROM (ghcr\.io\/astral-sh\/uv:\S+)@sha256:[0-9a-f]{64} AS uv$/m;
+    // The same uv image, by digest, so the same archive checksums install the same Python.
+    const uv = /^FROM (ghcr\.io\/astral-sh\/uv:\S+@sha256:[0-9a-f]{64}) AS uv$/m;
+    expect(uv.exec(dockerfile)?.[1]).toBeDefined();
     expect(uv.exec(dockerfile)?.[1]).toBe(uv.exec(worker)?.[1]);
     const python = /^RUN uv python install (\S+)/m;
     expect(python.exec(dockerfile)?.[1]).toBe(python.exec(worker)?.[1]);

@@ -153,9 +153,11 @@ WORKDIR /work
 # python-build-standalone, its archive checked against the SHA-256 uv carries for it) and the
 # launcher zone_a.drawing runs Chrome through (LABEL_CHROME). zone_a and label_docx are not
 # installed: they, and the registry and mapping files the recompute reads, are mounted from the
-# checkout (scripts/render/word-drawing.mjs), so a code change does not change the image. Both
-# packages use Python's standard library only. The certificates uv downloads with are the
-# renderer's own.
+# checkout (scripts/render/word-drawing.mjs), so a code change does not change the image. What
+# the drawing imports (zone_a.drawing, zone_a.recompute, the modules of zone_a and label_docx they
+# import, and the checks' scripts) needs Python's standard library alone: zone_a declares pydantic,
+# but only for modules the drawing never imports (zone-a/tests/test_word_drawing_check.py holds
+# this). The certificates uv downloads with are the renderer's own.
 FROM ghcr.io/astral-sh/uv:0.12.17@sha256:10787c682e4184e4f290de1171fd4703dc63de99221f10fe1c99002ce7fa9acc AS uv
 
 FROM renderer AS python

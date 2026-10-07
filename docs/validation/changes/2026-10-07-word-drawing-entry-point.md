@@ -31,13 +31,13 @@ version changes. ADR 0006 P4, D3: `docs/design/certified-word-drawing.md`, build
    Python 3.14.7 installed by uv 0.12.17 (pinned by digest) in a stage built on the renderer, as the
    worker installs it; the launcher `src/render/image/word-drawing-chrome.sh`, through which
    zone_a.drawing runs the pinned chrome-headless-shell (`LABEL_CHROME`) with `--no-sandbox`, since
-   Chrome's own sandbox cannot start in the hardened container (measured in CI, run 37651573909: "No
-   usable sandbox!"); and the Python environment (`PYTHONPATH` to the mounted checkout,
-   `ZONE_A_ROOT`, safe path, no user site, no bytecode, UTF-8). Its build asserts Python 3.14.7,
-   Unicode 16.0.0 and the pinned Chrome's version. zone_a and label_docx are not installed: they and
-   the registry and mapping files are mounted from the checkout. `scripts/ci/renderer-pins.mjs`
-   reads the renderer's pins from its stage and refuses any later stage that is neither built on it
-   nor pinned by digest.
+   Chrome's own sandbox could not start in the hardened container on CI's ubuntu-24.04 host, whose
+   AppArmor restricts unprivileged user namespaces (run 37651573909: "No usable sandbox!"); and the
+   Python environment (`PYTHONPATH` to the mounted checkout, `ZONE_A_ROOT`, safe path, no user site,
+   no bytecode, UTF-8). Its build asserts Python 3.14.7, Unicode 16.0.0 and the pinned Chrome's
+   version. zone_a and label_docx are not installed: they and the registry and mapping files are
+   mounted from the checkout. `scripts/ci/renderer-pins.mjs` reads the renderer's pins from its
+   stage and refuses any later stage that is neither built on it nor pinned by digest.
 4. **The hardened run** (`scripts/render/word-drawing.mjs`): `docker run` with the renderer's
    hardening (`HARDENING`, now exported by `scripts/render/run.mjs`, whose `ISOLATION` is it plus
    the renderer's no-sandbox flag) and, read-only, only what the drawing and its checks read.
@@ -94,6 +94,33 @@ accepts that the previous refused.
 `test/render/word-drawing.test.ts`, `test/render/run.test.ts`, `test/ci/renderer-pins.test.ts`,
 `test/ci/check-all.test.ts`, `test/ci/workflow-runs.test.ts`, `test/certified-word/`; CI's Word
 drawing job in the image.
+
+**The independent review of #201**, each fixed with a test that fails without it where code is
+involved:
+
+1. Step 1 was overclaimed as done: the design note now says it is partly done and lists what
+   remains for PR 2 (the corpus in the Linux image, with its time and memory; Cloud Build's
+   machines; Chrome's sandbox on Cloud Build's hosts). The corpus harness is committed
+   (`zone-a/scripts/word_drawing_corpus.py`, counts only), including the launcher it draws at 375 by
+   812 and a ratio of 2 through, without changing the reader, and the counts were made again with
+   it. The 130 against 131 SmPCs is stated as unexplained.
+2. The drawing's version did not cover everything that decides the record's bytes: its lock now
+   also covers `zone_a/canonical_json.py`, `zone_a/recompute.py`, `zone_a/qrd/check.py` (which
+   the structurer reads under no version of its own) and `label_docx/epi.py` (the thresholds the
+   browser check marks by), `word-drawing/1.2.0` re-locked, unreleased.
+   `zone-a/tests/test_versions_lock.py` holds every module `python -m zone_a.drawing` imports to
+   the drawing's own lock or to a version its request names.
+3. The image's check could pass on less: it now requires at least the committed fixtures, a
+   refused label's exact closed code, Chrome's raw answers equal to Google Chrome's recording, and
+   reads the hardening back from inside (the checkout's mounts read-only, `/tmp` a writable tmpfs,
+   memory and processes bounded) (`zone-a/tests/test_word_drawing_check.py`).
+4. The uv image is held to the worker's by digest, not tag (`test/render/word-drawing.test.ts`).
+5. A request nested too deep for the JSON parser or for canonical JSON is refused
+   (`refused: request`), not a traceback (`zone-a/tests/test_drawing_record.py`).
+6. `Dockerfile.renderer` no longer says both packages need the standard library only: what the
+   drawing imports does, which `zone-a/tests/test_word_drawing_check.py` holds.
+7. The sandbox's failure is the host's (its AppArmor restriction of user namespaces), as Chrome's
+   message says, not the container's flags alone; a seccomp profile would not lift it there.
 
 **Not verified here.** The Mac this was written on has no container runtime. The image was built
 and run in CI only, on the committed fixtures, and the EMA corpus was drawn with the pinned shell's
