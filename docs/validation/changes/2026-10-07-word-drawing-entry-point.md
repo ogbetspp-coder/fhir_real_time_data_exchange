@@ -26,16 +26,18 @@ version changes. ADR 0006 P4, D3: `docs/design/certified-word-drawing.md`, build
    `narrativeDivSha256` (as the importer hashes it). Otherwise status 1 and nothing on standard
    output; standard error gives a closed code (`refused: <code>`, `browser-failed`,
    `error: <type>`) or each section that differs and where, never the text.
-3. **The image** (`Dockerfile.renderer`): the renderer's stage is named `renderer`, its
-   instructions unchanged, and `npm run renderer:image` builds that target. A `word-drawing` target
-   follows it: Python 3.14.7 installed by uv 0.12.17 (pinned by digest) in a stage built on the
-   renderer, as the worker installs it; the launcher `src/render/image/word-drawing-chrome.sh`, through
-   which zone_a.drawing runs the pinned chrome-headless-shell (`LABEL_CHROME`); and the Python
-   environment (`PYTHONPATH` to the mounted checkout, `ZONE_A_ROOT`, safe path, no user site, no
-   bytecode, UTF-8). Its build asserts Python 3.14.7, Unicode 16.0.0 and the pinned Chrome's version.
-   zone_a and label_docx are not installed: they and the registry and mapping files are mounted
-   from the checkout. `scripts/ci/renderer-pins.mjs` reads the renderer's pins from its stage and
-   refuses any later stage that is neither built on it nor pinned by digest.
+3. **The image** (`Dockerfile.renderer`): the renderer's stage is named `renderer`, its instructions
+   unchanged, and `npm run renderer:image` builds that target. A `word-drawing` target follows it:
+   Python 3.14.7 installed by uv 0.12.17 (pinned by digest) in a stage built on the renderer, as the
+   worker installs it; the launcher `src/render/image/word-drawing-chrome.sh`, through which
+   zone_a.drawing runs the pinned chrome-headless-shell (`LABEL_CHROME`) with `--no-sandbox`, since
+   Chrome's own sandbox cannot start in the hardened container (measured in CI, run 37651573909: "No
+   usable sandbox!"); and the Python environment (`PYTHONPATH` to the mounted checkout,
+   `ZONE_A_ROOT`, safe path, no user site, no bytecode, UTF-8). Its build asserts Python 3.14.7,
+   Unicode 16.0.0 and the pinned Chrome's version. zone_a and label_docx are not installed: they and
+   the registry and mapping files are mounted from the checkout. `scripts/ci/renderer-pins.mjs`
+   reads the renderer's pins from its stage and refuses any later stage that is neither built on it
+   nor pinned by digest.
 4. **The hardened run** (`scripts/render/word-drawing.mjs`): `docker run` with the renderer's
    hardening (`HARDENING`, now exported by `scripts/render/run.mjs`, whose `ISOLATION` is it plus
    the renderer's no-sandbox flag) and, read-only, only what the drawing and its checks read.
@@ -92,5 +94,10 @@ accepts that the previous refused.
 `test/render/word-drawing.test.ts`, `test/render/run.test.ts`, `test/ci/renderer-pins.test.ts`,
 `test/ci/check-all.test.ts`, `test/ci/workflow-runs.test.ts`, `test/certified-word/`; CI's Word
 drawing job in the image.
+
+**Not verified here.** The Mac this was written on has no container runtime. The image was built
+and run in CI only, on the committed fixtures, and the EMA corpus was drawn with the pinned shell's
+macOS build instead (`docs/design/certified-word-drawing.md`, "Step 1"). Left for PR 2: the corpus
+in the Linux image; Cloud Build's Intel and AMD machines; and e2-standard-2 timings.
 
 **Approval (step 8).** Not obtained: the author and the releaser are the same identity.

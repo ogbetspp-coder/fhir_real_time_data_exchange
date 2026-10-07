@@ -163,7 +163,9 @@ rule), never what. Zone A's preview shows the producer the same.
   drives Chrome;
 - chrome-headless-shell 154.0.8037.57, through a one-line launcher. PR 1 tries Chrome's own
   sandbox inside the hardened container (section 4); if it cannot start there, the launcher adds
-  `--no-sandbox`, as the renderer gate runs it, and the residual is recorded;
+  `--no-sandbox`, as the renderer gate runs it, and the residual is recorded. (Measured: it cannot
+  start there, so the launcher, `src/render/image/word-drawing-chrome.sh`, adds `--no-sandbox`;
+  "Step 1", below.)
 - Python 3.14.7, installed as the worker image installs it (as built: by uv 0.12.17, pinned by
   digest, in a stage built on the renderer's, since that image installs nothing from Debian outside
   its dated snapshot and has the certificates uv needs).
@@ -365,7 +367,7 @@ it, is gone: neither names the other.
   outputs agree falsely. An escape from the container as well reaches the build machine, its
   metadata server, and so the drawing identity's token, which can sign a false record and read
   every uploaded label. This is the residual of running Chrome on producer-supplied bytes; the
-  hardening above, and Chrome's own sandbox if it runs, are what stand in the way;
+  hardening above is what stands in the way (Chrome's own sandbox cannot start in it: "Step 1");
 - what it can do today without D3, it still can: assert an approval, which is an attestation until
   `approval.md`'s signed approvals are enforced.
 
@@ -583,8 +585,10 @@ break between words).
 
 **The window and the fonts.** The shell drew every part again at 375 by 812 pixels and a device
 pixel ratio of 2, and gave the same raw answers on all 241 parts. The fonts were macOS's for the
-corpus. The image's pinned fonts were measured on the fixtures in CI only: IMAGE_FONTS. The corpus in
-the Linux image, with its pinned fonts, is not measured (PR 2).
+corpus. The image's pinned fonts were measured on the fixtures in CI only. There, all six (the five
+Word-made SmPCs and the QRD template) gave raw answers byte for byte those of Google Chrome's
+recording on macOS, and every section agreed. The corpus in the Linux image, with its pinned fonts,
+is not measured (PR 2).
 
 **Repeatability.**
 
@@ -593,18 +597,26 @@ the Linux image, with its pinned fonts, is not measured (PR 2).
   that carry every section and the 4 committed labels it signs. Each ran 20 times one after another
   and 20 times two at a time. That is 1,080 runs: every one exited 0, and each label's 40
   outputs were byte for byte the same.
-- In the image (CI), each committed label ran twice, in two processes: IMAGE_REPEAT.
+- In the image (CI), each committed label ran twice, in two processes. The four it signs gave the
+  same bytes twice, and the refused one was refused with nothing written.
 
 **HTML and XML.** Every narrative drawn was parsed by Chrome's HTML parser, as the drawing page
 parses it, and by its XML parser, as XHTML. The two trees were the same every time:
 
 - 4,649 narratives on the corpus, in the shell and in Google Chrome;
-- IMAGE_PARSE in the image.
+- 262 of 262 narratives in the image.
 
 The check finds the seeded differences it should: an HTML-closed `p`, a `pre`'s first line feed, a
 CDATA section, an entity XML lacks, and text after the root.
 
-**Chrome's sandbox in the hardened container.** SANDBOX
+**Chrome's sandbox in the hardened container.** It cannot start. The container was Docker on
+ubuntu-24.04, with its default seccomp profile, every capability dropped and no new privileges.
+There chrome-headless-shell 154.0.8037.57 ended at once with
+`FATAL:...zygote_host_impl_linux.cc:129] No usable sandbox!` (CI run 37651573909). So the launcher
+adds `--no-sandbox`, as the renderer gate runs Chrome, and the stated residual holds: one layer
+fewer stands between a label built to attack Chrome and the container's isolation. Loosening the
+container so that the sandbox could start (a seccomp profile admitting user namespaces) was not
+tried. It trades one layer for another, and that trade is the owner's to weigh.
 
 **Time and memory on the M2.** One label ran at a time, but the Mac was swapping throughout, so the
 tails are loose: the slowest check, 8.5 s, took 2.6 s when repeated.
@@ -616,12 +628,18 @@ tails are loose: the slowest check, 8.5 s, took 2.6 s when repeated.
 - **The parse check:** median 0.2 s per part.
 - **Reads:** median 2.5 s. The slowest among files that build took 59 s: 2,280 paragraphs, its
   refused read first and then its accepted view. That file peaked at 895 MB resident in Python. The
-  largest single Chrome process was 223 MB.
+  largest process the run waited for, Chrome's browser process, was 223 MB; Chrome's renderer
+  processes are not counted.
 - **The entry point, per label it signs** (read, recompute and check, Python's start included): on
   average 1.0 to 3.5 s for an SmPC and 1.2 to 2.1 s for a leaflet, one after another. One leaflet
-  of 2,023 paragraphs took 5.7 s. Two at a time added up to 1.2 s a run. No single process, Python
-  or Chrome, went above 178 MB.
-- **In the image (CI, x86_64):** IMAGE_TIMES.
+  of 2,023 paragraphs took 5.7 s. Two at a time added up to 1.2 s a run. No process the runs waited
+  for (Python, or Chrome's browser process) went above 178 MB.
+- **In the image (CI, x86_64):**
+  - the image builds in 36 s, with no cache;
+  - the whole check takes 21 s;
+  - the entry point takes 1.0 s per run of each committed label, and the check 0.4 to 0.6 s per
+    Word-made SmPC;
+  - the container peaked at 146 MiB over the whole run.
 
 **PR 1's choices, where this note left them open:**
 
@@ -705,8 +723,8 @@ tails are loose: the slowest check, 8.5 s, took 2.6 s when repeated.
   a reader uses.
 - An exploit in the drawing container could make both drawings agree falsely; an escape from the
   container reaches the build machine's metadata server and the drawing identity's token, which can
-  sign and can read every upload. If Chrome's own sandbox cannot run in the container, one layer
-  fewer stands in the way.
+  sign and can read every upload. Chrome's own sandbox cannot start in the hardened container
+  (measured, "Step 1"), so one layer fewer stands in the way.
 - A flood of well-formed requests costs build minutes; the backstop is a budget alert.
 - The record does not vouch for the product, the document id (P5) or the approval: only that each
   narrative draws as the .docx was read.
