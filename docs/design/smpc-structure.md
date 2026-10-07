@@ -1,6 +1,6 @@
 # Design note: finding an SmPC's sections
 
-- Status: Built (`smpc-structure/1.2.0`, `zone-a/src/zone_a/structure.py`); run on the EMA's QRD
+- Status: Built (`smpc-structure/1.3.0`, `zone-a/src/zone_a/structure.py`); run on the EMA's QRD
   template and on synthetic labels. No company label is in the repository.
 - Date: 2026-10-05
 - Related: the UI proposal (Claude Docs, "Label Intake — UI proposal"), `docs/design/qrd-registry.md`
@@ -24,7 +24,9 @@ shows exactly, and leaves every judgement to the person, as the reader does.
    labels and not in others.
 2. **Candidates, never guesses.** A line that starts with a section's number but goes on
    otherwise, or a paragraph in a heading style that is no QRD heading, is shown to the person.
-   The section stays `missing` until the person names its heading (`--assign smpc.4.4=57`).
+   The section stays `missing` until the person names its heading (`--assign smpc.4.4=57`). A
+   named heading counts for the scan too: the named subsections after it are found inside it
+   (`smpc-structure/1.3.0`), so a person names a section once, not each subsection under it.
 3. **Text by position.** Every paragraph belongs to the last heading before it; nothing is
    moved, merged or dropped. The SmPC ends at "ANNEX II", the registry's own end.
 4. **One status per section:** `mapped`, `assigned`, `missing`, `absent` (optional),
@@ -50,4 +52,5 @@ which no label does; assigning them makes it `ready`.
 
 - Build the ePI's section tree (FHIR Composition sections with these codes) from a `ready`
   structure, held to the fidelity check against the Word text.
-- The package leaflet and the labelling, from their own templates.
+- The labelling, from its own template. The package leaflet is found by the same statuses
+  (`zone_a.structure.find`), with its own headings: `docs/design/pl-structure.md`.

@@ -155,8 +155,8 @@ The record does not admit this today, for reasons this ADR has to answer rather 
    EU GMP Annex 11; that is the owner's quality function's decision.
 
 8. **Scope:** the centralised SmPC in English (QRD 10.4), with the root `lang` attribute set to
-   `en`. The package leaflet, the labelling and other languages come later, each from its own
-   template.
+   `en`, and its package leaflet (owner decision 8). The labelling, Annex II and other languages
+   come later, each from its own template.
 
 ## Prerequisites, in order
 
@@ -226,6 +226,31 @@ silver;">`, the one style `fidelity-norm/3.3.0` allows (§5, exactly that value,
    every other tab. On the EMA SmPC cuts it carries 228 of the 845 body paragraphs still refused
    for a tab.
 
+## Owner decision (2026-10-06, night)
+
+Taken as recommended, under the owner's authorisation of the evening ("I follow your
+recommendations ... the rest you are authorized to do as well"); each reading is the EMA's own.
+
+8. **The package leaflet** (`docs/design/pl-structure.md`, `pl-structure/1.0.0`): found by its
+   template's headings as the SmPC is, its tree and codes from the EMA's leaflet profile
+   (`fhir/mappings/cap-pl-en.json`), with the medicine's name for the template's "X" ("X stands
+   for the (invented) name of the medicine", the annotated template 10.4) and three readings of
+   the template's own:
+   - a choice that begins with a comma is written without the space before it, and a
+     non-breaking hyphen is the hyphen it draws;
+   - a heading that ends in the date completed at printing ("This leaflet was last revised in
+     <{MM/YYYY}>...") is found by its text followed by that date, its placeholder or nothing;
+   - "Marketing Authorisation Holder" alone heads the holder's section, which the template calls
+     "Marketing Authorisation Holder and Manufacturer" and the annotated template allows only
+     where the two are the same.
+
+   A wording the annotated template leaves to the EMA case by case ("How X is given" for a
+   medicine a nurse gives) is for a person, as decision 4 says. Each leaflet of a file is its own
+   ePI, as decision 3 says for SmPCs. Two judgements of structure, not wording: the leaflet ends
+   at the product information's next annex ("ANNEX IV") or the document's end, and numbered lines
+   standing together are a list (the leaflet's list of its sections when it starts with section
+   1's heading; else numbered steps, among which a section's heading stays a heading).
+
 ## Progress
 
 - **P1, tables** (2026-10-05): the reader reports each body table's grid (`docx-reader/1.27.0`,
@@ -257,5 +282,8 @@ silver;">`, the one style `fidelity-norm/3.3.0` allows (§5, exactly that value,
 - **P1, pictures** (2026-10-05): each U+FFFC the reader writes says what it stands for (part,
   SHA-256, type by signature, pixels, extent, crop, and a reason from a closed list where it cannot
   be carried), certified; Word's own saves agree on every DrawingML picture of the corpus.
+- **The package leaflet** (2026-10-06, owner decision 8): `zone_a.leaflet` (`pl-structure/1.0.0`)
+  finds a leaflet's sections, `zone_a.word_epi` builds them unchanged; see
+  `docs/design/pl-structure.md` for what it carries on the EMA's published Word leaflets.
 - **Still to do:** in the reader (P1), floating tables, frames, right-to-left tables and page
   breaks reported in place of the scan; P2, P4 and P5.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 from pathlib import Path
@@ -23,6 +24,10 @@ from zone_a.qrd.registry import (
     _split_trailer,
     build,
     build_appendix_ii,
+    build_leaflet,
+    build_pl,
+    flat,
+    load_source,
     serialise,
 )
 
@@ -33,6 +38,12 @@ REGISTRY: dict[str, Any] = json.loads(
     (QRD / "registry" / "cap-smpc-en-10.4.json").read_text(encoding="utf-8")
 )
 MAPPING = json.loads((ROOT / "fhir" / "mappings" / "cap-smpc-en.json").read_text(encoding="utf-8"))
+LEAFLET_MAPPING = json.loads(
+    (ROOT / "fhir" / "mappings" / "cap-pl-en.json").read_text(encoding="utf-8")
+)
+LEAFLET: dict[str, Any] = json.loads(
+    (QRD / "registry" / "cap-pl-en-10.4.json").read_text(encoding="utf-8")
+)
 
 
 # --- pinned sources ---------------------------------------------------------------------
@@ -105,6 +116,37 @@ def test_the_committed_registry_is_what_the_sources_build() -> None:
     expected = serialise(build(QRD / "sources", LOCK))
     current = (QRD / "registry" / "cap-smpc-en-10.4.json").read_text(encoding="utf-8")
     assert current == expected, "regenerate with zone-a/scripts/generate_qrd_registry.py"
+
+
+def test_the_committed_leaflet_registry_is_what_the_template_and_mapping_build() -> None:
+    expected = serialise(build_leaflet(QRD / "sources", LOCK, LEAFLET_MAPPING))
+    current = (QRD / "registry" / "cap-pl-en-10.4.json").read_text(encoding="utf-8")
+    assert current == expected, "regenerate with zone-a/scripts/generate_qrd_registry.py"
+
+
+def test_every_section_of_the_leaflet_mapping_is_a_template_heading_once() -> None:
+    def visit(node: dict[str, Any]) -> list[dict[str, Any]]:
+        return [node, *(n for child in node.get("children", []) for n in visit(child))]
+
+    heads = {h["key"]: h for h in [*LEAFLET["sections"], *LEAFLET["headings"]]}
+    rules = visit(LEAFLET_MAPPING["root"])[1:]
+    assert sorted(heads) == sorted(rule["sourceKey"] for rule in rules)
+    for rule in rules:
+        head = heads[rule["sourceKey"]]
+        number = f"{head['number']}. " if "number" in head else ""
+        # The EMA's profile writes each title flattened: brackets dropped, fill-ins kept.
+        assert number + flat(head["title"]) == rule["title"]
+        assert render(head["title"]).strip() in head["source"]
+    assert [s["number"] for s in LEAFLET["sections"]] == ["1", "2", "3", "4", "5", "6"]
+    assert LEAFLET["root"] == "B. PACKAGE LEAFLET"
+
+
+def test_the_leaflet_build_refuses_a_mapping_title_the_template_does_not_have() -> None:
+    template = load_source(QRD / "sources", "qrd-product-information-template-version-104_en.docx")
+    mapping = json.loads(json.dumps(LEAFLET_MAPPING))
+    mapping["root"]["children"][1]["children"][0]["title"] = "Do not take X"
+    with pytest.raises(RegistryError, match=r"pl\.2\.do-not-take: 0 template paragraphs"):
+        build_pl(template, mapping)
 
 
 def test_every_appendix_i_pattern_and_heading_title_renders_back() -> None:
@@ -470,3 +512,46 @@ def test_an_erratum_must_apply_exactly_once() -> None:
 def test_a_blank_numbered_paragraph_among_the_storage_statements_is_refused() -> None:
     with pytest.raises(RegistryError):
         _check(Paragraph("", None, Numbering(2, 0), None), "Appendix III SmPC", keeps_marks=True)
+
+
+def _template_with(change: Any) -> Source:
+    """The pinned template, its paragraphs changed by ``change`` (a list in, a list out)."""
+    template = load_source(QRD / "sources", "qrd-product-information-template-version-104_en.docx")
+    return Source(template.file, template.sha256, change(list(template.paragraphs)))
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        # The leaflet's opening line before its root line.
+        (lambda ps: [*ps[:572], ps[573], ps[572], *ps[574:]], "out of order"),
+        # A heading that is not the list's line.
+        (
+            lambda ps: [
+                dataclasses.replace(p, text="5.\tHow to keep X")
+                if i > 600 and p.text == "5.\tHow to store X"
+                else p
+                for i, p in enumerate(ps)
+            ],
+            "does not list then head",
+        ),
+        # Text inside the list of sections.
+        (
+            lambda ps: [*ps[:596], dataclasses.replace(ps[596], text="and"), *ps[596:]],
+            "interrupted",
+        ),
+    ],
+)
+def test_the_leaflet_build_refuses_a_template_of_another_shape(change: Any, message: str) -> None:
+    with pytest.raises(RegistryError, match=message):
+        build_pl(_template_with(change), LEAFLET_MAPPING)
+
+
+def test_the_leaflet_build_refuses_a_named_section_under_no_numbered_one() -> None:
+    template = load_source(QRD / "sources", "qrd-product-information-template-version-104_en.docx")
+    mapping = json.loads(json.dumps(LEAFLET_MAPPING))
+    mapping["root"]["children"].append(
+        {"sourceKey": "pl.extra", "targetCode": "1", "title": "Extra", "required": False}
+    )
+    with pytest.raises(RegistryError, match="under no numbered section"):
+        build_pl(template, mapping)

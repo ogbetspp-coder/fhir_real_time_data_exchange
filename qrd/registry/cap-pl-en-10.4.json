@@ -1,0 +1,753 @@
+{
+  "registryVersion": "1.3.0",
+  "readerVersion": "docx-reader/1.31.0",
+  "readerFormat": "label-docx-json/1.18.1",
+  "mappingVersion": "1.0.0",
+  "template": {
+    "family": "EMA QRD product-information template, centralised procedure",
+    "version": "10.4",
+    "status": "adopted",
+    "annex": "IIIB",
+    "document": "Package leaflet",
+    "language": "en"
+  },
+  "sources": [
+    {
+      "file": "qrd-product-information-template-version-104_en.docx",
+      "sha256": "6c9da03b2c72f055c81dc14f12c82da61a1609e7beffcc71f95e8046d7104fd1",
+      "emaReference": null,
+      "lastUpdated": "2024-02-29"
+    }
+  ],
+  "root": "B. PACKAGE LEAFLET",
+  "leafletTitle": {
+    "source": "Package leaflet: Information for the <patient> <user>",
+    "title": [
+      {
+        "kind": "text",
+        "value": "Package leaflet: Information for the "
+      },
+      {
+        "kind": "optional",
+        "value": [
+          {
+            "kind": "text",
+            "value": "patient"
+          }
+        ]
+      },
+      {
+        "kind": "text",
+        "value": " "
+      },
+      {
+        "kind": "optional",
+        "value": [
+          {
+            "kind": "text",
+            "value": "user"
+          }
+        ]
+      }
+    ]
+  },
+  "contents": "What is in this leaflet",
+  "sections": [
+    {
+      "key": "pl.1",
+      "number": "1",
+      "level": 1,
+      "optional": false,
+      "source": "1.\tWhat X is and what it is used for",
+      "title": [
+        {
+          "kind": "text",
+          "value": "What X is and what it is used for"
+        }
+      ],
+      "guidance": null,
+      "dotted": true,
+      "gap": "\t"
+    },
+    {
+      "key": "pl.2",
+      "number": "2",
+      "level": 1,
+      "optional": false,
+      "source": "2.\tWhat you need to know before you <take> <use> X ",
+      "title": [
+        {
+          "kind": "text",
+          "value": "What you need to know before you "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "take"
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "value": " "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "use"
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "value": " X"
+        }
+      ],
+      "guidance": null,
+      "dotted": true,
+      "gap": "\t"
+    },
+    {
+      "key": "pl.3",
+      "number": "3",
+      "level": 1,
+      "optional": false,
+      "source": "3.\tHow to <take> <use> X",
+      "title": [
+        {
+          "kind": "text",
+          "value": "How to "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "take"
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "value": " "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "use"
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "value": " X"
+        }
+      ],
+      "guidance": null,
+      "dotted": true,
+      "gap": "\t"
+    },
+    {
+      "key": "pl.4",
+      "number": "4",
+      "level": 1,
+      "optional": false,
+      "source": "4.\tPossible side effects",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Possible side effects"
+        }
+      ],
+      "guidance": null,
+      "dotted": true,
+      "gap": "\t"
+    },
+    {
+      "key": "pl.5",
+      "number": "5",
+      "level": 1,
+      "optional": false,
+      "source": "5.\tHow to store X",
+      "title": [
+        {
+          "kind": "text",
+          "value": "How to store X"
+        }
+      ],
+      "guidance": null,
+      "dotted": true,
+      "gap": "\t"
+    },
+    {
+      "key": "pl.6",
+      "number": "6",
+      "level": 1,
+      "optional": false,
+      "source": "6.\tContents of the pack and other information",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Contents of the pack and other information"
+        }
+      ],
+      "guidance": null,
+      "dotted": true,
+      "gap": "\t"
+    }
+  ],
+  "headings": [
+    {
+      "key": "pl.2.do-not-take",
+      "parent": "pl.2",
+      "source": "Do not <take> <use> X",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Do not "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "take"
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "value": " "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "use"
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "value": " X"
+        }
+      ],
+      "optional": false
+    },
+    {
+      "key": "pl.2.warnings",
+      "parent": "pl.2",
+      "source": "Warnings and precautions ",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Warnings and precautions "
+        }
+      ],
+      "optional": false
+    },
+    {
+      "key": "pl.2.children",
+      "parent": "pl.2",
+      "source": "Children <and adolescents>",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Children "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "and adolescents"
+            }
+          ]
+        }
+      ],
+      "optional": false
+    },
+    {
+      "key": "pl.2.medicines",
+      "parent": "pl.2",
+      "source": "Other medicines and X",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Other medicines and X"
+        }
+      ],
+      "optional": false
+    },
+    {
+      "key": "pl.2.food",
+      "parent": "pl.2",
+      "source": "X with <food> <and> <,> <drink> <and> <alcohol>",
+      "title": [
+        {
+          "kind": "text",
+          "value": "X with "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "food"
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "value": " "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "and"
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "value": " "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": ","
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "value": " "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "drink"
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "value": " "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "and"
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "value": " "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "alcohol"
+            }
+          ]
+        }
+      ],
+      "optional": false
+    },
+    {
+      "key": "pl.2.pregnancy",
+      "parent": "pl.2",
+      "source": "Pregnancy <and> <,> breast-feeding <and fertility>",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Pregnancy "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "and"
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "value": " "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": ","
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "value": " breast-feeding "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "and fertility"
+            }
+          ]
+        }
+      ],
+      "optional": false
+    },
+    {
+      "key": "pl.2.driving",
+      "parent": "pl.2",
+      "source": "Driving and using machines",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Driving and using machines"
+        }
+      ],
+      "optional": false
+    },
+    {
+      "key": "pl.2.excipients",
+      "parent": "pl.2",
+      "source": "<X contains {name the excipient(s)}>",
+      "title": [
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "X contains "
+            },
+            {
+              "kind": "fill",
+              "value": "name the excipient(s)"
+            }
+          ]
+        }
+      ],
+      "optional": true
+    },
+    {
+      "key": "pl.3.children",
+      "parent": "pl.3",
+      "source": "<Use in children <and adolescents>>",
+      "title": [
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "Use in children "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "and adolescents"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "optional": true
+    },
+    {
+      "key": "pl.3.too-much",
+      "parent": "pl.3",
+      "source": "<If you <take> <use> more X than you should>",
+      "title": [
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "If you "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "take"
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "use"
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " more X than you should"
+            }
+          ]
+        }
+      ],
+      "optional": true
+    },
+    {
+      "key": "pl.3.forgotten",
+      "parent": "pl.3",
+      "source": "<If you forget to <take> <use> X>",
+      "title": [
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "If you forget to "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "take"
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "use"
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " X"
+            }
+          ]
+        }
+      ],
+      "optional": true
+    },
+    {
+      "key": "pl.3.stopping",
+      "parent": "pl.3",
+      "source": "<If you stop <taking> <using> X>",
+      "title": [
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "If you stop "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "taking"
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "using"
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " X"
+            }
+          ]
+        }
+      ],
+      "optional": true
+    },
+    {
+      "key": "pl.4.children",
+      "parent": "pl.4",
+      "source": "<Additional side effects in children <and adolescents>>",
+      "title": [
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "Additional side effects in children "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "and adolescents"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "optional": true
+    },
+    {
+      "key": "pl.4.reporting",
+      "parent": "pl.4",
+      "source": "Reporting of side effects",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Reporting of side effects"
+        }
+      ],
+      "optional": false
+    },
+    {
+      "key": "pl.6.contents",
+      "parent": "pl.6",
+      "source": "What X contains ",
+      "title": [
+        {
+          "kind": "text",
+          "value": "What X contains "
+        }
+      ],
+      "optional": false
+    },
+    {
+      "key": "pl.6.appearance",
+      "parent": "pl.6",
+      "source": "What X looks like and contents of the pack",
+      "title": [
+        {
+          "kind": "text",
+          "value": "What X looks like and contents of the pack"
+        }
+      ],
+      "optional": false
+    },
+    {
+      "key": "pl.6.holder",
+      "parent": "pl.6",
+      "source": "Marketing Authorisation Holder and Manufacturer",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Marketing Authorisation Holder and Manufacturer"
+        }
+      ],
+      "optional": false
+    },
+    {
+      "key": "pl.6.revised",
+      "parent": "pl.6",
+      "source": "This leaflet was last revised in <{MM/YYYY}><{month YYYY}>.",
+      "title": [
+        {
+          "kind": "text",
+          "value": "This leaflet was last revised in "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "fill",
+              "value": "MM/YYYY"
+            }
+          ]
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "fill",
+              "value": "month YYYY"
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "value": "."
+        }
+      ],
+      "optional": false
+    },
+    {
+      "key": "pl.6.other-sources",
+      "parent": "pl.6",
+      "source": "<Other sources of information>",
+      "title": [
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "Other sources of information"
+            }
+          ]
+        }
+      ],
+      "optional": true
+    },
+    {
+      "key": "pl.6.professionals",
+      "parent": "pl.6",
+      "source": "<The following information is intended for healthcare professionals only:>",
+      "title": [
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "The following information is intended for healthcare professionals only:"
+            }
+          ]
+        }
+      ],
+      "optional": true
+    }
+  ]
+}

@@ -1,7 +1,8 @@
 """An SmPC's ePI sections from its Word file: each section's narrative and page, or why not.
 
     uv run --frozen python scripts/epi_from_word.py LABEL.docx \
-        [--view accepted|original] [--assign KEY=PARAGRAPH ...] [--no-drawing] [--out FILE]
+        [--view accepted|original] [--assign KEY=PARAGRAPH ...] [--no-drawing] [--document smpc|pl]
+        [--out FILE]
 
 The label is read with zone_a.certified, structured with zone_a.structure (``--assign`` as in
 scripts/structure_label.py) and built with zone_a.word_epi; where Chrome is installed and
@@ -17,7 +18,10 @@ names with ``--view`` (every change accepted, or every one rejected), which the 
 with the number of changes (``tracked``); without one it is refused. An Annex I holding several
 SmPCs gives each its own result, in ``smpcs`` (its ``span`` of paragraphs, its structure, product
 and sections; ``--assign`` goes to the SmPC holding the paragraph), or the reason a person must
-settle where one ends (zone_a.structure.smpcs). See ADR 0006.
+settle where one ends (zone_a.structure.smpcs). With ``--document pl`` the label is read for
+its package leaflets instead (zone_a.leaflet): each gives its own result in ``leaflets`` (its
+``span``, structure and sections; no product proposal yet), or the reason a person must find
+them. See ADR 0006.
 """
 
 from __future__ import annotations
@@ -32,7 +36,7 @@ from typing import Any
 from label_docx import browser, output, reader
 from label_docx.reader import DocxRefusedError
 
-from zone_a import drawing, product, word_epi
+from zone_a import drawing, leaflet, product, word_epi
 from zone_a.canonical_json import canonical_json
 from zone_a.certified import VIEWS, Body, read_body
 from zone_a.structure import smpcs, structure
@@ -40,6 +44,8 @@ from zone_a.structure import smpcs, structure
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = ROOT / "qrd" / "registry" / "cap-smpc-en-10.4.json"
 MAPPING = ROOT / "fhir" / "mappings" / "cap-smpc-en.json"
+LEAFLET_REGISTRY = ROOT / "qrd" / "registry" / "cap-pl-en-10.4.json"
+LEAFLET_MAPPING = ROOT / "fhir" / "mappings" / "cap-pl-en.json"
 
 
 def _assignment(text: str) -> tuple[str, int]:
@@ -49,8 +55,19 @@ def _assignment(text: str) -> tuple[str, int]:
     return key, int(at)
 
 
+def _placed(assignments: dict[str, int], parts: list[tuple[int, int, int | None]]) -> None:
+    """Refuses an assignment to a paragraph in no part: it would be dropped, not refused."""
+    for key, at in assignments.items():
+        if not any(start <= at < end for start, end, _ in parts):
+            raise ValueError(f"{key}={at}: paragraph {at} is in no part the document holds")
+
+
 def build(
-    data: bytes, assignments: dict[str, int], chrome: Path | None, view: str | None = None
+    data: bytes,
+    assignments: dict[str, int],
+    chrome: Path | None,
+    view: str | None = None,
+    document: str = "smpc",
 ) -> dict[str, Any]:
     """The result for one label (the module docstring)."""
     result: dict[str, Any] = {
@@ -64,12 +81,37 @@ def build(
         return result | {"refusal": {"code": refused.code, "detail": refused.detail}}
     if body.view is not None:
         result["tracked"] = {"view": body.view, "changes": body.changes}
+    if document == "pl":
+        registry = json.loads(LEAFLET_REGISTRY.read_text(encoding="utf-8"))
+        mapping = json.loads(LEAFLET_MAPPING.read_text(encoding="utf-8"))
+        found, reason = leaflet.leaflets(body.paragraphs, registry)
+        if reason is not None:
+            return result | {"leaflets": {"ready": False, "reason": reason}}
+        _placed(assignments, found)
+        result["leaflets"] = [
+            {"span": [start, end]}
+            | _sections(
+                body,
+                leaflet.structure(
+                    body.paragraphs,
+                    registry,
+                    mapping,
+                    {key: at for key, at in assignments.items() if start <= at < end},
+                    (start, end, shared),
+                ),
+                registry,
+                chrome,
+            )
+            for start, end, shared in found
+        ]
+        return result
     registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
     mapping = json.loads(MAPPING.read_text(encoding="utf-8"))
     parts, why = smpcs(body.paragraphs, registry, mapping)
     if why is not None:
         # Several SmPCs whose boundary the template's own lines do not settle: for a person.
         return result | {"smpcs": {"ready": False, "reason": why}}
+    _placed(assignments, parts)
     if len(parts) == 1:
         return result | _smpc(body, registry, mapping, assignments, None, chrome)
     result["smpcs"] = [
@@ -97,9 +139,16 @@ def _smpc(
 ) -> dict[str, Any]:
     """One SmPC's structure, who it is for, and its ePI sections once the structure is ready."""
     structured = structure(body.paragraphs, registry, mapping, assignments, part)
-    out: dict[str, Any] = {"structure": structured}
     # Who it is for, from its sections 1, 7 and 8, for a person to confirm (zone_a.product).
-    out["product"] = product.propose(body.paragraphs, structured)
+    out = {"product": product.propose(body.paragraphs, structured)}
+    return out | _sections(body, structured, registry, chrome)
+
+
+def _sections(
+    body: Body, structured: dict[str, Any], registry: dict[str, Any], chrome: Path | None
+) -> dict[str, Any]:
+    """A structure, and its ePI sections once it is ready."""
+    out: dict[str, Any] = {"structure": structured}
     if not structured["ready"]:
         return out
     try:
@@ -119,17 +168,26 @@ def main(argv: list[str] | None = None) -> int:
         The exit status: 0 when written (a refusal included).
     """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("label", type=Path, help="the SmPC (.docx)")
+    parser.add_argument("label", type=Path, help="the label (.docx)")
     parser.add_argument(
         "--view", choices=VIEWS, help="for a label with tracked changes, the view to build"
     )
     parser.add_argument("--assign", type=_assignment, action="append", default=[])
     parser.add_argument("--no-drawing", action="store_true", help="do not ask Chrome")
     parser.add_argument("--out", type=Path, help="write here instead of standard output")
+    parser.add_argument(
+        "--document", choices=("smpc", "pl"), default="smpc", help="the part to build"
+    )
     arguments = parser.parse_args(argv)
     chrome = None if arguments.no_drawing else browser.find_chrome()
     try:
-        result = build(arguments.label.read_bytes(), dict(arguments.assign), chrome, arguments.view)
+        result = build(
+            arguments.label.read_bytes(),
+            dict(arguments.assign),
+            chrome,
+            arguments.view,
+            arguments.document,
+        )
     except ValueError as problem:
         parser.error(str(problem))
     text = canonical_json(result) + "\n"

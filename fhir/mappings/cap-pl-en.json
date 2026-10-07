@@ -1,0 +1,196 @@
+{
+  "mappingVersion": "1.0.0",
+  "sourceCodeSystem": "https://khs.dev/fhir/CodeSystem/canonical-pl-sections",
+  "targetCodeSystem": "http://ema.europa.eu/fhir/CodeSystem/200000029659",
+  "targetCodeSystemAliases": ["https://spor.ema.europa.eu/v1/lists/200000029659/terms/"],
+  "profiles": {
+    "list": "http://ema.europa.eu/fhir/StructureDefinition/EUEpiList",
+    "bundle": "http://ema.europa.eu/fhir/StructureDefinition/EUEpiBundle",
+    "composition": [
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiComposition",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiCompositionPackageLeaflet",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiCompositionCAP",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUQRD-CAP-template-new-Package-Leaflet-en"
+    ]
+  },
+  "root": {
+    "sourceKey": "pl",
+    "targetCode": "200000029894",
+    "title": "PACKAGE LEAFLET",
+    "required": true,
+    "children": [
+      {
+        "sourceKey": "pl.1",
+        "targetCode": "200000029895",
+        "title": "1. What X is and what it is used for",
+        "required": true
+      },
+      {
+        "sourceKey": "pl.2",
+        "targetCode": "200000029896",
+        "title": "2. What you need to know before you take use X",
+        "required": true,
+        "children": [
+          {
+            "sourceKey": "pl.2.do-not-take",
+            "targetCode": "200000029897",
+            "title": "Do not take use X",
+            "required": true
+          },
+          {
+            "sourceKey": "pl.2.warnings",
+            "targetCode": "200000029898",
+            "title": "Warnings and precautions",
+            "required": true
+          },
+          {
+            "sourceKey": "pl.2.children",
+            "targetCode": "200000029899",
+            "title": "Children and adolescents",
+            "required": false
+          },
+          {
+            "sourceKey": "pl.2.medicines",
+            "targetCode": "200000029900",
+            "title": "Other medicines and X",
+            "required": true
+          },
+          {
+            "sourceKey": "pl.2.food",
+            "targetCode": "200000029901",
+            "title": "X with food and , drink and alcohol",
+            "required": false
+          },
+          {
+            "sourceKey": "pl.2.pregnancy",
+            "targetCode": "200000029902",
+            "title": "Pregnancy and , breast-feeding and fertility",
+            "required": true
+          },
+          {
+            "sourceKey": "pl.2.driving",
+            "targetCode": "200000029903",
+            "title": "Driving and using machines",
+            "required": true
+          },
+          {
+            "sourceKey": "pl.2.excipients",
+            "targetCode": "200000029904",
+            "title": "X contains {name the excipient(s)}",
+            "required": false
+          }
+        ]
+      },
+      {
+        "sourceKey": "pl.3",
+        "targetCode": "200000029905",
+        "title": "3. How to take use X",
+        "required": true,
+        "children": [
+          {
+            "sourceKey": "pl.3.children",
+            "targetCode": "200000029906",
+            "title": "Use in children and adolescents",
+            "required": false
+          },
+          {
+            "sourceKey": "pl.3.too-much",
+            "targetCode": "200000029907",
+            "title": "If you take use more X than you should",
+            "required": false
+          },
+          {
+            "sourceKey": "pl.3.forgotten",
+            "targetCode": "200000029908",
+            "title": "If you forget to take use X",
+            "required": false
+          },
+          {
+            "sourceKey": "pl.3.stopping",
+            "targetCode": "200000029909",
+            "title": "If you stop taking using X",
+            "required": false
+          }
+        ]
+      },
+      {
+        "sourceKey": "pl.4",
+        "targetCode": "200000029910",
+        "title": "4. Possible side effects",
+        "required": true,
+        "children": [
+          {
+            "sourceKey": "pl.4.children",
+            "targetCode": "200000029911",
+            "title": "Additional side effects in children and adolescents",
+            "required": false
+          },
+          {
+            "sourceKey": "pl.4.reporting",
+            "targetCode": "200000029912",
+            "title": "Reporting of side effects",
+            "required": true
+          }
+        ]
+      },
+      {
+        "sourceKey": "pl.5",
+        "targetCode": "200000029913",
+        "title": "5. How to store X",
+        "required": true
+      },
+      {
+        "sourceKey": "pl.6",
+        "targetCode": "200000029914",
+        "title": "6. Contents of the pack and other information",
+        "required": true,
+        "children": [
+          {
+            "sourceKey": "pl.6.contents",
+            "targetCode": "200000029915",
+            "title": "What X contains",
+            "required": true
+          },
+          {
+            "sourceKey": "pl.6.appearance",
+            "targetCode": "200000029916",
+            "title": "What X looks like and contents of the pack",
+            "required": true
+          },
+          {
+            "sourceKey": "pl.6.holder",
+            "targetCode": "200000029917",
+            "title": "Marketing Authorisation Holder and Manufacturer",
+            "required": true
+          },
+          {
+            "sourceKey": "pl.6.revised",
+            "targetCode": "200000029919",
+            "title": "This leaflet was last revised in {MM/YYYY}{month YYYY}.",
+            "required": true
+          },
+          {
+            "sourceKey": "pl.6.other-sources",
+            "targetCode": "200000029920",
+            "title": "Other sources of information",
+            "required": false
+          },
+          {
+            "sourceKey": "pl.6.professionals",
+            "targetCode": "200000029921",
+            "title": "The following information is intended for healthcare professionals only:",
+            "required": false
+          }
+        ]
+      }
+    ]
+  },
+  "unmapped": [
+    {
+      "sourceKey": "pl.custom.h3",
+      "targetCode": "200000044346",
+      "title": "Custom subsection (level H3)",
+      "reason": "A custom subsection carries its author's own heading and may occur any number of times under one section (the profile's Blanksubsections slices, 0..*). Zone A carries the template's own sections only, each once and under the label's heading; a custom subsection's text stays in the section it stands in."
+    }
+  ]
+}

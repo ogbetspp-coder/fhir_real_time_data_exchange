@@ -26,7 +26,7 @@ from zone_a.certified import read_docx
 from zone_a.qrd.pattern import Token, UnbalancedTemplateError, children, is_balanced, parse
 from zone_a.underline import underline_changes
 
-REGISTRY_VERSION = "1.2.8"
+REGISTRY_VERSION = "1.3.0"
 
 TEMPLATE_FILE = "qrd-product-information-template-version-104_en.docx"
 APPENDIX_I_FILE = (
@@ -54,6 +54,11 @@ APPENDIX_I_HEADINGS = {
 }
 APPENDIX_III_START = "6.4\tSpecial precautions for storage"
 APPENDIX_III_END = "A. LABELLING"
+# The package leaflet (Annex IIIB): its title page line, the line that opens each leaflet, and the
+# line before the leaflet's list of its own six sections.
+PL_ROOT = "B. PACKAGE LEAFLET"
+PL_TITLE = "Package leaflet: Information for the <patient> <user>"
+PL_CONTENTS = "What is in this leaflet"
 
 # Corrections the registry applies to EMA's text, each for a defect in the source itself. The key
 # is the exact source paragraph (it must occur exactly once); the value is the corrected text and
@@ -471,6 +476,112 @@ def build_appendix_iii(source: Source) -> dict[str, Any]:
     return {"items": _items(statements, "Appendix III SmPC"), "notes": [p.text for p in notes]}
 
 
+def flat(tokens: list[Token]) -> str:
+    """A title as the EMA's profiles write it: brackets dropped, fill-ins in braces, no guidance.
+
+    The profile titles ("Do not take use X", "This leaflet was last revised in {MM/YYYY}{month
+    YYYY}.") are the template's headings so flattened; spaces are collapsed.
+    """
+
+    def walk(tokens: list[Token]) -> str:
+        out: list[str] = []
+        for token in tokens:
+            if token["kind"] == "optional":
+                out.append(walk(children(token)))
+            elif token["kind"] == "fill":
+                out.append("{" + str(token["value"]) + "}")
+            elif token["kind"] == "text":
+                out.append(str(token["value"]))
+        return "".join(out)
+
+    return _collapse(walk(tokens))
+
+
+def _collapse(text: str) -> str:
+    return re.sub(r"[ \t\u00a0]+", " ", text).strip()
+
+
+def build_pl(template: Source, mapping: dict[str, Any]) -> dict[str, Any]:
+    """The package leaflet's headings, as the template writes them.
+
+    Its root line, the line opening each leaflet, the six numbered sections, and each named
+    section of the mapping (``fhir/mappings/cap-pl-en.json``, from the EMA's profile). A named
+    section's template paragraph is the one paragraph of its parent section, outside a table,
+    whose title flattened as the profile writes it (``flat``) is the mapping's title.
+    """
+    texts = [p.text for p in template.paragraphs]
+    root = _exactly_one(texts, PL_ROOT, TEMPLATE_FILE)
+    title = _exactly_one(texts, PL_TITLE, TEMPLATE_FILE)
+    contents = _exactly_one(texts, PL_CONTENTS, TEMPLATE_FILE)
+    if not root < title < contents:
+        raise RegistryError("the package leaflet's opening lines are out of order")
+    for at in (root, title, contents):
+        _check(template.paragraphs[at], "package leaflet")
+    numbered = [
+        (i, heading)
+        for i in range(contents + 1, len(texts))
+        if (heading := _heading(texts[i])) is not None
+    ]
+    # The leaflet lists its six sections after PL_CONTENTS, then gives each its heading.
+    listed, headed = numbered[:6], numbered[6:]
+    if [h["number"] for _, h in listed] != [str(n) for n in range(1, 7)] or [
+        _collapse(h["source"]) for _, h in listed
+    ] != [_collapse(h["source"]) for _, h in headed]:
+        raise RegistryError("the package leaflet does not list then head its six sections")
+    if any(
+        texts[i].strip() for i in range(listed[0][0], listed[-1][0]) if _heading(texts[i]) is None
+    ):
+        raise RegistryError("the package leaflet's list of sections is interrupted")
+    sections: list[dict[str, Any]] = []
+    for i, heading in headed:
+        _check(template.paragraphs[i], f"package leaflet heading {heading['number']}")
+        sections.append({"key": f"pl.{heading['number']}", **heading})
+    starts = [i for i, _ in headed] + [len(texts)]
+
+    def visit(node: dict[str, Any]) -> list[dict[str, Any]]:
+        return [node, *(n for child in node.get("children", []) for n in visit(child))]
+
+    keys = {s["key"]: n for n, s in enumerate(sections)}
+    headings: list[dict[str, Any]] = []
+    for node in visit(mapping["root"])[1:]:
+        if node["sourceKey"] in keys:
+            continue
+        parent = node["sourceKey"].rsplit(".", 1)[0]
+        if parent not in keys:
+            raise RegistryError(f"{node['sourceKey']} is under no numbered section")
+        n = keys[parent]
+        hits = [
+            i
+            for i in range(starts[n] + 1, starts[n + 1])
+            if template.paragraphs[i].table is None
+            and is_balanced(texts[i])
+            and flat(parse(texts[i])) == node["title"]
+        ]
+        if len(hits) != 1:
+            raise RegistryError(f"{node['sourceKey']}: {len(hits)} template paragraphs, expected 1")
+        at = hits[0]
+        _check(template.paragraphs[at], f"package leaflet {node['sourceKey']}")
+        tokens = parse(texts[at])
+        _guard(tokens, node["sourceKey"])
+        headings.append(
+            {
+                "key": node["sourceKey"],
+                "parent": parent,
+                "source": texts[at],
+                "title": tokens,
+                "optional": _optional(tokens),
+            }
+        )
+    order = {key: n for n, key in enumerate(node["sourceKey"] for node in visit(mapping["root"]))}
+    return {
+        "root": PL_ROOT,
+        "leafletTitle": {"source": PL_TITLE, "title": parse(PL_TITLE)},
+        "contents": PL_CONTENTS,
+        "sections": sections,
+        "headings": sorted(headings, key=lambda h: order[h["key"]]),
+    }
+
+
 def _check_errata(items: list[dict[str, Any]]) -> None:
     """Each erratum corrects exactly one item; one that matches nothing is a stale correction."""
     for source in ERRATA:
@@ -546,6 +657,43 @@ def build(directory: Path, lock: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def build_leaflet(directory: Path, lock: dict[str, Any], mapping: dict[str, Any]) -> dict[str, Any]:
+    """The package leaflet's registry, built from the pinned template and the leaflet mapping.
+
+    Raises:
+        RegistryError: The template does not match its lock entry, or does not have the shape the
+            build relies on.
+        DocxRefusedError: The Word reader refuses the template.
+    """
+    entry = next((e for e in lock["sources"] if e["file"] == TEMPLATE_FILE), None)
+    template = load_source(directory, TEMPLATE_FILE)
+    if entry is None or entry["sha256"] != template.sha256:
+        raise RegistryError(f"{TEMPLATE_FILE} does not match qrd/sources.lock.json")
+    return {
+        "registryVersion": REGISTRY_VERSION,
+        "readerVersion": READER_VERSION,
+        "readerFormat": FORMAT_VERSION,
+        "mappingVersion": mapping["mappingVersion"],
+        "template": {
+            "family": "EMA QRD product-information template, centralised procedure",
+            "version": "10.4",
+            "status": "adopted",
+            "annex": "IIIB",
+            "document": "Package leaflet",
+            "language": "en",
+        },
+        "sources": [
+            {
+                "file": TEMPLATE_FILE,
+                "sha256": template.sha256,
+                "emaReference": entry.get("emaReference"),
+                "lastUpdated": entry["lastUpdated"],
+            }
+        ],
+        **build_pl(template, mapping),
+    }
+
+
 def serialise(registry: dict[str, Any]) -> str:
     """The registry as its committed file holds it: JSON, indented by two, with a final newline."""
     return json.dumps(registry, ensure_ascii=False, indent=2) + "\n"
@@ -557,5 +705,6 @@ __all__ = [
     "RegistryError",
     "UnbalancedTemplateError",
     "build",
+    "build_leaflet",
     "serialise",
 ]

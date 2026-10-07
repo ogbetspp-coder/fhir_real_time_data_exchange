@@ -7,14 +7,29 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { pinnedValidator } from "../../scripts/fhir/compile-map.mjs";
 import { loadEmaMapping, type EmaMapping, type SectionRule } from "../../src/fhir/mapping.js";
 
-// Every section slot of the EMA's CAP SmPC template profile is either mapped by a rule of the
-// manifest (and so by the ConceptMap, equivalent) or named in its unmapped list (noMap, with a
-// reason). The slots are read from the profile's own StructureDefinition in the pinned EUePI
+// Every section slot of the EMA's CAP SmPC and package leaflet template profiles is either mapped
+// by a rule of its manifest (for the SmPC, and so by the ConceptMap, equivalent) or named in its
+// unmapped list (noMap, with a reason). The slots are read from the profile's own StructureDefinition in the pinned EUePI
 // package, the one the validator sidecar loads, checked against its SHA-256 here; nothing is
 // restated from memory. Run in CI's Official validation job (npm run test:official), where the
 // pinned packages are fetched and checked.
 
-const PROFILE = "StructureDefinition-EUQRD-CAP-template-new-SmPC-en.json";
+const PROFILES = [
+  {
+    document: "SmPC",
+    manifest: "fhir/mappings/cap-smpc-en.json",
+    profile: "StructureDefinition-EUQRD-CAP-template-new-SmPC-en.json",
+    own: 59,
+    custom: 44,
+  },
+  {
+    document: "package leaflet",
+    manifest: "fhir/mappings/cap-pl-en.json",
+    profile: "StructureDefinition-EUQRD-CAP-template-new-Package-Leaflet-en.json",
+    own: 27,
+    custom: 6,
+  },
+];
 
 type ElementDefinition = {
   id: string;
@@ -78,67 +93,74 @@ function flatten(
   return [[rule, parent], ...(rule.children ?? []).flatMap((child) => flatten(child, rule))];
 }
 
-let mapping: EmaMapping;
-let all: Slot[];
+describe.each(PROFILES)(
+  "the EMA's CAP $document template profile, read from the pinned EUePI package",
+  ({ manifest, profile: file, own, custom: customs }) => {
+    let mapping: EmaMapping;
+    let all: Slot[];
 
-beforeAll(async () => {
-  mapping = await loadEmaMapping();
-  const read = spawnSync("tar", ["-xzOf", euepiPackage(), `package/${PROFILE}`], {
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  if (read.status !== 0) throw new Error(`could not read ${PROFILE} from the EUePI package`);
-  const profile = JSON.parse(read.stdout) as {
-    url: string;
-    differential: { element: ElementDefinition[] };
-  };
-  expect(profile.url).toBe(mapping.profiles.composition.at(-1));
-  all = slots(profile);
-});
+    beforeAll(async () => {
+      mapping = await loadEmaMapping(manifest);
+      const read = spawnSync("tar", ["-xzOf", euepiPackage(), `package/${file}`], {
+        encoding: "utf8",
+        maxBuffer: 64 * 1024 * 1024,
+      });
+      if (read.status !== 0) throw new Error(`could not read ${file} from the EUePI package`);
+      const profile = JSON.parse(read.stdout) as {
+        url: string;
+        differential: { element: ElementDefinition[] };
+      };
+      expect(profile.url).toBe(mapping.profiles.composition.at(-1));
+      all = slots(profile);
+    });
 
-describe("the EMA's CAP SmPC template profile, read from the pinned EUePI package", () => {
-  it("has 103 section slots: 59 of the template's own sections and 44 for custom subsections", () => {
-    expect(all).toHaveLength(103);
-    expect(all.filter((slot) => !slot.custom)).toHaveLength(59);
-    expect(all.filter((slot) => slot.custom)).toHaveLength(44);
-  });
+    it(`has ${own + customs} section slots: ${own} of the template's own sections and ${customs} for custom subsections`, () => {
+      expect(all).toHaveLength(own + customs);
+      expect(all.filter((slot) => !slot.custom)).toHaveLength(own);
+      expect(all.filter((slot) => slot.custom)).toHaveLength(customs);
+    });
 
-  it("has no slot that is neither mapped nor explicitly unmapped", () => {
-    const mapped = new Set(flatten(mapping.root).map(([rule]) => rule.targetCode));
-    const unmapped = new Set((mapping.unmapped ?? []).map((slot) => slot.targetCode));
-    expect(all.filter((slot) => !mapped.has(slot.code) && !unmapped.has(slot.code))).toEqual([]);
-    // A custom subsection slot is unmapped, never mapped; every other slot is mapped.
-    expect(all.filter((slot) => slot.custom && !unmapped.has(slot.code))).toEqual([]);
-    expect(all.filter((slot) => !slot.custom && !mapped.has(slot.code))).toEqual([]);
-  });
+    it("has no slot that is neither mapped nor explicitly unmapped", () => {
+      const mapped = new Set(flatten(mapping.root).map(([rule]) => rule.targetCode));
+      const unmapped = new Set((mapping.unmapped ?? []).map((slot) => slot.targetCode));
+      expect(all.filter((slot) => !mapped.has(slot.code) && !unmapped.has(slot.code))).toEqual([]);
+      // A custom subsection slot is unmapped, never mapped; every other slot is mapped.
+      expect(all.filter((slot) => slot.custom && !unmapped.has(slot.code))).toEqual([]);
+      expect(all.filter((slot) => !slot.custom && !mapped.has(slot.code))).toEqual([]);
+    });
 
-  it("is the manifest's tree: each section a rule, under its parent's rule, in order, as required", () => {
-    const named = all.filter((slot) => !slot.custom);
-    const rules = flatten(mapping.root);
-    expect(rules).toHaveLength(named.length);
-    const byId = new Map(named.map((slot) => [slot.id, slot]));
-    for (const slot of named) {
-      const found = rules.find(([rule]) => rule.targetCode === slot.code);
-      expect(found, slot.id).toBeDefined();
-      const [rule, parent] = found ?? [];
-      expect([slot.id, parent?.targetCode]).toEqual([
-        slot.id,
-        slot.parent === undefined ? undefined : byId.get(slot.parent)?.code,
-      ]);
-      expect([slot.id, rule?.required, rule?.title]).toEqual([slot.id, slot.min === 1, slot.title]);
-      expect(slot.max).toBe("1");
-      const children = named.filter((child) => child.parent === slot.id).map(({ code }) => code);
-      expect((rule?.children ?? []).map(({ targetCode }) => targetCode)).toEqual(children);
-    }
-  });
+    it("is the manifest's tree: each section a rule, under its parent's rule, in order, as required", () => {
+      const named = all.filter((slot) => !slot.custom);
+      const rules = flatten(mapping.root);
+      expect(rules).toHaveLength(named.length);
+      const byId = new Map(named.map((slot) => [slot.id, slot]));
+      for (const slot of named) {
+        const found = rules.find(([rule]) => rule.targetCode === slot.code);
+        expect(found, slot.id).toBeDefined();
+        const [rule, parent] = found ?? [];
+        expect([slot.id, parent?.targetCode]).toEqual([
+          slot.id,
+          slot.parent === undefined ? undefined : byId.get(slot.parent)?.code,
+        ]);
+        expect([slot.id, rule?.required, rule?.title]).toEqual([
+          slot.id,
+          slot.min === 1,
+          slot.title,
+        ]);
+        expect(slot.max).toBe("1");
+        const children = named.filter((child) => child.parent === slot.id).map(({ code }) => code);
+        expect((rule?.children ?? []).map(({ targetCode }) => targetCode)).toEqual(children);
+      }
+    });
 
-  it("names every unmapped code in a custom subsection slot", () => {
-    const custom = new Set(all.filter((slot) => slot.custom).map((slot) => slot.code));
-    expect((mapping.unmapped ?? []).map((slot) => slot.targetCode).sort()).toEqual(
-      [...custom].sort(),
-    );
-    for (const slot of all.filter((each) => each.custom)) {
-      expect([slot.id, slot.min, slot.max]).toEqual([slot.id, 0, "*"]);
-    }
-  });
-});
+    it("names every unmapped code in a custom subsection slot", () => {
+      const custom = new Set(all.filter((slot) => slot.custom).map((slot) => slot.code));
+      expect((mapping.unmapped ?? []).map((slot) => slot.targetCode).sort()).toEqual(
+        [...custom].sort(),
+      );
+      for (const slot of all.filter((each) => each.custom)) {
+        expect([slot.id, slot.min, slot.max]).toEqual([slot.id, 0, "*"]);
+      }
+    });
+  },
+);
