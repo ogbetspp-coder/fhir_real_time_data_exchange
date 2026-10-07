@@ -52,6 +52,7 @@ output "record_readers_targets" {
       google_storage_bucket.profiles.name,
       google_storage_bucket.build_staging.name,
       google_storage_bucket.approval_heads.name,
+      google_storage_bucket.word_drawings.name,
     ]
     datasets = [
       google_bigquery_dataset.ledger.dataset_id,

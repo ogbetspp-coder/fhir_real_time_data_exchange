@@ -25,6 +25,8 @@ const records: [type: string, name: string][] = [
   ["google_kms_crypto_key", "manifest_signing"],
   ["google_kms_crypto_key", "record"],
   ["google_kms_crypto_key", "manifest_signing_hsm"],
+  ["google_kms_crypto_key", "word_drawing_hsm"],
+  ["google_storage_bucket", "word_drawings"],
 ];
 
 describe("resources that hold a record", () => {
@@ -56,13 +58,14 @@ describe("every bucket", () => {
     },
   );
 
-  it("includes the five Terraform creates, and the ones it does not are enforced by script", () => {
+  it("includes the six Terraform creates, and the ones it does not are enforced by script", () => {
     expect(buckets.map(({ name }) => name).sort()).toEqual([
       "approval_heads",
       "build_staging",
       "evidence",
       "profiles",
       "submissions",
+      "word_drawings",
     ]);
     // The state bucket, created by deploy.sh before Terraform exists (on its key, too: audit
     // I-10, test/infra/fresh-environment.test.ts), and the agent staging bucket, created by hand.

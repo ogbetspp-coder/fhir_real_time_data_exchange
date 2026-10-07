@@ -155,6 +155,28 @@ steps:
       - org.opencontainers.image.revision=${_REVISION}
       - --tag
       - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/signer:${_IMAGE_TAG}
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/word-drawing:${_IMAGE_TAG}
+    - .
+
+  # The Word drawing's image (docs/design/certified-word-drawing.md, "The image"): Dockerfile.renderer's
+  # word-drawing target, pushed so that a pull request pins its digest per environment
+  # (src/render/word-drawing/lock.json). Nothing here deploys it: the drawing build
+  # (infra/word-drawing.tf) pulls it by the digest main pins. Built with the legacy builder, as CI's
+  # Word drawing job builds it (measured on Cloud Build's default machine: 80 to 84 s).
+  - id: build-word-drawing-image
+    name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
+    waitFor: ["-"]
+    env: ["DOCKER_BUILDKIT=0"]
+    args:
+      - build
+      - --file
+      - Dockerfile.renderer
+      - --target
+      - word-drawing
+      - --label
+      - org.opencontainers.image.revision=${_REVISION}
+      - --tag
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/word-drawing:${_IMAGE_TAG}
       - .
 
 images:
@@ -163,3 +185,4 @@ images:
   - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/validator:buildcache
   - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/query:${_IMAGE_TAG}
   - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/signer:${_IMAGE_TAG}
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/word-drawing:${_IMAGE_TAG}

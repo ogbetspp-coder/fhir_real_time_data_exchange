@@ -48,7 +48,9 @@ STATE_BUCKET="${PROJECT_ID}-ema-flow-tfstate"
 CONDITION="assertion.repository_id=='${REPOSITORY_ID}' && assertion.event_name=='pull_request' && assertion.workflow_ref.startsWith('${REPOSITORY}/.github/workflows/plan.yml@refs/pull/')"
 
 # Read-only, metadata and policy only. Each line is a resource type in infra/ or a call the plan
-# workflow makes; nothing here returns a stored record's content.
+# workflow makes; nothing here returns a stored record's content. cloudbuild.builds.get is how a
+# Cloud Build trigger is read (infra/word-drawing.tf); it also reads a build's metadata, whose one
+# value from outside is a drawing request: hashes, section keys and versions, never a label's text.
 PERMISSIONS=(
   resourcemanager.projects.get
   resourcemanager.projects.getIamPolicy
@@ -62,6 +64,7 @@ PERMISSIONS=(
   bigquery.datasets.getIamPolicy
   bigquery.tables.get
   bigquery.tables.getIamPolicy
+  cloudbuild.builds.get
   run.services.get
   run.services.getIamPolicy
   healthcare.datasets.get

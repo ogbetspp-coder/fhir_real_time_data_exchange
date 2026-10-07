@@ -2,7 +2,9 @@
 
 - Status: proposed 2026-10-07; revised the same day after an independent review of #197, whose
   recommendations the owner said to go ahead on. Build order step 1 partly measured and PR 1
-  built the same day ("Step 1: measured, and PR 1 as built", below); PR 2 to 4 are not built
+  built the same day ("Step 1: measured, and PR 1 as built", below); PR 2 built and step 1's
+  remainder measured the same day ("Step 2: PR 2 as built, and measured", below); PR 3 and 4 are
+  not built
 - Implements: `docs/design/certified-word-import.md` D3 (a), the owner's choice of 2026-10-06
   ("extend the renderer gate's attested records"), and that note's "The gate", steps 5 and 6
 - Fits: `docs/design/authority-import-renderer.md` R1 (attested records), frozen, its architecture
@@ -59,8 +61,10 @@ change named):
 - Cloud Build, for a trigger fired by a Pub/Sub message (PR 2): it runs the build as the trigger's
   own service account without the publisher holding `actAs` on it; it binds a field of the
   message's JSON body to a substitution; its CEL filter can refuse a message before any build
-  starts; and it accepts an inline build with no repository connection.
-- Every timing not measured below ("Cost and operations").
+  starts; and it accepts an inline build with no repository connection. (Tested, each of them:
+  "Step 2", below.)
+- Every timing not measured below ("Cost and operations"). (Measured on Cloud Build's machines:
+  "Step 2".)
 
 ## The trust model, plainly
 
@@ -342,9 +346,9 @@ it, is gone: neither names the other.
   so a backlog expires rather than runs late.
 - **Values only through `env:`.** The request reaches each step as an environment value, never in
   a step's arguments or script text.
-- **Step 1, slim** (a pinned Cloud SDK image, before any download): it decodes the request,
-  computes the key, and looks for the record under the newest pinned key version. If it is there,
-  every later step ends at once.
+- **Step 1, slim** (a pinned Cloud SDK image, before the image or the .docx is downloaded): it
+  fetches main's source, decodes the request, computes the key, and looks for the record under the
+  newest pinned key version. If it is there, every later step ends at once.
 - **Step 2,** with network: it parses the request strictly (canonical JSON, the recompute
   request's own shape) and reads the .docx by the worker's rules (the configured bucket, the
   content address, the 32 MiB cap, the hash). It pulls the image by digest.
@@ -355,6 +359,9 @@ it, is gone: neither names the other.
 - **Step 4,** with network: it requires the two outputs to be identical, checks that the commit is
   a first-parent commit of main (R1), adds the environment, commit, image digest and key version,
   signs with Cloud KMS, and writes create-if-absent.
+
+As built (PR 2), these are the steps `exists`, `pull`, `parse`, `fetch`, `draw-1` and `draw-2` at
+once, `record` and `sign` of `scripts/word-drawing/build.sh` ("Step 2", below).
 
 **What a compromised Zone A, or producer, could do:**
 
@@ -457,13 +464,13 @@ counts and times only, no text kept). "Builds" means with no heading left for a 
 Each check starts Chrome twice (once for the text, once for the list labels). The build runs two
 checks, side by side.
 
-**Estimated, to be measured in PR 2** on Cloud Build's machine (step 1 measured an M2's, below):
-about 2 to 4 build-minutes per label.
-Most of it is fixed: fetching main's source, `npm ci`, pulling the image and signing. Each drawing
-container runs a read and a check: under 5 s for the largest carried SmPC here, under 7 s for the
-largest carried leaflet, and about 45 s for the slowest read. Cloud Build's default machine is
-likely slower per core than an M2; by how much is not measured. The build's timeout is set from
-that measurement, as R11 sets the authority build's.
+**Measured in PR 2** on Cloud Build's default machine, an e2-standard-2 ("Step 2", below): about
+1 to 1.5 build-minutes for a label of the corpus, and under 4 for the slowest read that builds.
+Most of it is fixed: pulling the Cloud SDK image (38 s), main's source (2 to 3 s), the drawing
+image (about 20 s, estimated from the worker image's pull) and signing. The two drawings, at
+once, take 5 to 26 s for the corpus's labels that carry every section, and 132 to 152 s for the
+slowest read. The build's timeout (600 s) and each container's memory (2 GiB) are set from these,
+as R11 sets the authority build's.
 The 40 s read is also closer to the worker's 60 s recompute limit (D2) than D2's 4.1 s figure
 suggests, so the first deploy's measurement of the recompute should include that label.
 
@@ -484,13 +491,14 @@ suggests, so the first deploy's measurement of the recompute should include that
   image), a third-party download (Chrome, the Debian snapshot) on the deploy's path, and a new
   digest each deploy that nothing uses until pinned. Old digests stay, since the repository has no
   cleanup policy; one must be added with an exception for pinned digests if it ever is.
-- **The repository connection** (to be tested in PR 2): a trigger with an inline build that clones
-  the public repository at `refs/heads/main` over HTTPS needs no GitHub connection. It records the
-  commit and checks it is first-parent on main. If Cloud Build accepts such a trigger, the owner's
-  connection step falls away; if not, the trigger takes its source through the connection, which
-  only the owner can make.
-- **New infrastructure**, all in Terraform (PR 2): the drawing identity, its key, its record bucket,
-  one topic, one trigger, the worker's read on the record bucket, and the producer's publish grant.
+- **The repository connection** (tested in PR 2): a trigger with an inline build that clones the
+  public repository at `refs/heads/main` over HTTPS needs no GitHub connection. It records the
+  commit and checks it is first-parent on main. Cloud Build accepts such a trigger and runs it
+  ("Step 2"), so the owner's connection step falls away.
+- **New infrastructure**, all in Terraform (PR 2, `infra/word-drawing.tf`): the drawing identity,
+  its key, its record bucket, one topic, one trigger and the worker's read on the record bucket.
+  The producer's publish grant is not made: today's producer is the operator, whose owner role
+  already publishes; the label gateway's grant comes with the gateway.
 
 ## 7. Alternatives within (a)
 
@@ -529,9 +537,10 @@ second image target, and the drawing identity's read of `uploads/sha256/` alone.
 reviewed as any change is; its deploy creates an HSM key that Terraform cannot destroy and whose
 destruction waits 120 days.
 
-**Left for the owner,** only if PR 2's test shows a Pub/Sub trigger cannot run an inline build that
-clones the public repository: the GitHub connection to Cloud Build in `europe-west4`, a step only
-the owner can take.
+**Left for the owner:** no GitHub connection. PR 2's test showed a Pub/Sub trigger runs an inline
+build that clones the public repository ("Step 2"). One step remains outside Terraform, as the
+planner always is: `scripts/gcp/plan-identity.sh`, run once by the owner after PR 2's deploy, gives
+the planner `cloudbuild.builds.get`, without which every later plan fails to read the trigger.
 
 ## What this takes from R1, and what differs
 
@@ -690,7 +699,7 @@ tails are loose: the slowest check, 8.5 s, took 2.6 s when repeated.
    the owner can add.
 
 **Not measured, so left for PR 2 (each needs the cloud, or a machine with a container runtime
-where the corpus may go):**
+where the corpus may go).** Each was measured in PR 2 ("Step 2", below):
 
 - **The corpus in the Linux image:** parity, with its pinned fonts, on every SmPC and leaflet that
   builds; and time and memory per label there. In the image, CI measured the fixtures only.
@@ -700,6 +709,144 @@ where the corpus may go):**
   timeout and the two containers' memory are set from them.
 - **Chrome's sandbox on Cloud Build's hosts** (below: on GitHub's it cannot start).
 - **The trigger's tests:** payload binding, the CEL filter, `actAs` and the inline clone.
+
+## Step 2: PR 2 as built, and measured (2026-10-07)
+
+**What PR 2 adds.** Everything persistent is in Terraform (`infra/word-drawing.tf`), and the
+deploy applies it after the merge; nothing was made by hand.
+
+- The drawing identity `ema-flow-word-drawing-<env>`, holding exactly six grants, which
+  `test/infra/word-drawing.test.ts` proves exhaustive: `cloudkms.signer` on `word-drawing-hsm`;
+  `objectCreator` and `objectViewer` on the record bucket; `objectViewer` on the submissions bucket
+  under the condition `uploads/sha256/`; `artifactregistry.reader` on `ema-flow-images`; and log
+  writer.
+- The key `word-drawing-hsm` in the evidence ring: HSM, RSA-PSS 3072 with SHA-256, signing only,
+  `prevent_destroy`, 120 days before any destruction.
+- The record bucket `<project>-ema-flow-<env>-word-drawings`: on the evidence key, no versioning,
+  public access prevented, `prevent_destroy`. The worker may read it.
+- The topic `ema-flow-<env>-word-drawing-requests`, and the trigger `ema-flow-<env>-word-drawing`
+  in the region.
+- The image: `cloudbuild.images.yaml` builds the `word-drawing` target on every deploy, with the
+  legacy builder (as CI's Word drawing job now builds it too), and pushes it as
+  `word-drawing:<commit>`. PR 3 pins a digest from it.
+- The build itself: `scripts/word-drawing/build.sh`, one step per call, and, in the image,
+  `zone-a/scripts/word_drawing_build.py` (the strict parse, and the record's assembly).
+- The planner gains `cloudbuild.builds.get` (`scripts/gcp/plan-identity.sh`), the one permission
+  that reads a trigger, and the deploy's effective-IAM export names the drawing identity.
+
+**The trigger, as built.** Fired by a message on the topic; its substitution `_REQUEST` is bound to
+`$(body.message.data.request)`, and its filter is `size(_REQUEST) > 0 && size(_REQUEST) <= 4000 &&
+_REQUEST.matches("^[A-Za-z0-9_-]+$")` (4,000 characters: a request with every SmPC section assigned
+is about 1,250). The request reaches the first step alone, as `REQUEST` in its `env`; the other
+inputs (environment, buckets, key, image repository) are literals Terraform writes into the build's
+`options.env`. The build has no source and no configuration file: its steps are written in the
+trigger, and the first fetches `refs/heads/main` of the public repository over HTTPS. Its timeout
+is 600 s and its `queueTtl` 300 s. The steps, each in an image pinned by digest:
+
+1. `exists` (Cloud SDK 588.0.0-slim): main's source, depth 1; the request decoded only where it is
+   unpadded base64url and the one spelling of its bytes; the key; the drawing id from the lock; the
+   newest key version pinned for the environment (`src/render/word-drawing/keys/<env>/<n>.pem`, less
+   those `revoked.json` lists); and the record looked for by Cloud Storage's JSON API. Found (200),
+   every later step ends at once; not found (404), the build goes on; any other answer fails it.
+   Until PR 3 pins an image and a key, every build ends here, refused.
+2. `pull` (the images build's Docker builder): the image, by the pinned digest.
+3. `parse` (the image, hardened, no network): the request, its canonical JSON exactly, of the
+   recompute request's shape (`word_drawing_build.py request`), before the .docx is read.
+4. `fetch` (Cloud SDK): the .docx at its content address, at most 32 MiB (`curl --max-filesize`,
+   then its length), of the SHA-256 the request names.
+5. `draw-1` and `draw-2`, at once (the image, hardened, no network, 2 GiB each):
+   `python -m zone_a.drawing`.
+6. `record` (the image, no network): the two outputs byte for byte the same, each exactly the
+   fields of this request, made the record with the environment, the commit, the image's digest
+   and the key version (a JSON integer), as canonical JSON (`word_drawing_build.py record`).
+7. `sign` (Cloud SDK): the commit is on main's first-parent line, fetched again; Cloud KMS signs the
+   SHA-256 of the record's bytes; the signature is checked against the pinned public key before
+   anything is written (a record that did not verify would hold its path for good); and
+   `{record, signatureBase64}` is written with `ifGenerationMatch=0`. Where an object is there
+   already (412, or 403), it must begin with this record's bytes, or the build fails as a
+   determinism failure.
+
+Cloud Build makes the trigger's push subscription itself (`gcb-<trigger>`, seven days' retention),
+outside Terraform, and deletes it with the trigger (observed).
+
+**The trigger's tests** (a throwaway topic, publisher and trigger in `europe-west4`, applied by a
+scratch Terraform configuration of the same blocks, tested and destroyed):
+
+- **No repository connection.** Cloud Build accepted a Pub/Sub trigger whose build is inline, with
+  no source, and ran it: the first step fetched `refs/heads/main` anonymously over HTTPS (main at
+  `67581df`, in 2 to 3 s).
+- **Payload binding.** The step's `REQUEST` was the message's `request` exactly (its length and
+  SHA-256 compared), and a later step without the `env` entry did not see it.
+- **The filter.** No build started for a padded request, a base64 one (`+/`), a body without
+  `request`, a body that is not JSON, an empty request, or one of 4,001 characters. One of 4,000
+  characters started a build and arrived whole.
+- **`actAs`.** The messages were published by a throwaway service account holding only
+  `pubsub.publisher` on the topic; the builds ran as the trigger's service account.
+
+**Create-if-absent, by IAM** (a throwaway bucket and an identity holding `objectCreator` and
+`objectViewer`, destroyed after): the first write with `ifGenerationMatch=0` was created (200); a
+second was refused as existing (412); a write without the precondition was refused (403), as was a
+delete (403); the object read back unchanged; a missing one read 404.
+
+**Chrome's sandbox on Cloud Build's hosts.** It cannot start there either. The hosts run Debian's
+5.10 cloud kernel, cgroup v1, Docker 20.10.24 with AppArmor and its default seccomp profile, and
+the shell ended at once with the same `No usable sandbox!`. So `--no-sandbox` stays, and so does
+the residual.
+
+**The image on Cloud Build, Intel and AMD.** Built with the legacy builder in 80 to 84 s
+(781 MB). Eight builds ran it, five on Intel (Xeon at 2.20 GHz, e2-standard-2) and three on AMD
+(EPYC 7B12: one e2-standard-2, two e2-highcpu-8). In every one:
+
+- `word_drawing_check.py` passed, hardened (19 to 35 s): every committed label's fields the bytes
+  it requires, each drawn twice alike, the refused one refused; every carried section of the
+  Word-made SmPCs and the QRD template agreeing, with raw answers byte for byte Google Chrome's
+  recording; 262 of 262 narratives parsed alike;
+- `python -m zone_a.drawing`, two containers at once on each signed label, wrote the same bytes in
+  every run of every build: one output per label across both CPUs.
+
+**The corpus in the Linux image.** The 181 corpus files that build a part were drawn in the image,
+each label in a container of its own (hardened, 2 GiB, `/tmp` made executable for the harness's
+window launcher), by `word_drawing_corpus.py one`, with the image's shell in every Chrome's place;
+names stayed on the Mac, and the files went to a temporary path of the build-staging bucket, deleted
+after (`gs://…-build-staging/word-drawing-pr2-corpus/`, within its seven-day soft-delete window).
+
+- Parity: 131 SmPCs and 110 leaflets drawn, 3,277 and 1,372 narratives: every one of the 4,649
+  sections agrees. Every part's counts (builds, sections, drawn, every section, characters of
+  markup) are the Mac's, on all 253 parts, and so are the reads (view, paragraphs).
+- Repeatability: the shell drew every part again, and at 375 by 812 and a ratio of 2: the same raw
+  answers on all 241 parts. HTML and XML parse trees: 4,649 of 4,649 the same.
+- Across machines: two runs on AMD (e2-highcpu-8) gave the same raw answers on all 241 parts;
+  a run on Intel (e2-standard-2) is still drawing as this is written.
+- Not measured: the corpus's raw answers against macOS's; the Mac kept no digests of them. The
+  fixtures' raw answers are byte for byte Google Chrome's on macOS (above).
+
+**Time and memory on e2-standard-2** (Intel; two containers at once, as the build runs them):
+
+- The 23 corpus labels that carry every section, five builds each: 5.3 to 25.9 s a pair (median
+  8.9 s); each container peaked at 114 to 186 MiB. Every label wrote one output across all twelve
+  runs (six builds, two containers).
+- The slowest read that builds (2,280 paragraphs, its accepted view, refused at `section` for its
+  first part): 132 to 152 s a pair, each container peaking at 893 to 896 MiB. Under the build's own bound, 2 GiB (below), the same: refused at `section` in both
+  containers, in 119 s, neither killed for memory.
+- The committed labels: 2.1 to 3.9 s a pair on Intel, 1.4 to 2.5 s on AMD; about 100 MiB each.
+- Fixed: the Cloud SDK image's pull, 38 s; main's source, 2 to 3 s; a trigger's build queued for 1
+  to 32 s; the worker image (393 MB) pulled from `ema-flow-images` in 9.4 to 10.3 s, so the drawing
+  image (781 MB) in about 20 s, estimated.
+- So the timeout, 600 s, is four times the slowest read's drawing and about two and a half times
+  the slowest build, all steps counted; the `queueTtl`, 300 s, lets a backlog expire. Each drawing
+  container is bounded to 2 GiB: more than twice the slowest read's peak, the worker's own bound
+  for the same recompute, and 4 GiB for the two of 8 GB.
+
+**The build's own steps, end to end** (`build.sh` on e2-standard-2, from `parse` to `record`,
+with a committed label and what `exists` writes seeded, since the key and the bucket do not exist
+yet): `parse` 1.9 s; `draw-1` and `draw-2` at once, 4.2 and 4.4 s, byte for byte the same; and
+`record` 1.9 s, which wrote the record of section 3 with the four fields the build adds.
+
+**Uncertain until the first build after PR 3:** what needs the deployed resources has run only
+against stand-ins (`test/infra/word-drawing.test.ts`) and the throwaway tests above: `exists`'s
+lookup in the record bucket, `pull` of the pushed image as the drawing identity, `fetch` under the
+conditioned grant, Cloud KMS's signature, and the write. The first synthetic label's record (PR 4)
+is their first run; until then a request ends at `exists`, refused, since nothing is pinned.
 
 ## Build order, each change reviewed on its own
 
@@ -722,9 +869,9 @@ where the corpus may go):**
    - a CI job that draws the fixtures in the image and requires the recorded verdicts, two
      identical runs and the parser test;
    - step 1's corpus parity, repeatability and timings recorded in the pull request.
-3. **PR 2, the infrastructure:** section 6's list, with the Terraform tests (the identity's grants
-   proven exhaustive; the trigger's ref and configuration as literals) and the trigger tests
-   (payload binding, CEL filter, `actAs`, the inline clone).
+3. **PR 2, the infrastructure** (built 2026-10-07, "Step 2"): section 6's list, with the Terraform
+   tests (the identity's grants proven exhaustive; the trigger's ref and configuration as literals)
+   and the trigger tests (payload binding, CEL filter, `actAs`, the inline clone).
 4. **PR 3, the pins:**
    - each environment's image digest in `src/render/word-drawing/lock.json`;
    - the key's first public key in `src/render/word-drawing/keys/<environment>/`.
@@ -746,8 +893,11 @@ where the corpus may go):**
 - An exploit in the drawing container could make both drawings agree falsely; an escape from the
   container reaches the build machine's metadata server and the drawing identity's token, which can
   sign and can read every upload. Chrome's own sandbox could not start in the hardened container
-  on CI's host (measured, "Step 1"), and the launcher runs Chrome without it, so one layer fewer
-  stands in the way.
+  on CI's host (measured, "Step 1") nor on Cloud Build's (measured, "Step 2"), and the launcher
+  runs Chrome without it, so one layer fewer stands in the way.
+- The planner's `cloudbuild.builds.get`, needed to read the trigger, also reads every build's
+  metadata, a drawing build's request among them: the .docx's hash, its section keys and versions,
+  never its text.
 - A flood of well-formed requests costs build minutes; the backstop is a budget alert.
 - The record does not vouch for the product, the document id (P5) or the approval: only that each
   narrative draws as the .docx was read.

@@ -350,8 +350,8 @@ describe("the image build", () => {
     const labels = build.match(
       /- --label\n\s+- org\.opencontainers\.image\.revision=\$\{_REVISION\}/g,
     );
-    expect(builds).toHaveLength(4);
-    expect(labels).toHaveLength(4);
+    expect(builds).toHaveLength(5);
+    expect(labels).toHaveLength(5);
     expect(readFileSync("scripts/gcp/deploy.sh", "utf8")).toContain("_REVISION=${SERVICE_VERSION}");
   });
 });

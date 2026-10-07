@@ -791,13 +791,15 @@ export_effective_iam() {
   done < <(iam_evidence_list bigquery-dataset bigquery_evidence_request GET "${bq}/datasets?all=true&maxResults=1000" |
     python3 -c "import sys,json;[print(d['datasetReference']['datasetId']) for d in json.load(sys.stdin).get('datasets') or []]" 2>/dev/null || true)
 
-  # Who each identity is: the four service accounts infra/ declares, and the deployer this runs as.
+  # Who each identity is: the service accounts infra/ declares but the build identity, and the
+  # deployer this runs as.
   deployer="$(gcloud --quiet auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1 || true)"
   local identities=(
     "worker=ema-flow-worker-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"
     "query=ema-flow-query-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"
     "caller=ema-flow-caller-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"
     "signer=ema-flow-signer-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"
+    "word-drawing=ema-flow-word-drawing-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"
   )
   if [[ "$deployer" == *.gserviceaccount.com ]]; then
     identities+=("deployer=${deployer}!")
