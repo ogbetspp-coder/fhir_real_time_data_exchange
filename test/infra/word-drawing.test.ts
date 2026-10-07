@@ -313,7 +313,7 @@ function checkout(): { dir: string; bin: string; key: KeyObject } {
     "git",
     // STUB_LONG: main's first-parent line runs on after the commit, as a real one does, so a
     // reader that leaves at its first match closes the pipe on a git still writing.
-    `case "$1" in rev-parse) echo ${COMMIT} ;; rev-list) printf '%s\\n' \${STUB_MAIN:-${COMMIT}}; [ -n "\${STUB_LONG:-}" ] && yes ${"e".repeat(40)} | head -n 200000 ;; esac`,
+    `case "$1" in rev-parse) echo ${COMMIT} ;; rev-list) printf '%s\\n' \${STUB_MAIN:-${COMMIT}}; if [ -n "\${STUB_LONG:-}" ]; then yes ${"e".repeat(40)} | head -n 200000; fi ;; esac`,
   );
   stub(
     "curl",
