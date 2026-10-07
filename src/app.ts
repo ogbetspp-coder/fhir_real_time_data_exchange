@@ -14,8 +14,10 @@ import {
   SubmissionReadError,
   type SubmissionReader,
 } from "./gcp/submission-reader.js";
+import { ApprovalRefusedError } from "./approval/statement.js";
+import { ApprovalStoreError } from "./gcp/approval-store.js";
 import { log } from "./lib/logger.js";
-import { runPipeline, type PipelineInput } from "./pipeline.js";
+import { runPipeline, type PipelineDependencies, type PipelineInput } from "./pipeline.js";
 
 // Which of this service's own gates threw, as a closed code. Keyed by the exact message literals
 // thrown in src/pipeline.ts, src/gcp/ and src/fhir/official-validator.ts, so nothing derived from
@@ -63,6 +65,9 @@ export const FAILURE_REASONS: Readonly<Record<string, string>> = {
   "Data Lineage API returned no process name": "lineage-no-process",
   "Data Lineage API returned no run name": "lineage-no-run",
   "SUBMISSION_BUCKET is required": "submission-bucket-not-configured",
+  "Approval verification is not configured": "approval-not-configured",
+  "Transaction response names no version of the document Bundle": "committed-unlinked",
+  "The run committed but its approval could not be linked": "committed-unlinked",
   "Submission reader is unavailable": "submission-reader-unavailable",
 };
 
@@ -71,6 +76,8 @@ export const FAILURE_REASONS: Readonly<Record<string, string>> = {
 // missing identifier); a reused runId is a replay, which must not be retried as it is.
 const FAILURE_STATUS: Readonly<Record<string, 409 | 422>> = {
   "crosswalk-refused": 422,
+  // The submission is not the document's approved head (docs/design/approval.md, D8).
+  "not-approved": 422,
   // The HTTP surface refuses a disabled source before the pipeline, with the same code and status.
   "source-disabled": 422,
   "run-id-reused": 409,
@@ -79,20 +86,29 @@ const FAILURE_STATUS: Readonly<Record<string, 409 | 422>> = {
 export function pipelineFailure(failure: Error): { reason: string; status: 409 | 422 | 500 } {
   // An upstream refusal carries its own closed operation, so it is classified by type rather
   // than by message: the message embeds a status and a hash and could never match a literal.
+  // A refused approval is the caller's to act on (approve the submission, or re-review): its own
+  // closed code is logged by the pipeline's caller; the answer says `not-approved`.
+  if (failure instanceof ApprovalRefusedError) {
+    return { reason: "not-approved", status: 422 };
+  }
   const reason =
-    failure instanceof HealthcareApiError
-      ? `healthcare-${failure.operation}-refused`
-      : failure instanceof OfficialValidatorError
-        ? "official-validator-refused"
-        : failure instanceof TransformationError
-          ? "crosswalk-refused"
-          : (FAILURE_REASONS[failure.message] ?? "unclassified");
+    failure instanceof ApprovalStoreError
+      ? "approval-store-refused"
+      : failure instanceof HealthcareApiError
+        ? `healthcare-${failure.operation}-refused`
+        : failure instanceof OfficialValidatorError
+          ? "official-validator-refused"
+          : failure instanceof TransformationError
+            ? "crosswalk-refused"
+            : (FAILURE_REASONS[failure.message] ?? "unclassified");
   return { reason, status: FAILURE_STATUS[reason] ?? 500 };
 }
 
 export type AppOverrides = {
   config?: AppConfig;
   submissionReader?: SubmissionReader;
+  // Where a document run reads its head statement and the approval key (src/pipeline.ts).
+  approvals?: PipelineDependencies["approvals"];
 };
 
 // The request's runId, for the error handler's log line.
@@ -186,7 +202,12 @@ export function createApp(overrides: AppOverrides = {}): Hono<AppEnvironment> {
       };
     }
 
-    const result = await runPipeline(input, mapping, config);
+    const result = await runPipeline(
+      input,
+      mapping,
+      config,
+      overrides.approvals === undefined ? {} : { approvals: overrides.approvals },
+    );
 
     return context.json({
       runId: result.runId,
@@ -237,6 +258,15 @@ export function createApp(overrides: AppOverrides = {}): Hono<AppEnvironment> {
         errorCount: error.issues.length,
       });
       return context.json({ error: "submission-rejected", errorType: error.name }, 422);
+    }
+    if (error instanceof ApprovalRefusedError) {
+      // A closed code (src/approval/statement.ts, ApprovalRefusal), so the caller learns why.
+      log("warning", "Submission is not the document's approved head", {
+        ...(runId === undefined ? {} : { runId }),
+        stage: "approval",
+        reason: error.reason,
+      });
+      return context.json({ error: "not-approved", reason: error.reason }, 422);
     }
     const { reason, status } = pipelineFailure(error);
     log("error", "Request failed", {

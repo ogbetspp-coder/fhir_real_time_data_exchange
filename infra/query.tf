@@ -2,7 +2,9 @@
 # component with a different trust level than the worker is its own deployable, with its own
 # service account holding least-privilege IAM, its own configuration, and its own image. This
 # service never writes: it holds a reader role on the validated FHIR store, a log writer role,
-# and nothing else (after phase 2 of audit B04 removes its transitional dataset-wide reader).
+# read on the approval heads bucket and the approval key's public keys (signer.tf, keys.tf;
+# docs/design/approval.md, D9), and nothing else (after phase 2 of audit B04 removes its
+# transitional dataset-wide reader).
 
 locals {
   query_service_name = "${local.name_prefix}-query"
@@ -150,6 +152,25 @@ resource "google_cloud_run_v2_service" "query" {
         name  = "QUERY_LOG_REJECTION_REASON"
         value = var.query_log_rejection_reason ? "true" : "false"
       }
+      # Verification of every answer against its version's signed approval
+      # (docs/design/approval.md, D9): off until the demonstration documents are approved through
+      # the signer, with the agent that reads query-tools 5.0.0 (var.query_approval_verification).
+      env {
+        name  = "APPROVAL_VERIFICATION"
+        value = var.query_approval_verification ? "on" : "off"
+      }
+      env {
+        name  = "APPROVAL_ENVIRONMENT"
+        value = var.environment
+      }
+      env {
+        name  = "APPROVAL_HEADS_BUCKET"
+        value = google_storage_bucket.approval_heads.name
+      }
+      env {
+        name  = "APPROVAL_SIGNING_KEY_VERSION"
+        value = local.approval_signing_key_version
+      }
     }
   }
 
@@ -171,6 +192,8 @@ resource "google_cloud_run_v2_service" "query" {
   depends_on = [
     google_healthcare_fhir_store_iam_member.query_fhir_reader,
     google_project_iam_member.query_log_writer,
+    google_kms_crypto_key_iam_member.query_approval_public_key,
+    google_storage_bucket_iam_member.query_heads_reader,
   ]
 }
 

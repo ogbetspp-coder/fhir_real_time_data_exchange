@@ -361,6 +361,17 @@ Each change record (`docs/validation/README.md`, Change records) states its own 
 `agent-turn` 1.2.0 add an optional `contractVersion` to both audit records, and the published
 `pattern`s are ECMA-262 expressions over ASCII digits, which the vendored models read as such.
 
+### query-tools 5.0.0
+
+Signed approvals (`docs/design/approval.md`, D9). A version without a valid approval is
+`not-approved`, which this agent reads as unavailable, like any `isError`. `get_section` and
+`get_provenance` answers may carry `approval`: the verified statement, its approver's name and
+e-mail, and whether a later approval supersedes it. The service gives it only once
+`APPROVAL_VERIFICATION` is on, and a 4.1.0 copy refuses an answer that carries it, so this agent
+must be redeployed with 5.0.0 before verification is turned on (the change record
+`docs/validation/changes/2026-10-06-signed-approvals-query-tools-5-0-0.md`). The agent does not yet
+show the approver; that is the migration's change.
+
 ### query-tools 4.0.0
 
 `QuoteVerification` is a union on `result` (audit AG-4). A `match` must carry `match`, must

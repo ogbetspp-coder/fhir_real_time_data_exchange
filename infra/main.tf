@@ -52,6 +52,9 @@ resource "google_project_service" "required" {
     "orgpolicy.googleapis.com",
     "serviceusage.googleapis.com",
     "sts.googleapis.com",
+    # The approver's surface: a Google Chat app built as a Workspace add-on, whose HTTP endpoint is
+    # the approval signer (docs/design/approval.md, D2). Configured by the owner in the console.
+    "chat.googleapis.com",
     # The assistant: Gemini Enterprise's connector, and Vertex AI for the agent (roadmap 1b).
     "aiplatform.googleapis.com",
     "discoveryengine.googleapis.com",

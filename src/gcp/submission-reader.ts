@@ -143,7 +143,10 @@ export class GcsSubmissionReader implements SubmissionReader {
   readonly #maxBytes: number;
   readonly #fetch: GcsObjectFetcher;
 
-  public constructor(config: AppConfig, fetcher?: GcsObjectFetcher) {
+  public constructor(
+    config: Pick<AppConfig, "SUBMISSION_BUCKET" | "GOOGLE_CLOUD_PROJECT" | "SUBMISSION_MAX_BYTES">,
+    fetcher?: GcsObjectFetcher,
+  ) {
     const bucket = config.SUBMISSION_BUCKET;
     if (bucket === undefined) throw new Error("SUBMISSION_BUCKET is required");
     const projectId = config.GOOGLE_CLOUD_PROJECT;

@@ -26,8 +26,8 @@ substitutions:
 # Images job builds them the same way (DOCKER_BUILDKIT=0), and scripts/ci/pin-freshness.mjs
 # reports the pin as held, with this reason, rather than as behind.
 #
-# The three images build at once (waitFor: ["-"]): none reads another. The worker and the query
-# service are two targets of one Dockerfile (audit B07, S-5). The validator image starts from the
+# The images build at once (waitFor: ["-"]): none reads another. The worker, the query service and
+# the approval signer are targets of one Dockerfile (audit B07, S-5). The validator image starts from the
 # layers of its previous build (--cache-from its buildcache tag), so an unchanged
 # Dockerfile.validator does not download the ~210 MB of validator and packages again; a changed
 # line rebuilds from that line on, and a first build, with no cache to pull, builds everything.
@@ -130,8 +130,23 @@ steps:
       - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/query:${_IMAGE_TAG}
       - .
 
+  - id: build-signer-image
+    name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
+    waitFor: ["-"]
+    env: ["DOCKER_BUILDKIT=0"]
+    args:
+      - build
+      - --target
+      - signer
+      - --label
+      - org.opencontainers.image.revision=${_REVISION}
+      - --tag
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/signer:${_IMAGE_TAG}
+      - .
+
 images:
   - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/worker:${_IMAGE_TAG}
   - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/validator:${_IMAGE_TAG}
   - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/validator:buildcache
   - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/query:${_IMAGE_TAG}
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/signer:${_IMAGE_TAG}

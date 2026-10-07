@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://khs.dev/contracts/approval-statement/1.0.0/schema.json",
+  "$ref": "#/$defs/SignedApprovalStatement",
+  "$defs": {
+    "SignedApprovalStatement": {
+      "type": "object",
+      "properties": {
+        "statement": {
+          "$ref": "#/$defs/ApprovalStatement"
+        },
+        "signatureBase64": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 2048,
+          "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+        }
+      },
+      "required": ["statement", "signatureBase64"],
+      "additionalProperties": false,
+      "description": "An ApprovalStatement and the approval service's signature over its canonical JSON. This exact object, as canonical JSON, is a document's head entry and the data of its versioned Provenance's signature."
+    },
+    "ApprovalStatement": {
+      "type": "object",
+      "properties": {
+        "statementVersion": {
+          "type": "string",
+          "const": "approval-statement/1"
+        },
+        "kind": {
+          "$ref": "#/$defs/ApprovalKind"
+        },
+        "environment": {
+          "$ref": "#/$defs/ApprovalEnvironment"
+        },
+        "document": {
+          "$ref": "#/$defs/ApprovalDocument"
+        },
+        "sequence": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 999999999999
+        },
+        "previousStatementSha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sha256Hex"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "submissionId": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "approvedContentSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "mappingVersion": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*#[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "documentBundleSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "sections": {
+          "minItems": 1,
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ApprovedSection"
+          }
+        },
+        "reviewSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "approver": {
+          "type": "object",
+          "properties": {
+            "sub": {
+              "$ref": "#/$defs/PrincipalId"
+            },
+            "role": {
+              "$ref": "#/$defs/ApproverRole"
+            },
+            "approverMapSha256": {
+              "$ref": "#/$defs/Sha256Hex"
+            }
+          },
+          "required": ["sub", "role", "approverMapSha256"],
+          "additionalProperties": false
+        },
+        "manifestation": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "^[^<>\\n\\r\\t]+$"
+            },
+            "email": {
+              "type": "string",
+              "maxLength": 254,
+              "pattern": "^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+$"
+            }
+          },
+          "required": ["name", "email"],
+          "additionalProperties": false
+        },
+        "meaning": {
+          "$ref": "#/$defs/ApprovalStatementMeaning"
+        },
+        "signedAt": {
+          "$ref": "#/$defs/IsoDateTime"
+        },
+        "signer": {
+          "type": "object",
+          "properties": {
+            "imageDigest": {
+              "$ref": "#/$defs/ImageDigest"
+            },
+            "keyVersion": {
+              "type": "string",
+              "pattern": "^projects\\/[a-z0-9-]{1,63}\\/locations\\/[a-z0-9-]{1,63}\\/keyRings\\/[A-Za-z0-9_-]{1,63}\\/cryptoKeys\\/[A-Za-z0-9_-]{1,63}\\/cryptoKeyVersions\\/[0-9]{1,9}$"
+            }
+          },
+          "required": ["imageDigest", "keyVersion"],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "statementVersion",
+        "kind",
+        "environment",
+        "document",
+        "sequence",
+        "previousStatementSha256",
+        "submissionId",
+        "approvedContentSha256",
+        "mappingVersion",
+        "documentBundleSha256",
+        "sections",
+        "reviewSha256",
+        "approver",
+        "manifestation",
+        "meaning",
+        "signedAt",
+        "signer"
+      ],
+      "additionalProperties": false,
+      "description": "What a named person approved: the document, the exact content and sections by hash, the review they were shown by hash, who they are as Google asserted it, and the meaning of the signature. Signed by the approval service, not by the person."
+    },
+    "ApprovalKind": {
+      "type": "string",
+      "enum": ["approve"]
+    },
+    "ApprovalEnvironment": {
+      "type": "string",
+      "enum": ["dev", "validation", "prod"]
+    },
+    "ApprovalDocument": {
+      "type": "object",
+      "properties": {
+        "identifier": {
+          "type": "object",
+          "properties": {
+            "system": {
+              "$ref": "#/$defs/CanonicalUri"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          "required": ["value"],
+          "additionalProperties": false
+        },
+        "emaBundleId": {
+          "$ref": "#/$defs/AddressableFhirId"
+        },
+        "language": {
+          "type": "string",
+          "pattern": "^[a-z]{2,3}(?:-[A-Z]{2})?$"
+        }
+      },
+      "required": ["identifier", "emaBundleId", "language"],
+      "additionalProperties": false
+    },
+    "CanonicalUri": {
+      "type": "string",
+      "maxLength": 256,
+      "pattern": "^(?:https?:\\/\\/[A-Za-z0-9.-]{1,253}(?:[/?#][A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]*)?|urn:[A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]+)$"
+    },
+    "AddressableFhirId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9\\-.]{0,63}$",
+      "description": "FHIR id that begins with a letter or digit, so a single URL path segment."
+    },
+    "Sha256Hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Lower-case hexadecimal SHA-256 digest."
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "ApprovedSection": {
+      "type": "object",
+      "properties": {
+        "sourceKey": {
+          "$ref": "#/$defs/SourceKey"
+        },
+        "narrativeDivSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        }
+      },
+      "required": ["sourceKey", "narrativeDivSha256"],
+      "additionalProperties": false
+    },
+    "SourceKey": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:\\.[a-z0-9]+)*$",
+      "description": "Canonical SmPC section identifier from the mapping manifest, e.g. smpc.4.2.posology."
+    },
+    "PrincipalId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+    },
+    "ApproverRole": {
+      "type": "string",
+      "enum": ["content-reviewer", "qa-reviewer"]
+    },
+    "ApprovalStatementMeaning": {
+      "type": "string",
+      "enum": ["record-represents-approved-label"]
+    },
+    "IsoDateTime": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$",
+      "description": "RFC 3339 timestamp with Z or a numeric offset."
+    },
+    "ImageDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

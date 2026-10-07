@@ -183,6 +183,11 @@ jobs:
           QUERY_TOKEN_CREATORS: ${{ vars.QUERY_TOKEN_CREATORS }}
           QUERY_ENTITLEMENTS_JSON: ${{ vars.QUERY_ENTITLEMENTS_JSON }}
           QUERY_OAUTH_CLIENT_IDS: ${{ vars.QUERY_OAUTH_CLIENT_IDS }}
+          APPROVERS_JSON: ${{ vars.APPROVERS_JSON }}
+          APPROVAL_ADDON_SERVICE_ACCOUNT: ${{ vars.APPROVAL_ADDON_SERVICE_ACCOUNT }}
+          APPROVAL_ADDON_OAUTH_CLIENT_ID: ${{ vars.APPROVAL_ADDON_OAUTH_CLIENT_ID }}
+          APPROVAL_ENFORCEMENT: ${{ vars.APPROVAL_ENFORCEMENT }}
+          QUERY_APPROVAL_VERIFICATION: ${{ vars.QUERY_APPROVAL_VERIFICATION }}
           ALERT_NOTIFICATION_EMAIL: ${{ vars.ALERT_NOTIFICATION_EMAIL }}
           ALERT_NOTIFICATION_CHANNELS: ${{ vars.ALERT_NOTIFICATION_CHANNELS }}
         shell: bash
@@ -216,7 +221,7 @@ jobs:
           # service is no invoker, no token creator on the caller service account, no
           # entitlement, and no accepted OAuth client id: the service deploys and its startup
           # probe passes, and no caller is authorised.
-          for name in QUERY_INVOKERS QUERY_TOKEN_CREATORS QUERY_ENTITLEMENTS_JSON QUERY_OAUTH_CLIENT_IDS; do
+          for name in QUERY_INVOKERS QUERY_TOKEN_CREATORS QUERY_ENTITLEMENTS_JSON QUERY_OAUTH_CLIENT_IDS APPROVERS_JSON APPROVAL_ADDON_SERVICE_ACCOUNT APPROVAL_ADDON_OAUTH_CLIENT_ID APPROVAL_ENFORCEMENT QUERY_APPROVAL_VERIFICATION; do
             if [[ -z "${!name:-}" ]]; then
               echo "Optional repository variable ${name} is not set; the Terraform default applies."
             else
@@ -306,7 +311,8 @@ jobs:
 
       # Repository variables, not secrets. QUERY_INVOKERS and QUERY_TOKEN_CREATORS hold IAM
       # member strings, the entitlement map holds opaque subject ids and FHIR bundle ids, and
-      # QUERY_OAUTH_CLIENT_IDS holds OAuth client ids: none of these is a credential, and
+      # QUERY_OAUTH_CLIENT_IDS and APPROVAL_ADDON_OAUTH_CLIENT_ID hold OAuth client ids, and
+      # APPROVERS_JSON approvers' subjects, roles and addresses: none of these is a credential, and
       # holding one proves nothing and grants nothing. Each query variable is optional; unset
       # leaves the Terraform default (no invoker, no token creator, no entitlement, no accepted
       # OAuth client id). The alert recipient is not, outside dev: the apply refuses to run
@@ -319,6 +325,11 @@ jobs:
           QUERY_TOKEN_CREATORS: ${{ vars.QUERY_TOKEN_CREATORS }}
           QUERY_ENTITLEMENTS_JSON: ${{ vars.QUERY_ENTITLEMENTS_JSON }}
           QUERY_OAUTH_CLIENT_IDS: ${{ vars.QUERY_OAUTH_CLIENT_IDS }}
+          APPROVERS_JSON: ${{ vars.APPROVERS_JSON }}
+          APPROVAL_ADDON_SERVICE_ACCOUNT: ${{ vars.APPROVAL_ADDON_SERVICE_ACCOUNT }}
+          APPROVAL_ADDON_OAUTH_CLIENT_ID: ${{ vars.APPROVAL_ADDON_OAUTH_CLIENT_ID }}
+          APPROVAL_ENFORCEMENT: ${{ vars.APPROVAL_ENFORCEMENT }}
+          QUERY_APPROVAL_VERIFICATION: ${{ vars.QUERY_APPROVAL_VERIFICATION }}
           ALERT_NOTIFICATION_EMAIL: ${{ env.EMA_FLOW_ENVIRONMENT != 'dev' && vars.ALERT_NOTIFICATION_EMAIL || '' }}
           ALERT_NOTIFICATION_CHANNELS: ${{ env.EMA_FLOW_ENVIRONMENT != 'dev' && vars.ALERT_NOTIFICATION_CHANNELS || '' }}
         run: bash scripts/gcp/deploy.sh apply 2>&1 | tee -a deploy-run.log

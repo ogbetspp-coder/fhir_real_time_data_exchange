@@ -9,7 +9,8 @@ import { sha256Utf8 } from "../lib/hash.js";
 // Healthcare API refused a write rather than, say, KMS refusing a signature — a distinction the
 // first failed run could not make, because every upstream refusal arrived as a bare `Error` and
 // the pipeline could only call it `unclassified`.
-export type HealthcareOperation = "read-source" | "read-target" | "validate" | "execute-bundle";
+export type HealthcareOperation =
+  "read-source" | "read-target" | "validate" | "execute-bundle" | "write-approval-link";
 
 // An OperationOutcome's `diagnostics` quotes the content that was rejected, so it is never
 // carried. `issue[].code` is a closed FHIR value set, and `details.text` is a machine code such
@@ -391,6 +392,25 @@ export class HealthcareApiClient {
       throw new Error("The target store answered a resource without a version id");
     }
     return { versionId };
+  }
+
+  // Creates a resource in the target store by its id, only if none exists by that id: the
+  // `If-None-Match: *` precondition of a FHIR update, which Google documents for fhir.update
+  // ("The conditional update interaction If-None-Match is supported, including the wildcard
+  // behaviour", read 2026-10-06). The versioned approval link (src/approval/link.ts) is written so:
+  // a link is never replaced.
+  public async createResource(resource: FhirResource, runId: string): Promise<FhirResource> {
+    const store = this.options.TARGET_FHIR_STORE_ID;
+    if (store === undefined) throw new Error("TARGET_FHIR_STORE_ID is required");
+    const id = resource.id;
+    if (id === undefined)
+      throw new Error("Every persisted resource requires an id for idempotent persistence");
+    const url = `${this.#storeBase(store)}/${encodeURIComponent(resource.resourceType)}/${encodeURIComponent(id)}`;
+    return this.#request<FhirResource>("write-approval-link", url, runId, {
+      method: "PUT",
+      headers: { "if-none-match": "*" },
+      body: JSON.stringify(resource),
+    });
   }
 
   public async validate(

@@ -38,10 +38,10 @@
     },
     {
       "name": "query-tools",
-      "version": "4.1.0",
-      "$id": "https://khs.dev/contracts/query-tools/4.1.0/schema.json",
+      "version": "5.0.0",
+      "$id": "https://khs.dev/contracts/query-tools/5.0.0/schema.json",
       "file": "query-tools.schema.json",
-      "sha256": "7586c361370e0fe65120f7ed08231a0a4e22103bbb16c608cf03d852ee0c3890"
+      "sha256": "8258ce3891cb6febfb977f3bc4e7adbc40504edbd40421e99382d4e9fac14162"
     },
     {
       "name": "agent-turn",
@@ -56,6 +56,20 @@
       "$id": "https://khs.dev/contracts/run-manifest/5.0.0/schema.json",
       "file": "run-manifest.schema.json",
       "sha256": "53d05a260c341e8285c4df68bef86507be38e19ab524f740660377f76ebfdcf5"
+    },
+    {
+      "name": "approval-statement",
+      "version": "1.0.0",
+      "$id": "https://khs.dev/contracts/approval-statement/1.0.0/schema.json",
+      "file": "approval-statement.schema.json",
+      "sha256": "ebcbc12f84d6c08683646ef1e5881a83ec5aa44df08b8d32aa3ce2a5febe5f71"
+    },
+    {
+      "name": "review-record",
+      "version": "1.0.0",
+      "$id": "https://khs.dev/contracts/review-record/1.0.0/schema.json",
+      "file": "review-record.schema.json",
+      "sha256": "4291f85c5c51cca2f40fde6336987bcf8e3ac2bda3c6a5c6483c1f258a3c8219"
     }
   ]
 }

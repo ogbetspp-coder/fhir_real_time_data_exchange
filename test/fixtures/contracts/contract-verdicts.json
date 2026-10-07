@@ -6678,6 +6678,1350 @@
       "variant": "upper-case",
       "value": "00000000-0000-4000-8000-0000000000AA",
       "accepted": true
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "AddressableFhirId",
+      "variant": "example",
+      "value": "synthetic-type2-smpc",
+      "accepted": true
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "AddressableFhirId",
+      "variant": "trailing-newline",
+      "value": "synthetic-type2-smpc\n",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "AddressableFhirId",
+      "variant": "trailing-crlf",
+      "value": "synthetic-type2-smpc\r\n",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "AddressableFhirId",
+      "variant": "leading-newline",
+      "value": "\nsynthetic-type2-smpc",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "AddressableFhirId",
+      "variant": "trailing-space",
+      "value": "synthetic-type2-smpc ",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "AddressableFhirId",
+      "variant": "trailing-line-separator",
+      "value": "synthetic-type2-smpc ",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "AddressableFhirId",
+      "variant": "trailing-latin-letter",
+      "value": "synthetic-type2-smpcé",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "AddressableFhirId",
+      "variant": "empty",
+      "value": "",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "AddressableFhirId",
+      "variant": "number",
+      "value": 1,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "AddressableFhirId",
+      "variant": "boolean",
+      "value": true,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "AddressableFhirId",
+      "variant": "null",
+      "value": null,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "AddressableFhirId",
+      "variant": "arabic-indic-digits",
+      "value": "synthetic-type٢-smpc",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "AddressableFhirId",
+      "variant": "fullwidth-digits",
+      "value": "synthetic-type２-smpc",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "AddressableFhirId",
+      "variant": "upper-case",
+      "value": "SYNTHETIC-TYPE2-SMPC",
+      "accepted": true
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "CanonicalUri",
+      "variant": "example",
+      "value": "https://khs.dev/fhir/identifier",
+      "accepted": true
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "CanonicalUri",
+      "variant": "trailing-newline",
+      "value": "https://khs.dev/fhir/identifier\n",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "CanonicalUri",
+      "variant": "trailing-crlf",
+      "value": "https://khs.dev/fhir/identifier\r\n",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "CanonicalUri",
+      "variant": "leading-newline",
+      "value": "\nhttps://khs.dev/fhir/identifier",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "CanonicalUri",
+      "variant": "trailing-space",
+      "value": "https://khs.dev/fhir/identifier ",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "CanonicalUri",
+      "variant": "trailing-line-separator",
+      "value": "https://khs.dev/fhir/identifier ",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "CanonicalUri",
+      "variant": "trailing-latin-letter",
+      "value": "https://khs.dev/fhir/identifieré",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "CanonicalUri",
+      "variant": "empty",
+      "value": "",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "CanonicalUri",
+      "variant": "number",
+      "value": 1,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "CanonicalUri",
+      "variant": "boolean",
+      "value": true,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "CanonicalUri",
+      "variant": "null",
+      "value": null,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "CanonicalUri",
+      "variant": "upper-case",
+      "value": "HTTPS://KHS.DEV/FHIR/IDENTIFIER",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "ImageDigest",
+      "variant": "example",
+      "value": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "accepted": true
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "ImageDigest",
+      "variant": "trailing-newline",
+      "value": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "ImageDigest",
+      "variant": "trailing-crlf",
+      "value": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\r\n",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "ImageDigest",
+      "variant": "leading-newline",
+      "value": "\nsha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "ImageDigest",
+      "variant": "trailing-space",
+      "value": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef ",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "ImageDigest",
+      "variant": "trailing-line-separator",
+      "value": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef ",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "ImageDigest",
+      "variant": "trailing-latin-letter",
+      "value": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdefé",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "ImageDigest",
+      "variant": "empty",
+      "value": "",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "ImageDigest",
+      "variant": "number",
+      "value": 1,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "ImageDigest",
+      "variant": "boolean",
+      "value": true,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "ImageDigest",
+      "variant": "null",
+      "value": null,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "ImageDigest",
+      "variant": "arabic-indic-digits",
+      "value": "sha٢٥٦:٠١٢٣٤٥٦٧٨٩abcdef٠١٢٣٤٥٦٧٨٩abcdef٠١٢٣٤٥٦٧٨٩abcdef٠١٢٣٤٥٦٧٨٩abcdef",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "ImageDigest",
+      "variant": "fullwidth-digits",
+      "value": "sha２５６:０１２３４５６７８９abcdef０１２３４５６７８９abcdef０１２３４５６７８９abcdef０１２３４５６７８９abcdef",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "ImageDigest",
+      "variant": "upper-case",
+      "value": "SHA256:0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "IsoDateTime",
+      "variant": "example",
+      "value": "2026-09-28T12:30:05.250+02:00",
+      "accepted": true
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "IsoDateTime",
+      "variant": "trailing-newline",
+      "value": "2026-09-28T12:30:05.250+02:00\n",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "IsoDateTime",
+      "variant": "trailing-crlf",
+      "value": "2026-09-28T12:30:05.250+02:00\r\n",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "IsoDateTime",
+      "variant": "leading-newline",
+      "value": "\n2026-09-28T12:30:05.250+02:00",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "IsoDateTime",
+      "variant": "trailing-space",
+      "value": "2026-09-28T12:30:05.250+02:00 ",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "IsoDateTime",
+      "variant": "trailing-line-separator",
+      "value": "2026-09-28T12:30:05.250+02:00 ",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "IsoDateTime",
+      "variant": "trailing-latin-letter",
+      "value": "2026-09-28T12:30:05.250+02:00é",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "IsoDateTime",
+      "variant": "empty",
+      "value": "",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "IsoDateTime",
+      "variant": "number",
+      "value": 1,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "IsoDateTime",
+      "variant": "boolean",
+      "value": true,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "IsoDateTime",
+      "variant": "null",
+      "value": null,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "IsoDateTime",
+      "variant": "arabic-indic-digits",
+      "value": "٢٠٢٦-٠٩-٢٨T١٢:٣٠:٠٥.٢٥٠+٠٢:٠٠",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "IsoDateTime",
+      "variant": "fullwidth-digits",
+      "value": "２０２６-０９-２８T１２:３０:０５.２５０+０２:００",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "IsoDateTime",
+      "variant": "lower-case",
+      "value": "2026-09-28t12:30:05.250+02:00",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "PrincipalId",
+      "variant": "example",
+      "value": "urn:reviewer:synthetic-01",
+      "accepted": true
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "PrincipalId",
+      "variant": "trailing-newline",
+      "value": "urn:reviewer:synthetic-01\n",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "PrincipalId",
+      "variant": "trailing-crlf",
+      "value": "urn:reviewer:synthetic-01\r\n",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "PrincipalId",
+      "variant": "leading-newline",
+      "value": "\nurn:reviewer:synthetic-01",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "PrincipalId",
+      "variant": "trailing-space",
+      "value": "urn:reviewer:synthetic-01 ",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "PrincipalId",
+      "variant": "trailing-line-separator",
+      "value": "urn:reviewer:synthetic-01 ",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "PrincipalId",
+      "variant": "trailing-latin-letter",
+      "value": "urn:reviewer:synthetic-01é",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "PrincipalId",
+      "variant": "empty",
+      "value": "",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "PrincipalId",
+      "variant": "number",
+      "value": 1,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "PrincipalId",
+      "variant": "boolean",
+      "value": true,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "PrincipalId",
+      "variant": "null",
+      "value": null,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "PrincipalId",
+      "variant": "arabic-indic-digits",
+      "value": "urn:reviewer:synthetic-٠١",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "PrincipalId",
+      "variant": "fullwidth-digits",
+      "value": "urn:reviewer:synthetic-０１",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "PrincipalId",
+      "variant": "upper-case",
+      "value": "URN:REVIEWER:SYNTHETIC-01",
+      "accepted": true
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Sha256Hex",
+      "variant": "example",
+      "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "accepted": true
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Sha256Hex",
+      "variant": "trailing-newline",
+      "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Sha256Hex",
+      "variant": "trailing-crlf",
+      "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\r\n",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Sha256Hex",
+      "variant": "leading-newline",
+      "value": "\n0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Sha256Hex",
+      "variant": "trailing-space",
+      "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef ",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Sha256Hex",
+      "variant": "trailing-line-separator",
+      "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef ",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Sha256Hex",
+      "variant": "trailing-latin-letter",
+      "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdefé",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Sha256Hex",
+      "variant": "empty",
+      "value": "",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Sha256Hex",
+      "variant": "number",
+      "value": 1,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Sha256Hex",
+      "variant": "boolean",
+      "value": true,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Sha256Hex",
+      "variant": "null",
+      "value": null,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Sha256Hex",
+      "variant": "arabic-indic-digits",
+      "value": "٠١٢٣٤٥٦٧٨٩abcdef٠١٢٣٤٥٦٧٨٩abcdef٠١٢٣٤٥٦٧٨٩abcdef٠١٢٣٤٥٦٧٨٩abcdef",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Sha256Hex",
+      "variant": "fullwidth-digits",
+      "value": "０１２３４５６７８９abcdef０１２３４５６７８９abcdef０１２３４５６７８９abcdef０１２３４５６７８９abcdef",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Sha256Hex",
+      "variant": "upper-case",
+      "value": "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "SourceKey",
+      "variant": "example",
+      "value": "smpc.4.2",
+      "accepted": true
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "SourceKey",
+      "variant": "trailing-newline",
+      "value": "smpc.4.2\n",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "SourceKey",
+      "variant": "trailing-crlf",
+      "value": "smpc.4.2\r\n",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "SourceKey",
+      "variant": "leading-newline",
+      "value": "\nsmpc.4.2",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "SourceKey",
+      "variant": "trailing-space",
+      "value": "smpc.4.2 ",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "SourceKey",
+      "variant": "trailing-line-separator",
+      "value": "smpc.4.2 ",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "SourceKey",
+      "variant": "trailing-latin-letter",
+      "value": "smpc.4.2é",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "SourceKey",
+      "variant": "empty",
+      "value": "",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "SourceKey",
+      "variant": "number",
+      "value": 1,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "SourceKey",
+      "variant": "boolean",
+      "value": true,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "SourceKey",
+      "variant": "null",
+      "value": null,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "SourceKey",
+      "variant": "arabic-indic-digits",
+      "value": "smpc.٤.٢",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "SourceKey",
+      "variant": "fullwidth-digits",
+      "value": "smpc.４.２",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "SourceKey",
+      "variant": "upper-case",
+      "value": "SMPC.4.2",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Uuid",
+      "variant": "example",
+      "value": "00000000-0000-4000-8000-0000000000aa",
+      "accepted": true
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Uuid",
+      "variant": "trailing-newline",
+      "value": "00000000-0000-4000-8000-0000000000aa\n",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Uuid",
+      "variant": "trailing-crlf",
+      "value": "00000000-0000-4000-8000-0000000000aa\r\n",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Uuid",
+      "variant": "leading-newline",
+      "value": "\n00000000-0000-4000-8000-0000000000aa",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Uuid",
+      "variant": "trailing-space",
+      "value": "00000000-0000-4000-8000-0000000000aa ",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Uuid",
+      "variant": "trailing-line-separator",
+      "value": "00000000-0000-4000-8000-0000000000aa ",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Uuid",
+      "variant": "trailing-latin-letter",
+      "value": "00000000-0000-4000-8000-0000000000aaé",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Uuid",
+      "variant": "empty",
+      "value": "",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Uuid",
+      "variant": "number",
+      "value": 1,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Uuid",
+      "variant": "boolean",
+      "value": true,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Uuid",
+      "variant": "null",
+      "value": null,
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Uuid",
+      "variant": "arabic-indic-digits",
+      "value": "٠٠٠٠٠٠٠٠-٠٠٠٠-٤٠٠٠-٨٠٠٠-٠٠٠٠٠٠٠٠٠٠aa",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Uuid",
+      "variant": "fullwidth-digits",
+      "value": "００００００００-００００-４０００-８０００-００００００００００aa",
+      "accepted": false
+    },
+    {
+      "contract": "approval-statement",
+      "definition": "Uuid",
+      "variant": "upper-case",
+      "value": "00000000-0000-4000-8000-0000000000AA",
+      "accepted": true
+    },
+    {
+      "contract": "review-record",
+      "definition": "AddressableFhirId",
+      "variant": "example",
+      "value": "synthetic-type2-smpc",
+      "accepted": true
+    },
+    {
+      "contract": "review-record",
+      "definition": "AddressableFhirId",
+      "variant": "trailing-newline",
+      "value": "synthetic-type2-smpc\n",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "AddressableFhirId",
+      "variant": "trailing-crlf",
+      "value": "synthetic-type2-smpc\r\n",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "AddressableFhirId",
+      "variant": "leading-newline",
+      "value": "\nsynthetic-type2-smpc",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "AddressableFhirId",
+      "variant": "trailing-space",
+      "value": "synthetic-type2-smpc ",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "AddressableFhirId",
+      "variant": "trailing-line-separator",
+      "value": "synthetic-type2-smpc ",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "AddressableFhirId",
+      "variant": "trailing-latin-letter",
+      "value": "synthetic-type2-smpcé",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "AddressableFhirId",
+      "variant": "empty",
+      "value": "",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "AddressableFhirId",
+      "variant": "number",
+      "value": 1,
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "AddressableFhirId",
+      "variant": "boolean",
+      "value": true,
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "AddressableFhirId",
+      "variant": "null",
+      "value": null,
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "AddressableFhirId",
+      "variant": "arabic-indic-digits",
+      "value": "synthetic-type٢-smpc",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "AddressableFhirId",
+      "variant": "fullwidth-digits",
+      "value": "synthetic-type２-smpc",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "AddressableFhirId",
+      "variant": "upper-case",
+      "value": "SYNTHETIC-TYPE2-SMPC",
+      "accepted": true
+    },
+    {
+      "contract": "review-record",
+      "definition": "CanonicalUri",
+      "variant": "example",
+      "value": "https://khs.dev/fhir/identifier",
+      "accepted": true
+    },
+    {
+      "contract": "review-record",
+      "definition": "CanonicalUri",
+      "variant": "trailing-newline",
+      "value": "https://khs.dev/fhir/identifier\n",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "CanonicalUri",
+      "variant": "trailing-crlf",
+      "value": "https://khs.dev/fhir/identifier\r\n",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "CanonicalUri",
+      "variant": "leading-newline",
+      "value": "\nhttps://khs.dev/fhir/identifier",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "CanonicalUri",
+      "variant": "trailing-space",
+      "value": "https://khs.dev/fhir/identifier ",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "CanonicalUri",
+      "variant": "trailing-line-separator",
+      "value": "https://khs.dev/fhir/identifier ",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "CanonicalUri",
+      "variant": "trailing-latin-letter",
+      "value": "https://khs.dev/fhir/identifieré",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "CanonicalUri",
+      "variant": "empty",
+      "value": "",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "CanonicalUri",
+      "variant": "number",
+      "value": 1,
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "CanonicalUri",
+      "variant": "boolean",
+      "value": true,
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "CanonicalUri",
+      "variant": "null",
+      "value": null,
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "CanonicalUri",
+      "variant": "upper-case",
+      "value": "HTTPS://KHS.DEV/FHIR/IDENTIFIER",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "NormalizationVersion",
+      "variant": "example",
+      "value": "fidelity-norm/3.3.0",
+      "accepted": true
+    },
+    {
+      "contract": "review-record",
+      "definition": "NormalizationVersion",
+      "variant": "trailing-newline",
+      "value": "fidelity-norm/3.3.0\n",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "NormalizationVersion",
+      "variant": "trailing-crlf",
+      "value": "fidelity-norm/3.3.0\r\n",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "NormalizationVersion",
+      "variant": "leading-newline",
+      "value": "\nfidelity-norm/3.3.0",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "NormalizationVersion",
+      "variant": "trailing-space",
+      "value": "fidelity-norm/3.3.0 ",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "NormalizationVersion",
+      "variant": "trailing-line-separator",
+      "value": "fidelity-norm/3.3.0 ",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "NormalizationVersion",
+      "variant": "trailing-latin-letter",
+      "value": "fidelity-norm/3.3.0é",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "NormalizationVersion",
+      "variant": "empty",
+      "value": "",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "NormalizationVersion",
+      "variant": "number",
+      "value": 1,
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "NormalizationVersion",
+      "variant": "boolean",
+      "value": true,
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "NormalizationVersion",
+      "variant": "null",
+      "value": null,
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "NormalizationVersion",
+      "variant": "arabic-indic-digits",
+      "value": "fidelity-norm/٣.٣.٠",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "NormalizationVersion",
+      "variant": "fullwidth-digits",
+      "value": "fidelity-norm/３.３.０",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "NormalizationVersion",
+      "variant": "upper-case",
+      "value": "FIDELITY-NORM/3.3.0",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Sha256Hex",
+      "variant": "example",
+      "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "accepted": true
+    },
+    {
+      "contract": "review-record",
+      "definition": "Sha256Hex",
+      "variant": "trailing-newline",
+      "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Sha256Hex",
+      "variant": "trailing-crlf",
+      "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\r\n",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Sha256Hex",
+      "variant": "leading-newline",
+      "value": "\n0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Sha256Hex",
+      "variant": "trailing-space",
+      "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef ",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Sha256Hex",
+      "variant": "trailing-line-separator",
+      "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef ",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Sha256Hex",
+      "variant": "trailing-latin-letter",
+      "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdefé",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Sha256Hex",
+      "variant": "empty",
+      "value": "",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Sha256Hex",
+      "variant": "number",
+      "value": 1,
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Sha256Hex",
+      "variant": "boolean",
+      "value": true,
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Sha256Hex",
+      "variant": "null",
+      "value": null,
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Sha256Hex",
+      "variant": "arabic-indic-digits",
+      "value": "٠١٢٣٤٥٦٧٨٩abcdef٠١٢٣٤٥٦٧٨٩abcdef٠١٢٣٤٥٦٧٨٩abcdef٠١٢٣٤٥٦٧٨٩abcdef",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Sha256Hex",
+      "variant": "fullwidth-digits",
+      "value": "０１２３４５６７８９abcdef０１２３４５６７８９abcdef０１２３４５６７８９abcdef０１２３４５６７８９abcdef",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Sha256Hex",
+      "variant": "upper-case",
+      "value": "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "SourceKey",
+      "variant": "example",
+      "value": "smpc.4.2",
+      "accepted": true
+    },
+    {
+      "contract": "review-record",
+      "definition": "SourceKey",
+      "variant": "trailing-newline",
+      "value": "smpc.4.2\n",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "SourceKey",
+      "variant": "trailing-crlf",
+      "value": "smpc.4.2\r\n",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "SourceKey",
+      "variant": "leading-newline",
+      "value": "\nsmpc.4.2",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "SourceKey",
+      "variant": "trailing-space",
+      "value": "smpc.4.2 ",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "SourceKey",
+      "variant": "trailing-line-separator",
+      "value": "smpc.4.2 ",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "SourceKey",
+      "variant": "trailing-latin-letter",
+      "value": "smpc.4.2é",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "SourceKey",
+      "variant": "empty",
+      "value": "",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "SourceKey",
+      "variant": "number",
+      "value": 1,
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "SourceKey",
+      "variant": "boolean",
+      "value": true,
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "SourceKey",
+      "variant": "null",
+      "value": null,
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "SourceKey",
+      "variant": "arabic-indic-digits",
+      "value": "smpc.٤.٢",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "SourceKey",
+      "variant": "fullwidth-digits",
+      "value": "smpc.４.２",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "SourceKey",
+      "variant": "upper-case",
+      "value": "SMPC.4.2",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Uuid",
+      "variant": "example",
+      "value": "00000000-0000-4000-8000-0000000000aa",
+      "accepted": true
+    },
+    {
+      "contract": "review-record",
+      "definition": "Uuid",
+      "variant": "trailing-newline",
+      "value": "00000000-0000-4000-8000-0000000000aa\n",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Uuid",
+      "variant": "trailing-crlf",
+      "value": "00000000-0000-4000-8000-0000000000aa\r\n",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Uuid",
+      "variant": "leading-newline",
+      "value": "\n00000000-0000-4000-8000-0000000000aa",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Uuid",
+      "variant": "trailing-space",
+      "value": "00000000-0000-4000-8000-0000000000aa ",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Uuid",
+      "variant": "trailing-line-separator",
+      "value": "00000000-0000-4000-8000-0000000000aa ",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Uuid",
+      "variant": "trailing-latin-letter",
+      "value": "00000000-0000-4000-8000-0000000000aaé",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Uuid",
+      "variant": "empty",
+      "value": "",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Uuid",
+      "variant": "number",
+      "value": 1,
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Uuid",
+      "variant": "boolean",
+      "value": true,
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Uuid",
+      "variant": "null",
+      "value": null,
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Uuid",
+      "variant": "arabic-indic-digits",
+      "value": "٠٠٠٠٠٠٠٠-٠٠٠٠-٤٠٠٠-٨٠٠٠-٠٠٠٠٠٠٠٠٠٠aa",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Uuid",
+      "variant": "fullwidth-digits",
+      "value": "００００００００-００００-４０００-８０００-００００００００００aa",
+      "accepted": false
+    },
+    {
+      "contract": "review-record",
+      "definition": "Uuid",
+      "variant": "upper-case",
+      "value": "00000000-0000-4000-8000-0000000000AA",
+      "accepted": true
     }
   ],
   "documents": [

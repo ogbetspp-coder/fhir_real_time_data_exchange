@@ -186,7 +186,7 @@ ema_flow_json_array() {
 
 # The full -var list the deploy applies with, built in one place so the pull-request plan
 # (phase_plan) and the apply cannot drift apart. Sets TF_DEPLOY_VARS.
-#   tf_deploy_vars <deployer account> <worker image> <validator image> <query image> <service version>
+#   tf_deploy_vars <deployer account> <worker image> <validator image> <query image> <service version> <signer image>
 tf_deploy_vars() {
   # Query service access configuration, supplied by the environment (GitHub Actions repository
   # variables, see .github/workflows/deploy.yml). Unset means the Terraform defaults: no
@@ -198,6 +198,9 @@ tf_deploy_vars() {
   query_token_creators_json="$(ema_flow_json_array "${QUERY_TOKEN_CREATORS:-}")"
   query_oauth_client_ids_json="$(ema_flow_json_array "${QUERY_OAUTH_CLIENT_IDS:-}")"
   query_entitlements_json="${QUERY_ENTITLEMENTS_JSON:-}"
+  # The approver map (docs/design/approval.md, D2), a JSON object; unset is none.
+  local approvers_json="${APPROVERS_JSON:-}"
+  if [[ -z "$approvers_json" ]]; then approvers_json='{}'; fi
   if [[ -z "$query_entitlements_json" ]]; then
     query_entitlements_json='{}'
   fi
@@ -252,6 +255,7 @@ tf_deploy_vars() {
     -var="worker_image=${2}"
     -var="validator_image=${3}"
     -var="query_image=${4}"
+    -var="signer_image=${6:-}"
     -var="query_invokers=${query_invokers_json}"
     -var="query_token_creators=${query_token_creators_json}"
     -var="query_oauth_client_ids=${query_oauth_client_ids_json}"
@@ -266,6 +270,16 @@ tf_deploy_vars() {
     # (docs/design/authority-import-contract.md, D7). Set by the environment's inputs file; unset
     # is the Terraform default, false.
     -var="allow_synthetic_sources=${ALLOW_SYNTHETIC_SOURCES:-false}"
+    # Signed approvals (docs/design/approval.md): the approver map, the Workspace add-on that may
+    # call the signer, whether the worker publishes a document only under its approval, and whether
+    # the query service verifies every answer. Repository variables; unset are the Terraform
+    # defaults: nobody approves, nothing calls the signer, and neither the worker nor the query
+    # service checks an approval.
+    -var="approvers=${approvers_json}"
+    -var="approval_addon_service_account=${APPROVAL_ADDON_SERVICE_ACCOUNT:-}"
+    -var="approval_addon_oauth_client_id=${APPROVAL_ADDON_OAUTH_CLIENT_ID:-}"
+    -var="approval_enforcement=${APPROVAL_ENFORCEMENT:-false}"
+    -var="query_approval_verification=${QUERY_APPROVAL_VERIFICATION:-false}"
   )
 }
 
@@ -474,6 +488,7 @@ import_unmanaged() {
     -var="worker_image=us-docker.pkg.dev/cloudrun/container/hello" \
     -var="validator_image=us-docker.pkg.dev/cloudrun/container/hello" \
     -var="query_image=us-docker.pkg.dev/cloudrun/container/hello" \
+    -var="signer_image=us-docker.pkg.dev/cloudrun/container/hello" \
     "$address" "$id"
 }
 
@@ -540,7 +555,8 @@ phase_apis() {
     "${tf_common_vars[@]}" \
     -var="worker_image=us-docker.pkg.dev/cloudrun/container/hello" \
     -var="validator_image=us-docker.pkg.dev/cloudrun/container/hello" \
-    -var="query_image=us-docker.pkg.dev/cloudrun/container/hello"
+    -var="query_image=us-docker.pkg.dev/cloudrun/container/hello" \
+    -var="signer_image=us-docker.pkg.dev/cloudrun/container/hello"
   terraform -chdir=infra apply -input=false "$REVIEWED_PLAN"
   rm -f "$REVIEWED_PLAN"
 }
@@ -775,12 +791,13 @@ export_effective_iam() {
   done < <(iam_evidence_list bigquery-dataset bigquery_evidence_request GET "${bq}/datasets?all=true&maxResults=1000" |
     python3 -c "import sys,json;[print(d['datasetReference']['datasetId']) for d in json.load(sys.stdin).get('datasets') or []]" 2>/dev/null || true)
 
-  # Who each identity is: the three service accounts infra/ declares, and the deployer this runs as.
+  # Who each identity is: the four service accounts infra/ declares, and the deployer this runs as.
   deployer="$(gcloud --quiet auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1 || true)"
   local identities=(
     "worker=ema-flow-worker-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"
     "query=ema-flow-query-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"
     "caller=ema-flow-caller-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"
+    "signer=ema-flow-signer-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"
   )
   if [[ "$deployer" == *.gserviceaccount.com ]]; then
     identities+=("deployer=${deployer}!")
@@ -988,6 +1005,7 @@ phase_apply() {
   WORKER_DIGEST="$(resolve_image_digest worker "$TAG")"
   VALIDATOR_DIGEST="$(resolve_image_digest validator "$TAG")"
   QUERY_DIGEST="$(resolve_image_digest query "$TAG")"
+  SIGNER_DIGEST="$(resolve_image_digest signer "$TAG")"
 
   # The account this deploy runs as, granted roles/run.invoker on the worker
   # (google_cloud_run_v2_service_iam_member.deployer_invoker in infra/run.tf) so phase_smoke can
@@ -1009,7 +1027,8 @@ phase_apply() {
     "${REPOSITORY}/worker@${WORKER_DIGEST}" \
     "${REPOSITORY}/validator@${VALIDATOR_DIGEST}" \
     "${REPOSITORY}/query@${QUERY_DIGEST}" \
-    "$SERVICE_VERSION"
+    "$SERVICE_VERSION" \
+    "${REPOSITORY}/signer@${SIGNER_DIGEST}"
 
   preflight_apply_permissions
   ensure_fhir_stores
@@ -1022,7 +1041,7 @@ phase_apply() {
     # src/lib/logger.ts, and only the five fields named in --format; the validator sidecar's
     # free-text console output is never copied into deploy logs.
     local service
-    for service in worker query; do
+    for service in worker query signer; do
       echo "--- ema-flow-${ENVIRONMENT}-${service} ---" >&2
       gcloud --quiet logging read \
         "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"ema-flow-${ENVIRONMENT}-${service}\" AND resource.labels.container_name=\"${service}\"" \
@@ -1070,11 +1089,19 @@ phase_plan() {
     python3 -c "import sys,json;c={x.get('name','x'):x['image'] for x in json.load(sys.stdin)['spec']['template']['spec']['containers']};print(c['worker'],c['validator'])")"
   live_version="$(gcloud --quiet run services describe "$query_service" --region="$REGION" --format=json |
     python3 -c "import sys,json;c=json.load(sys.stdin)['spec']['template']['spec']['containers'][0];print(next(e['value'] for e in c.get('env',[]) if e['name']=='QUERY_SERVICE_VERSION'))")"
-  local query_image
+  local query_image signer_image
   query_image="$(gcloud --quiet run services describe "$query_service" --region="$REGION" --format='value(spec.template.spec.containers[0].image)')"
+  # The signer's running image; until a deploy has created the signer, the query image stands in,
+  # by digest, so the plan shows the signer being created (it is never applied: the deploy builds
+  # and passes the signer's own image).
+  signer_image="$(gcloud --quiet run services describe "ema-flow-${ENVIRONMENT}-signer" --region="$REGION" --format='value(spec.template.spec.containers[0].image)' 2>/dev/null || true)"
+  if [[ -z "$signer_image" ]]; then
+    echo "::notice title=Signer not deployed yet::The plan shows the approval signer with the query image's digest in place of its own; the deploy builds and passes the signer's image."
+    signer_image="$query_image"
+  fi
 
   tf_deploy_vars "$DEPLOY_SERVICE_ACCOUNT" \
-    "${images% *}" "${images#* }" "$query_image" "$live_version"
+    "${images% *}" "${images#* }" "$query_image" "$live_version" "$signer_image"
 
   local code=0 plan_file plan_json="-"
   plan_file="$(mktemp)"
@@ -1241,7 +1268,7 @@ phase_smoke() {
     break
   done
 
-  # 0: persisted; 3: source disabled, skip; 1: anything else. Non-JSON bodies (Cloud Run's own
+  # 0: persisted; 3: source disabled, or refused under approval enforcement, skip; 1: anything else. Non-JSON bodies (Cloud Run's own
   # 401/403/404 pages) yield no fields, and no body text is ever printed.
   verdict=0
   python3 - "$http_code" "$body_file" <<'PY' || verdict=$?
@@ -1267,6 +1294,9 @@ if isinstance(validation, dict):
 print(f"HTTP {code}: {json.dumps(fields, sort_keys=True)}")
 if code == "422" and fields.get("error") == "source-disabled":
     print("::notice title=Smoke run skipped::the worker's run-source allowlist (enabled_run_sources) excludes fixture, so no fixture run was attempted; this is the allowlist working as configured.")
+    sys.exit(3)
+if code == "422" and fields.get("error") == "not-approved" and fields.get("reason") == "ungated-source":
+    print("::notice title=Smoke run skipped::approval enforcement is on (approval_enforcement), so no unsigned fixture run may persist (docs/design/approval.md); this is enforcement working as configured.")
     sys.exit(3)
 if code == "200" and fields.get("status") == "persisted":
     print(f"Smoke run persisted: runId={fields.get('runId')} targetBundleId={fields.get('targetBundleId')}")

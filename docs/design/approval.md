@@ -1,9 +1,12 @@
 # Approval: a named person signs, and only the text they approved answers
 
-_Roadmap item 2. Design, 2026-09-22. Nothing in this note is built. It was revised once after an
-independent adversarial review (validation, security and engineering lenses), amended on
-2026-09-25 for an authority import's request statement after that amendment's own reviews (roadmap
-3a's PR 3c design), and is reviewed again before any of it runs._
+_Roadmap item 2. Design, 2026-09-22. It was revised once after an independent adversarial review
+(validation, security and engineering lenses), amended on 2026-09-25 for an authority import's
+request statement after that amendment's own reviews (roadmap 3a's PR 3c design), and is reviewed
+again before any of it runs. Phase 1's build steps 2 to 5 are built (2026-10-06), with the pipeline's
+enforcement and the query service's verification both off until step 6; the amendment of 2026-10-06 records, as proposed, the
+mechanics they settle. Step 1 (the add-on, in the owner's Workspace console) and step 6 (the
+migration) are not done._
 
 ## What this is for
 
@@ -568,3 +571,210 @@ signer's egress to the authority and the wider surface of the process holding th
   and one of another environment, refused; a request from a List other than a current import's
   refused; append-only heads under retention, two racing statements refused; the query service
   verifying a request and its withheld set), before PR 5.
+
+## Amendment (2026-10-06, phase 1 as built; proposed for item 2's review)
+
+_Proposed. Build steps 2 to 5 of phase 1 are built: the statement, review and verifier libraries
+(`src/approval/`, `src/contracts/approval.ts`), the signer (`src/signer/`, `infra/signer.tf`), the
+pipeline's check and link (`src/pipeline.ts`) and the query service's verification
+(`src/query/tools.ts`), each with the tests named below. Where this note left a mechanic to item 2's
+own review, the simplest option that keeps the claim true was taken, and it is written here for that
+review to accept or change. Nothing here changes D1 to D9 or the 2026-09-25 amendment's eight
+requirements, except where it says so._
+
+**The approver (D2, step 1).** The signer is the add-on's HTTP endpoint itself, with no receiver in
+front of it: the click's parameters are not signed by Google's tokens, so nothing stands between them
+and the signer, and the image allowlist stays phase 2 (there is no receiver to put under it). Every
+event's two tokens are verified by the signer from the raw tokens (`src/signer/identity.ts`), as
+Google documents them for an add-on's HTTP endpoint ("Build a Google Workspace add-on using HTTP
+endpoints", read 2026-10-06): the system ID token from the `Authorization` header, whose audience is
+the endpoint URL and whose `email` is the add-on's service account; and `userIdToken`, whose audience
+is the add-on's OAuth client id, issued by Google, with a `sub` and a verified e-mail. The user token
+must have been issued at most 300 seconds earlier, and it is consumed once: the signer creates
+`tokens/<its SHA-256>` in the heads bucket, create-if-absent, before it signs, and refuses a token it
+finds there. Only the token's `sub` and verified e-mail are used: the `sub` is the approver, and the
+e-mail must equal the approver map's for that subject. The display name recorded with an approval
+(the manifestation's `name`) is the approver map's, set by the owner: a Google ID token carries
+`name` only with the profile scope, which the add-on does not ask for. Tested with locally generated keys and
+tokens (`test/signer/identity.test.ts`); not yet against the real add-on, which is step 1's spike.
+
+**The review (D6).** Built by the signer from the gated submission, the crosswalk's output and the
+document's current head (`src/approval/review.ts`): every published section with narrative, its
+heading and its `text.div` exactly as the crosswalk will publish it, and whether it is `added`,
+`changed` or `unchanged` since the head's statement, by the section's hash; sections the head
+approved that the record no longer carries are listed as removed. The diff is per section, never a
+diff alone: every section's full text is shown whatever changed. The record (`review-record` 1.0.0)
+is rendered into one HTML file whose policy lets nothing load or run, stored as
+`reviews/<SHA-256 of its bytes>` create-if-absent; the statement's `reviewSha256` is that hash, so it
+covers exactly what was shown. A review already stored under the name is hashed before it is used.
+The approver opens it through Cloud Storage's authenticated browser download, granted on `reviews/`
+only. The signer runs the gate, the source preflight, the crosswalk and the EMA preflight before it
+builds a review, and refuses an authority import's submission (`request` is not built). The signer
+rebuilds the review at the click against the head as it is then, so a review built against an older
+head no longer hashes the same and is `stale-review`. Besides the sections, the review shows the
+record's structured facts as the crosswalk will publish them (the product's name and identifiers,
+each authorisation's identifiers, the EU authorisation numbers among them, and the holders they name)
+and the published record's hash, which the statement signs (below).
+
+**The whole published record.** The statement signs `documentBundleSha256`: the SHA-256 of the
+canonical JSON of the EMA document Bundle the crosswalk will publish, leaving out only what the store
+assigns on every write, `meta.versionId` and `meta.lastUpdated` (and `meta` when nothing else is
+left in it). So the approval covers the narrative and the structure, as its meaning says: a stored
+version whose product name, identifier, holder or authorisation number differs from what was
+approved, with every narrative unchanged, is a different record. The pipeline requires the head's
+value to be its own crosswalk's (`other-record` otherwise), and the query service re-hashes the stored
+Bundle the same way on every answer and refuses a mismatch. Whether the Healthcare API returns a
+stored Bundle exactly as it was written, apart from those two values, has not been checked against
+the store; if it does not, every answer is `not-approved` (a false refusal, never a false approval),
+and the step-6 runbook checks it before verification is turned on.
+
+**The statement's sections.** Every published section with narrative, by its `sourceKey` and the
+SHA-256 of its `text.div`, in the mapping's order, from the crosswalk's output (which copies each
+narrative byte for byte). A record with a narrative section the mapping does not name cannot be
+described by a statement and is refused. The query service requires the stored Composition's set to
+equal the statement's exactly, so a missing, an extra or a changed section is `not-approved`.
+
+**Heads.** As the 2026-09-25 amendment proposes: the bucket `approval-heads` (no versioning,
+retention of `evidence_retention_days`, not locked), `docs/<SHA-256 of the document>/<twelve-digit
+sequence>`, each entry the signed statement's canonical JSON, written create-if-absent. A reader lists
+the prefix, refuses the whole listing if any name is not an entry of that document, takes the highest,
+verifies its signature, and requires its document and sequence to be the name's. It does not read the
+entry below: the signed `previousStatementSha256` was checked by the signer against the head it
+extended, and an entry cannot be replaced or deleted while it is retained. A Type 2 approval writes
+its head first and then its copy under `approvals/` (a failure of the copy is logged; the head is
+the approval).
+
+**The key.** `approval-signing-hsm`, `RSA_SIGN_PSS_3072_SHA256`, HSM. Cloud KMS's PSS salt is the
+digest's length, 32 bytes, as D3 asks. The signer signs the SHA-256 of the statement's canonical JSON
+and verifies its own signature with the key's public key before it writes the head. Every reader,
+the signer included, trusts exactly one key version, `kms_approval_key_version`, and no other version
+of this key or any other key (D4), and fetches its public key once per process: a new or compromised
+version is never trusted silently. Moving to a new version is a configuration change, after which
+statements signed by the old version are untrusted until approved again.
+
+**The pipeline (D5, flow step 6).** Enforcement is a setting, `APPROVAL_ENFORCEMENT`
+(`approval_enforcement`), off by default, so that merging this changes nothing the running system
+does: until step 6 a document run publishes as before, reads no head and writes no link. With it on,
+every persisted run publishes only under a verified head. A persisted `fixture` or `healthcare-api`
+run has no submission an approval can name, so it is refused before any read or write
+(`ungated-source`; the deploy's smoke run, a fixture run, then skips with a notice). A persisted
+`document` run reads its document's head (no change to the run request: the head is the one
+statement that may publish), verifies it, and requires its environment, document, submission,
+approved content, mapping, published record (`documentBundleSha256`) and sections to be the run's,
+before anything is validated, signed or written; anything else is refused with a closed code
+(`not-approved` at HTTP, 422). The approval settings are required whenever enforcement is on. A dry run persists nothing and is not
+checked. After the transaction commits, the run writes the link: `Provenance/<stableUuid(bundleId,
+versionId)>`, targeting `Bundle/<id>/_history/<vid>`, created with `If-None-Match: *` so a link is
+never replaced, carrying the head entry's bytes as its `signature.data` (`targetFormat` and
+`sigFormat` `application/json`; no `activity`, since the repository's code system has no code for it).
+A run that cannot link answers `committed-unlinked`, and the version is refused by the query service
+until it is linked. The statement never names the store's version or the transaction's precondition
+(`ifMatch`, docs/design/version-identity.md): D4 keeps store versions out of statements, and the
+precondition is covered by the worker's signed run manifest, which signs the transaction's hash.
+The run manifest does not yet name the statement; binding the two (a run manifest minor) is a
+proposed follow-up.
+
+**The query service (D9).** Verification is a setting, `APPROVAL_VERIFICATION`
+(`query_approval_verification`), off by default, so that merging this cannot turn the live
+demonstration documents `not-approved` before step 6. Step 6 turns it and the pipeline's
+`APPROVAL_ENFORCEMENT` on in one change. While both are off, a deploy creates the HSM key, the heads
+bucket and the signer, all inert: nothing calls the signer, and nothing reads the heads or the key. With it on: for the version it serves, the
+service reads the link by id, verifies the statement against the environment's key version,
+re-hashes the stored Bundle (`documentBundleSha256`) and every section, and reads the head (the link,
+the head's listing and its entry: three reads beyond the Bundle; `get_provenance` adds the ingestion
+Provenance by its deterministic id). The open question of
+a lookup from the head's statement to its stored version is settled by having none: a plain request
+answers the newest stored version only if its linked statement is the head, and is `not-approved`
+otherwise (fail closed; a version published after the head's, by an unsigned route, also makes the
+document `not-approved` until the head's content is published again). A named version whose valid
+statement a later head supersedes is answered and marked `superseded`, with `supersededBy`, only
+after the head entry at the statement's own sequence is read and found to be that statement (one
+more read): a validly signed statement that never became a head, one that lost a race, is not an
+approval.
+`find_product` lists only documents whose current version verifies, structure included, and its
+scan horizon is 50 documents (four reads each, half the request's budget). `get_provenance` names the
+statement's approver, never the ingestion Provenance's unverified attester. With it off, no answer
+carries `approval` and none is `not-approved`, so every answer is one `query-tools` 4.1.0 also
+accepts. What does change: the audit records say `contractVersion` 5.0.0; `tools/list` shows the
+optional `approval` in the `get_section` and `get_provenance` output schemas, and descriptions that
+state both modes; the published contract (not `tools/list`, which lists no error codes) carries
+`not-approved`.
+
+**What is not built here, and stays as stated.**
+
+- _`approval-statement` 1.0.0 has no `request` kind._ The 2026-09-25 amendment's "Versions" bullet
+  asks that 1.0.0 include it. Its review is built from the renderer gate's attested record, whose
+  signed layout record (3c C3 to C5) was dropped, so its shape cannot be defined now without guessing.
+  So `request` arrives as `approval-statement` 2.0.0, with roadmap 3a's PR 5. This departs from that
+  bullet and needs the owner's decision.
+- _`CanonicalSubmission`'s major (the contract table: `approval` removed)._ It changes the authority
+  import's contract and its importer (where the publication's approval moves into the source record)
+  and roadmap 3a's majors with it, so it is its own change. Until then a submission keeps its
+  placeholder `approval`, which no longer decides publication, and the ingestion Provenance still
+  records it as the attester: a stated residual, which the query service does not answer with once
+  verification is on.
+- _The worker's evidence write condition_ (excluding `approvals/` and `reviews/`, moved to phase 1 by
+  the 2026-09-25 amendment). Conditioning the live binding replaces it, which the plan check refuses
+  without the owner's `allow-replace`. Until then the worker could create objects under those
+  prefixes: a denial, not a forgery, since no reader trusts them without checking (the pipeline and
+  the query service read the heads bucket, which the worker cannot write, and the signer hashes a
+  stored review before using it).
+- Phase 2 as designed: segregation of duties (D7; in `dev` one person prepares and approves, a known
+  gap), `reject` and `withdraw`, the image allowlist and Binary Authorization on the signer, paging on
+  the key's IAM changes beyond the existing key alert, Eventarc, and re-authentication (option C).
+
+**What the owner creates for step 1.** In the Google Cloud console of the environment's project
+(the Google Chat API is enabled by the next deploy: it is in `infra/main.tf`'s API list; enable any
+other API the console asks for, and add it to that list in the same change): in the Chat API's
+configuration, build
+the app as a Workspace add-on, with an HTTP endpoint URL equal to Terraform's `signer_service_url`
+(one URL for all triggers), visible only to the approvers; add the
+`https://www.googleapis.com/auth/userinfo.email` scope (the only one the signer needs: it reads the
+token's subject and verified e-mail); copy the add-on's service account e-mail (shown under the Chat
+API configuration's connection settings, and in the Google Workspace Marketplace SDK's HTTP
+Deployments tab, Authorization Resource) into the repository variable
+`APPROVAL_ADDON_SERVICE_ACCOUNT`, and its OAuth client id (that tab's Authorization Resource, OAuth
+Client Id; whether a Chat-configured add-on has one there is for the spike to confirm) into
+`APPROVAL_ADDON_OAUTH_CLIENT_ID`; set `APPROVERS_JSON` to each approver's Google subject, role,
+display name (recorded with each of their approvals) and lower-case e-mail. The next deploy grants the add-on's account `run.invoker` on the signer, and each
+approver read on `reviews/`. The spike then records a click reaching the signer with both tokens
+verified, their audiences and issue times, whether Google mints a fresh user token per event (the
+300-second window and the consumed-token rule depend on it), and what the data-access log records of
+a review opened from the card's link.
+
+**Step 6 runbook.** Step 6 turns `APPROVAL_ENFORCEMENT` and `APPROVAL_VERIFICATION` on in one
+change, in this order: approve each demonstration submission through the signer; turn enforcement
+on, deploy, and publish each approved submission with a hand-started run; redeploy the agent from
+`main` (it reads `query-tools` 5.0.0); turn verification on and deploy. Before verification goes on,
+read one published version back from the store and check that its `documentBundleSha256` matches its
+statement (the Healthcare API may not return the Bundle exactly as written; if not, every answer is
+`not-approved`, and verification stays off until the hash's rule is corrected). Three things to know
+while it runs, and after:
+
+- Signing a new head for a document makes its plain requests `not-approved` until the run that
+  publishes the new head's submission has committed and linked its version: approve and publish
+  together.
+- One malformed object under a document's `docs/<key>/` (a name that is not a twelve-digit sequence,
+  or bytes that are not a statement that verifies there) makes that document `not-approved`, and
+  blocks its next approval, for the bucket's retention period: retention forbids deleting it, and a
+  reader never steps over it. Of the services only the signer can write there; an identity with
+  write access to the bucket outside Terraform (the deployer, an administrator) could too.
+- Until the worker's evidence-write condition lands (phase 2), the worker can create an object under
+  `reviews/<hash>` before the signer does. The signer hashes a stored review before it shows or signs
+  it, so such an object makes that review `review-object-differs` (a denial), never a different text
+  signed.
+
+**Tests.** Step 2: `test/approval/statement.test.ts` (another key, other content, another document, a
+replayed old head, a stale review hash, an unmapped subject, a wrong environment, and the head's and
+review's rules). Step 3: `test/signer/*.test.ts` (a signed statement and its review file stored; a
+racing second approval refused; a reused token; an unverifiable signature writes no head),
+`test/infra/signer-identity.test.ts`, `test/approval-store.test.ts`. Step 4: `test/persisted-run.test.ts`
+("a persisted document run's approval": an unsigned submission refused before anything is written;
+the same content signed, published and linked). Step 5: `test/query/approval.test.ts`
+(`not-approved` for an unapproved document; an approved version answering with the approver's name;
+a superseded version marked; a tampered section refused; the stored record's structure changed, every
+narrative kept, refused; a named version whose statement never became its sequence's head refused).
+The security review of #191 (2026-10-06) added: the whole published record in the statement, the
+ungated sources refused under enforcement, the name from the approver map, the superseded head
+check and one trusted key version, each with a test that fails without it. None of this has run
+against Google Cloud.

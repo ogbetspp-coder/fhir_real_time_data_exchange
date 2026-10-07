@@ -7,6 +7,8 @@ import { FAILURE_REASONS, pipelineFailure } from "../src/app.js";
 import { OfficialValidatorError } from "../src/fhir/official-validator.js";
 import { TransformationError } from "../src/fhir/transform.js";
 import { HealthcareApiError } from "../src/gcp/healthcare.js";
+import { ApprovalRefusedError } from "../src/approval/statement.js";
+import { ApprovalStoreError } from "../src/gcp/approval-store.js";
 
 // The run API answers a failure with a closed reason code, keyed by the exact message this
 // service threw. A message with no entry answered `unclassified`, which is how a crosswalk
@@ -43,6 +45,17 @@ describe("the run API's failure reasons", () => {
       expect(literal, `${at} throws something other than a string literal`).toBeDefined();
       expect(FAILURE_REASONS[literal ?? ""], `${at}: ${literal ?? ""}`).toBeDefined();
     }
+  });
+
+  it("answers a refused approval not-approved, and a failed approval store as such", () => {
+    expect(pipelineFailure(new ApprovalRefusedError("no-head"))).toEqual({
+      reason: "not-approved",
+      status: 422,
+    });
+    expect(pipelineFailure(new ApprovalStoreError("Cloud Storage refused a read", 403))).toEqual({
+      reason: "approval-store-refused",
+      status: 500,
+    });
   });
 
   it("classifies the typed errors by type, and answers the caller's faults with 4xx", () => {

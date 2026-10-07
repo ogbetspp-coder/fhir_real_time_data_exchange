@@ -216,6 +216,7 @@ describe("the deploy's effective-IAM evidence", { timeout: 60_000 }, () => {
       "effective-iam-caller.json",
       "effective-iam-deployer.json",
       "effective-iam-query.json",
+      "effective-iam-signer.json",
       "effective-iam-worker.json",
     ]);
     expect(JSON.stringify(reports)).not.toContain("someone@company.eu");

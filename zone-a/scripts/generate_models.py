@@ -39,8 +39,10 @@ SCHEMAS = ROOT.parent / "contracts" / "generated"
 OUTPUT = ROOT / "src" / "zone_a" / "contracts"
 
 # The contracts Zone A neither writes nor reads: the query service's tool surface and the agent's
-# turn record, whose readers are the agent (its vendored copies) and people.
-NOT_ZONE_A = frozenset({"agent-turn", "query-tools"})
+# turn record, whose readers are the agent (its vendored copies) and people; and the approval
+# statement and review record, which the signer writes and Zone B and people read
+# (docs/design/approval.md).
+NOT_ZONE_A = frozenset({"agent-turn", "approval-statement", "query-tools", "review-record"})
 
 
 def zone_a_contracts() -> list[str]:

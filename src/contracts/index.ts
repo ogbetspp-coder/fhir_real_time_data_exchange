@@ -1,4 +1,10 @@
 import { AGENT_TURN_VERSION, AgentTurnRecordSchema } from "./agent-turn.js";
+import {
+  APPROVAL_STATEMENT_VERSION,
+  REVIEW_RECORD_VERSION,
+  ReviewRecordSchema,
+  SignedApprovalStatementSchema,
+} from "./approval.js";
 import { CANONICAL_SUBMISSION_VERSION, CanonicalSubmissionSchema } from "./canonical-submission.js";
 import {
   FIDELITY_REPORT_VERSION,
@@ -35,11 +41,18 @@ export const CONTRACTS: readonly ContractDefinition[] = [
   { name: "query-tools", version: QUERY_TOOLS_VERSION, schema: QueryToolsSchema },
   { name: "agent-turn", version: AGENT_TURN_VERSION, schema: AgentTurnRecordSchema },
   { name: "run-manifest", version: RUN_MANIFEST_VERSION, schema: RunManifestSchema },
+  {
+    name: "approval-statement",
+    version: APPROVAL_STATEMENT_VERSION,
+    schema: SignedApprovalStatementSchema,
+  },
+  { name: "review-record", version: REVIEW_RECORD_VERSION, schema: ReviewRecordSchema },
 ];
 
 export { contractId, type ContractDefinition } from "./json-schema.js";
 
 export * from "./agent-turn.js";
+export * from "./approval.js";
 export * from "./canonical-submission.js";
 export * from "./common.js";
 export * from "./fidelity-report.js";

@@ -1257,12 +1257,31 @@ describe("ePI query service, phase 1", () => {
       type: "google_healthcare_dataset_iam_member",
       role: "roles/healthcare.fhirResourceReader",
     });
-    expect(serviceAccountRoles(terraform, "query")).toHaveLength(3);
+    expect(serviceAccountRoles(terraform, "query")).toHaveLength(5);
     const roles = serviceAccountRoles(withoutResources(terraform, TRANSITIONAL_GRANTS), "query");
     expect(new Set(roles.map(({ role }) => role))).toEqual(
-      new Set(["roles/healthcare.fhirResourceReader", "roles/logging.logWriter"]),
+      new Set([
+        "roles/healthcare.fhirResourceReader",
+        "roles/logging.logWriter",
+        "roles/storage.objectViewer",
+        "roles/cloudkms.publicKeyViewer",
+      ]),
     );
-    expect(roles).toHaveLength(2);
+    expect(roles).toHaveLength(4);
+
+    // Signed approvals (docs/design/approval.md, D9): read on the approval heads bucket and the
+    // approval key's public keys, each bound on that one resource, and nothing that signs or writes.
+    const heads = roles.find(({ role }) => role === "roles/storage.objectViewer");
+    expect(heads?.type).toBe("google_storage_bucket_iam_member");
+    expect(
+      blocks.find(({ type, name }) => type === heads?.type && name === "query_heads_reader")?.body,
+    ).toMatch(/bucket\s*=\s*google_storage_bucket\.approval_heads\.name\n/);
+    const keys = roles.find(({ role }) => role === "roles/cloudkms.publicKeyViewer");
+    expect(keys?.type).toBe("google_kms_crypto_key_iam_member");
+    expect(
+      blocks.find(({ type, name }) => type === keys?.type && name === "query_approval_public_key")
+        ?.body,
+    ).toMatch(/crypto_key_id\s*=\s*google_kms_crypto_key\.approval_signing_hsm\.id\n/);
 
     const reader = roles.find(({ role }) => role === "roles/healthcare.fhirResourceReader");
     const writer = roles.find(({ role }) => role === "roles/logging.logWriter");

@@ -13,6 +13,23 @@ import type { SignedManifest } from "../src/gcp/evidence.js";
 import type { PersistTransaction } from "../src/gcp/healthcare.js";
 import { sha256 } from "../src/lib/hash.js";
 import { officialValidationTargets, runPipeline } from "../src/pipeline.js";
+import { approvalLinkProvenance } from "../src/approval/link.js";
+import {
+  ApprovalRefusedError,
+  signedStatementBytes,
+  statementSha256,
+} from "../src/approval/statement.js";
+import type { SignedApprovalStatement } from "../src/contracts/index.js";
+import {
+  MemoryHeads,
+  approvableRecord,
+  approvalKeys,
+  otherKeys,
+  signStatement,
+  statementFor,
+  trustedKeys,
+  KEY_VERSION,
+} from "./support/approval.js";
 
 // A persisted run (DRY_RUN=false) with every Google client and both validators replaced, so what
 // is asserted is the pipeline's own behaviour: that each validation gate stops the run before any
@@ -36,6 +53,9 @@ const state = vi.hoisted(() => ({
   // The version of the document Bundle the target store holds before the run writes it; none
   // when undefined.
   stored: undefined as { versionId: string } | undefined,
+  failLink: false,
+  // The versioned approval links the run created in the target store, if-none-match.
+  linked: [] as FhirResource[],
   objects: new Map<string, unknown>(),
   executed: [] as unknown[],
   // What each validator was asked: the resource and its profiles, in order.
@@ -90,6 +110,12 @@ vi.mock("../src/gcp/healthcare.js", async (importOriginal) => ({
     public readStoredVersion(): Promise<{ versionId: string } | "absent"> {
       state.events.push({ kind: "read-stored" });
       return Promise.resolve(state.stored ?? "absent");
+    }
+    public createResource(resource: FhirResource): Promise<FhirResource> {
+      state.events.push({ kind: "link" });
+      if (state.failLink) return Promise.reject(new Error("Healthcare API request timed out"));
+      state.linked.push(resource);
+      return Promise.resolve(resource);
     }
     public executeTransaction(transaction: PersistTransaction): Promise<unknown> {
       state.events.push({ kind: "execute" });
@@ -164,6 +190,20 @@ vi.mock("@google-cloud/lineage", () => ({
 
 const RUN_ID = "88888888-8888-4888-a888-888888888888";
 
+// The heads bucket with the default synthetic submission's signed statement as its document's head.
+function approvedHeads(
+  overrides: Parameters<typeof statementFor>[1] = {},
+  privateKey = approvalKeys().privateKey,
+): { heads: MemoryHeads; keys: typeof trustedKeys; signed: SignedApprovalStatement } {
+  const heads = new MemoryHeads();
+  const signed = signStatement(
+    statementFor(approvableRecord(mapping).facts, overrides),
+    privateKey,
+  );
+  heads.append(signed);
+  return { heads, keys: trustedKeys, signed };
+}
+
 let mapping: EmaMapping;
 let config: AppConfig;
 
@@ -198,6 +238,8 @@ beforeEach(() => {
   state.failLedger = false;
   state.failLineage = false;
   state.stored = undefined;
+  state.failLink = false;
+  state.linked.length = 0;
   state.objects.clear();
   state.executed.length = 0;
   state.official.length = 0;
@@ -467,5 +509,295 @@ describe("a persisted run's commit order", () => {
     expect(await response.json()).toMatchObject({ status: "persisted" });
     expect(kinds()).toContain("ledger");
     expect(kinds()).not.toContain("write:lineage-resources");
+  });
+});
+
+// Build step 4 of docs/design/approval.md: the pipeline publishes a document only under its
+// verified head statement, then links the stored version to it (D5). Evidence asked for: an
+// unsigned submission refused; the same content signed, published, with its versioned Provenance.
+describe("a persisted document run's approval", () => {
+  const APPROVAL_SIGNING_KEY_VERSION = KEY_VERSION;
+  // The deployment with APPROVAL_ENFORCEMENT on, as the design's step 6 sets it.
+  const enforcing = (): AppConfig => ({
+    ...config,
+    APPROVAL_ENFORCEMENT: true,
+    APPROVAL_ENVIRONMENT: "dev",
+    APPROVAL_HEADS_BUCKET: "approval-heads",
+    APPROVAL_SIGNING_KEY_VERSION,
+  });
+
+  function documentRun(
+    approvals: ReturnType<typeof approvedHeads> | { heads: MemoryHeads; keys: typeof trustedKeys },
+  ) {
+    const { submission, fidelityReport, sourceText } = createSyntheticSubmission(mapping);
+    return runPipeline(
+      {
+        runId: crypto.randomUUID(),
+        sourceKind: "document",
+        submission,
+        fidelityReport,
+        sourceText,
+        sourceResource: `document:${"0".repeat(64)}`,
+      },
+      mapping,
+      enforcing(),
+      { approvals },
+    );
+  }
+
+  // Off, the default until step 6: a document run publishes as before, reads no head and writes
+  // no link, whatever the heads bucket holds.
+  it("publishes as before and links nothing while APPROVAL_ENFORCEMENT is off", async () => {
+    const { submission, fidelityReport, sourceText } = createSyntheticSubmission(mapping);
+    const heads = new MemoryHeads();
+    const result = await runPipeline(
+      {
+        runId: crypto.randomUUID(),
+        sourceKind: "document",
+        submission,
+        fidelityReport,
+        sourceText,
+        sourceResource: `document:${"0".repeat(64)}`,
+      },
+      mapping,
+      config,
+      { approvals: { heads, keys: trustedKeys } },
+    );
+    expect(config.APPROVAL_ENFORCEMENT).toBe(false);
+    expect(result.status).toBe("persisted");
+    expect(state.linked).toEqual([]);
+    expect(kinds()).not.toContain("link");
+    expect(state.objects.has("approval-link")).toBe(false);
+  });
+
+  it("is off unless set, and on needs its environment, heads bucket and key version", () => {
+    const environment = {
+      NODE_ENV: "test",
+      DRY_RUN: "false",
+      GOOGLE_CLOUD_PROJECT: "synthetic-project",
+      HEALTHCARE_DATASET_ID: "dataset",
+      SOURCE_FHIR_STORE_ID: "source",
+      TARGET_FHIR_STORE_ID: "target",
+      EVIDENCE_BUCKET: "evidence",
+      FHIR_VALIDATOR_URL: "http://validator.invalid",
+      FHIR_ANALYTICS_DATASET: "analytics",
+      KMS_MANIFEST_KEY:
+        "projects/p/locations/europe-west4/keyRings/evidence/cryptoKeys/manifest-signing/cryptoKeyVersions/1",
+      TRANSFORMATION_LEDGER_DATASET: "ledger",
+    };
+    expect(loadConfig(environment).APPROVAL_ENFORCEMENT).toBe(false);
+    for (const key of [
+      "APPROVAL_ENVIRONMENT",
+      "APPROVAL_HEADS_BUCKET",
+      "APPROVAL_SIGNING_KEY_VERSION",
+    ]) {
+      expect(() => loadConfig({ ...environment, APPROVAL_ENFORCEMENT: "on" })).toThrow(
+        `${key} is required when DRY_RUN=false`,
+      );
+    }
+    const on = {
+      ...environment,
+      APPROVAL_ENFORCEMENT: "on",
+      APPROVAL_ENVIRONMENT: "dev",
+      APPROVAL_HEADS_BUCKET: "approval-heads",
+      APPROVAL_SIGNING_KEY_VERSION,
+    };
+    expect(loadConfig(on).APPROVAL_ENFORCEMENT).toBe(true);
+    // Whichever sources the deployment runs: with enforcement on, every persisted run is checked.
+    expect(() =>
+      loadConfig({
+        ...environment,
+        APPROVAL_ENFORCEMENT: "on",
+        ALLOW_SYNTHETIC_SOURCES: "true",
+        ENABLED_RUN_SOURCES: "fixture",
+      }),
+    ).toThrow("APPROVAL_HEADS_BUCKET is required when DRY_RUN=false");
+    // One key version is trusted, never a whole key.
+    expect(() =>
+      loadConfig({
+        ...on,
+        APPROVAL_SIGNING_KEY_VERSION: APPROVAL_SIGNING_KEY_VERSION.split("/cryptoKeyVersions/")[0],
+      }),
+    ).toThrow(/must name a crypto key version/);
+  });
+
+  // An ungated source has no submission an approval can name: with enforcement on it persists
+  // nothing, refused before any read or write.
+  it.each(["fixture", "healthcare-api"] as const)(
+    "refuses a persisted %s run while APPROVAL_ENFORCEMENT is on",
+    async (sourceKind) => {
+      await expect(
+        runPipeline(
+          sourceKind === "fixture"
+            ? {
+                runId: crypto.randomUUID(),
+                sourceKind,
+                source: createSyntheticType2Bundle(mapping),
+                sourceResource: "fixture",
+              }
+            : {
+                runId: crypto.randomUUID(),
+                sourceKind,
+                source: createSyntheticType2Bundle(mapping),
+                sourceResource: "Bundle/b",
+              },
+          mapping,
+          enforcing(),
+        ),
+      ).rejects.toEqual(new ApprovalRefusedError("ungated-source"));
+      expect(kinds()).toEqual([]);
+      expect(state.executed).toEqual([]);
+    },
+  );
+
+  it("answers a refused fixture run not-approved over HTTP, writing nothing", async () => {
+    const response = await createApp({ config: enforcing() }).request("/v1/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ source: "fixture", runId: crypto.randomUUID() }),
+    });
+    expect([response.status, await response.json()]).toEqual([
+      422,
+      { error: "not-approved", reason: "ungated-source" },
+    ]);
+    expect(state.executed).toEqual([]);
+  });
+
+  it("refuses a head that approved another published record", async () => {
+    await expect(
+      documentRun(approvedHeads({ documentBundleSha256: "9".repeat(64) })),
+    ).rejects.toEqual(new ApprovalRefusedError("other-record"));
+    expect(state.executed).toEqual([]);
+  });
+
+  it("publishes under the signed head, then links the version the transaction wrote", async () => {
+    const approvals = approvedHeads();
+    const result = await documentRun(approvals);
+    expect(result.status).toBe("persisted");
+    const link = approvalLinkProvenance(result.emaBundle.id ?? "", VERSION, approvals.signed);
+    expect(state.linked).toEqual([link]);
+    // The link carries the head entry's bytes exactly.
+    const data = (link.signature as { data: string }[])[0]?.data ?? "";
+    expect(Buffer.from(data, "base64").toString("utf8")).toBe(
+      signedStatementBytes(approvals.signed),
+    );
+    expect(state.objects.get("approval-link")).toEqual({
+      statementSha256: statementSha256(approvals.signed.statement),
+      sequence: 1,
+      provenanceId: link.id,
+      targetBundle: { id: result.emaBundle.id, versionId: VERSION },
+    });
+    // After the transaction and its record, never before.
+    const order = sideEffects();
+    expect(order.indexOf("link")).toBeGreaterThan(order.indexOf("ledger"));
+  });
+
+  it("refuses a document run in a deployment that cannot verify its approval", async () => {
+    const { submission, fidelityReport, sourceText } = createSyntheticSubmission(mapping);
+    await expect(
+      runPipeline(
+        {
+          runId: crypto.randomUUID(),
+          sourceKind: "document",
+          submission,
+          fidelityReport,
+          sourceText,
+          sourceResource: `document:${"0".repeat(64)}`,
+        },
+        mapping,
+        { ...enforcing(), APPROVAL_HEADS_BUCKET: undefined },
+      ),
+    ).rejects.toThrow("Approval verification is not configured");
+    expect(kinds()).toEqual([]);
+  });
+
+  it("refuses an unsigned submission before anything is validated, signed or written", async () => {
+    await expect(documentRun({ heads: new MemoryHeads(), keys: trustedKeys })).rejects.toEqual(
+      new ApprovalRefusedError("no-head"),
+    );
+    expect(kinds()).toEqual([]);
+    expect(state.executed).toEqual([]);
+  });
+
+  it.each([
+    ["another key signed the head", {}, otherKeys().privateKey, "bad-signature"],
+    [
+      "the head is another environment's",
+      { environment: "validation" as const },
+      undefined,
+      "wrong-environment",
+    ],
+    [
+      "the head approved other content",
+      { approvedContentSha256: "e".repeat(64) },
+      undefined,
+      "not-head",
+    ],
+    [
+      "the head names other sections",
+      { sections: [{ sourceKey: "smpc.1.name", narrativeDivSha256: "f".repeat(64) }] },
+      undefined,
+      "section-mismatch",
+    ],
+    [
+      "the head names another mapping",
+      { mappingVersion: "cap-smpc-en#0.0.1" },
+      undefined,
+      "other-mapping",
+    ],
+  ])("refuses when %s", async (_case, overrides, key, reason) => {
+    await expect(documentRun(approvedHeads(overrides, key))).rejects.toEqual(
+      new ApprovalRefusedError(reason as never),
+    );
+    expect(state.executed).toEqual([]);
+  });
+
+  // A replayed old head: the submission was approved once, and a later approval is now the head.
+  it("refuses a submission whose approval a later one superseded", async () => {
+    const approvals = approvedHeads();
+    approvals.heads.append(
+      signStatement(
+        statementFor(approvableRecord(mapping).facts, {
+          sequence: 2,
+          previousStatementSha256: statementSha256(approvals.signed.statement),
+          submissionId: "00000000-0000-4000-8000-0000000000aa",
+          approvedContentSha256: "a".repeat(64),
+        }),
+      ),
+    );
+    await expect(documentRun(approvals)).rejects.toEqual(new ApprovalRefusedError("not-head"));
+    expect(state.executed).toEqual([]);
+  });
+
+  it("answers not-approved over HTTP, with the closed reason, and writes nothing", async () => {
+    const parts = createSyntheticSubmission(mapping);
+    const app = createApp({
+      config: enforcing(),
+      submissionReader: { read: () => Promise.resolve(parts) },
+      approvals: { heads: new MemoryHeads(), keys: trustedKeys },
+    });
+    const response = await app.request("/v1/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        source: "document",
+        runId: crypto.randomUUID(),
+        submissionRef: { uri: "gs://submissions/s.json", sha256: "0".repeat(64) },
+      }),
+    });
+    expect([response.status, await response.json()]).toEqual([
+      422,
+      { error: "not-approved", reason: "no-head" },
+    ]);
+    expect(state.executed).toEqual([]);
+  });
+
+  it("answers committed-unlinked when the version cannot be linked", async () => {
+    state.failLink = true;
+    await expect(documentRun(approvedHeads())).rejects.toThrow(
+      "The run committed but its approval could not be linked",
+    );
+    expect(state.executed).toHaveLength(1);
+    expect(state.objects.has("approval-link")).toBe(false);
   });
 });

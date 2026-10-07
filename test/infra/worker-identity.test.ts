@@ -62,9 +62,27 @@ describe("the worker identity once the transitional grants are removed", () => {
         },
         { type: "google_project_iam_member", role: "roles/datalineage.editor" },
         { type: "google_project_iam_member", role: "roles/logging.logWriter" },
+        { type: "google_kms_crypto_key_iam_member", role: "roles/cloudkms.publicKeyViewer" },
       ]),
     );
-    expect(roles).toHaveLength(8);
+    // objectViewer twice: the submissions bucket and the approval heads bucket.
+    expect(roles).toHaveLength(10);
+  });
+
+  // It verifies a document's head before it publishes (docs/design/approval.md, D8): it reads the
+  // heads and the approval key's public keys, and can neither sign an approval nor write a head.
+  it("reads approvals, and can neither sign nor write one", () => {
+    expect(block("google_storage_bucket_iam_member", "worker_heads_reader")).toMatch(
+      /bucket\s*=\s*google_storage_bucket\.approval_heads\.name\s*\n\s*role\s*=\s*"roles\/storage\.objectViewer"/,
+    );
+    expect(block("google_kms_crypto_key_iam_member", "worker_approval_public_key")).toMatch(
+      /crypto_key_id\s*=\s*google_kms_crypto_key\.approval_signing_hsm\.id\s*\n\s*role\s*=\s*"roles\/cloudkms\.publicKeyViewer"/,
+    );
+    const signers = roles.filter(({ role }) => role === "roles/cloudkms.signerVerifier");
+    expect(signers).toHaveLength(1);
+    expect(block("google_kms_crypto_key_iam_member", "worker_manifest_signer_hsm")).toMatch(
+      /crypto_key_id\s*=\s*google_kms_crypto_key\.manifest_signing_hsm\.id/,
+    );
   });
 
   it("reads the source store and edits the validated store, and no other", () => {

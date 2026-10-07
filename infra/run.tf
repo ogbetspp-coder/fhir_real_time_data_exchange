@@ -164,6 +164,27 @@ resource "google_cloud_run_v2_service" "worker" {
         name  = "FHIR_VALIDATOR_URL"
         value = "http://localhost:8090"
       }
+      # Whether a document run publishes only under the document's verified head statement and
+      # links the version it wrote to it (docs/design/approval.md, D5 and D8): off until the
+      # demonstration documents are approved through the signer (var.approval_enforcement); on, it
+      # also refuses every persisted run from an ungated source. Then the environment statements
+      # must name, the heads bucket, and the one approval key version it trusts.
+      env {
+        name  = "APPROVAL_ENFORCEMENT"
+        value = var.approval_enforcement ? "on" : "off"
+      }
+      env {
+        name  = "APPROVAL_ENVIRONMENT"
+        value = var.environment
+      }
+      env {
+        name  = "APPROVAL_HEADS_BUCKET"
+        value = google_storage_bucket.approval_heads.name
+      }
+      env {
+        name  = "APPROVAL_SIGNING_KEY_VERSION"
+        value = local.approval_signing_key_version
+      }
       # Tie every signed run manifest to the code and the image that produced it
       # (runtime.sourceCommit and runtime.imageDigest, src/pipeline.ts). Without these the worker
       # recorded "development" for both. The commit is the value the query service records as
@@ -221,6 +242,8 @@ resource "google_cloud_run_v2_service" "worker" {
     google_storage_bucket_iam_member.worker_evidence_writer,
     google_storage_bucket_iam_member.worker_submission_reader,
     google_kms_crypto_key_iam_member.worker_manifest_signer_hsm,
+    google_kms_crypto_key_iam_member.worker_approval_public_key,
+    google_storage_bucket_iam_member.worker_heads_reader,
     google_bigquery_table_iam_member.worker_ledger_appender,
     google_bigquery_table.transformation_runs,
   ]

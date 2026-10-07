@@ -7,7 +7,7 @@ The agent shares nothing with the worker or with Zone A except two published sch
 schema). Both are vendored into the package by ``scripts/sync_contract.py`` so the deployable
 is self-contained on Agent Engine, and CI fails if either copy has drifted.
 
-query-tools 4.1.0. Since 2.0.0, ``FindProductOutput`` carries ``truncated``, and
+query-tools 5.0.0. Since 2.0.0, ``FindProductOutput`` carries ``truncated``, and
 ``not-entitled`` is no longer an error code a caller can see — outside the caller's entitlement
 the service answers ``document-not-found``. Nothing here ever matched on an error code (an
 ``isError`` result is unavailable whatever its code), so that change alters no behaviour at this
@@ -20,7 +20,12 @@ with 3.0.0 or later no later than the service. 4.0.0 makes ``QuoteVerification``
 unavailable here rather than a match. The schema cannot say that ``startOffset`` comes before
 ``endOffset``; ``postcheck`` holds every offset to the chunk's own, which is stricter. 4.1.0 adds an
 optional ``contractVersion`` to the service's audit record, which the agent never reads; no tool
-answer changes.
+answer changes. 5.0.0 (signed approvals, ``docs/design/approval.md``) adds the error code
+``not-approved``, which this module reads as it reads any ``isError`` result (unavailable), an
+optional ``approval`` on ``get_section`` and ``get_provenance``, which nothing here reads yet, and
+two optional audit fields. With the service's verification on, every answer carries ``approval``,
+which a 4.1.0 copy refuses as schema-invalid: this agent must be deployed with 5.0.0 before the
+service's verification is turned on.
 
 Patterns are read as the schema's dialect reads them (``ecma_pattern``): Python's ``re``, which
 ``jsonschema`` uses unchanged, let ``$`` match before a final newline and a digit class match any

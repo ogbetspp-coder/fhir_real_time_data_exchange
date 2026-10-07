@@ -32,7 +32,7 @@ from .conftest import CONTRACT_FIXTURES, FIXTURES, load_json
 CORPUS = load_json(CONTRACT_FIXTURES / "contract-verdicts.json")
 
 # The contracts Zone A neither writes nor reads (scripts/generate_models.py, NOT_ZONE_A).
-NOT_ZONE_A = frozenset({"agent-turn", "query-tools"})
+NOT_ZONE_A = frozenset({"agent-turn", "approval-statement", "query-tools", "review-record"})
 
 # Each Zone A contract's reader: its generated root model, or the verifier on top of it where the
 # contract has rules between fields (zone_a.run_manifest_rules).

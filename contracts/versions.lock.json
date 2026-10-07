@@ -23,6 +23,14 @@
       }
     ]
   },
+  "approval-statement": {
+    "1.0.0": [
+      {
+        "sha256": "dc179556da716244468fbaffcfbb9e6ea02281354b6be331c10d7c118f2c680d",
+        "record": "docs/validation/changes/2026-10-06-signed-approvals-query-tools-5-0-0.md"
+      }
+    ]
+  },
   "canonical-submission": {
     "1.0.0": [
       {
@@ -124,6 +132,20 @@
       {
         "sha256": "82f004c346bc9453d59f497d4ee8ef1fff08eec3bd083fc74fd3004e1fe0db2b",
         "record": "docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md"
+      }
+    ],
+    "5.0.0": [
+      {
+        "sha256": "556962b9140c00404820b793bd9802552264427d22f087b99efb8bba424c7401",
+        "record": "docs/validation/changes/2026-10-06-signed-approvals-query-tools-5-0-0.md"
+      }
+    ]
+  },
+  "review-record": {
+    "1.0.0": [
+      {
+        "sha256": "9bd5a016d6ba7c8d4447b9bd2d4f3405a301a8988b7ed0014a46b5ef9cde0691",
+        "record": "docs/validation/changes/2026-10-06-signed-approvals-query-tools-5-0-0.md"
       }
     ]
   },

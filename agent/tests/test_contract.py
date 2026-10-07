@@ -43,8 +43,32 @@ def test_each_vendored_contract_is_the_published_one(name: str) -> None:
 
 
 def test_the_two_schemas_are_the_versions_the_agent_was_adapted_to() -> None:
-    assert load_schema()["$id"].endswith("/query-tools/4.1.0/schema.json")
+    assert load_schema()["$id"].endswith("/query-tools/5.0.0/schema.json")
     assert load_agent_turn_schema()["$id"].endswith("/agent-turn/1.2.0/schema.json")
+
+
+def test_an_approved_answer_validates_and_a_4_1_0_copy_would_not_have_it() -> None:
+    # query-tools 5.0.0: with the service verifying approvals, every section carries `approval`;
+    # the vendored copy accepts it, and the same answer without it is still valid, as the service
+    # gives it with verification off.
+    section = next(iter(load_sections().values())).payload
+    approval = {
+        "statementSha256": "a" * 64,
+        "kind": "approve",
+        "meaning": "record-represents-approved-label",
+        "sequence": 1,
+        "approver": {
+            "sub": "109876543210987654321",
+            "role": "content-reviewer",
+            "name": "Synthetic Approver",
+            "email": "approver@khs.dev",
+        },
+        "signedAt": "2026-10-06T12:00:00.000Z",
+        "superseded": False,
+    }
+    assert validate_tool_output("get_section", section).available
+    assert validate_tool_output("get_section", dict(section) | {"approval": approval}).available
+    assert "not-approved" in load_schema()["$defs"]["QueryErrorCode"]["enum"]
 
 
 def test_not_entitled_is_no_longer_an_error_code_a_caller_can_see() -> None:

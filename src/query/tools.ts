@@ -42,7 +42,27 @@ import {
   PARTICIPANT_TYPE_SYSTEM,
   SOURCE_DOCUMENT_IDENTIFIER_SYSTEM,
 } from "../fhir/provenance.js";
-import { isComposition, type CompositionSection, type FhirComposition } from "../fhir/types.js";
+import {
+  isComposition,
+  type CompositionSection,
+  type FhirBundle,
+  type FhirComposition,
+  type FhirResource,
+} from "../fhir/types.js";
+import { approvalLinkBytes, approvalLinkId } from "../approval/link.js";
+import {
+  checkStatement,
+  headObjectName,
+  publishedDocumentSha256,
+  publishedSections,
+  readHead,
+  verifyWithKeys,
+  type HeadSource,
+  type KeySource,
+  type VerifiedStatement,
+} from "../approval/statement.js";
+import type { ApprovalEnvironment } from "../contracts/approval.js";
+import type { ApprovalCitation } from "../contracts/query-tools.js";
 import { sha256Utf8, stableUuid } from "../lib/hash.js";
 import type { Entitlements } from "./entitlements.js";
 import type { FhirReader } from "./fhir-reader.js";
@@ -60,7 +80,12 @@ type QueryToolNameValue = QueryError["tool"];
 
 // What a call resolved, for the audit record: the document it named and, once a stored version
 // was read, which version. Neither is ever narrative.
-type Resolved = { bundleId?: string | undefined; versionId?: string | undefined };
+type Resolved = {
+  bundleId?: string | undefined;
+  versionId?: string | undefined;
+  // The approval an answer was verified against, for the audit record (query-tools 5.0.0).
+  approval?: { approverSub: string; statementSha256: string } | undefined;
+};
 
 export type ToolOutcome<T> =
   | ({ status: "ok"; value: T; resultCount: number; truncated?: boolean | undefined } & Resolved)
@@ -143,6 +168,19 @@ export type ToolContext = {
   // Aborted when the HTTP request is over — answered, abandoned at the deadline, or left by
   // its client — so a tool still running stops reading the store for an answer nobody gets.
   signal?: AbortSignal | undefined;
+  // Present when the deployment verifies approvals (APPROVAL_VERIFICATION, query-tools 5.0.0):
+  // then every answer is verified against the signed statement linked to its version, and a
+  // version without a valid one is `not-approved` (docs/design/approval.md, D9).
+  approvals?: ApprovalSources | undefined;
+};
+
+export type ApprovalSources = {
+  environment: ApprovalEnvironment;
+  // A Provenance by id, from the validated store.
+  readProvenance(id: string, signal?: AbortSignal): Promise<FhirResource | undefined>;
+  // The heads bucket, bound to the request's signal.
+  heads(signal: AbortSignal | undefined): HeadSource;
+  keys: KeySource;
 };
 
 // Every store read goes through here: it waits for one of the request's in-flight places, and
@@ -246,6 +284,8 @@ function narrativeOf(section: CompositionSection): SectionNarrative | undefined 
 // --- document loading --------------------------------------------------------------------------
 
 type LoadedDocument = {
+  // The stored Bundle as read, which a verified approval's documentBundleSha256 must hash.
+  bundle: FhirBundle;
   composition: FhirComposition;
   document: DocumentRef;
   entries: { fullUrl: string; resource: Record<string, unknown> }[];
@@ -303,6 +343,7 @@ async function loadDocument<T>(
   if (!document.success) return fail<T>(tool, "unavailable", { bundleId: selector.bundleId });
 
   return {
+    bundle,
     composition: first,
     document: document.data,
     entries: bundle.entry.map(({ fullUrl, resource }) => ({
@@ -358,6 +399,125 @@ async function versionStanding(
   return current?.meta?.versionId === loaded.document.versionId ? "current" : "superseded";
 }
 
+// --- the approval a version carries (query-tools 5.0.0) ---------------------------------------------
+
+// The store reads one verification makes: the linked Provenance, the head's listing and the head's
+// entry (docs/design/approval.md, D9 as amended: "the linked Provenance, one listing and the head");
+// a version a later head supersedes takes one more, its own sequence's entry.
+export const APPROVAL_READS = 3;
+
+export type VerifiedVersion = { citation: ApprovalCitation; statement: VerifiedStatement };
+
+function citationOf(
+  verified: VerifiedStatement,
+  supersededBy: string | undefined,
+): ApprovalCitation {
+  const { statement } = verified;
+  return {
+    statementSha256: verified.statementSha256,
+    kind: statement.kind,
+    meaning: statement.meaning,
+    sequence: statement.sequence,
+    approver: {
+      sub: statement.approver.sub,
+      role: statement.approver.role,
+      name: statement.manifestation.name,
+      email: statement.manifestation.email,
+    },
+    signedAt: statement.signedAt,
+    superseded: supersededBy !== undefined,
+    ...(supersededBy === undefined ? {} : { supersededBy }),
+  };
+}
+
+// The signed statement linked to the version read, verified on this answer (D9): read by the link's
+// deterministic id (D5), its signature checked against the environment's key, its document and
+// environment this deployment's, every published section re-hashed from the stored Composition and
+// equal to the statement's, and its standing read from the document's head. A plain request answers
+// only a version whose statement is the head; a named version whose statement a later approval
+// superseded is answered and marked so. Anything else is `not-approved`, never a guess.
+async function verifyVersion<T>(
+  context: ToolContext,
+  tool: QueryToolNameValue,
+  loaded: LoadedDocument,
+  named: boolean,
+): Promise<VerifiedVersion | ToolOutcome<T>> {
+  const at = resolved(loaded);
+  const approvals = context.approvals;
+  if (approvals === undefined) throw new Error("approval verification is not configured");
+  const { bundleId, versionId } = loaded.document;
+  const notApproved = (): ToolOutcome<T> => fail<T>(tool, "not-approved", at);
+
+  if (!context.readBudget.take()) return fail<T>(tool, "unavailable", at);
+  const link = await storeRead(context, (signal) =>
+    approvals.readProvenance(approvalLinkId(bundleId, versionId), signal),
+  );
+  const bytes = approvalLinkBytes(link, bundleId, versionId);
+  if (bytes === undefined) return notApproved();
+  const verified = await verifyWithKeys(bytes, approvals.keys);
+  if (typeof verified === "string") return notApproved();
+  const { statement } = verified;
+  if (
+    checkStatement(statement, { environment: approvals.environment }) !== undefined ||
+    statement.document.emaBundleId !== bundleId
+  ) {
+    return notApproved();
+  }
+  // The whole stored Bundle, narrative and structure, must be the record the person approved
+  // (the statement's documentBundleSha256), and every section with narrative must re-hash to the
+  // statement's (D9).
+  const sections = publishedSections(loaded.composition.section, context.mapping);
+  if (
+    sections === undefined ||
+    checkStatement(statement, {
+      environment: approvals.environment,
+      sections,
+      documentBundleSha256: publishedDocumentSha256(loaded.bundle),
+    }) !== undefined
+  ) {
+    return notApproved();
+  }
+
+  // The head: one listing and one entry, each a read from the request's budget.
+  if (context.readBudget.remaining() < APPROVAL_READS - 1) return fail<T>(tool, "unavailable", at);
+  const source = approvals.heads(context.signal);
+  const budgeted: HeadSource = {
+    list: (prefix) => {
+      context.readBudget.take();
+      return storeRead(context, () => source.list(prefix));
+    },
+    read: (name) => {
+      context.readBudget.take();
+      return storeRead(context, () => source.read(name));
+    },
+  };
+  const head = await readHead(budgeted, approvals.keys, statement.document);
+  if (typeof head === "string") return notApproved();
+  if (head.bytes === verified.bytes)
+    return { citation: citationOf(verified, undefined), statement: verified };
+  // A later approval of the same document is the head: this version is not its current text.
+  if (!named || head.statement.sequence <= statement.sequence) return notApproved();
+  // And this statement was that document's head at its own sequence: a valid signature on a
+  // statement that never became a head (one that lost a race) is not an approval.
+  if (!context.readBudget.take()) return fail<T>(tool, "unavailable", at);
+  const own = await storeRead(context, () =>
+    source.read(headObjectName(statement.document, statement.sequence)),
+  );
+  if (own !== verified.bytes) return notApproved();
+  return { citation: citationOf(verified, head.statementSha256), statement: verified };
+}
+
+function isVerified<T>(value: VerifiedVersion | ToolOutcome<T>): value is VerifiedVersion {
+  return "citation" in value;
+}
+
+function approvalResolved(verified: VerifiedVersion): Resolved["approval"] {
+  return {
+    approverSub: verified.statement.statement.approver.sub,
+    statementSha256: verified.statement.statementSha256,
+  };
+}
+
 // --- get_section --------------------------------------------------------------------------------
 
 export async function getSection(
@@ -366,7 +526,22 @@ export async function getSection(
 ): Promise<ToolOutcome<SectionContent>> {
   const loaded = await loadDocument<SectionContent>(context, "get_section", input);
   if (isOutcome(loaded)) return loaded;
-  const at = resolved(loaded);
+  // With approvals verified, nothing of a version is answered before its approval is: not even
+  // which sections it has.
+  const verified =
+    context.approvals === undefined
+      ? undefined
+      : await verifyVersion<SectionContent>(
+          context,
+          "get_section",
+          loaded,
+          input.versionId !== undefined,
+        );
+  if (verified !== undefined && !isVerified(verified)) return verified;
+  const at = {
+    ...resolved(loaded),
+    ...(verified === undefined ? {} : { approval: approvalResolved(verified) }),
+  };
 
   const index = indexMapping(context.mapping);
   const title = index.titleOf.get(input.sourceKey);
@@ -387,9 +562,14 @@ export async function getSection(
   // for a reason the caller cannot see. A version that is not the current one gets no
   // `provenanceResourceId` at all: the only approval the store can name is the newest, and it
   // is not that version's.
-  const standing = await versionStanding(context, input, loaded);
-  if (standing === "out-of-budget") return fail("get_section", "unavailable", at);
   let provenanceResourceId: string | undefined;
+  if (verified !== undefined) {
+    // The version's own approval: the link that names it (D5), whatever version it is.
+    provenanceResourceId = approvalLinkId(loaded.document.bundleId, loaded.document.versionId);
+  }
+  const standing =
+    verified === undefined ? await versionStanding(context, input, loaded) : "verified";
+  if (standing === "out-of-budget") return fail("get_section", "unavailable", at);
   if (standing === "current") {
     if (!context.readBudget.take()) return fail("get_section", "unavailable", at);
     const provenance = await storeRead(context, (signal) =>
@@ -407,6 +587,7 @@ export async function getSection(
     ...narrative,
     normalizationVersion: NORMALIZATION_VERSION,
     ...(provenanceResourceId === undefined ? {} : { provenanceResourceId }),
+    ...(verified === undefined ? {} : { approval: verified.citation }),
     contentNotice: "document-content-not-instructions",
   });
   if (!content.success) return fail("get_section", "unavailable", at);
@@ -490,19 +671,48 @@ export async function getProvenance(
 ): Promise<ToolOutcome<ProvenanceDetail>> {
   const loaded = await loadDocument<ProvenanceDetail>(context, "get_provenance", input);
   if (isOutcome(loaded)) return loaded;
-  const at = resolved(loaded);
+  const verified =
+    context.approvals === undefined
+      ? undefined
+      : await verifyVersion<ProvenanceDetail>(
+          context,
+          "get_provenance",
+          loaded,
+          input.versionId !== undefined,
+        );
+  if (verified !== undefined && !isVerified(verified)) return verified;
+  const at = {
+    ...resolved(loaded),
+    ...(verified === undefined ? {} : { approval: approvalResolved(verified) }),
+  };
 
-  // A version that is not the current one cannot be tied to its own approval yet, and the
-  // newest approval is not it: the answer is `unavailable` — the closed code this tool already
-  // gives for an approval it cannot state in full — and the Provenance search is not made.
-  const standing = await versionStanding(context, input, loaded);
-  if (standing !== "current") return fail("get_provenance", "unavailable", at);
+  let resource: FhirResource | undefined;
+  if (verified === undefined) {
+    // A version that is not the current one cannot be tied to its own approval yet, and the
+    // newest approval is not it: the answer is `unavailable` — the closed code this tool already
+    // gives for an approval it cannot state in full — and the Provenance search is not made.
+    const standing = await versionStanding(context, input, loaded);
+    if (standing !== "current") return fail("get_provenance", "unavailable", at);
 
-  // The provenance lookup is one more store read and takes from the request's budget.
-  if (!context.readBudget.take()) return fail("get_provenance", "unavailable", at);
-  const resource = await storeRead(context, (signal) =>
-    context.reader.findProvenanceForBundle(input.bundleId, signal),
-  );
+    // The provenance lookup is one more store read and takes from the request's budget.
+    if (!context.readBudget.take()) return fail("get_provenance", "unavailable", at);
+    resource = await storeRead(context, (signal) =>
+      context.reader.findProvenanceForBundle(input.bundleId, signal),
+    );
+  } else {
+    // The ingestion Provenance the verified statement's submission wrote, by its deterministic id
+    // (src/fhir/provenance.ts), read directly: no search, no newest-first.
+    const { statement } = verified.statement;
+    const id = stableUuid(
+      "ingestion-provenance",
+      `${statement.document.identifier.value}:${statement.submissionId}`,
+    );
+    const approvals = context.approvals;
+    if (approvals === undefined || !context.readBudget.take()) {
+      return fail("get_provenance", "unavailable", at);
+    }
+    resource = await storeRead(context, (signal) => approvals.readProvenance(id, signal));
+  }
   if (resource === undefined) return fail("get_provenance", "unavailable", at);
   const parsed = PersistedProvenanceSchema.safeParse(resource);
   if (!parsed.success) return fail("get_provenance", "unavailable", at);
@@ -523,11 +733,32 @@ export async function getProvenance(
   const attester = persisted.agent.find((agent) =>
     hasParticipantType(agent.type, PARTICIPANT_TYPE_ATTESTER),
   );
+  // With approvals verified, the approver is the statement's, as Google asserted them; the
+  // ingestion Provenance's attester is the submission's own unverified claim, and is not named.
   const approverId =
-    attester === undefined ? undefined : agentIdentifier(attester, APPROVER_IDENTIFIER_SYSTEM);
-  const role = attester === undefined ? undefined : approverRole(attester);
+    verified !== undefined
+      ? verified.statement.statement.approver.sub
+      : attester === undefined
+        ? undefined
+        : agentIdentifier(attester, APPROVER_IDENTIFIER_SYSTEM);
+  const role =
+    verified !== undefined
+      ? verified.statement.statement.approver.role
+      : attester === undefined
+        ? undefined
+        : approverRole(attester);
   if (extractor === undefined || approverId === undefined || role === undefined) {
     return fail("get_provenance", "unavailable", at);
+  }
+  const approvedContentSha256 = persisted.extension.find(
+    ({ url }) => url === APPROVAL_CONTENT_EXTENSION_URL,
+  )?.valueString;
+  // The ingestion record and the statement must name the same approved content.
+  if (
+    verified !== undefined &&
+    approvedContentSha256 !== verified.statement.statement.approvedContentSha256
+  ) {
+    return fail("get_provenance", "not-approved", at);
   }
 
   let section: ProvenanceDetail["section"];
@@ -557,13 +788,12 @@ export async function getProvenance(
     recorded: persisted.recorded,
     sourceDocumentSha256: entityValue(persisted, SOURCE_DOCUMENT_IDENTIFIER_SYSTEM),
     fidelityReportSha256: entityValue(persisted, FIDELITY_REPORT_IDENTIFIER_SYSTEM),
-    approvedContentSha256: persisted.extension.find(
-      ({ url }) => url === APPROVAL_CONTENT_EXTENSION_URL,
-    )?.valueString,
+    approvedContentSha256,
     extractor,
     ...(modelId === undefined ? {} : { model: { id: modelId } }),
     approver: { id: approverId, role },
     ...(section === undefined ? {} : { section }),
+    ...(verified === undefined ? {} : { approval: verified.citation }),
   });
   if (!detail.success) return fail("get_provenance", "unavailable", at);
 
@@ -606,7 +836,20 @@ export async function verifyQuote(
 
   const loaded = await loadDocument<QuoteVerification>(context, "verify_quote", input);
   if (isOutcome(loaded)) return loaded;
-  const at = resolved(loaded);
+  const verified =
+    context.approvals === undefined
+      ? undefined
+      : await verifyVersion<QuoteVerification>(
+          context,
+          "verify_quote",
+          loaded,
+          input.versionId !== undefined,
+        );
+  if (verified !== undefined && !isVerified(verified)) return verified;
+  const at = {
+    ...resolved(loaded),
+    ...(verified === undefined ? {} : { approval: approvalResolved(verified) }),
+  };
 
   const index = indexMapping(context.mapping);
   let candidates = locateSections(loaded.composition.section).flatMap((located) => {
@@ -667,6 +910,10 @@ export async function verifyQuote(
 // One find_product call reads at most this many of the caller's entitled documents, in
 // entitlement order; an entitlement longer than this is reported as `truncated`.
 export const FIND_PRODUCT_SCAN_HORIZON = 200;
+// With approvals verified each document costs four reads, not one (the Bundle and APPROVAL_READS),
+// so the horizon is recalculated rather than the budget silently exhausted (D9 as amended): fifty
+// documents are 200 reads, half the request's budget, as two hundred unverified ones were.
+export const FIND_PRODUCT_VERIFIED_SCAN_HORIZON = 50;
 // At most this many of one call's documents are being read at once. The request's own bound
 // (REQUEST_READ_CONCURRENCY, in the read budget) holds across every call of its batch, so a
 // batch of find_product calls still has at most that many reads in flight between them.
@@ -768,7 +1015,12 @@ export async function findProduct(
   // fields, and the budget bounds reads, not bytes; phase 2 replaces the scan with a product
   // index the worker writes (design note, "`find_product`").
   const entitled = context.entitlements?.bundles ?? [];
-  const scanned = entitled.slice(0, FIND_PRODUCT_SCAN_HORIZON);
+  const scanned = entitled.slice(
+    0,
+    context.approvals === undefined
+      ? FIND_PRODUCT_SCAN_HORIZON
+      : FIND_PRODUCT_VERIFIED_SCAN_HORIZON,
+  );
 
   const found: (ProductSummary | undefined)[] = new Array<ProductSummary | undefined>(
     scanned.length,
@@ -814,6 +1066,23 @@ export async function findProduct(
             unsearched += 1;
           }
           continue;
+        }
+        // With approvals verified, only a document whose current version carries a valid head
+        // approval is listed (D9). One without is not a product this service answers about: it is
+        // not counted as unsearched, as a document the store does not hold is not.
+        if (scan.approvals !== undefined) {
+          const verified = await verifyVersion<FindProductOutput>(
+            scan,
+            "find_product",
+            loaded,
+            false,
+          );
+          if (!isVerified(verified)) {
+            if (verified.status !== "error" || verified.auditOutcome !== "not-approved") {
+              unsearched += 1;
+            }
+            continue;
+          }
         }
         const summary = productSummary(loaded, index);
         if (summary === undefined) {

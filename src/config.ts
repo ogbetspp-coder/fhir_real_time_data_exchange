@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { ApprovalEnvironment } from "./contracts/approval.js";
 import { GitCommit, ImageDigest, Token } from "./contracts/common.js";
 import type { RunRequest } from "./contracts/run-request.js";
 
@@ -77,6 +78,25 @@ const ConfigSchema = z
       .regex(KMS_KEY_VERSION, "KMS_MANIFEST_KEY must name a crypto key version")
       .optional(),
     FHIR_VALIDATOR_URL: z.url().optional(),
+    // Whether a persisted document run publishes only under the document's signed head statement,
+    // and links the version it wrote to it (docs/design/approval.md, D8 and D5). Off by default, and
+    // off in every deploy until the demonstration documents are approved through the signer (the
+    // design's step 6, which turns this and the query service's verification on together): with it
+    // on, a document run without a valid head approval is refused `not-approved`.
+    APPROVAL_ENFORCEMENT: z
+      .enum(["on", "off"])
+      .default("off")
+      .transform((value) => value === "on"),
+    // When it is on: the environment every statement it accepts names, the heads bucket it reads
+    // the head from, and the one approval key version it trusts (a statement signed by any other
+    // version, of this key or another, is refused).
+    APPROVAL_ENVIRONMENT: ApprovalEnvironment.optional(),
+    APPROVAL_HEADS_BUCKET: optionalNonEmpty,
+    APPROVAL_SIGNING_KEY_VERSION: z
+      .string()
+      .trim()
+      .regex(KMS_KEY_VERSION, "APPROVAL_SIGNING_KEY_VERSION must name a crypto key version")
+      .optional(),
     // The code and the images a run manifest names (`runtime`, run manifest 5.0.0), each in its
     // own grammar: infra/run.tf sets the commit (`service_version`, which scripts/gcp/deploy.sh
     // passes as the full git SHA) and both image digests; Cloud Run sets K_REVISION. A value in
@@ -119,7 +139,13 @@ const ConfigSchema = z
       "TRANSFORMATION_LEDGER_DATASET",
     ] as const;
 
-    for (const key of required) {
+    // With APPROVAL_ENFORCEMENT on, every persisted run is verified against its approval: there is
+    // no unapproved publication, and no deployment that cannot check.
+    const approval = value.APPROVAL_ENFORCEMENT
+      ? (["APPROVAL_ENVIRONMENT", "APPROVAL_HEADS_BUCKET", "APPROVAL_SIGNING_KEY_VERSION"] as const)
+      : [];
+
+    for (const key of [...required, ...approval]) {
       if (value[key] === undefined) {
         context.addIssue({
           code: "custom",

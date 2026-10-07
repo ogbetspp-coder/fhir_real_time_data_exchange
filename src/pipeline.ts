@@ -46,6 +46,17 @@ import { GcpLineagePublisher } from "./gcp/lineage.js";
 import { defaultFetcher, type AuthorityFetcher } from "./authority/fetch.js";
 import { verifyAuthorityImport, type AuthorityGateResult } from "./authority/gate.js";
 import { sha256Bytes } from "./authority/import.js";
+import { approvalLinkProvenance } from "./approval/link.js";
+import { recordFacts } from "./approval/review.js";
+import {
+  ApprovalRefusedError,
+  checkStatement,
+  readHead,
+  type HeadSource,
+  type KeySource,
+  type VerifiedStatement,
+} from "./approval/statement.js";
+import { GcsApprovalObjects, kmsKeySource } from "./gcp/approval-store.js";
 import { sha256 } from "./lib/hash.js";
 import { log } from "./lib/logger.js";
 
@@ -239,7 +250,58 @@ async function documentGate(
 }
 
 // What a run may be given instead of its production default; tests use it.
-export type PipelineDependencies = { authorityFetcher?: AuthorityFetcher };
+export type PipelineDependencies = {
+  authorityFetcher?: AuthorityFetcher;
+  // Where a document run reads its head statement and the approval key's public keys; Cloud
+  // Storage and Cloud KMS from the configuration by default.
+  approvals?: { heads: HeadSource; keys: KeySource };
+};
+
+// The document's head statement, verified, and held to the record this run is about to publish
+// (docs/design/approval.md, D8 and "The flow", step 6): the signature against the environment's
+// approval key, the environment, and the document, submission, approved content, mapping and every
+// published section's hash. A head that is another submission's is `not-head`: replaying an older
+// signed submission cannot make its text current. Throws ApprovalRefusedError with a closed code.
+async function verifiedApproval(
+  gate: DocumentGateResult,
+  transformed: EmaPackage,
+  mapping: EmaMapping,
+  config: AppConfig,
+  dependencies: PipelineDependencies,
+): Promise<VerifiedStatement> {
+  const environment = config.APPROVAL_ENVIRONMENT;
+  const bucket = config.APPROVAL_HEADS_BUCKET;
+  const keyVersion = config.APPROVAL_SIGNING_KEY_VERSION;
+  if (environment === undefined || bucket === undefined || keyVersion === undefined) {
+    throw new Error("Approval verification is not configured");
+  }
+  const approvals = dependencies.approvals ?? {
+    heads: new GcsApprovalObjects(bucket),
+    keys: kmsKeySource(keyVersion),
+  };
+  const facts = recordFacts(gate, transformed, mapping);
+  const head = await readHead(approvals.heads, approvals.keys, facts.document);
+  if (typeof head === "string") throw new ApprovalRefusedError(head);
+  const { document, sections, mappingVersion, approvedContentSha256, submissionId } = facts;
+  const mismatch = checkStatement(head.statement, {
+    environment,
+    document,
+    mappingVersion,
+    documentBundleSha256: facts.documentBundleSha256,
+  });
+  if (mismatch !== undefined) throw new ApprovalRefusedError(mismatch);
+  // The head names another submission or other content: this one is not the document's current
+  // approved text.
+  if (
+    head.statement.submissionId !== submissionId ||
+    head.statement.approvedContentSha256 !== approvedContentSha256
+  ) {
+    throw new ApprovalRefusedError("not-head");
+  }
+  const sectionMismatch = checkStatement(head.statement, { environment, sections });
+  if (sectionMismatch !== undefined) throw new ApprovalRefusedError(sectionMismatch);
+  return head;
+}
 
 // The code and images the manifest names, read through the configuration, which has already
 // refused a value outside its grammar (src/config.ts); `development` where none is set, as off
@@ -268,6 +330,12 @@ export async function runPipeline(
   // source the deployment disabled: a no-synthetic deployment never signs fixture content.
   if (!config.ENABLED_RUN_SOURCES.includes(input.sourceKind)) {
     throw new Error("Run source is disabled");
+  }
+  // With APPROVAL_ENFORCEMENT on, every persisted run publishes under a verified head approval,
+  // and only a document run has a submission an approval can name: the ungated sources (fixture,
+  // healthcare-api) persist nothing, refused before any read or write.
+  if (config.APPROVAL_ENFORCEMENT && !config.DRY_RUN && input.sourceKind !== "document") {
+    throw new ApprovalRefusedError("ungated-source");
   }
   const runId = input.runId ?? randomUUID();
   const startedAt = new Date().toISOString();
@@ -338,6 +406,15 @@ export async function runPipeline(
   if (emaBundleId === undefined || emaCompositionId === undefined) {
     throw new Error("The EMA document Bundle and Composition require ids");
   }
+
+  // With APPROVAL_ENFORCEMENT on, a persisted document run publishes only under the document's
+  // verified head statement, checked before anything is validated, signed or written, and links
+  // the version it wrote to it after the commit. A dry run persists nothing and is not asked. Off
+  // (the default until the design's step 6), a document run publishes as it did before.
+  const approval =
+    gate === undefined || config.DRY_RUN || !config.APPROVAL_ENFORCEMENT
+      ? undefined
+      : await verifiedApproval(gate, transformed, mapping, config, dependencies);
   const provenanceResource =
     gate === undefined
       ? undefined
@@ -575,6 +652,41 @@ export async function runPipeline(
       errorType: error instanceof Error ? error.name : typeof error,
     });
     throw new Error("The run committed but its record could not be written", { cause: error });
+  }
+
+  // The stored version is linked to its approval after it is written (docs/design/approval.md,
+  // D5): a Provenance whose target is this version, created only if absent, carrying the signed
+  // statement. Without it the query service refuses the version; so a run that cannot link says
+  // so, as a committed run with no approval, rather than succeed.
+  if (approval !== undefined) {
+    try {
+      if (persistedBundle === undefined) {
+        throw new Error("Transaction response names no version of the document Bundle");
+      }
+      const link = approvalLinkProvenance(emaBundleId, persistedBundle.versionId, approval.signed);
+      await healthcare.createResource(link, runId);
+      artifactUris.push(
+        await store.writeJson(
+          runId,
+          "approval-link",
+          {
+            statementSha256: approval.statementSha256,
+            sequence: approval.statement.sequence,
+            provenanceId: link.id,
+            targetBundle: { id: emaBundleId, versionId: persistedBundle.versionId },
+          },
+          { afterCommit: true },
+        ),
+      );
+    } catch (error) {
+      log("error", "A committed run's version could not be linked to its approval", {
+        runId,
+        stage: "approval-link",
+        statementSha256: approval.statementSha256,
+        errorType: error instanceof Error ? error.name : typeof error,
+      });
+      throw new Error("The run committed but its approval could not be linked", { cause: error });
+    }
   }
 
   // Lineage is published after the commit and is best effort: a Data Lineage failure no longer

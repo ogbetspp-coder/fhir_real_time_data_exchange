@@ -223,6 +223,31 @@ describe("reading the stored version of a resource", () => {
   });
 });
 
+// The versioned approval link (docs/design/approval.md, D5) is created, never replaced: a PUT by
+// its id with `If-None-Match: *`, and a refusal is the store's, by operation.
+describe("creating a resource only if absent", () => {
+  it("PUTs the resource by its id with If-None-Match: *", async () => {
+    const link: FhirResource = { resourceType: "Provenance", id: "link-1" };
+    answer = respond(201, link);
+    expect(await new HealthcareApiClient(OPTIONS).createResource(link, RUN_ID)).toEqual(link);
+    const request = only();
+    expect(request.url).toBe(`${BASE}/validated/fhir/Provenance/link-1`);
+    expect(request.init.method).toBe("PUT");
+    expect(request.headers.get("if-none-match")).toBe("*");
+    expectStandardHeaders(request.headers);
+    expect(JSON.parse(request.init.body as string)).toEqual(link);
+  });
+
+  it("refuses when the store already holds one, naming the operation", async () => {
+    answer = respond(412, { resourceType: "OperationOutcome", issue: [] });
+    const refused = await new HealthcareApiClient(OPTIONS)
+      .createResource({ resourceType: "Provenance", id: "link-1" }, RUN_ID)
+      .catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(HealthcareApiError);
+    expect((refused as HealthcareApiError).operation).toBe("write-approval-link");
+  });
+});
+
 function transaction(extras: FhirResource[] = []) {
   const target = transformType2ToEma(createSyntheticType2Bundle(mapping), mapping);
   return buildPersistTransaction(target.list, target.documentBundle, RUN_ID, "absent", extras);

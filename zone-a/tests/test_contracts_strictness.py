@@ -25,7 +25,7 @@ from .conftest import CONTRACT_SCHEMAS, load_json
 
 # Every contract the index publishes that Zone A reads (scripts/generate_models.py), derived rather
 # than listed, so a contract added to the index is checked here without an edit (audit C-8).
-NOT_ZONE_A = frozenset({"agent-turn", "query-tools"})
+NOT_ZONE_A = frozenset({"agent-turn", "approval-statement", "query-tools", "review-record"})
 CONTRACTS = [
     (entry["name"], entry["name"].replace("-", "_"))
     for entry in load_json(CONTRACT_SCHEMAS / "index.json")["contracts"]

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://khs.dev/contracts/query-tools/4.1.0/schema.json",
+  "$id": "https://khs.dev/contracts/query-tools/5.0.0/schema.json",
   "$ref": "#/$defs/QueryTools",
   "$defs": {
     "QueryTools": {
@@ -8,7 +8,7 @@
       "properties": {
         "version": {
           "type": "string",
-          "const": "4.1.0"
+          "const": "5.0.0"
         },
         "tools": {
           "type": "object",
@@ -263,6 +263,9 @@
         "provenanceResourceId": {
           "$ref": "#/$defs/Uuid"
         },
+        "approval": {
+          "$ref": "#/$defs/ApprovalCitation"
+        },
         "contentNotice": {
           "$ref": "#/$defs/ContentNotice"
         }
@@ -280,7 +283,7 @@
         "contentNotice"
       ],
       "additionalProperties": false,
-      "description": "One QRD section, verbatim. `div` is the stored XHTML; `text` is its normalised plain text; the hashes are recomputable from `div` by anyone. `provenanceResourceId` is given for the document's current version only."
+      "description": "One QRD section, verbatim. `div` is the stored XHTML; `text` is its normalised plain text; the hashes are recomputable from `div` by anyone. Without approval verification, `provenanceResourceId` is given for the document's current version only; with it, `provenanceResourceId` is the version's own approval link and `approval` its verified approval."
     },
     "TargetPath": {
       "type": "string",
@@ -301,6 +304,85 @@
       "type": "string",
       "format": "uuid",
       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "ApprovalCitation": {
+      "type": "object",
+      "properties": {
+        "statementSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "kind": {
+          "$ref": "#/$defs/ApprovalKind"
+        },
+        "meaning": {
+          "$ref": "#/$defs/ApprovalStatementMeaning"
+        },
+        "sequence": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "approver": {
+          "type": "object",
+          "properties": {
+            "sub": {
+              "$ref": "#/$defs/PrincipalId"
+            },
+            "role": {
+              "$ref": "#/$defs/ApproverRole"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "^[^<>\\n\\r\\t]+$"
+            },
+            "email": {
+              "type": "string",
+              "maxLength": 254,
+              "pattern": "^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+$"
+            }
+          },
+          "required": ["sub", "role", "name", "email"],
+          "additionalProperties": false
+        },
+        "signedAt": {
+          "$ref": "#/$defs/IsoDateTime"
+        },
+        "superseded": {
+          "type": "boolean"
+        },
+        "supersededBy": {
+          "$ref": "#/$defs/Sha256Hex"
+        }
+      },
+      "required": [
+        "statementSha256",
+        "kind",
+        "meaning",
+        "sequence",
+        "approver",
+        "signedAt",
+        "superseded"
+      ],
+      "additionalProperties": false,
+      "description": "The signed approval that covers this version, verified on this answer: who approved it (Google subject, role, name, e-mail), when, with what meaning, and whether a later approval supersedes it."
+    },
+    "ApprovalKind": {
+      "type": "string",
+      "enum": ["approve"]
+    },
+    "ApprovalStatementMeaning": {
+      "type": "string",
+      "enum": ["record-represents-approved-label"]
+    },
+    "PrincipalId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+    },
+    "ApproverRole": {
+      "type": "string",
+      "enum": ["content-reviewer", "qa-reviewer"]
     },
     "ContentNotice": {
       "type": "string",
@@ -395,6 +477,9 @@
           },
           "required": ["sourceKey", "narrativeDivSha256", "normalizedTextSha256"],
           "additionalProperties": false
+        },
+        "approval": {
+          "$ref": "#/$defs/ApprovalCitation"
         }
       },
       "required": [
@@ -408,15 +493,7 @@
         "approver"
       ],
       "additionalProperties": false,
-      "description": "Who and what put this document in the store: source document hash, extractor and model identities, fidelity report hash, approver and approval content hash, all from the persisted Provenance resource; per-section hashes recomputed live. Answered for the document's current version only; a named earlier version is `unavailable`."
-    },
-    "PrincipalId": {
-      "type": "string",
-      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
-    },
-    "ApproverRole": {
-      "type": "string",
-      "enum": ["content-reviewer", "qa-reviewer"]
+      "description": "Who and what put this document in the store: source document hash, extractor and model identities, fidelity report hash, approver and approval content hash, all from the persisted Provenance resource; per-section hashes recomputed live. Without approval verification, answered for the document's current version only, and a named earlier version is `unavailable`; with it, the approver is the version's own verified approval's (`approval`), and a named version a later approval supersedes is answered and marked superseded."
     },
     "VerifyQuoteInput": {
       "type": "object",
@@ -561,7 +638,8 @@
         "document-not-found",
         "version-not-found",
         "section-not-found",
-        "unavailable"
+        "unavailable",
+        "not-approved"
       ]
     },
     "QueryAuditRecord": {
@@ -620,6 +698,12 @@
         "turnId": {
           "$ref": "#/$defs/Uuid"
         },
+        "approverSub": {
+          "$ref": "#/$defs/PrincipalId"
+        },
+        "statementSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
         "degraded": {
           "type": "string",
           "enum": ["arguments-unhashable", "record-rejected"]
@@ -662,6 +746,7 @@
         "version-not-found",
         "section-not-found",
         "unavailable",
+        "not-approved",
         "not-entitled"
       ]
     }

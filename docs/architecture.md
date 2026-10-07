@@ -403,11 +403,13 @@ not a mode of the worker. It is tested under `test/query/` and deployed in `dev`
   AI assistant answer questions about product information with verifiable answers: every
   result names the FHIR resource and version it came from and carries the hashes needed to
   check it against the store without trusting the service.
-- **Identity and image.** Its own service account, `ema-flow-query-<env>`, holds exactly two
+- **Identity and image.** Its own service account, `ema-flow-query-<env>`, holds exactly four
   roles: `roles/healthcare.fhirResourceReader` on the validated store (and, until B04's phase 2,
-  the dataset) and `roles/logging.logWriter` on the project. No write role, no bucket, no BigQuery,
-  no KMS access. `test/query/acceptance.test.ts` ("least privilege, proven") reads every
-  `infra/*.tf` and asserts that role set. Its image is `Dockerfile --target query` (the `query` path
+  the dataset), `roles/logging.logWriter` on the project, and, for signed approvals,
+  `roles/storage.objectViewer` on the approval heads bucket and `roles/cloudkms.publicKeyViewer` on
+  `approval-signing-hsm`. No write role, no other bucket, no BigQuery, no key it can sign with.
+  `test/query/acceptance.test.ts` ("least privilege, proven") reads every `infra/*.tf` and asserts
+  that role set. Its image is `Dockerfile --target query` (the `query` path
   of the shared Artifact Registry repository), the worker's runtime: debian-slim with the pinned
   Node binary; `npm run images:check` fails a root `Dockerfile*` base without a digest, or two Node
   bases with different digests.
@@ -475,6 +477,49 @@ not a mode of the worker. It is tested under `test/query/` and deployed in `dev`
   join on that value without either carrying a word of what was asked or answered. Which agent
   build is live: `agent/deploy/README.md`, and the `serviceVersion` on audit records.
 
+- **Signed approvals.** With `APPROVAL_VERIFICATION` on (`query_approval_verification`, off by
+  default), every answer is verified against the signed statement linked to the version it serves,
+  the whole stored Bundle and every served section are re-hashed against it, and a version without
+  a valid approval is `not-approved` (`query-tools` 5.0.0; `docs/design/approval.md`, D9 and the
+  amendment of 2026-10-06). Off, no answer carries `approval` and none is `not-approved`; audit
+  records say `contractVersion` 5.0.0, `tools/list` shows the optional `approval` in the
+  `get_section` and `get_provenance` output schemas and descriptions that state both modes, and the
+  published contract, not `tools/list`, carries the `not-approved` code.
+
+## Approval signer
+
+`ema-flow-<env>-signer` (`docs/design/approval.md`; ADR 0004) is the third Cloud Run deployable:
+the HTTP endpoint of the Google Chat app, built as a Workspace add-on, through which a named person
+approves a submission. Built 2026-10-06 (phase 1, steps 2 to 4 of the design); the add-on itself is
+the owner's to create (step 1), and until it is, nothing can call the signer and it refuses every
+event.
+
+- **Intended use.** Records a person's approval of one submission's content, as Google asserts the
+  person's identity, as a statement signed with the environment's approval key. It is the approval
+  service's signature over a statement naming the person, not the person's electronic signature, and
+  it claims no 21 CFR Part 11 or Annex 11 compliance.
+- **What it does.** On a `review <submission URI> <SHA-256>` message it reads the submission, runs
+  the gate, the preflights and the crosswalk, reads the document's head, builds the review and stores
+  it once under `reviews/<its SHA-256>`, and answers a card. On the Approve click it verifies both of
+  Google's tokens again, rebuilds the review, refuses one whose hash is not the click's, consumes the
+  person's token, signs with `approval-signing-hsm` (RSA-PSS, SHA-256, salt 32, HSM), verifies its own
+  signature, and appends the head create-if-absent in the `approval-heads` bucket. It calls nothing:
+  publishing is started by hand in phase 1.
+- **Identity and image.** `ema-flow-signer-<env>` holds `roles/cloudkms.signerVerifier` on
+  `approval-signing-hsm` (no other identity signs with it); create and read on the heads bucket;
+  create on the evidence bucket's `reviews/` and `approvals/` and read on `reviews/` (IAM
+  conditions); read on the submissions bucket; and the log writer role. No FHIR, BigQuery or other
+  key role (`test/infra/signer-identity.test.ts`). Its image is `Dockerfile --target signer`, by
+  digest, named in every statement it signs. Only the add-on's service account may invoke it
+  (`approval_addon_service_account`, empty by default).
+- **The worker's side.** With `APPROVAL_ENFORCEMENT` on (`approval_enforcement`, off by default
+  until the design's step 6), every persisted run needs a verified head: a `fixture` or
+  `healthcare-api` run is refused, and a `document` run publishes only under its document's head
+  statement, whole published record included, and links the version it wrote to it after the commit
+  (`docs/design/approval.md`, D5 and D8); off, it publishes as before. Every reader trusts exactly one
+  approval key version (`kms_approval_key_version`). The worker holds read on the heads bucket and `roles/cloudkms.publicKeyViewer` on the
+  approval key, and cannot sign or write an approval.
+
 ## Scale and failure behavior
 
 Each document is an independent, idempotent run. Workflows provides retries and execution
@@ -493,7 +538,10 @@ profiles, evidence schemas, or validation rules.
 - The synthetic SmPC is not medical advice or authorized product information.
 - Terminology validation runs offline in the validator sidecar (`-tx n/a`) for reproducibility;
   required external terminology checks need an approved, versioned terminology service.
-- Human content approval and regulated electronic signature are future control boundaries.
+- Human content approval is built for phase 1 (the approval signer, above) and is not in force for
+  the query service until `query_approval_verification` is on. Segregation of duties, `reject` and
+  `withdraw`, re-authentication at signing and a regulated electronic signature are future control
+  boundaries.
 - An authority import trusts the authority's HTTPS server at gate time (it serves no
   signature); the EMA calls its ePI service a pilot, so an import carries `authorityStatus:
 pilot` and an EMA outage refuses the run. Imports are dry-run only until roadmap 3a PR 5

@@ -53,6 +53,10 @@ export default defineConfig({
         "src/authority/**": { lines: 98, statements: 97, functions: 99, branches: 92 },
         "src/render/**": { lines: 97, statements: 96, functions: 99, branches: 87 },
         "src/fixtures/**": { lines: 94, statements: 94, functions: 100, branches: 80 },
+        // The approval library and the signer (docs/design/approval.md), measured 2026-10-06. The
+        // signer's floor holds its entry point (server.ts), which no test runs.
+        "src/approval/**": { lines: 98, statements: 96, functions: 97, branches: 89 },
+        "src/signer/**": { lines: 91, statements: 91, functions: 86, branches: 87 },
       },
     },
   },
