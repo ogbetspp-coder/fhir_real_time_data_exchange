@@ -18,5 +18,9 @@
   "1.2.1": {
     "sourceSha256": "8fee884c5c4311877840ee6d0333aab1df3f8ec9ea593ce598d0fe50a91da7fe",
     "vectorsSha256": "7899fde723abc51ffa0717a7a31cc193287612299a9eaa9dc5325daf31f238b5"
+  },
+  "1.2.2": {
+    "sourceSha256": "5917fff1c62b23f868cb8abad706271adc14fc6ac12e1b2c5de4950918e5b003",
+    "vectorsSha256": "ed728f4659a68aa95e3e142d3b53912aff49446161d0041896206b1a58335e45"
   }
 }

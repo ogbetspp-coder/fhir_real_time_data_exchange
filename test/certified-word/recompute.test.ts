@@ -19,6 +19,7 @@ import {
 } from "../../src/certified-word/gate.js";
 import { importCertifiedWord } from "../../src/certified-word/import.js";
 import {
+  exclusive,
   MAX_UPLOAD_BYTES,
   RecomputeFailedError,
   UploadRefusedError,
@@ -335,6 +336,41 @@ describe("the recompute's subprocess (D2)", () => {
     expect(seen.labelSha256).toBe(sha256Bytes(label("smpc")));
     expect(JSON.parse(seen.input as string)).toEqual(request);
     expect(existsSync(seen.label as string)).toBe(false);
+  });
+
+  it("runs one recompute at a time, in the order asked, a failure not stopping the next", async () => {
+    // Each run writes when it started and ended; overlapping runs would interleave.
+    const log = join(folder, "order.log");
+    writeFileSync(log, "");
+    const python = fake(
+      "takes-turns",
+      `const { appendFileSync } = require("node:fs");
+       appendFileSync(${JSON.stringify(log)}, "start\\n");
+       setTimeout(() => { appendFileSync(${JSON.stringify(log)}, "end\\n"); process.exit(3); }, 150);`,
+    );
+    const outcomes = await Promise.all([answer(python), answer(python), answer(python)]);
+    expect(outcomes).toEqual(["exit-status", "exit-status", "exit-status"]);
+    expect(readFileSync(log, "utf8").trim().split("\n")).toEqual([
+      "start",
+      "end",
+      "start",
+      "end",
+      "start",
+      "end",
+    ]);
+    const order: number[] = [];
+    await Promise.all([
+      exclusive(async () => {
+        await new Promise((done) => setTimeout(done, 30));
+        order.push(1);
+      }),
+      exclusive(() => Promise.reject(new Error("no"))).catch(() => order.push(2)),
+      exclusive(() => {
+        order.push(3);
+        return Promise.resolve();
+      }),
+    ]);
+    expect(order).toEqual([1, 2, 3]);
   });
 
   it("answers a refusal by its code, and only a token of it", async () => {

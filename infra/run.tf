@@ -78,10 +78,12 @@ resource "google_cloud_run_v2_service" "worker" {
         container_port = 8080
       }
 
+      # 2 GiB: a certified Word recompute (a Python subprocess, one at a time) peaked at 796 MB on
+      # the slowest EMA SmPC that builds (src/certified-word/recompute.ts, RECOMPUTE_TIMEOUT_MS).
       resources {
         limits = {
           cpu    = "1"
-          memory = "1Gi"
+          memory = "2Gi"
         }
       }
 

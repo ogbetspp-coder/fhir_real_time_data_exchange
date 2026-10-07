@@ -20,8 +20,13 @@ const UPLOAD_OBJECT = /^uploads\/sha256\/([0-9a-f]{64})\.docx$/;
 // The largest .docx the gate reads. The EMA's published Word labels are well under it.
 export const MAX_UPLOAD_BYTES = 32 * 1024 * 1024;
 
-// D2: the recompute's limits. The largest label at hand (9,795 paragraphs) took 4.1 s on a laptop.
-export const RECOMPUTE_TIMEOUT_MS = 60_000;
+// D2: the recompute's limits. Measured on an M2 laptop, 2026-10-07: the slowest EMA Word SmPC that
+// builds (2,280 paragraphs, 90,422 runs, two tracked changes, read by its accepted view) took 31.6 s
+// and peaked at 796 MB resident; the largest label at hand (9,795 paragraphs) took 4.1 s. A Cloud
+// Run vCPU is slower than a laptop core, so the limit leaves room: a label slower still is
+// refused (`timeout`), never read in part. The worker has 2 GiB and runs one recompute at a time
+// (`exclusive`), so two such reads never share its memory.
+export const RECOMPUTE_TIMEOUT_MS = 300_000;
 export const MAX_RECOMPUTE_OUTPUT_BYTES = 32 * 1024 * 1024;
 
 // Why the upload was not read, as a closed code; never a byte of it.
@@ -150,38 +155,49 @@ export function pythonRecompute(options: {
   timeoutMs?: number;
   maxOutputBytes?: number;
 }): CertifiedWordSources["recompute"] {
-  return async (docx, request) => {
-    const folder = await mkdtemp(join(tmpdir(), "certified-word-"));
-    try {
-      const label = join(folder, "label.docx");
-      await writeFile(label, docx, { mode: 0o600 });
-      const { status, stdout } = await run(
-        options.python,
-        ["-I", "-X", "utf8", "-m", "zone_a.recompute", label],
-        JSON.stringify(request),
-        {
-          cwd: options.root,
-          env: { ZONE_A_ROOT: options.root },
-          timeoutMs: options.timeoutMs ?? RECOMPUTE_TIMEOUT_MS,
-          maxOutputBytes: options.maxOutputBytes ?? MAX_RECOMPUTE_OUTPUT_BYTES,
-        },
-      );
-      if (status === 0) return { made: stdout };
-      if (status !== 1) throw new RecomputeFailedError("exit-status");
-      let refusal: unknown;
+  return (docx, request) =>
+    exclusive(async () => {
+      const folder = await mkdtemp(join(tmpdir(), "certified-word-"));
       try {
-        refusal = readAuthorityJson(stdout);
-      } catch {
-        throw new RecomputeFailedError("not-a-refusal");
+        const label = join(folder, "label.docx");
+        await writeFile(label, docx, { mode: 0o600 });
+        const { status, stdout } = await run(
+          options.python,
+          ["-I", "-X", "utf8", "-m", "zone_a.recompute", label],
+          JSON.stringify(request),
+          {
+            cwd: options.root,
+            env: { ZONE_A_ROOT: options.root },
+            timeoutMs: options.timeoutMs ?? RECOMPUTE_TIMEOUT_MS,
+            maxOutputBytes: options.maxOutputBytes ?? MAX_RECOMPUTE_OUTPUT_BYTES,
+          },
+        );
+        if (status === 0) return { made: stdout };
+        if (status !== 1) throw new RecomputeFailedError("exit-status");
+        let refusal: unknown;
+        try {
+          refusal = readAuthorityJson(stdout);
+        } catch {
+          throw new RecomputeFailedError("not-a-refusal");
+        }
+        const parsed = RecomputeRefusalSchema.safeParse(refusal);
+        if (!parsed.success) throw new RecomputeFailedError("not-a-refusal");
+        const { code } = parsed.data.refusal;
+        return { refused: CODE.test(code) ? code : "unnamed" };
+      } finally {
+        await rm(folder, { recursive: true, force: true });
       }
-      const parsed = RecomputeRefusalSchema.safeParse(refusal);
-      if (!parsed.success) throw new RecomputeFailedError("not-a-refusal");
-      const { code } = parsed.data.refusal;
-      return { refused: CODE.test(code) ? code : "unnamed" };
-    } finally {
-      await rm(folder, { recursive: true, force: true });
-    }
-  };
+    });
+}
+
+// One recompute at a time in this process, in the order asked: a label's read can take most of a
+// gigabyte (above), and the worker takes four requests at once. A failed recompute does not stop
+// the next.
+let running: Promise<unknown> = Promise.resolve();
+export function exclusive<T>(task: () => Promise<T>): Promise<T> {
+  const next = running.then(task, task);
+  running = next.catch(() => undefined);
+  return next;
 }
 
 // The worker's own: the submissions bucket under its identity, and the Python its image installs
