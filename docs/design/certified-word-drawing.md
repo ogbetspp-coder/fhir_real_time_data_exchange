@@ -465,7 +465,7 @@ Each check starts Chrome twice (once for the text, once for the list labels). Th
 checks, side by side.
 
 **Measured in PR 2** on Cloud Build's default machine, an e2-standard-2 ("Step 2", below): about
-about 1.5 build-minutes for a label of the corpus, and under 4 for the slowest read that builds.
+1.5 build-minutes for a label of the corpus, and under 4 for the slowest read that builds.
 Most of it is fixed: pulling the Cloud SDK image (38 s), main's source (2 to 3 s), the drawing
 image (about 20 s, estimated from the worker image's pull) and signing. The two drawings, at
 once, take 5 to 26 s for the corpus's labels that carry every section, and 132 to 152 s for the
