@@ -116,7 +116,8 @@ export function submissionDownloadOptions(maxBytes: number): {
   return { start: 0, end: maxBytes, decompress: false };
 }
 
-function storageFetcher(projectId: string): GcsObjectFetcher {
+// Also the certified Word gate's read of an upload (src/certified-word/recompute.ts, D4).
+export function storageFetcher(projectId: string): GcsObjectFetcher {
   const storage = new Storage({ projectId });
   return async (bucket, object, maxBytes) => {
     try {

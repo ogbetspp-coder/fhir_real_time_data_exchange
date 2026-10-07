@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -31,7 +32,7 @@ def _script() -> ModuleType:
 def test_the_committed_results_are_what_this_build_writes() -> None:
     script = _script()
     committed = {path.name: path.read_bytes() for path in script.TARGET.glob("*")}
-    assert committed == {name: text.encode("utf-8") for name, text in script.render().items()}
+    assert committed == script.render()
 
 
 def test_each_result_is_the_commands_and_the_labels_are_synthetic() -> None:
@@ -40,12 +41,18 @@ def test_each_result_is_the_commands_and_the_labels_are_synthetic() -> None:
     cases = json.loads(files["cases.json"])
     assert [case["name"] for case in cases] == [name for name, *_ in script._cases()]
     for case in cases:
-        written = files[f"{case['name']}.json"]
+        written = files[f"{case['name']}.json"].decode("utf-8")
         result = json.loads(written)
         if case["name"] == "smpc-refused":
             assert result == {"refusal": {"code": "section", "detail": "refused: smpc.4.2"}}
             continue
         assert written.endswith("\n")
+        # Each result is of its committed label, which the gate's tests read as the upload (D4).
+        label = files[f"{case['name']}.docx"]
+        assert result["source"] == {
+            "sha256": hashlib.sha256(label).hexdigest(),
+            "bytes": len(label),
+        }
         assert result["versions"] == recompute.versions(case["request"]["document"])
         assert all(s["refusal"] is None for s in result["sections"])
         # Every narrative says it is synthetic (test/synthetic-only.test.ts).

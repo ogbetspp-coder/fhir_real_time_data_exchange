@@ -1,3 +1,5 @@
+import { isAbsolute } from "node:path";
+
 import { z } from "zod";
 
 import { ApprovalEnvironment } from "./contracts/approval.js";
@@ -5,6 +7,7 @@ import { GitCommit, ImageDigest, Token } from "./contracts/common.js";
 import type { RunRequest } from "./contracts/run-request.js";
 
 const optionalNonEmpty = z.string().trim().min(1).optional();
+const AbsolutePath = z.string().trim().refine(isAbsolute, "must be an absolute path").optional();
 
 export type RunSource = RunRequest["source"];
 
@@ -69,6 +72,13 @@ const ConfigSchema = z
       .min(1_024)
       .max(256 * 1_024 * 1_024)
       .default(48 * 1_024 * 1_024),
+    // The Python the certified Word gate runs `zone_a.recompute` with, and the directory holding
+    // the registry and mapping files it reads (docs/design/certified-word-import.md, D2), each an
+    // absolute path: the subprocess has no PATH to look a name up in, and a relative one would
+    // depend on the service's working directory. The worker image sets both (Dockerfile); unset,
+    // the gate cannot recompute, and refuses a certified Word submission that is not a dry run.
+    RECOMPUTE_PYTHON: AbsolutePath,
+    ZONE_A_ROOT: AbsolutePath,
     FHIR_ANALYTICS_DATASET: optionalNonEmpty,
     TRANSFORMATION_LEDGER_DATASET: optionalNonEmpty,
     TRANSFORMATION_LEDGER_TABLE: z.string().trim().min(1).default("transformation_runs"),

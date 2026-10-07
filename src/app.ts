@@ -229,6 +229,10 @@ export function createApp(overrides: AppOverrides = {}): Hono<AppEnvironment> {
       ...(result.evidence.manifest.ingestion === undefined
         ? {}
         : { submissionId: result.evidence.manifest.ingestion.submissionId }),
+      // A certified Word run's closed field: whether its gate recomputed (src/certified-word/gate.ts).
+      ...(result.certifiedWordCheck === undefined
+        ? {}
+        : { certifiedWordCheck: result.certifiedWordCheck }),
     });
   });
 

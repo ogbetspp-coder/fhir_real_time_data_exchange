@@ -6,7 +6,9 @@ ADR 0006 decision 1's second leg, P4 D2 (``docs/design/certified-word-import.md`
 make, from the uploaded bytes and what a person confirmed, the very sections the submission
 carries. This is the one function both sides run: the producer to make the sections, the gate to
 make them again and compare. It is deterministic and reads nothing but the bytes and the committed
-registry and mapping files: no network, no clock, no browser (the drawing is D3's, not this).
+registry and mapping files: no network, no clock, no browser (the drawing is D3's, not this). The
+files are read from this checkout, or from ``ZONE_A_ROOT`` where it is set: the worker image
+installs the package, which then is in no checkout, and names its copy of the files there.
 
 The request (JSON on standard input) names:
 
@@ -32,6 +34,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 from collections.abc import Mapping
 from pathlib import Path
@@ -44,7 +47,7 @@ from zone_a import leaflet, structure, word_epi
 from zone_a.canonical_json import canonical_json
 from zone_a.certified import VIEWS, read_body
 
-RECOMPUTE_VERSION: Final = "recompute/1.0.0"
+RECOMPUTE_VERSION: Final = "recompute/1.1.0"
 
 ROOT: Final = Path(__file__).resolve().parents[3]
 # The registry and the mapping each document is found by.
@@ -191,7 +194,7 @@ def main(argv: list[str] | None = None) -> int:
     except OSError:
         return _refuse("request", "the label cannot be read")
     try:
-        result = recompute(data, request)
+        result = recompute(data, request, Path(os.environ.get("ZONE_A_ROOT", ROOT)))
     except RefusedError as refused:
         return _refuse(refused.code, refused.detail)
     sys.stdout.write(canonical_json(result) + "\n")

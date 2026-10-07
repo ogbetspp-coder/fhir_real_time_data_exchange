@@ -42,13 +42,13 @@ import {
 // function of what `python -m zone_a.recompute` wrote for a Word label and what a person confirmed
 // for it, to the canonical submission. Narratives, pages and titles come only from the recompute;
 // nothing is added, reordered or reworded. The producer runs it on the recompute it ran; Zone B's
-// gate will run the recompute again on the uploaded bytes and this again on its result, and
-// require the same submission (D2). It reads no clock, no locale and no network.
+// gate runs the recompute again on the uploaded bytes and this again on its result, and
+// requires the same submission (D2). It reads no clock, no locale and no network.
 
 // The importer's version: with the recompute's versions it names the extractor (ADR 0006 decision
 // 6), and it is locked to the hash of this directory's code and of its golden vectors
 // (importer.lock.json, `npm run certified-word:lock`), so a change of what it makes changes it.
-export const IMPORTER_VERSION = "1.0.0";
+export const IMPORTER_VERSION = "1.1.0";
 export const CERTIFIED_WORD_IMPORTER = `certified-word-import/${IMPORTER_VERSION}`;
 
 export const CERTIFIED_WORD_IDENTIFIER_SYSTEM = "https://khs.dev/fhir/identifier/certified-word";

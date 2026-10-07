@@ -311,7 +311,10 @@ export const CanonicalSubmissionSchema = CanonicalSubmissionBase.superRefine(
 
 // A refusal the HTTP caller learns by its closed code (src/app.ts); every other rejection says only
 // that the submission was rejected.
-export type SubmissionRefusal = "certified-word-not-recomputed";
+export type SubmissionRefusal =
+  | "certified-word-not-recomputed"
+  | "certified-word-recompute-refused"
+  | "certified-word-drawing-missing";
 
 export class SubmissionRejectedError extends Error {
   public constructor(
@@ -424,9 +427,10 @@ function unverifiedTextIssues(bundle: unknown, verifiedDivPaths: Set<string>): s
 export type GateOptions = {
   allowSyntheticSources: boolean;
   recomputedImport?: { submissionSha256: string } | undefined;
-  // A certified Word submission the gate let through unrecomputed because the run is a dry run
-  // (docs/design/certified-word-import.md, D2): set only by src/certified-word/gate.ts, and only
-  // while DRY_RUN is true, until the gate recomputes it.
+  // A certified Word submission src/certified-word/gate.ts let through as a dry run, set only
+  // there and only while DRY_RUN is true: recomputed from its upload and compared where the worker
+  // can recompute (docs/design/certified-word-import.md, D2, D4), its own checks only where it
+  // cannot. No drawing record (D3) vouches for it yet, so nothing else lets one through.
   certifiedWordDryRun?: { submissionSha256: string } | undefined;
 };
 
@@ -672,11 +676,12 @@ export function verifyDocumentSubmission(
     if (!CERTIFIED_WORD_IDENTIFIER.test(identifier)) {
       issues.push("A certified Word import's Bundle identifier is its certified-word value");
     }
-    // Zone B does not yet make the sections again from the bytes (ADR 0002 invariant 11, as ADR
-    // 0006 amends it): until it does, a certified Word source passes only a dry run.
+    // A certified Word source is admitted once Zone B has made its sections again (D2) and the
+    // renderer gate has drawn them (D3; ADR 0002 invariant 11, as ADR 0006 amends it). The drawing
+    // is not built, so one passes only a dry run.
     if (options.certifiedWordDryRun?.submissionSha256 !== sha256(submission)) {
       issues.push(
-        "A certified Word source is accepted only as a dry run until Zone B recomputes it",
+        "A certified Word source is accepted only as a dry run until its drawing is recorded",
       );
     }
   }

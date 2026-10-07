@@ -73,6 +73,8 @@ step "Zone A: differential corpus at seed $DIFFERENTIAL_RUN_SEED"
 npx tsx scripts/fidelity/differential.ts --seed "$DIFFERENTIAL_RUN_SEED" --count 2000 >> differential.jsonl
 step "Zone A: uv run --frozen pytest --cov"
 (cd zone-a && DIFFERENTIAL_CORPUS="$ROOT/differential.jsonl" "$UV" run --frozen pytest --cov)
+step "Zone A: the certified Word gate with this Python's recompute"
+RECOMPUTE_PYTHON="$ROOT/zone-a/.venv/bin/python" npx vitest run test/certified-word/recompute.test.ts
 
 # --- Agent (job: agent) --------------------------------------------------------------------
 step "Agent: uv sync --locked"

@@ -164,3 +164,20 @@ def test_the_command_writes_the_result_or_the_refusal(
     assert recompute.main([str(tmp_path / "missing.docx")]) == 1
     assert json.loads(capsys.readouterr().out)["refusal"]["detail"] == "the label cannot be read"
     assert recompute.main([]) == 2
+
+
+def test_the_command_reads_the_files_under_zone_a_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # The worker image installs the package, which is then in no checkout: it names its copy of the
+    # registry and mapping files in ZONE_A_ROOT, and the command reads them there.
+    label = tmp_path / "label.docx"
+    label.write_bytes(_docx(*_smpc()))
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(_request())))
+    monkeypatch.setenv("ZONE_A_ROOT", str(tmp_path))
+    with pytest.raises(FileNotFoundError):
+        recompute.main([str(label)])
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(_request())))
+    monkeypatch.setenv("ZONE_A_ROOT", str(ROOT))
+    assert recompute.main([str(label)]) == 0
+    assert json.loads(capsys.readouterr().out)["versions"] == recompute.versions("smpc")

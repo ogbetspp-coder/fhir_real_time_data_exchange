@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
@@ -67,22 +67,25 @@ function buildkitOnly(text: string): string[] {
 }
 
 describe("the worker and query image", () => {
-  it("is one file with a build stage, a runtime, and a target per service, the worker last", () => {
+  it("is one file with build stages, a runtime, and a target per service, the worker last", () => {
     expect(existsSync("Dockerfile.query")).toBe(false);
     expect(stages.map(({ name }) => name)).toEqual([
       "build",
+      "uv",
+      "python",
       "runtime",
       "query",
       "signer",
       "worker",
     ]);
-    expect(stages[2]?.image).toBe("runtime");
-    expect(stages[3]?.image).toBe("runtime");
-    expect(stages[4]?.image).toBe("runtime");
+    expect(stages.slice(4).map(({ image }) => image)).toEqual(["runtime", "runtime", "runtime"]);
+    // The query service's and the signer's target is the runtime and their command; the worker's
+    // adds the recompute's Python first (below).
     const cmd = (target: string) =>
-      new RegExp(`^FROM runtime AS ${target}\\n(?:#[^\\n]*\\n)*CMD (\\[[^\\n]*\\])$`, "m").exec(
-        dockerfile,
-      )?.[1];
+      new RegExp(
+        `^FROM runtime AS ${target}\\n(?:(?:#|COPY --from=python |COPY qrd/|ENV |    |RUN \\[")[^\\n]*\\n)*CMD (\\[[^\\n]*\\])$`,
+        "m",
+      ).exec(dockerfile)?.[1];
     expect(cmd("worker")).toBe('["node", "dist/server.js"]');
     expect(cmd("query")).toBe('["node", "dist/query/server.js"]');
     expect(cmd("signer")).toBe('["node", "dist/signer/server.js"]');
@@ -90,7 +93,10 @@ describe("the worker and query image", () => {
 
   it("runs the pinned Node binary on a Debian base pinned by digest, which Dependabot moves", () => {
     expect(stages[0]?.image).toMatch(/^node:22\.22\.0-bookworm-slim@sha256:[0-9a-f]{64}$/);
-    expect(stages[1]?.image).toMatch(/^debian:bookworm-slim@sha256:[0-9a-f]{64}$/);
+    expect(stages[3]?.image).toMatch(/^debian:bookworm-slim@sha256:[0-9a-f]{64}$/);
+    // The recompute's Python is built on the same Debian, by the uv CI pins.
+    expect(stages[2]?.image).toBe(stages[3]?.image);
+    expect(stages[1]?.image).toMatch(/^ghcr\.io\/astral-sh\/uv:0\.12\.17@sha256:[0-9a-f]{64}$/);
     expect(dockerfile).toMatch(
       /^COPY --from=build \/usr\/local\/bin\/node \/usr\/local\/bin\/node$/m,
     );
@@ -121,6 +127,47 @@ describe("the worker and query image", () => {
       /^COPY --chown=node:node fhir\/validator-packages\.lock \.\/fhir\/validator-packages\.lock$/m,
     );
     expect(dockerfile).toMatch(/^USER node$/m);
+  });
+
+  // docs/design/certified-word-import.md, D2: the worker alone carries Python 3.14, the zone-a and
+  // label-docx packages from zone-a/uv.lock, not editable, and the files zone_a.recompute reads,
+  // and names them to the gate; the query service's and the signer's images carry none of it.
+  it("gives the worker, and only the worker, the recompute's Python and files", () => {
+    expect(dockerfile).toMatch(/^RUN uv python install 3\.14\.\d+$/m);
+    expect(dockerfile).toMatch(
+      /^RUN uv sync --locked --no-dev --no-editable --python 3\.14\.\d+ --project zone-a$/m,
+    );
+    const worker = dockerfile.slice(dockerfile.indexOf("FROM runtime AS worker"));
+    const others = dockerfile.slice(
+      dockerfile.indexOf("FROM runtime AS query"),
+      dockerfile.indexOf("FROM runtime AS worker"),
+    );
+    for (const line of [
+      "COPY --from=python /opt/python /opt/python",
+      "COPY --from=python /opt/zone-a /opt/zone-a",
+      "COPY qrd/registry ./qrd/registry",
+    ]) {
+      expect([line, worker.includes(line), others.includes(line)]).toEqual([line, true, false]);
+    }
+    expect(worker).toMatch(
+      /^ENV RECOMPUTE_PYTHON=\/opt\/zone-a\/bin\/python \\\n {4}ZONE_A_ROOT=\/app$/m,
+    );
+    expect(worker).toContain("unicodedata.unidata_version");
+    expect(readFileSync(".dockerignore", "utf8")).toMatch(/^!zone-a\/uv\.lock$/m);
+    // CI pins the same uv, and every workflow's Python is the image's, patch and all (review of
+    // #196: CI's "3.14" had moved to 3.14.8 while the image ran 3.14.7).
+    expect(readFileSync(".github/workflows/ci.yml", "utf8")).toContain('version: "0.12.17"');
+    const image = /^RUN uv python install (\S+)$/m.exec(dockerfile)?.[1];
+    expect(dockerfile).toContain(`--python ${image ?? ""} --project zone-a`);
+    const workflows = readdirSync(".github/workflows").flatMap((file) =>
+      [
+        ...readFileSync(`.github/workflows/${file}`, "utf8").matchAll(
+          /^\s+python-version: "([^"]+)"$/gm,
+        ),
+      ].map(([, version]) => [file, version]),
+    );
+    expect(workflows.length).toBeGreaterThanOrEqual(5);
+    for (const [file, version] of workflows) expect([file, version]).toEqual([file, image]);
   });
 
   it("leaves the renderer's code out of the build", () => {
@@ -186,6 +233,22 @@ describe("the Cloud Build configuration", () => {
       expect([file, buildkitOnly(readFileSync(file, "utf8"))]).toEqual([file, []]);
     expect(readFileSync("scripts/ci/build-images.sh", "utf8")).toMatch(
       /^export DOCKER_BUILDKIT=0$/m,
+    );
+  });
+
+  // docs/design/certified-word-import.md, D2: the deploy rebuilds the worker in Cloud Build, so the
+  // image that is pushed is proven there, by the script CI's Images job runs (review of #196).
+  it("runs the recompute smoke on the worker it built, before anything is pushed", () => {
+    const smoke = cloudbuildSteps().find(({ id }) => id === "worker-recompute-smoke");
+    expect(smoke?.args).toEqual([
+      "scripts/ci/worker-recompute-smoke.sh",
+      "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/worker:${_IMAGE_TAG}",
+    ]);
+    expect(cloudbuild).toMatch(
+      /- id: worker-recompute-smoke\n(?: {4}.*\n)*? {4}waitFor: \["build-app-image"\]\n {4}entrypoint: bash\n/,
+    );
+    expect(readFileSync("scripts/ci/build-images.sh", "utf8")).toMatch(
+      /^bash scripts\/ci\/worker-recompute-smoke\.sh ema-flow\/worker:ci$/m,
     );
   });
 

@@ -10,6 +10,8 @@
 #   - the worker's build asserts Node 22.22.0, ICU 77.1 and Unicode 16.0 in the image itself;
 #   - the worker and the query service run as `node` with their own command, and the worker's
 #     image holds the standards lock its run manifest names;
+#   - the worker's image asserts its Python's Unicode version, and its recompute makes each committed
+#     synthetic Word label's result again, byte for byte (the certified Word gate, D2);
 #   - the validator runs as a user without root, holds no curl or wget, and starts with no
 #     network at all, loading only installed packages, under universal jurisdiction in the pinned
 #     locale (the same judgement, by the same script, as cloudbuild.images.yaml's
@@ -50,6 +52,25 @@ docker run --rm --network none ema-flow/worker:ci node --input-type=module -e '
   if (packages.length === 0) process.exit(1);
   console.log(`worker image: ${packages.length} pinned packages in its two locks`);
 '
+
+# The certified Word recompute in the worker's image (docs/design/certified-word-import.md, D2), as
+# Cloud Build runs it before pushing: the gate's own runner makes again, byte for byte, what
+# `python -m zone_a.recompute` wrote for each committed synthetic label. Once more on a copy with
+# one byte of one result changed, which must fail, so a smoke that cannot fail is caught here.
+bash scripts/ci/worker-recompute-smoke.sh ema-flow/worker:ci
+changed="$(mktemp -d)"
+cp -R test/fixtures/certified-word/recompute/. "$changed"
+sed -i 's/"changes":0/"changes":1/' "$changed/smpc.json"
+if cmp -s "$changed/smpc.json" test/fixtures/certified-word/recompute/smpc.json; then
+  echo "The smoke's changed copy is not changed." >&2
+  exit 1
+fi
+if bash scripts/ci/worker-recompute-smoke.sh ema-flow/worker:ci "$changed" 2>/dev/null; then
+  echo "The worker image's recompute smoke passed a changed result." >&2
+  exit 1
+fi
+rm -rf "$changed"
+echo "worker image: the recompute smoke fails on a changed result"
 
 if docker run --rm --network none --entrypoint sh ema-flow/validator:ci -c 'command -v curl || command -v wget'; then
   echo "The validator's runtime image still holds a download tool." >&2

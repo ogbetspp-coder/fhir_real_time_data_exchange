@@ -277,8 +277,11 @@ jobs:
         with:
           # ADR 0003 pins the Unicode Character Database, and the UCD ships with the
           # interpreter: 3.14 is Unicode 16.0, the same as the Zone B runtime image.
-          # tests/test_environment.py asserts this rather than trusting it.
-          python-version: "3.14"
+          # tests/test_environment.py asserts this rather than trusting it. The patch is the one
+          # the worker image's recompute runs (Dockerfile, `uv python install`), so the gate's
+          # Python step below tests the interpreter that ships; every workflow pins the same one
+          # (test/ci/pin-freshness.test.ts), and test/ci/images.test.ts holds it to the image's.
+          python-version: "3.14.7"
 
       - name: Set up uv
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
@@ -332,6 +335,16 @@ jobs:
           DIFFERENTIAL_CORPUS: ${{ github.workspace }}/differential.jsonl
         run: uv run --frozen pytest --cov
 
+      # The certified Word gate with the real recompute (docs/design/certified-word-import.md, D2):
+      # the Check job has no Python, so there the gate's tests run on the recompute's committed
+      # results; here the gate's runner runs this job's Python on the committed labels, and the
+      # tests also require it to make each committed result again, byte for byte.
+      - name: Recompute the committed Word labels through the gate
+        working-directory: .
+        env:
+          RECOMPUTE_PYTHON: ${{ github.workspace }}/zone-a/.venv/bin/python
+        run: npx vitest run test/certified-word/recompute.test.ts
+
   agent:
     name: Agent
     runs-on: ubuntu-24.04
@@ -351,7 +364,7 @@ jobs:
         with:
           # The highest version google-adk 2.9.2 and Vertex AI Agent Engine both support.
           # agent/README.md "Why 3.14" carries the citations.
-          python-version: "3.14"
+          python-version: "3.14.7"
 
       - name: Set up uv
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0

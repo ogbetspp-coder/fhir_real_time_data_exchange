@@ -46,7 +46,8 @@ import {
 import { GcpLineagePublisher } from "./gcp/lineage.js";
 import { defaultFetcher, type AuthorityFetcher } from "./authority/fetch.js";
 import { verifyAuthorityImport, type AuthorityGateResult } from "./authority/gate.js";
-import { verifyCertifiedWordImport } from "./certified-word/gate.js";
+import { verifyCertifiedWordImport, type CertifiedWordCheck } from "./certified-word/gate.js";
+import { certifiedWordSources, type CertifiedWordSources } from "./certified-word/recompute.js";
 import { sha256Bytes } from "./authority/import.js";
 import { approvalLinkProvenance } from "./approval/link.js";
 import { recordFacts } from "./approval/review.js";
@@ -97,6 +98,8 @@ export type PipelineResult = {
   // The version of the EMA document Bundle the transaction wrote, as its response named it;
   // absent for a dry run, or when the response did not say.
   persistedBundle?: PersistedVersion;
+  // For a certified Word source, what its gate proved (src/certified-word/gate.ts).
+  certifiedWordCheck?: CertifiedWordCheck;
 };
 
 // What a run sends to the official HL7 validator and to the Cloud Healthcare API's $validate, each
@@ -222,17 +225,22 @@ async function documentGate(
   config: AppConfig,
   runId: string,
   dependencies: PipelineDependencies,
-): Promise<{ gate: DocumentGateResult; authority?: AuthorityRun }> {
+): Promise<{
+  gate: DocumentGateResult;
+  authority?: AuthorityRun;
+  certifiedWordCheck?: CertifiedWordCheck;
+}> {
   const options = { allowSyntheticSources: config.ALLOW_SYNTHETIC_SOURCES };
   try {
     const claimed = claimedSourceKind(input.submission);
     if (claimed === "certified-word") {
-      return {
-        gate: verifyCertifiedWordImport(input, mapping.sourceCodeSystem, {
-          ...options,
-          dryRun: config.DRY_RUN,
-        }),
-      };
+      const { gate, check } = await verifyCertifiedWordImport(
+        input,
+        mapping,
+        { ...options, dryRun: config.DRY_RUN },
+        dependencies.certifiedWord ?? certifiedWordSources(config),
+      );
+      return { gate, certifiedWordCheck: check };
     }
     if (claimed === "authority-publication") {
       const fetcher =
@@ -261,6 +269,9 @@ async function documentGate(
 // What a run may be given instead of its production default; tests use it.
 export type PipelineDependencies = {
   authorityFetcher?: AuthorityFetcher;
+  // Where the certified Word gate reads an upload and runs the recompute; from the configuration
+  // by default (src/certified-word/recompute.ts).
+  certifiedWord?: CertifiedWordSources;
   // Where a document run reads its head statement and the approval key's public keys; Cloud
   // Storage and Cloud KMS from the configuration by default.
   approvals?: { heads: HeadSource; keys: KeySource };
@@ -357,9 +368,16 @@ export async function runPipeline(
 
   let gate: DocumentGateResult | undefined;
   let authority: AuthorityRun | undefined;
+  let certifiedWordCheck: CertifiedWordCheck | undefined;
   let source: FhirBundle;
   if (input.sourceKind === "document") {
-    ({ gate, authority } = await documentGate(input, mapping, config, runId, dependencies));
+    ({ gate, authority, certifiedWordCheck } = await documentGate(
+      input,
+      mapping,
+      config,
+      runId,
+      dependencies,
+    ));
     source = gate.bundle;
   } else {
     source = input.source;
@@ -520,6 +538,7 @@ export async function runPipeline(
       outcome: status,
       durationMs: Date.now() - stageStarted,
       mappingDecisions: transformed.mappingDecisions.length,
+      ...(certifiedWordCheck === undefined ? {} : { certifiedWordCheck }),
     });
 
     return {
@@ -537,6 +556,7 @@ export async function runPipeline(
       evidence: signed,
       artifactUris,
       ...(persistedBundle === undefined ? {} : { persistedBundle }),
+      ...(certifiedWordCheck === undefined ? {} : { certifiedWordCheck }),
     };
   };
 

@@ -12,5 +12,13 @@ test
 .cache
 .claude
 agent
-zone-a
-label-docx-reader
+# Zone A and the label reader: only what the worker's recompute installs (Dockerfile, the python
+# stage) reaches the build.
+zone-a/*
+!zone-a/pyproject.toml
+!zone-a/uv.lock
+!zone-a/src
+label-docx-reader/*
+!label-docx-reader/pyproject.toml
+!label-docx-reader/src
+**/__pycache__

@@ -58,6 +58,24 @@ function issues(run: () => unknown): string[] {
   return [];
 }
 
+// The gate where the worker cannot recompute (no bucket or no Python configured): what the
+// submission holds only, and a dry run only (test/certified-word/recompute.test.ts recomputes).
+function verify(
+  input: DocumentSubmissionInput,
+  options: { allowSyntheticSources: boolean; dryRun: boolean } = OPTIONS,
+) {
+  return verifyCertifiedWordImport(input, mapping, options, undefined);
+}
+
+async function rejection(gate: Promise<unknown>): Promise<SubmissionRejectedError> {
+  const error: unknown = await gate.then(
+    () => undefined,
+    (cause: unknown) => cause,
+  );
+  if (error instanceof SubmissionRejectedError) return error;
+  throw new Error("not refused", { cause: error });
+}
+
 // The submission changed and its hashes made again, so only the rule under test refuses it.
 function resealed(submission: CanonicalSubmission): CanonicalSubmission {
   const sealed = { ...submission, bundleSha256: sha256(submission.bundle) };
@@ -68,25 +86,22 @@ function resealed(submission: CanonicalSubmission): CanonicalSubmission {
 }
 
 describe("the certified Word gate", () => {
-  it("passes a dry run, through every check of the ordinary gate", () => {
+  it("passes a dry run, through every check of the ordinary gate", async () => {
     const input = imported();
-    const gate = verifyCertifiedWordImport(input, mapping.sourceCodeSystem, OPTIONS);
+    const { gate, check } = await verify(input);
     expect(gate.submission).toEqual(input.submission);
     expect(gate.narrativeSections.length).toBe(input.submission.provenance.sections.length);
+    // Where the worker cannot recompute, the answer says the dry run checked the submission only.
+    expect(check).toBe("submission-only");
   });
 
-  it("refuses one when DRY_RUN is false, with its closed code", () => {
-    expect(
-      issues(() =>
-        verifyCertifiedWordImport(imported(), mapping.sourceCodeSystem, {
-          ...OPTIONS,
-          dryRun: false,
-        }),
-      ),
-    ).toEqual([CERTIFIED_WORD_NOT_RECOMPUTED]);
+  it("refuses one when DRY_RUN is false, with its closed code", async () => {
+    expect((await rejection(verify(imported(), { ...OPTIONS, dryRun: false }))).issues).toEqual([
+      CERTIFIED_WORD_NOT_RECOMPUTED,
+    ]);
   });
 
-  it("refuses a submission another version of the importer made", () => {
+  it("refuses a submission another version of the importer made", async () => {
     const input = imported();
     const source = input.submission.provenance.sourceDocument;
     if (source.kind !== "certified-word") throw new Error("not a certified Word source");
@@ -111,58 +126,35 @@ describe("the certified Word gate", () => {
       },
     });
     expect(structuralInvariantIssues(other)).toEqual([]);
-    expect(
-      issues(() =>
-        verifyCertifiedWordImport(
-          { ...input, submission: other },
-          mapping.sourceCodeSystem,
-          OPTIONS,
-        ),
-      ),
-    ).toEqual(["The submission was made by another importer version than the gate runs"]);
+    expect((await rejection(verify({ ...input, submission: other }))).issues).toEqual([
+      "The submission was made by another importer version than the gate runs",
+    ]);
   });
 
-  it("gives the HTTP caller its closed code when DRY_RUN is false", () => {
-    try {
-      verifyCertifiedWordImport(imported(), mapping.sourceCodeSystem, {
-        ...OPTIONS,
-        dryRun: false,
-      });
-    } catch (error) {
-      expect(error).toBeInstanceOf(SubmissionRejectedError);
-      expect((error as SubmissionRejectedError).reason).toBe("certified-word-not-recomputed");
-      return;
-    }
-    throw new Error("not refused");
+  it("gives the HTTP caller its closed code when DRY_RUN is false", async () => {
+    expect((await rejection(verify(imported(), { ...OPTIONS, dryRun: false }))).reason).toBe(
+      "certified-word-not-recomputed",
+    );
   });
 
-  it("refuses what is not a certified Word submission, or not a submission", () => {
+  it("refuses what is not a certified Word submission, or not a submission", async () => {
     const drawn = createSyntheticSubmission(mapping);
-    expect(
-      issues(() => verifyCertifiedWordImport(drawn, mapping.sourceCodeSystem, OPTIONS)),
-    ).toEqual(["Not a certified Word import"]);
+    expect((await rejection(verify(drawn))).issues).toEqual(["Not a certified Word import"]);
     const invalid = { ...imported(), submission: { schemaVersion: "3.0.0" } };
-    expect(
-      issues(() => verifyCertifiedWordImport(invalid, mapping.sourceCodeSystem, OPTIONS)).length,
-    ).toBeGreaterThan(0);
+    expect((await rejection(verify(invalid))).issues.length).toBeGreaterThan(0);
   });
 
-  it("bounds the input's shape before anything walks or hashes it", () => {
+  it("bounds the input's shape before anything walks or hashes it", async () => {
     let deep: unknown = "x";
     for (let depth = 0; depth < 60; depth += 1) deep = { deep };
-    const found = issues(() =>
-      verifyCertifiedWordImport(
-        { ...imported(), fidelityReport: deep },
-        mapping.sourceCodeSystem,
-        OPTIONS,
-      ),
-    );
-    expect(found).toEqual(["fidelityReport nesting exceeds depth 48"]);
+    const found = await rejection(verify({ ...imported(), fidelityReport: deep }));
+    expect(found.issues).toEqual(["fidelityReport nesting exceeds depth 48"]);
   });
 
   it("is the only way past the ordinary gate, for the very submission it examined", () => {
     const input = imported();
-    const rule = "A certified Word source is accepted only as a dry run until Zone B recomputes it";
+    const rule =
+      "A certified Word source is accepted only as a dry run until its drawing is recorded";
     expect(
       issues(() =>
         verifyDocumentSubmission(input, mapping.sourceCodeSystem, { allowSyntheticSources: true }),
@@ -180,15 +172,10 @@ describe("the certified Word gate", () => {
 });
 
 describe("a certified Word source's ingress rules", () => {
-  it("synthetic only where the deployment accepts it, and marked as one throughout", () => {
+  it("synthetic only where the deployment accepts it, and marked as one throughout", async () => {
     const input = imported();
     expect(
-      issues(() =>
-        verifyCertifiedWordImport(input, mapping.sourceCodeSystem, {
-          allowSyntheticSources: false,
-          dryRun: true,
-        }),
-      ),
+      (await rejection(verify(input, { allowSyntheticSources: false, dryRun: true }))).issues,
     ).toEqual(["Synthetic content where the deployment accepts none"]);
     // Real ids, synthetic narratives: a non-synthetic submission carrying the marker.
     const found = recomputedCases()[0];
@@ -203,9 +190,9 @@ describe("a certified Word source's ingress rules", () => {
         holder: { ...request.product.holder, id: "33333333-3333-4333-8333-333333333333" },
       },
     });
-    expect(
-      issues(() => verifyCertifiedWordImport(real, mapping.sourceCodeSystem, OPTIONS)),
-    ).toEqual(["A non-synthetic submission carries a synthetic mark"]);
+    expect((await rejection(verify(real))).issues).toEqual([
+      "A non-synthetic submission carries a synthetic mark",
+    ]);
   });
 
   it("holds the source, the graph, the approval and the extractor together (invariant 7)", () => {
@@ -276,7 +263,7 @@ describe("a certified Word source's ingress rules", () => {
     );
   });
 
-  it("writes its namespace only from its own source, as its importer derives it", () => {
+  it("writes its namespace only from its own source, as its importer derives it", async () => {
     const input = imported();
     const odd = resealed({
       ...input.submission,
@@ -288,11 +275,9 @@ describe("a certified Word source's ingress rules", () => {
         },
       },
     });
-    expect(
-      issues(() =>
-        verifyCertifiedWordImport({ ...input, submission: odd }, mapping.sourceCodeSystem, OPTIONS),
-      ),
-    ).toEqual(["A certified Word import's Bundle identifier is its certified-word value"]);
+    expect((await rejection(verify({ ...input, submission: odd }))).issues).toEqual([
+      "A certified Word import's Bundle identifier is its certified-word value",
+    ]);
 
     const drawn = createSyntheticSubmission(mapping);
     const claimed = resealed({
