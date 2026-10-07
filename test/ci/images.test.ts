@@ -67,6 +67,26 @@ function buildkitOnly(text: string): string[] {
 }
 
 describe("the worker and query image", () => {
+  // gcloud reads the file as YAML before any step runs; the readers above are lenient line
+  // matchers, so a stray line inside the step list (a string where a step must be a mapping)
+  // passed them and failed the deploy (2026-10-07, "'str' object has no attribute 'items'").
+  it("is shaped as Cloud Build reads it: each step a mapping with an id, each build ending in its context", () => {
+    const start = cloudbuild.indexOf("\nsteps:\n");
+    const end = cloudbuild.indexOf("\nimages:\n");
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const strays = cloudbuild
+      .slice(start + "\nsteps:\n".length, end)
+      .split("\n")
+      .filter(
+        (line) => /^ {0,3}\S/.test(line) && !/^ {2}- id: \S+$/.test(line) && !/^ {2}#/.test(line),
+      );
+    expect(strays).toEqual([]);
+    const builds = cloudbuildSteps().filter((step) => step.args[0] === "build");
+    expect(builds.length).toBeGreaterThan(0);
+    for (const step of builds) expect([step.id, step.args.at(-1)]).toEqual([step.id, "."]);
+  });
+
   it("is one file with build stages, a runtime, and a target per service, the worker last", () => {
     expect(existsSync("Dockerfile.query")).toBe(false);
     expect(stages.map(({ name }) => name)).toEqual([

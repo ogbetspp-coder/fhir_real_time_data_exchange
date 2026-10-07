@@ -155,8 +155,7 @@ steps:
       - org.opencontainers.image.revision=${_REVISION}
       - --tag
       - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/signer:${_IMAGE_TAG}
-  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/word-drawing:${_IMAGE_TAG}
-    - .
+      - .
 
   # The Word drawing's image (docs/design/certified-word-drawing.md, "The image"): Dockerfile.renderer's
   # word-drawing target, pushed so that a pull request pins its digest per environment
