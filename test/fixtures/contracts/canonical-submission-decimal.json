@@ -656,21 +656,27 @@
           "type": {
             "coding": [
               {
-                "code": "MedicinalProduct"
+                "system": "http://hl7.org/fhir/medicinal-product-type",
+                "code": "MedicinalProduct",
+                "display": "Medicinal Product"
               }
             ]
           },
           "domain": {
             "coding": [
               {
-                "code": "Human"
+                "system": "http://hl7.org/fhir/medicinal-product-domain",
+                "code": "Human",
+                "display": "Human use"
               }
             ]
           },
           "status": {
             "coding": [
               {
-                "code": "active"
+                "system": "http://hl7.org/fhir/publication-status",
+                "code": "active",
+                "display": "Active"
               }
             ]
           },
@@ -708,7 +714,9 @@
           "status": {
             "coding": [
               {
-                "code": "active"
+                "system": "http://hl7.org/fhir/publication-status",
+                "code": "active",
+                "display": "Active"
               }
             ]
           }
@@ -746,7 +754,9 @@
             "type": {
               "coding": [
                 {
-                  "display": "Carton"
+                  "system": "http://hl7.org/fhir/packaging-type",
+                  "code": "100000073498",
+                  "display": "Box"
                 }
               ]
             },
@@ -783,6 +793,8 @@
           "manufacturedDoseForm": {
             "coding": [
               {
+                "system": "http://hl7.org/fhir/manufactured-dose-form",
+                "code": "100000073664",
                 "display": "Tablet"
               }
             ]
@@ -790,6 +802,8 @@
           "unitOfPresentation": {
             "coding": [
               {
+                "system": "http://hl7.org/fhir/unit-of-presentation",
+                "code": "200000002152",
                 "display": "Tablet"
               }
             ]
@@ -821,6 +835,8 @@
           "administrableDoseForm": {
             "coding": [
               {
+                "system": "http://hl7.org/fhir/administrable-dose-form",
+                "code": "100000073664",
                 "display": "Tablet"
               }
             ]
@@ -835,7 +851,9 @@
               "code": {
                 "coding": [
                   {
-                    "display": "Oral use"
+                    "system": "http://snomed.info/sct",
+                    "code": "26643006",
+                    "display": "Oral route"
                   }
                 ]
               }
@@ -862,6 +880,8 @@
           "role": {
             "coding": [
               {
+                "system": "http://hl7.org/fhir/ingredient-role",
+                "code": "100000072072",
                 "display": "Active"
               }
             ]
@@ -911,7 +931,9 @@
           "status": {
             "coding": [
               {
-                "code": "active"
+                "system": "http://hl7.org/fhir/publication-status",
+                "code": "active",
+                "display": "Active"
               }
             ]
           },
@@ -921,7 +943,9 @@
               "status": {
                 "coding": [
                   {
-                    "code": "current"
+                    "system": "http://hl7.org/fhir/publication-status",
+                    "code": "active",
+                    "display": "Active"
                   }
                 ]
               }
@@ -931,7 +955,7 @@
       }
     ]
   },
-  "bundleSha256": "c2a682feaca2b1506040d0239c11ac7997701d1c65ca9ec1ea6246dc20aee4ed",
+  "bundleSha256": "d0f557f72e980d4d7206cb61bdb0eb1cc9d5a8eab20f19cc41eea5261a8f142e",
   "provenance": {
     "sourceDocument": {
       "kind": "drawn",
@@ -1564,6 +1588,6 @@
     "approvedAt": "2026-09-19T00:00:00Z",
     "method": "api-attestation",
     "meaning": "reviewed-fidelity-and-structure",
-    "approvedContentSha256": "4ea279ddf4e8c032f1321358e5fb7964e8e4c7c14e35a2f353301373e601b628"
+    "approvedContentSha256": "4672d4832fde22779adaf1fea857835f02b388ea0e62f0c021f9df46745f707e"
   }
 }

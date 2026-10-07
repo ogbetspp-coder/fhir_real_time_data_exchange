@@ -395,6 +395,16 @@ describe("the warnings the gate accepts", () => {
     writeFileSync(file, JSON.stringify([{ ...entry, reason: "" }]));
     expect(() => readWarningAllowlist(file)).toThrow(/not \{/);
   });
+
+  // A coding with a system the pinned packages hold completely is checked offline, as an error;
+  // one with no system, or no code, is not checked at all. Those two warnings may not be accepted
+  // again (docs/validation/changes/2026-10-06-product-graph-terminology-and-epi-topic.md).
+  it("accepts no coding without a system or without a code", () => {
+    const messages = readWarningAllowlist("scripts/ci/official-validation-warnings.json").map(
+      ({ message }) => message,
+    );
+    expect(messages.filter((message) => /^Coding has no system|cod-1/.test(message))).toEqual([]);
+  });
 });
 
 describe("the offline start's verdict", () => {

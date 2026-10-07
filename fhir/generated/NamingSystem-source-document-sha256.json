@@ -2,7 +2,7 @@
   "resourceType": "NamingSystem",
   "id": "source-document-sha256",
   "url": "https://khs.dev/fhir/NamingSystem/source-document-sha256",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "name": "SourceDocumentSha256",
   "title": "Source document SHA-256",
   "status": "active",

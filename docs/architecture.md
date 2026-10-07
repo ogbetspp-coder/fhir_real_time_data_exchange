@@ -276,7 +276,10 @@ Validation is deliberately redundant:
    identifier system (as a NamingSystem) and extension the pipeline writes, and the EU number
    profile `eu-product-identity`. Besides the source and the EMA List, Bundle and Composition, it
    validates a `document` run's Provenance against base R5, and the source and the EMA Bundle
-   against `eu-product-identity` too;
+   against `eu-product-identity` too. The package also holds the `epi-published` SubscriptionTopic.
+   Offline, the validator checks a code and its display only in a code system a pinned package
+   holds completely; it cannot check UCUM, and it says nothing about SNOMED CT
+   (`docs/design/terminology-server.md`);
 3. Cloud Healthcare API `$validate?profile=` verifies each profile as deployed in the target
    store. The Provenance and the package's own profile are not sent there: the store's profile
    import takes the four HL7 and EMA packages only, so the store has no definition of them; and
@@ -398,7 +401,8 @@ Workflows, and is evidence only: every failed read is a `::warning::`, never a f
   has not acknowledged (`README.md`, Google Cloud deployment).
 - Workflows can invoke the worker and query only the FHIR analytics dataset.
 - The Cloud Healthcare service agent can publish change notices and edit only the analytics
-  dataset.
+  dataset. A change notice names a resource and never carries its content; what a downstream
+  consumer receives is in `docs/design/epi-published-notifications.md`.
 - No credentials are built into images or stored in the repository.
 - Binary Authorization is configurable via `enforce_binary_authorization` and is disabled for
   the prototype; SLSA provenance and SBOM generation are not yet configured.
@@ -553,8 +557,9 @@ profiles, evidence schemas, or validation rules.
 
 - EMA EUePI 1.0.0 is a preview and HL7 Global ePI 1.0.0 is trial-use.
 - The synthetic SmPC is not medical advice or authorized product information.
-- Terminology validation runs offline in the validator sidecar (`-tx n/a`) for reproducibility;
-  required external terminology checks need an approved, versioned terminology service.
+- Terminology validation runs offline in the validator sidecar (`-tx n/a`) for reproducibility.
+  UCUM and SNOMED CT codes are not checked; `docs/design/terminology-server.md` proposes the
+  smallest pinned terminology service that would check them.
 - Human content approval is built for phase 1 (the approval signer, above) and is not in force for
   the query service until `query_approval_verification` is on. Segregation of duties, `reject` and
   `withdraw`, re-authentication at signing and a regulated electronic signature are future control

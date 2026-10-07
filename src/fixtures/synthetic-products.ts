@@ -10,8 +10,11 @@
 //
 // 1. The default product at version 1 is frozen. `test/fixtures/contracts/*.json` are its bytes,
 //    `npm run contracts:check` fails on drift, and the hashes in the committed evidence were
-//    computed over exactly these strings. Nothing that the default product emits may change:
-//    not an id, not an identifier, not a space inside a sentence.
+//    computed over exactly these strings. Nothing in its narrative, ids or identifiers may
+//    change: not an id, not an identifier, not a space inside a sentence. Its product graph's
+//    codings have moved twice, each a recorded change that regenerated those files
+//    (docs/validation/changes/2026-09-20-mapping-qrd-displays-and-ema-list-code.md,
+//    2026-10-06-product-graph-terminology-and-epi-topic.md).
 // 2. A version is a content difference, not an identity. Version 2 of a label keeps the Type 2
 //    Bundle id, the Bundle identifier and Bundle.timestamp of version 1, because the Global ePI
 //    profiles define both as persisting across versions and `src/fhir/transform.ts` derives the

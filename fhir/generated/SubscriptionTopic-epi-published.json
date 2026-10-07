@@ -1,0 +1,27 @@
+{
+  "resourceType": "SubscriptionTopic",
+  "id": "epi-published",
+  "url": "https://khs.dev/fhir/SubscriptionTopic/epi-published",
+  "version": "0.5.0",
+  "name": "EpiPublished",
+  "title": "ePI document published or superseded",
+  "status": "active",
+  "experimental": true,
+  "description": "A version of an EMA ePI document Bundle was written to the validated FHIR store: its first version (published) or a later one, which supersedes the version before it. The pipeline writes the Bundle with its List, its entries and, for a document run, its Provenance, in one transaction, and never deletes one. Delivered as Pub/Sub messages from the store, not by R5 Subscriptions: a notification carries the Bundle's resource name and version id, never its content (docs/design/epi-published-notifications.md).",
+  "resourceTrigger": [
+    {
+      "description": "A Bundle of type document is created, or updated to a new version.",
+      "resource": "Bundle",
+      "supportedInteraction": [
+        "create",
+        "update"
+      ],
+      "fhirPathCriteria": "%current.type = 'document'"
+    }
+  ],
+  "notificationShape": [
+    {
+      "resource": "Bundle"
+    }
+  ]
+}

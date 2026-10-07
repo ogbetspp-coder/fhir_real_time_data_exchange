@@ -34,9 +34,9 @@ import {
 // holds the two to the same output. The code systems, value sets, extension and naming systems
 // define every https://khs.dev/fhir/ system and extension the pipeline and its fixtures write
 // (test/version-identity.test.ts finds every identifier system they write and requires its
-// NamingSystem), and one profile states the EU number rules. Every resource is checked by the
-// official HL7 validator in CI
-// (scripts/ci/emit-validation-set.ts), and the package is loaded by it there and in the sidecar
+// NamingSystem), one profile states the EU number rules, and the SubscriptionTopic states the
+// event the validated store publishes. Every resource is checked by the official HL7 validator in
+// CI (scripts/ci/emit-validation-set.ts), and the package is loaded by it there and in the sidecar
 // (Dockerfile.validator, a fifth -ig), so what the pipeline writes is validated against them.
 //
 // The package, PACKAGE_FILE, is built here byte for byte reproducibly: a ustar archive with
@@ -52,7 +52,7 @@ await mkdir(output, { recursive: true });
 const mapping = await loadEmaMapping();
 
 const PACKAGE_NAME = "dev.khs.fhir.epi";
-const PACKAGE_VERSION = "0.4.0";
+const PACKAGE_VERSION = "0.5.0";
 const PACKAGE_FILE = `${PACKAGE_NAME}.tgz`;
 const CANONICAL = KHS_CANONICAL;
 
@@ -453,6 +453,33 @@ const euProductIdentity = {
   },
 };
 
+// The event downstream systems subscribe to. The Healthcare API has no R5 topic-based
+// Subscriptions: the validated store publishes one Pub/Sub message per resource it writes
+// (scripts/gcp/reconcile-fhir-stores.sh, notificationConfigs), and
+// docs/design/epi-published-notifications.md is the contract that maps this topic onto them.
+const epiPublishedTopic = {
+  resourceType: "SubscriptionTopic",
+  id: "epi-published",
+  url: `${CANONICAL}/SubscriptionTopic/epi-published`,
+  version: PACKAGE_VERSION,
+  name: "EpiPublished",
+  title: "ePI document published or superseded",
+  status: "active",
+  experimental: true,
+  description:
+    "A version of an EMA ePI document Bundle was written to the validated FHIR store: its first version (published) or a later one, which supersedes the version before it. The pipeline writes the Bundle with its List, its entries and, for a document run, its Provenance, in one transaction, and never deletes one. Delivered as Pub/Sub messages from the store, not by R5 Subscriptions: a notification carries the Bundle's resource name and version id, never its content (docs/design/epi-published-notifications.md).",
+  resourceTrigger: [
+    {
+      description: "A Bundle of type document is created, or updated to a new version.",
+      // Relative to http://hl7.org/fhir/StructureDefinition/, as R5 defines the element.
+      resource: "Bundle",
+      supportedInteraction: ["create", "update"],
+      fhirPathCriteria: "%current.type = 'document'",
+    },
+  ],
+  notificationShape: [{ resource: "Bundle" }],
+};
+
 const EMA_SMPC_SECTION_CODES = "http://ema.europa.eu/fhir/ValueSet/EUepismpcqrdcodesVs";
 
 const conceptMap = {
@@ -515,6 +542,7 @@ const resources: Record<string, unknown>[] = [
   approvalContentExtension,
   euProductIdentity,
   ...namingSystems,
+  epiPublishedTopic,
   conceptMap,
   structureMap,
 ];
@@ -534,7 +562,7 @@ const packageJson = {
   canonical: CANONICAL,
   title: "ema-flow ePI definitions",
   description:
-    "The code systems, value sets, extension, naming systems, profile, ConceptMap and StructureMap this repository's ePI pipeline writes or publishes (scripts/fhir/generate-artifacts.ts).",
+    "The code systems, value sets, extension, naming systems, profile, SubscriptionTopic, ConceptMap and StructureMap this repository's ePI pipeline writes or publishes (scripts/fhir/generate-artifacts.ts).",
   fhirVersions: ["5.0.0"],
   dependencies: { "hl7.fhir.r5.core": "5.0.0" },
   author: "khs-dev",

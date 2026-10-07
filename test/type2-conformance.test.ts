@@ -308,3 +308,86 @@ describe("synthetic Type 2 product graph against the Global ePI Bundle profile",
     }
   });
 });
+
+// Every Coding-shaped object, wherever it sits (a coding array, meta.tag, an extension's
+// valueCoding, a Quantity's unit): any object with a string system, code or display, but a
+// Reference (a string `reference`) and an Identifier (a string `value`).
+type FoundCoding = { path: string; system: unknown; code: unknown };
+function codings(value: unknown, path = "", into: FoundCoding[] = []): FoundCoding[] {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => codings(item, `${path}[${String(index)}]`, into));
+  } else if (value !== null && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const shaped = ["system", "code", "display"].some((key) => typeof record[key] === "string");
+    if (shaped && typeof record.reference !== "string" && typeof record.value !== "string") {
+      into.push({ path, system: record.system, code: record.code });
+    }
+    for (const [key, child] of Object.entries(record)) codings(child, `${path}.${key}`, into);
+  }
+  return into;
+}
+
+// R5's pattern for a code (hl7.fhir.r5.core#5.0.0, StructureDefinition code): not empty, and no
+// leading, trailing or doubled whitespace.
+const R5_CODE = /^[^\s]+( [^\s]+)*$/;
+
+function codingProblem({ system, code }: FoundCoding): string | undefined {
+  if (typeof system !== "string" || !/^https?:\/\//.test(system)) return "no system";
+  if (typeof code !== "string" || !R5_CODE.test(code)) return "no code";
+  return undefined;
+}
+
+// The official validator runs offline (-tx n/a). It checks a code, and its display, as an error
+// only in a code system a pinned package holds with content `complete`; it warns that it cannot
+// check UCUM, and says nothing at all about SNOMED CT (both measured 2026-10-06,
+// docs/design/terminology-server.md). A new system must be put in one list or the other.
+const CHECKED_OFFLINE = [
+  "http://hl7.org/fhir/administrable-dose-form",
+  "http://hl7.org/fhir/ingredient-role",
+  "http://hl7.org/fhir/manufactured-dose-form",
+  "http://hl7.org/fhir/medicinal-product-domain",
+  "http://hl7.org/fhir/medicinal-product-type",
+  "http://hl7.org/fhir/packaging-type",
+  "http://hl7.org/fhir/publication-status",
+  "http://hl7.org/fhir/unit-of-presentation",
+  "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+  "https://khs.dev/fhir/CodeSystem/document-type",
+];
+const UNCHECKED_OFFLINE = ["http://snomed.info/sct", "http://unitsofmeasure.org"];
+
+describe("the synthetic sources' terminology", () => {
+  it("names a system and a code for every coding, and only systems the gate has classified", () => {
+    const systems = new Set<string>();
+    for (const { product, version } of everyProductVersion()) {
+      const found = codings(createSyntheticType2Bundle(mapping, { product, version }));
+      expect(found.filter((coding) => codingProblem(coding) !== undefined)).toEqual([]);
+      for (const { system } of found) systems.add(String(system));
+    }
+    expect([...systems].sort()).toEqual([...CHECKED_OFFLINE, ...UNCHECKED_OFFLINE].sort());
+  });
+
+  it("finds a coding wherever it sits, and refuses one without a system or a code", () => {
+    const resource = {
+      resourceType: "Basic",
+      meta: { tag: [{ display: "y" }] },
+      extension: [
+        {
+          url: "https://khs.dev/fhir/StructureDefinition/example",
+          valueCoding: { system: "http://hl7.org/fhir/publication-status", code: "" },
+        },
+      ],
+      identifier: [{ system: "https://khs.dev/fhir/identifier/example", value: "1" }],
+      subject: { reference: "Basic/1", display: "not a coding" },
+      code: { coding: [{ system: "http://hl7.org/fhir/publication-status", code: "active" }] },
+      amount: { value: 1, unit: "mg", system: "http://unitsofmeasure.org", code: "mg" },
+      other: { system: "http://hl7.org/fhir/publication-status", code: " active" },
+    };
+    expect(codings(resource).map((coding) => [coding.path, codingProblem(coding)])).toEqual([
+      [".meta.tag[0]", "no system"],
+      [".extension[0].valueCoding", "no code"],
+      [".code.coding[0]", undefined],
+      [".amount", undefined],
+      [".other", "no code"],
+    ]);
+  });
+});
