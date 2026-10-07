@@ -324,17 +324,19 @@ pushed (`scripts/ci/worker-recompute-smoke.sh`, which CI's Images job also runs,
 changed result that must fail). A merge deploys for exactly the files of `zone-a/`,
 `label-docx-reader/` and `qrd/` the Dockerfile copies (`test/ci/deploy-trigger.test.ts`).
 
-**Memory: an oversized label fails closed, by killing its instance.** The gate caps what it reads
-(32 MiB of .docx) and what the recompute writes (32 MiB), and the reader caps what a package may
-unpack to (`MAX_PACKAGE_BYTES`, 256 MiB, 20 MiB a part), but not what the Python process holds while
-it reads: its memory counts against the worker container's (1 GiB, four requests at once,
-`infra/run.tf`). A label large enough to exceed it gets the instance killed for memory by Cloud
-Run: the run fails with no answer and nothing is persisted (a certified Word run persists nothing
-yet in any case), and every other request in flight on that instance fails with it, as a crash
-does. Nothing is accepted that should not be; the cost is availability. Not measured: the first
-deploy should record the recompute's peak memory on the largest label at hand (the US prescribing
-information of 9,795 paragraphs) and, if it is near the limit, run one recompute at a time or give
-the worker more memory.
+**Memory and time: measured, then sized.** The gate caps what it reads (32 MiB of .docx) and what
+the recompute writes (32 MiB), and the reader caps what a package may unpack to
+(`MAX_PACKAGE_BYTES`, 256 MiB, 20 MiB a part), but not what the Python process holds while it
+reads. Measured on an M2 laptop on 2026-10-07: the slowest EMA Word SmPC that builds (2,280
+paragraphs in 90,422 runs, two tracked changes, read by its accepted view) took 31.6 s and peaked at
+796 MB resident. So the worker container has 2 GiB (`infra/run.tf`), and runs one recompute at a
+time (`exclusive` in `src/certified-word/recompute.ts`; the requests after it wait their turn). The
+recompute's limit is 300 s, for a Cloud Run vCPU slower than a laptop core. A label beyond either
+still fails closed: a time-out is refused (`timeout`), and a label large enough to exceed the
+memory gets the instance killed by Cloud Run, the run failing with no answer and nothing persisted,
+as a crash does. To measure on the first deploy that recomputes: that label's time and peak memory
+on the worker. The read's cost is in the reader (three views read, two certified, of every run), a
+speed-up there to be held to its mutation record.
 
 Still to build:
 
