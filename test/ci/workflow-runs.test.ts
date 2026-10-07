@@ -133,9 +133,9 @@ const setJob = (name: string, fields: Partial<WorkflowJob>) =>
   succeeded.map((job) => (job.name === name ? { ...job, ...fields } : job));
 
 describe("the CI the deploy waits for", () => {
-  it("names every job of ci.yml but Renderer, by its check's name", () => {
+  it("names every job of ci.yml but Renderer and Word drawing, by its check's name", () => {
     const names = [...jobs(ci).values()].map((job) => /^ {4}name: (.+)$/m.exec(job)?.[1]);
-    expect([...AWAITED_JOBS, "Renderer"].sort()).toEqual(names.sort());
+    expect([...AWAITED_JOBS, "Renderer", "Word drawing"].sort()).toEqual(names.sort());
   });
 
   it("is waited for in the deploy job before any credential is taken", () => {

@@ -31,9 +31,19 @@ export function readRendererPins(dockerfile = RENDERER_DOCKERFILE) {
     throw new Error(`${name}: ${reason}`);
   };
 
+  // The renderer is the first stage, from one base pinned by digest. The Word drawing's stages
+  // follow it (docs/design/certified-word-drawing.md): each from that stage or an image pinned by
+  // digest, never a base of its own the renderer could be built from.
   const froms = lines.filter((line) => /^\s*FROM\s/i.test(line));
-  const base = /^\s*FROM\s+(\S+@sha256:[0-9a-f]{64})\s*$/i.exec(froms[0] ?? "")?.[1];
-  if (froms.length !== 1 || base === undefined) fail("expected one FROM, pinned by digest");
+  const base = /^\s*FROM\s+(\S+@sha256:[0-9a-f]{64})\s+AS\s+renderer\s*$/i.exec(
+    froms[0] ?? "",
+  )?.[1];
+  if (base === undefined) fail("expected the first FROM pinned by digest, AS renderer");
+  for (const from of froms.slice(1)) {
+    if (!/^\s*FROM\s+(?:renderer|\S+@sha256:[0-9a-f]{64})\s+AS\s+\S+\s*$/i.test(from)) {
+      fail(`a later stage from neither the renderer nor an image pinned by digest: ${from}`);
+    }
+  }
 
   const declared = args(lines, name);
   const required = (key, pattern) => {

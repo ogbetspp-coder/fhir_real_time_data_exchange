@@ -214,6 +214,39 @@ jobs:
         if: steps.inputs.outputs.run == 'true'
         run: npm run renderer:drawings
 
+  # The Word drawing's image (docs/design/certified-word-drawing.md, PR 1): Dockerfile.renderer's
+  # word-drawing target, the renderer's Chrome and fonts with Python 3.14.7, and zone_a.drawing run
+  # in it, hardened (scripts/render/word-drawing.mjs), by zone-a/scripts/word_drawing_check.py: the
+  # container's isolation from inside; each committed certified Word label drawn twice, the same
+  # bytes, the fields its recompute gives, the refused one refused; every carried section of the
+  # Word-made SmPCs and the QRD template agreeing, as Google Chrome's recording does; and Chrome's
+  # HTML and XML parsers making the same tree of every narrative drawn. Zone A's code, the label
+  # reader's and the image are all its inputs, so it runs on every change. Nothing is pushed.
+  word-drawing:
+    name: Word drawing
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22.22.0
+          package-manager-cache: false
+
+      - name: Build the word-drawing image
+        run: npm run word-drawing:image
+
+      - name: Draw the fixtures in the image
+        run: npm run word-drawing:check
+
   # The worker, query and validator images (audit B07), built from the files Cloud Build builds
   # them from, so a Dockerfile change is proved before the deploy that would first build it. The
   # worker's build asserts its Node, ICU and Unicode; each image's user and command are checked;

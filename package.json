@@ -43,13 +43,15 @@
     "authority:lock": "tsx scripts/authority/lock.ts",
     "certified-word:vectors": "tsx scripts/certified-word/generate-vectors.ts",
     "certified-word:lock": "tsx scripts/certified-word/lock.ts",
-    "renderer:image": "docker build --file Dockerfile.renderer --tag renderer:local .",
+    "renderer:image": "docker build --file Dockerfile.renderer --target renderer --tag renderer:local .",
     "renderer:smoke": "node scripts/render/run.mjs scripts/render/smoke.ts",
     "renderer:record": "node scripts/render/run.mjs scripts/render/record.ts --check",
     "renderer:check": "node scripts/render/run.mjs scripts/render/check.ts",
     "renderer:fonts": "node scripts/render/run.mjs scripts/render/check-fonts.ts",
     "renderer:drawings": "node scripts/render/run.mjs scripts/render/check-drawings.ts",
-    "renderer:boxes": "node scripts/render/run.mjs scripts/render/check-boxes.ts"
+    "renderer:boxes": "node scripts/render/run.mjs scripts/render/check-boxes.ts",
+    "word-drawing:image": "docker build --file Dockerfile.renderer --target word-drawing --tag word-drawing:local .",
+    "word-drawing:check": "node scripts/render/word-drawing.mjs /work/zone-a/scripts/word_drawing_check.py"
   },
   "repository": {
     "type": "git",

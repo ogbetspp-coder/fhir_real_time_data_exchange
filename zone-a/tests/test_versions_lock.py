@@ -4,7 +4,10 @@ its version (``scripts/lock_versions.py``, ``versions.lock.json``)."""
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 from types import ModuleType
 
@@ -83,3 +86,54 @@ def test_a_changed_released_entry_is_refused() -> None:
 def test_the_word_readers_version_lives_in_the_reader() -> None:
     # The registry records the Word reader's version; it is the reader's own constant.
     assert registry.READER_VERSION is docx_reader.READER_VERSION
+
+
+# What python -m zone_a.drawing imports that decides nothing it writes: package docstrings and
+# re-exports, the ePI reader (certified.py reads ePIs with it, never a .docx) and the fidelity
+# verifier its package re-exports, which the drawing never calls.
+_DECIDES_NOTHING = {
+    "label-docx-reader/src/label_docx/__init__.py",
+    "label-docx-reader/src/label_docx/epi_output.py",
+    "zone-a/src/zone_a/__init__.py",
+    "zone-a/src/zone_a/fidelity/__init__.py",
+    "zone-a/src/zone_a/fidelity/verify.py",
+    "zone-a/src/zone_a/qrd/__init__.py",
+}
+_SOURCES = ("zone-a/src", "label-docx-reader/src")
+# The components whose versions the drawing request names (zone_a.recompute.versions).
+_NAMED = ("recompute", "docx-reader", "docx-format", "smpc-structure", "pl-structure", "word-epi")
+
+
+def test_the_drawings_version_covers_what_decides_the_record() -> None:
+    """Every module the entry point imports is the drawing's own, or versioned in the request."""
+    script = _script()
+    repository = ZONE_A.parent
+    with subprocess.Popen(
+        [
+            sys.executable,
+            "-I",
+            "-c",
+            "import json, sys, zone_a.drawing; "
+            "print(json.dumps([getattr(m, '__file__', None) for m in list(sys.modules.values())]))",
+        ],
+        stdout=subprocess.PIPE,
+        env={},
+    ) as process:
+        loaded, _ = process.communicate()
+    ours = {
+        Path(file).resolve().relative_to(repository).as_posix()
+        for file in json.loads(loaded)
+        if file and any(Path(file).resolve().is_relative_to(repository / src) for src in _SOURCES)
+    }
+
+    def files(name: str) -> set[str]:
+        return {
+            (ZONE_A / file).resolve().relative_to(repository).as_posix()
+            for file in script.COMPONENTS[name].files
+        }
+
+    drawing = files("word-drawing")
+    named = set().union(*(files(name) for name in _NAMED))
+    assert {"zone-a/src/zone_a/canonical_json.py", "zone-a/src/zone_a/recompute.py"} <= drawing
+    assert sorted(ours - drawing - named - _DECIDES_NOTHING) == []
+    assert ours >= _DECIDES_NOTHING

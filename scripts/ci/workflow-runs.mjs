@@ -7,10 +7,12 @@ import { fileURLToPath } from "node:url";
 // anything (test/ci/deploy-permissions.test.ts).
 //
 // await-ci: the deploy waits for CI's run on the commit it deploys, and goes on only when every
-// job of it but Renderer succeeded. Until then the deploy's own gate ran `npm run check` alone, so
-// a push by an administrator, or a merge while Official validation was red, deployed unattended.
-// Renderer is not waited for: the renderer gate is CI-only, nothing the deploy ships reads its
-// verdict, and it stays a required check on every pull request.
+// job of it but Renderer and Word drawing succeeded. Until then the deploy's own gate ran `npm run
+// check` alone, so a push by an administrator, or a merge while Official validation was red,
+// deployed unattended. Renderer is not waited for: the renderer gate is CI-only, nothing the deploy
+// ships reads its verdict, and it stays a required check on every pull request. Nor is Word
+// drawing: its image is built in CI only, and the deploy ships nothing that reads a drawing
+// (docs/design/certified-word-drawing.md, until its images build and pins).
 // The run must be CI's run for a push to main of exactly this commit: a run for a pull request, a
 // branch or another commit is never taken for it, and a dispatch of the deploy on a commit with no
 // such run is refused.
@@ -28,7 +30,8 @@ import { fileURLToPath } from "node:url";
 //     --since now|<ISO time> [--wait-minutes N]
 
 // CI's jobs the deploy waits for, by the names the checks carry; every one must have succeeded
-// (test/ci/workflow-runs.test.ts holds this list and Renderer to .github/workflows/ci.yml).
+// (test/ci/workflow-runs.test.ts holds this list, Renderer and Word drawing to
+// .github/workflows/ci.yml).
 export const AWAITED_JOBS = ["Check", "Official validation", "Images", "Zone A", "Agent"];
 
 // The deploy job's steps that change what a plan reads: from the first to run until the job ends,

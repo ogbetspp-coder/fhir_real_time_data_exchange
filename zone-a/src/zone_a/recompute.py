@@ -28,6 +28,11 @@ code, title, heading, paragraphs, narrative and page). Or a refusal, ``{"refusal
 detail}}``, with exit status 1: the reader refuses the bytes, the request does not fit them, the
 structure is not ready, or a section is refused. An ePI carries every section its label has, so
 one refused section refuses the whole.
+
+``recompute_with_read`` gives the result with the read it was made from, for the drawing record
+(``zone_a.drawing``, ``docs/design/certified-word-drawing.md``): its narratives are drawn and held
+to that very read, so nothing reads the .docx twice. ``written`` is what the command writes for a
+result, byte for byte, whose hash the record names.
 """
 
 from __future__ import annotations
@@ -45,9 +50,9 @@ from label_docx.reader import DocxRefusedError
 
 from zone_a import leaflet, structure, word_epi
 from zone_a.canonical_json import canonical_json
-from zone_a.certified import VIEWS, read_body
+from zone_a.certified import VIEWS, Body, read_body
 
-RECOMPUTE_VERSION: Final = "recompute/1.1.0"
+RECOMPUTE_VERSION: Final = "recompute/1.2.0"
 
 ROOT: Final = Path(__file__).resolve().parents[3]
 # The registry and the mapping each document is found by.
@@ -121,6 +126,17 @@ def recompute(data: bytes, request: object, root: Path = ROOT) -> dict[str, Any]
     Raises:
         RefusedError: The sections cannot be made as the request names them.
     """
+    return recompute_with_read(data, request, root)[0]
+
+
+def recompute_with_read(
+    data: bytes, request: object, root: Path = ROOT
+) -> tuple[dict[str, Any], Body]:
+    """``recompute``'s result, and the body the label reader certified that it was made from.
+
+    Raises:
+        RefusedError: The sections cannot be made as the request names them.
+    """
     document, view, part, assignments, named = _request(request)
     built_by = versions(document, root)
     if named != built_by:
@@ -163,7 +179,7 @@ def recompute(data: bytes, request: object, root: Path = ROOT) -> dict[str, Any]
     refused_keys = [s["key"] for s in built["sections"] if s["refusal"] is not None]
     if refused_keys:
         raise RefusedError("section", f"refused: {', '.join(refused_keys)}")
-    return {
+    result = {
         "versions": built_by,
         "source": {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)},
         "view": body.view,
@@ -174,6 +190,12 @@ def recompute(data: bytes, request: object, root: Path = ROOT) -> dict[str, Any]
         "structure": structured,
         "sections": built["sections"],
     }
+    return result, body
+
+
+def written(result: Mapping[str, Any]) -> str:
+    """What the command writes for a result: its canonical JSON and a line feed."""
+    return canonical_json(result) + "\n"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -197,7 +219,7 @@ def main(argv: list[str] | None = None) -> int:
         result = recompute(data, request, Path(os.environ.get("ZONE_A_ROOT", ROOT)))
     except RefusedError as refused:
         return _refuse(refused.code, refused.detail)
-    sys.stdout.write(canonical_json(result) + "\n")
+    sys.stdout.write(written(result))
     return 0
 
 

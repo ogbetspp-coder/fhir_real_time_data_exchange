@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import io
 import json
+import subprocess
+import sys
 import zipfile
 from html import escape
 from pathlib import Path
@@ -181,3 +183,32 @@ def test_the_command_reads_the_files_under_zone_a_root(
     monkeypatch.setenv("ZONE_A_ROOT", str(ROOT))
     assert recompute.main([str(label)]) == 0
     assert json.loads(capsys.readouterr().out)["versions"] == recompute.versions("smpc")
+
+
+def test_the_result_with_its_read_is_what_the_command_writes() -> None:
+    """``recompute_with_read``'s result, as ``written``, is the command's output byte for byte.
+
+    The command is run as the gate runs it (``src/certified-word/recompute.ts``), on every committed
+    label; the read given with it is the label's own.
+    """
+    fixtures = ROOT / "test" / "fixtures" / "certified-word" / "recompute"
+    cases = json.loads((fixtures / "cases.json").read_text("utf-8"))
+    for case in cases:
+        label = fixtures / f"{case['name']}.docx"
+        with subprocess.Popen(
+            [sys.executable, "-I", "-X", "utf8", "-m", "zone_a.recompute", str(label)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            env={},
+        ) as command:
+            written, _ = command.communicate(json.dumps(case["request"]).encode("utf-8"))
+        assert written == (fixtures / f"{case['name']}.json").read_bytes()
+        if command.returncode == 1:
+            with pytest.raises(recompute.RefusedError):
+                recompute.recompute_with_read(label.read_bytes(), case["request"])
+            continue
+        assert command.returncode == 0
+        result, body = recompute.recompute_with_read(label.read_bytes(), case["request"])
+        assert recompute.written(result).encode("utf-8") == written
+        assert body == read_body(label.read_bytes(), case["request"]["view"])

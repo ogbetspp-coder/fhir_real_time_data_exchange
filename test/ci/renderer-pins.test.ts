@@ -53,6 +53,8 @@ describe("the renderer image's pins", () => {
   it.each([
     ["an unpinned base", (text: string) => text.replace(/@sha256:[0-9a-f]{64}/, "")],
     ["a second FROM", (text: string) => `${text}\nFROM scratch\n`],
+    ["a later stage from an unpinned image", (text: string) => `${text}\nFROM python:3 AS x\n`],
+    ["an unnamed renderer stage", (text: string) => text.replace(/ AS renderer$/m, "")],
     ["an apt install outside the snapshot's RUN", inUnpackRun("apt-get install --yes x")],
     ["an apt install with an option first", inUnpackRun("apt-get -y install x")],
     ["an apt install with a quiet option first", inUnpackRun("apt-get -qq install x")],
