@@ -90,7 +90,8 @@
     "1.3.0": "ecea5e662fa35cedee5532a1c305c8f15b8035433473bc3529edf3837380b169"
   },
   "recompute": {
-    "recompute/1.0.0": "1ef5b40ecc5d7cb623f14781e12f83467cdfbbb6a1a227688143344c62fb4d38"
+    "recompute/1.0.0": "1ef5b40ecc5d7cb623f14781e12f83467cdfbbb6a1a227688143344c62fb4d38",
+    "recompute/1.1.0": "ea8776bf7ba4c88761e6605ebc450adf8bda773faa0fcf3ea892d21826516933"
   },
   "smpc-structure": {
     "smpc-structure/1.0.0": "0f48158ea52293644d3a1f11c96575a47c447b343de7938b88e30e21f35989a5",

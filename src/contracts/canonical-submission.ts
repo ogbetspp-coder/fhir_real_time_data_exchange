@@ -311,7 +311,10 @@ export const CanonicalSubmissionSchema = CanonicalSubmissionBase.superRefine(
 
 // A refusal the HTTP caller learns by its closed code (src/app.ts); every other rejection says only
 // that the submission was rejected.
-export type SubmissionRefusal = "certified-word-not-recomputed";
+export type SubmissionRefusal =
+  | "certified-word-not-recomputed"
+  | "certified-word-recompute-refused"
+  | "certified-word-drawing-missing";
 
 export class SubmissionRejectedError extends Error {
   public constructor(

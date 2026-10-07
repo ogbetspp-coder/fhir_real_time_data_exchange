@@ -25,6 +25,37 @@ COPY src ./src
 RUN npm run build
 RUN npm prune --omit=dev --ignore-scripts
 
+# The certified Word recompute's Python, for the worker only (docs/design/certified-word-import.md,
+# D2): the gate runs `python -m zone_a.recompute` on an uploaded .docx, so the worker carries a
+# Python 3.14 and the zone-a and label-docx packages. uv, pinned by digest, installs the Python
+# (python-build-standalone, a relocatable build that needs only glibc, its archive checked against
+# the SHA-256 uv 0.12.17 carries for it) and both packages, non-editable, into /opt/zone-a from
+# zone-a/uv.lock, whose wheels uv checks against the lock's hashes; label-docx, which zone-a's lock
+# names by path, has no dependency of its own (label-docx-reader/pyproject.toml). The build backend
+# is pinned by version (each pyproject.toml's build-constraint-dependencies), not by hash. The
+# certificates are for uv's downloads in this stage, which is not shipped.
+FROM ghcr.io/astral-sh/uv:0.12.17@sha256:10787c682e4184e4f290de1171fd4703dc63de99221f10fe1c99002ce7fa9acc AS uv
+
+FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS python
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=uv /uv /usr/local/bin/uv
+ENV UV_PYTHON_INSTALL_DIR=/opt/python \
+    UV_PYTHON_PREFERENCE=only-managed \
+    UV_PROJECT_ENVIRONMENT=/opt/zone-a \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_NO_CACHE=1
+RUN uv python install 3.14.7
+WORKDIR /src
+COPY zone-a/pyproject.toml zone-a/uv.lock zone-a/README.md ./zone-a/
+COPY zone-a/src ./zone-a/src
+COPY label-docx-reader/pyproject.toml label-docx-reader/README.md ./label-docx-reader/
+COPY label-docx-reader/src ./label-docx-reader/src
+RUN uv sync --locked --no-dev --no-editable --python 3.14.7 --project zone-a
+
 # The operating system under the Node binary (audit B07, S-1). node:22.22.0-bookworm-slim stopped
 # being rebuilt when 22.22.1 was published (2026-03-04), so its Debian froze on the day it was
 # built and collected fixed advisories it could never receive; the Node pin itself kept it from
@@ -61,6 +92,16 @@ CMD ["node", "dist/query/server.js"]
 FROM runtime AS signer
 CMD ["node", "dist/signer/server.js"]
 
-# Last, so a build without --target is the worker, as it always was.
+# Last, so a build without --target is the worker, as it always was. It alone carries the Python
+# and the registry and mapping files the recompute reads (fhir/mappings, above, and qrd/registry),
+# read-only to the service, which runs it as `-I -m zone_a.recompute` with ZONE_A_ROOT the app's
+# directory; the build asserts the Unicode version ADR 0003 pins and that the recompute reads its
+# files there. CI's Images job runs it on the committed synthetic labels (scripts/ci/build-images.sh).
 FROM runtime AS worker
+COPY --from=python /opt/python /opt/python
+COPY --from=python /opt/zone-a /opt/zone-a
+COPY qrd/registry ./qrd/registry
+ENV RECOMPUTE_PYTHON=/opt/zone-a/bin/python \
+    ZONE_A_ROOT=/app
+RUN ["/opt/zone-a/bin/python", "-I", "-c", "import pathlib, sys, unicodedata; from zone_a import recompute; v = unicodedata.unidata_version; v == '16.0.0' or sys.exit('Python ' + sys.version.split()[0] + ' has Unicode ' + v + ', not 16.0.0'); print('Python', sys.version.split()[0], 'Unicode', v, recompute.versions('smpc', pathlib.Path('/app')))"]
 CMD ["node", "dist/server.js"]

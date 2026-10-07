@@ -3,12 +3,14 @@
     uv run --frozen python scripts/certified_word_fixtures.py          # write
     uv run --frozen python scripts/certified_word_fixtures.py --check  # fail on drift
 
-The Node gate cannot run Python, so the importer (``src/certified-word/``) is tested on what
+CI's Node job has no Python, so the importer (``src/certified-word/``) is tested on what
 ``python -m zone_a.recompute`` writes, committed here: for each synthetic Word label below, the
-very bytes the command writes on standard output (canonical JSON and a line feed, or the refusal),
-as ``<name>.json``, and ``cases.json`` naming each label's recompute request and what a person
-confirmed for it (the ePI's document id and the canonical product, its name and holder chosen from
-the label's own text). A change to the reader, the structurer or the builder changes these files;
+label itself as ``<name>.docx``, the very bytes the command writes on standard output for it
+(canonical JSON and a line feed, or the refusal) as ``<name>.json``, and ``cases.json`` naming each
+label's recompute request and what a person confirmed for it (the ePI's document id and the
+canonical product, its name and holder chosen from the label's own text). The gate's tests read the
+labels as the uploaded bytes (D4), and where a Python is at hand run the recompute on them (D2). A
+change to the reader, the structurer or the builder changes these files;
 ``tests/test_certified_word_fixtures.py`` fails until this is run again, and the TypeScript tests
 then read the new results.
 
@@ -212,13 +214,14 @@ def _recompute(data: bytes, request: dict[str, Any]) -> str:
     return out.getvalue()
 
 
-def render() -> dict[str, str]:
+def render() -> dict[str, bytes]:
     """Each file of ``TARGET`` by name, as this build writes it."""
-    files: dict[str, str] = {}
+    files: dict[str, bytes] = {}
     cases: list[dict[str, Any]] = []
     for position, (name, about, blocks, asked) in enumerate(_cases()):
         request = asked | {"versions": recompute.versions(asked["document"])}
-        files[f"{name}.json"] = _recompute(_docx(blocks), request)
+        files[f"{name}.docx"] = _docx(blocks)
+        files[f"{name}.json"] = _recompute(files[f"{name}.docx"], request).encode("utf-8")
         cases.append(
             {
                 "name": name,
@@ -228,7 +231,7 @@ def render() -> dict[str, str]:
                 "product": PRODUCT,
             }
         )
-    files["cases.json"] = json.dumps(cases, indent=2, ensure_ascii=False) + "\n"
+    files["cases.json"] = (json.dumps(cases, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
     return files
 
 
@@ -241,7 +244,7 @@ def main() -> int:
         # Bytes, not text: a text read folds a carriage return into a line feed, and the TypeScript
         # tests read the bytes.
         current = {path.name: path.read_bytes() for path in TARGET.glob("*")}
-        if current != {name: content.encode("utf-8") for name, content in files.items()}:
+        if current != files:
             sys.stderr.write(f"{TARGET} is out of date; run this script\n")
             return 1
         return 0
@@ -249,7 +252,7 @@ def main() -> int:
     for stale in {path.name for path in TARGET.glob("*")} - set(files):
         (TARGET / stale).unlink()
     for name, content in files.items():
-        (TARGET / name).write_bytes(content.encode("utf-8"))
+        (TARGET / name).write_bytes(content)
     return 0
 
 

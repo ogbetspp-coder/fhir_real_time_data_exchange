@@ -332,6 +332,16 @@ jobs:
           DIFFERENTIAL_CORPUS: ${{ github.workspace }}/differential.jsonl
         run: uv run --frozen pytest --cov
 
+      # The certified Word gate with the real recompute (docs/design/certified-word-import.md, D2):
+      # the Check job has no Python, so there the gate's tests run on the recompute's committed
+      # results; here the gate's runner runs this job's Python on the committed labels, and the
+      # tests also require it to make each committed result again, byte for byte.
+      - name: Recompute the committed Word labels through the gate
+        working-directory: .
+        env:
+          RECOMPUTE_PYTHON: ${{ github.workspace }}/zone-a/.venv/bin/python
+        run: npx vitest run test/certified-word/recompute.test.ts
+
   agent:
     name: Agent
     runs-on: ubuntu-24.04

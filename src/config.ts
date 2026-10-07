@@ -69,6 +69,12 @@ const ConfigSchema = z
       .min(1_024)
       .max(256 * 1_024 * 1_024)
       .default(48 * 1_024 * 1_024),
+    // The Python the certified Word gate runs `zone_a.recompute` with, and the directory holding
+    // the registry and mapping files it reads (docs/design/certified-word-import.md, D2). The
+    // worker image sets both (Dockerfile); unset, the gate cannot recompute, and refuses a
+    // certified Word submission that is not a dry run.
+    RECOMPUTE_PYTHON: optionalNonEmpty,
+    ZONE_A_ROOT: optionalNonEmpty,
     FHIR_ANALYTICS_DATASET: optionalNonEmpty,
     TRANSFORMATION_LEDGER_DATASET: optionalNonEmpty,
     TRANSFORMATION_LEDGER_TABLE: z.string().trim().min(1).default("transformation_runs"),

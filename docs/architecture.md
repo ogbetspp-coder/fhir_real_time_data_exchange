@@ -107,10 +107,13 @@ authorisation numbers from section 8, and the approval) into a Type 1 submission
 pages and titles come only from the recompute; a section's title is its label's heading line,
 which the crosswalk and the EMA preflight carry as written. The source pins the uploaded .docx,
 the recompute's request and every version it names, and the importer's own version; the extractor
-is `certified-word/` and the SHA-256 of the importer's and the recompute's versions. Until the
-worker runs the recompute itself (D2), the gate accepts a certified Word submission only as a dry
-run and refuses it when `DRY_RUN` is false, telling the caller so by the closed code
-`certified-word-not-recomputed`.
+is `certified-word/` and the SHA-256 of the importer's and the recompute's versions. The gate
+reads the uploaded .docx itself, from its content address in the submissions bucket (D4), runs
+`python -m zone_a.recompute` on it in a subprocess (the worker image carries Python 3.14 and the
+two packages, D2), runs the importer again on the result and requires the very submission, page
+text and report. Until the drawing records exist (D3) it accepts one only as a dry run, and refuses
+it when `DRY_RUN` is false with a closed code the caller learns (`certified-word-drawing-missing`
+once the recompute has passed).
 
 ### Renderer gate
 

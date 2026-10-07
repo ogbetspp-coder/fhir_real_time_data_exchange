@@ -2,7 +2,7 @@
 
 - Status: decided, 2026-10-06 (the owner took the recommendations: D2 (a), D3 (a), and D4's
   narrow upload path in the existing CMEK submissions bucket); being built in steps (below,
-  "Progress")
+  "Progress"): D1, D2 and D4 built, D3 not
 - Implements: ADR 0006 decisions 1, 5, 6 and 7, prerequisite P4
 - Related: ADR 0002 (invariants 7, 8, 11), ADR 0004 (service boundaries), ADR 0005's amendment
   (the renderer gate's attested records), `docs/design/authority-import-contract.md` (D1, the
@@ -140,11 +140,12 @@ and what a person confirmed, as the authority importer is of the authority's byt
   product, and the gate before anything persists (D2 lifts the dry-run refusal only with it) must
   bind it.
 
-Cross-language fixtures: the Node gate cannot run Python, so
-`zone-a/scripts/certified_word_fixtures.py` builds synthetic Word labels in Python and commits
-what `python -m zone_a.recompute` writes for each, byte for byte
-(`test/fixtures/certified-word/recompute/`), with `--check`; the importer's tests and golden
-vectors read them.
+Cross-language fixtures: CI's Node job has no Python, so
+`zone-a/scripts/certified_word_fixtures.py` builds synthetic Word labels in Python and commits each
+label (`<name>.docx`) and what `python -m zone_a.recompute` writes for it, byte for byte
+(`<name>.json`, in `test/fixtures/certified-word/recompute/`), with `--check`; the importer's tests
+and golden vectors read the results, and the gate's tests read the labels as the uploads (below,
+"The gate").
 
 **D2. The recompute (decision 1's second leg).** Zone B must make, from the uploaded bytes and the
 recorded assignments, the very pages and narratives the submission carries, as invariant 8 does
@@ -182,6 +183,24 @@ Either way the recomputed code is deterministic and has no model in it, so it ma
 submission names it by `storageUri` and `sha256`; Zone B reads it from there under its own
 identity and refuses unless the hash and length match.
 
+**D4, as built (2026-10-07): the narrow upload path.** The producer stores the .docx in the
+existing CMEK submissions bucket (`SUBMISSION_BUCKET`, `infra/security.tf`), at
+`uploads/sha256/<its SHA-256, lower-case hex>.docx`, and names that URI in
+`sourceDocument.document.storageUri`. The gate accepts exactly that: the configured bucket, that
+prefix, that suffix and the source's own `sha256` in the name, nothing else (another bucket or
+prefix, a hash in upper case or of other bytes, a path with more segments, a URL); it refuses a
+`byteLength` over 32 MiB before reading; it reads with one ranged request of `byteLength + 1` bytes,
+undecompressed (the submission reader's own read, `src/gcp/submission-reader.ts`), under the
+worker's identity; and it requires the length and the SHA-256 of what it read to be the source's.
+A Cloud Storage failure other than a missing object is not a refusal: it fails the run, as the
+submission reader's does. **IAM: no change.** The worker already holds `roles/storage.objectViewer`
+on the whole submissions bucket (`worker_submission_reader`), which it needs for the submissions
+themselves, whose paths the producer chooses; a prefix condition on that grant would refuse those.
+The prefix is held in code instead. Terraform grants no identity write access to the bucket (the
+demonstration's seed, `scripts/demo/seed.ts`, writes as the operator), so there is no write grant
+to narrow either; when the producer gets an identity (the label gateway), its grant should be
+`objectCreator` with a condition on `uploads/sha256/`, as the signer's on the evidence bucket is.
+
 **D5. Who is it for (decision 5).** `zone_a.product` proposes, from the label, its EU
 authorisation numbers (strict format, each with its product number) and the exact text of
 sections 1 and 7 for the name and the holder. A person confirms the name and holder once per
@@ -203,33 +222,63 @@ Every other source keeps the template's rule.
 designs, naming the submission's hash, which covers the pages, the narratives, the structure's
 assignments and the canonical product it is for.
 
-## The gate, once it recomputes
+## The gate
 
-Until the worker runs the recompute (D2), `src/certified-word/gate.ts` accepts a certified Word
-submission only as a dry run and refuses it when `DRY_RUN` is false, with the closed code
-`certified-word-not-recomputed`, which the HTTP answer carries (`reason`). In a dry run it compares
-nothing but what the submission holds: the extractor token with the importer and the recompute's
-versions, the importer with its own version, and each page with the record's section of the same
-place in pre-order (`sectionPages[i].key` is the (i+1)th section, and each narrative's span is on its
-own section's page). With D2 and D4 built, the gate will, before the ordinary gate:
+As built (2026-10-07), `src/certified-word/gate.ts` checks a certified Word submission as follows,
+after the shape bound and the lossless parse, and refuses at the first that fails:
 
-1. read the .docx at `document.storageUri` under its own identity and require its SHA-256 and
-   length (D4);
-2. run `python -m zone_a.recompute` on those bytes with `sourceDocument.recompute` as its request,
-   in a subprocess with no network; its refusal refuses the run, and so does a request naming
-   versions the worker's build does not have;
-3. make the importer's request again from the submission: the upload from the source, the
-   recompute's request from the source, the document id from the Bundle's identifier, the product
-   from the record (the MedicinalProductDefinition's id and name, the Organization's id and name,
-   the RegulatedAuthorizations' numbers) and the approval's fields, with the run's free fields
-   (`submissionId`, `createdAt`, `extractionRunId`, `serviceVersion`, the page text's and the
-   report's URIs);
-4. run the importer its build contains on the recompute's bytes and require the very submission,
-   page text and fidelity report it was sent, by SHA-256, as the authority gate does;
-5. with D3, require the renderer gate's signed drawing record for the submission's narratives;
-6. then run the ordinary gate with that proof bound to the submission's hash, in place of
-   `certifiedWordDryRun`, and record the recompute's versions and the worker's image in the run
-   manifest.
+1. the importer that made it is the one the gate runs (`certified-word-import/1.1.0`), before
+   anything is read;
+2. it reads the .docx at `document.storageUri` under its own identity (D4, above) and requires its
+   SHA-256 and length;
+3. it runs `python -I -X utf8 -m zone_a.recompute LABEL.docx` with `sourceDocument.recompute` on
+   standard input (D2, `src/certified-word/recompute.ts`): Python's isolated mode, UTF-8 whatever
+   the locale, the label in a directory of its own (removed after), the working directory and
+   `ZONE_A_ROOT` the image's copy of the registry and mapping files, and an environment of
+   `ZONE_A_ROOT` alone, so no variable naming a credential, a project, a proxy or a path reaches
+   it; standard error discarded (a traceback may quote the label), standard output capped at 32 MiB,
+   killed at 60 s. Status 0 is its result; status 1 with its refusal (strict UTF-8 and JSON,
+   `{"refusal": {code, detail}}` exactly) refuses the run with the closed code
+   `certified-word-recompute-refused`, the recompute's code kept in the issue only if it is a
+   token, the detail never; a request naming versions this build does not have is one such refusal
+   (`versions`). Anything else (no Python, the timeout, the cap, another status or a signal, status
+   1 without a refusal) refuses with a closed reason (`unavailable`, `timeout`,
+   `output-too-large`, `exit-status`, `not-a-refusal`);
+4. it makes the importer's request again from the submission (the upload and the recompute's
+   request from the source, the document id from the Bundle's identifier, the product from the
+   record: the MedicinalProductDefinition's canonical id and name, the Organization's canonical id
+   and name, the RegulatedAuthorizations' numbers; the approval's own fields), runs the importer
+   its build contains on the recompute's bytes with the run's free fields (`submissionId`,
+   `createdAt`, `extractionRunId`, `serviceVersion`, the page text's and the report's URIs), and
+   requires the very submission, page text and fidelity report it was sent, by SHA-256, as the
+   authority gate does. Malformed output is the importer's refusal (`bytes`, `shape`, `binding`...);
+5. **the drawing (D3) is not built**: a run that is not a dry run is refused here, after all of the
+   above passed, with the closed code `certified-word-drawing-missing`;
+6. a dry run then goes through the ordinary gate with `certifiedWordDryRun` bound to the
+   submission's hash; nothing is persisted.
+
+**What a dry run proves**, where the worker can recompute (its image sets `RECOMPUTE_PYTHON` and
+`ZONE_A_ROOT`, and `SUBMISSION_BUCKET` and `GOOGLE_CLOUD_PROJECT` are set): that the bytes at the
+upload's content address are the ones the source pins, that this build's recompute makes from
+them, under the source's request, the result this build's importer makes the very submission, page
+text and report from, and that the ordinary gate's checks pass. It does **not** prove that Chrome
+draws the narratives as Word does (D3), nor that the document id names this product's ePI (P5),
+and it persists nothing. Where the worker cannot recompute (no bucket or no Python configured: a
+local run, the official validation set), a dry run checks only what the submission holds (the
+token, the importer, the pages against the record) as before, and any other run is refused with
+`certified-word-not-recomputed`. A submission never passes without both legs: no run that is not a
+dry run passes at all until D3.
+
+**The run manifest** is unchanged (6.0.0): it already names the worker's image (`runtime.imageDigest`)
+and, through the extractor token (`parser`), the importer's and every recompute version. Whether a
+dry run recomputed is not recorded; step 6 below records it, with the drawing, as a contract change.
+
+Still to build:
+
+- (step 5) D3's signed drawing record for the submission's narratives, required in place of the
+  refusal above;
+- (step 6) the ordinary gate with that proof bound to the submission's hash, in place of
+  `certifiedWordDryRun`, and the recompute's run and the drawing recorded in the run manifest.
 
 ## ADR amendments this carries
 
@@ -268,6 +317,17 @@ bucket, before the label gateway.
    for synthetic Word labels, the titles carried as written (D6), the ADR 0001 and ADR 0002
    amendments, and the gate's dry-run-only acceptance. A certified Word submission runs through
    the worker's pipeline dry, and its record and EMA output pass the official validator.
-3. Next: the worker image and the gate's subprocess (D2, "The gate, once it recomputes"), the
-   upload path (D4) and the drawing records (D3); the leaflet through Zone B; and P5's form, which
-   supplies what the request says a person confirmed.
+3. **The recompute in the worker, and the upload path** (D2 and D4, 2026-10-07; "D4, as built" and
+   "The gate" above): the worker image carries Python 3.14.7 and the zone-a and label-docx packages
+   from `zone-a/uv.lock`, and the registry and mapping files; the gate reads the upload from its
+   content address and requires its hash and length, runs the recompute in an isolated subprocess,
+   runs the importer again and requires the same submission, page text and report; a run that is
+   not a dry run is still refused, now with `certified-word-drawing-missing`. `zone_a.recompute`
+   reads its files from `ZONE_A_ROOT` where set (`recompute/1.1.0`), and the importer is
+   `certified-word-import/1.1.0` (its directory holds the gate). Tested in CI three ways: the Check
+   job runs the gate on the recompute's committed results (no Python there), the Zone A job runs
+   the same tests with its own Python through the gate's runner and requires it to make each
+   committed result again byte for byte, and the Images job runs the gate's runner inside the
+   worker image on the committed labels, byte for byte.
+4. Next: the drawing records (D3); the leaflet through Zone B; and P5's form, which supplies what
+   the request says a person confirmed, and the registry that binds the document id.

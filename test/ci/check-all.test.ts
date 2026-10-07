@@ -117,7 +117,7 @@ describe("scripts/check-all.sh", () => {
     const sections = scriptCommands(script);
     expect([...sections].map(([job, commands]) => [job, commands.length])).toEqual([
       ["check", 2],
-      ["zone-a", 8],
+      ["zone-a", 9],
       ["agent", 6],
     ]);
     expect(sections.get("zone-a")?.[0]).toBe("zone-a uv sync --locked");

@@ -47,6 +47,7 @@ import { GcpLineagePublisher } from "./gcp/lineage.js";
 import { defaultFetcher, type AuthorityFetcher } from "./authority/fetch.js";
 import { verifyAuthorityImport, type AuthorityGateResult } from "./authority/gate.js";
 import { verifyCertifiedWordImport } from "./certified-word/gate.js";
+import { certifiedWordSources, type CertifiedWordSources } from "./certified-word/recompute.js";
 import { sha256Bytes } from "./authority/import.js";
 import { approvalLinkProvenance } from "./approval/link.js";
 import { recordFacts } from "./approval/review.js";
@@ -228,10 +229,12 @@ async function documentGate(
     const claimed = claimedSourceKind(input.submission);
     if (claimed === "certified-word") {
       return {
-        gate: verifyCertifiedWordImport(input, mapping.sourceCodeSystem, {
-          ...options,
-          dryRun: config.DRY_RUN,
-        }),
+        gate: await verifyCertifiedWordImport(
+          input,
+          mapping,
+          { ...options, dryRun: config.DRY_RUN },
+          dependencies.certifiedWord ?? certifiedWordSources(config),
+        ),
       };
     }
     if (claimed === "authority-publication") {
@@ -261,6 +264,9 @@ async function documentGate(
 // What a run may be given instead of its production default; tests use it.
 export type PipelineDependencies = {
   authorityFetcher?: AuthorityFetcher;
+  // Where the certified Word gate reads an upload and runs the recompute; from the configuration
+  // by default (src/certified-word/recompute.ts).
+  certifiedWord?: CertifiedWordSources;
   // Where a document run reads its head statement and the approval key's public keys; Cloud
   // Storage and Cloud KMS from the configuration by default.
   approvals?: { heads: HeadSource; keys: KeySource };
