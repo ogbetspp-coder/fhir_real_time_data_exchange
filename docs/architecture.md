@@ -103,7 +103,9 @@ A company's Word label (ADR 0006; `docs/design/certified-word-import.md`) is a t
 section's narrative and page (`python -m zone_a.recompute`); the importer (`src/certified-word/`,
 pure TypeScript) turns that result and what a person confirmed (the ePI's document id, the
 canonical product, its name and holder chosen from the label's sections 1 and 7, its EU
-authorisation numbers from section 8, and the approval) into a Type 1 submission. Narratives,
+authorisation numbers from section 8, and the approval; for a package leaflet, the name its
+section 1 heading gives the medicine, the holder from section 6 and no EU number) into a Type 1
+submission. Narratives,
 pages and titles come only from the recompute; a section's title is its label's heading line,
 which the crosswalk and the EMA preflight carry as written. The source pins the uploaded .docx,
 the recompute's request and every version it names, and the importer's own version; the extractor
@@ -175,11 +177,12 @@ sequenceDiagram
 The transformer accepts two authoritative source categories:
 
 - the structured product graph (Type 2, or for an authority import the Type 1 record); and
-- an authored canonical SmPC Composition with stable section identifiers.
+- an authored canonical SmPC or package leaflet Composition with stable section identifiers.
 
 The source preflight is `validateCanonicalPreflight(bundle, graphType)`: Type 2 as strict as
 ever, Type 1 exactly one Composition, MedicinalProductDefinition and Organization and one
-RegulatedAuthorization per authorisation, linked, named and identified. Both check EU numbers:
+RegulatedAuthorization per authorisation (a package leaflet states none, so its record may have
+none), linked, named and identified. Both check EU numbers:
 one RegulatedAuthorization per EU authorisation number (`EU/1/YY/NNN/PPP`), and the product's EU
 product numbers (`EU/1/YY/NNN`) exactly theirs (`docs/design/version-identity.md`). The graph type
 is the submission's, and the ungated sources are always Type 2.
@@ -243,10 +246,26 @@ carries the template's own sections only, each once, so it refuses a section wit
 on any slot that is neither. The ConceptMap publishes the rules as `equivalent` and the unmapped
 slots as `noMap`.
 
+The package leaflet has its own manifest, `fhir/mappings/cap-pl-en.json` (mapping 1.1.0): the
+EMA's profile `EUQRD-CAP-template-new-Package-Leaflet-en` written out, 27 rules, 17 of them
+required, and its custom subsection slot unmapped, held to the profile by the same test, with its
+own code system (`canonical-pl-sections`) and ConceptMap. The worker loads both manifests and
+takes, for each source, the one its `Composition.type` names, in our document type code system or
+the EMA's (`loadEmaMappings`, `mappingFor` in `src/fhir/mapping.ts`), and refuses a source that
+names none, two, or one no manifest maps; a caller that gives one manifest (the signer,
+`scripts/dev/run-pipeline.ts`) maps an untyped source by its sections, as before, and the crosswalk
+refuses a source that names another document than its manifest's. The EMA Composition is typed as
+the manifest's document (`100000155532` SmPC, `100000155538` Package Leaflet, from the EMA's code
+system in the pinned package), which the EMA preflight holds. A leaflet is carried only from a
+certified Word source, its titles as written (a Type 2 leaflet's template titles would write X:
+`leaflet-titles-not-carried`), and in a dry run only until the query service and the signer read
+one (`leaflet-not-readable`; `docs/design/pl-structure.md`, "Zone B").
+
 The StructureMap is the crosswalk's twin in the FHIR mapping language (`fhir/maps/`), compiled by the
 pinned validator and executed on its transform engine in CI against this crosswalk on every fixture
 (`test/official/structuremap-twin.test.ts`). It transforms; the ids, the reference rewrite and the
-refusals stay here (`docs/design/structuremap-twin.md`).
+refusals stay here (`docs/design/structuremap-twin.md`). It is the SmPC's alone: the leaflet adds
+data, not transform logic (that note, "The package leaflet: not twinned").
 
 ## Versions
 

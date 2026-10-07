@@ -87,7 +87,8 @@ and what a person confirmed, as the authority importer is of the authority's byt
 - **What it checks**, refusing at the first stage that fails with a closed reason: the request;
   the bytes (strict UTF-8 and JSON, the authority's reader); the recompute's own refusal; the
   result's shape; that the result is the one the request names (versions, document, view, part,
-  assignments) made with the mapping this build carries, of an SmPC; the mapping's tree, codes
+  assignments) made with the mapping this build carries for the document (the SmPC's or, since
+  importer 1.2.0, the package leaflet's); the mapping's tree, codes
   included; each title one line of plain text that draws something; each narrative read by Zone
   B's scanner as its page, and a section without a narrative having the empty page and being
   neither a leaf nor one whose narrative the mapping requires; and the product (tightened after the
@@ -120,8 +121,20 @@ and what a person confirmed, as the authority importer is of the authority's byt
   `certified-word:<document id>` in our system `https://khs.dev/fhir/identifier/certified-word`;
   `Bundle.timestamp` and `Composition.date` the run's `createdAt`; `Composition.title` the
   product's name.
-- **The leaflet** is refused (`binding: document-not-carried`): Zone B's crosswalk and preflights
-  are the SmPC's, and the canonical document types name the SmPC only.
+- **The leaflet** (since importer 1.2.0, 2026-10-07; `docs/design/pl-structure.md`, "Zone B") is
+  carried by its own mapping (`fhir/mappings/cap-pl-en.json`) and typed `pl`, with its own product
+  check, since its template places the product elsewhere:
+  - **the name** is the structure's `name` (`zone_a.leaflet`: what stands for X in every section
+    1 line of the leaflet, its list of sections included), and must stand for X in section 1's
+    heading as the label writes it, the mapping's form exactly, character for character ("1. What
+    Synthetic Exampline is and what it is used for"); it does not end in punctuation;
+  - **the holder** is the first line of section 6's holder section ("Marketing Authorisation
+    Holder and Manufacturer", or "Marketing Authorisation Holder" alone), exactly, and that line is
+    not one only the page writes;
+  - **no EU authorisation number**: the leaflet's template has no place for one, so a person
+    confirms none (a request naming one is refused), and the Type 1 record has no
+    RegulatedAuthorization, which the Type 1 preflight allows for a leaflet only. The canonical
+    product's id joins the leaflet to its SmPC's record.
 - **False refusals these rules make**, accepted until a label shows the need:
   - a name that is neither section 1's whole first line nor that line up to its strength: a name
     whose strength is written without a space ("Brand10 mg"), whose invented name itself begins
@@ -132,7 +145,10 @@ and what a person confirmed, as the authority importer is of the authority's byt
     or after other text), and a section 1 or 7 that begins with a table or a picture;
   - a line of section 8 that holds a slash and does not begin with a number (a date "01/2024", a
     note), a number written otherwise than the strict form, a run included;
-  - a leaflet.
+  - in a leaflet, a name written otherwise in its section 1 heading than the structure reads it
+    (two spaces, a non-breaking hyphen), a section 1 heading a person assigned, and a holder
+    section that begins with anything but the holder ("Marketing Authorisation Holder:" above it,
+    the manufacturer first).
 - **Open: the document id is bound to nothing.** The importer takes the ePI's document id as a
   person confirmed it and writes the record's identifier from it, and nothing checks that the id
   names this product's ePI and no other: two labels could be filed under one ePI, or one label's
@@ -358,5 +374,10 @@ bucket, before the label gateway.
    committed result again byte for byte, and the Images job runs the gate's runner inside the
    worker image on the committed labels, byte for byte, as Cloud Build does in the image it is
    about to push (after the review of #196: "The worker's Python, where it is built and proven").
-4. Next: the drawing records (D3); the leaflet through Zone B; and P5's form, which supplies what
+4. **The package leaflet** (2026-10-07, importer 1.2.0; "The leaflet" above and
+   `docs/design/pl-structure.md`, "Zone B"): the importer carries `document: "pl"` by the
+   leaflet's mapping, the worker takes each source's mapping by its document type, and a certified
+   Word leaflet runs through the worker's pipeline dry, its EMA output the EMA's leaflet document,
+   which passes the official validator.
+5. Next: the drawing records (D3); and P5's form, which supplies what
    the request says a person confirmed, and the registry that binds the document id.

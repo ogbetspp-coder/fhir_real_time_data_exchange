@@ -21,7 +21,7 @@ import {
   type SourceDocumentText,
   type SourcePage,
 } from "../fidelity/index.js";
-import type { EmaMapping } from "../fhir/mapping.js";
+import { DOCUMENT_TYPE_SYSTEM, type EmaMapping } from "../fhir/mapping.js";
 import { isComposition } from "../fhir/types.js";
 import { sha256, sha256Utf8 } from "../lib/hash.js";
 import {
@@ -171,7 +171,7 @@ function buildSectionProvenance(
   });
 }
 
-function buildDecisions(sections: NarrativeSection[]): StructuringDecision[] {
+function buildDecisions(sections: NarrativeSection[], document: string): StructuringDecision[] {
   return [
     ...sections.map((section) => ({
       target: section.path,
@@ -182,8 +182,8 @@ function buildDecisions(sections: NarrativeSection[]): StructuringDecision[] {
       target: "Composition.type",
       action: "code-mapped" as const,
       terminologyRef: {
-        system: "https://khs.dev/fhir/CodeSystem/document-type",
-        code: "smpc",
+        system: DOCUMENT_TYPE_SYSTEM,
+        code: document,
         lookupId: "synthetic-lookup-1",
       },
     },
@@ -252,7 +252,7 @@ export function createSyntheticSubmission(
     },
     extraction,
     sections: sectionProvenance,
-    decisions: buildDecisions(sections),
+    decisions: buildDecisions(sections, mapping.root.sourceKey),
     fidelity: {
       normalizationVersion: NORMALIZATION_VERSION,
       status: "passed",

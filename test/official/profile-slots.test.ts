@@ -5,7 +5,13 @@ import { readFileSync } from "node:fs";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { pinnedValidator } from "../../scripts/fhir/compile-map.mjs";
-import { loadEmaMapping, type EmaMapping, type SectionRule } from "../../src/fhir/mapping.js";
+import {
+  DOCUMENTS,
+  EMA_DOCUMENT_TYPE_SYSTEM,
+  loadEmaMapping,
+  type EmaMapping,
+  type SectionRule,
+} from "../../src/fhir/mapping.js";
 
 // Every section slot of the EMA's CAP SmPC and package leaflet template profiles is either mapped
 // by a rule of its manifest (for the SmPC, and so by the ConceptMap, equivalent) or named in its
@@ -19,6 +25,7 @@ const PROFILES = [
     document: "SmPC",
     manifest: "fhir/mappings/cap-smpc-en.json",
     profile: "StructureDefinition-EUQRD-CAP-template-new-SmPC-en.json",
+    typeProfile: "StructureDefinition-EUEpiCompositionSmPC.json",
     own: 59,
     custom: 44,
   },
@@ -26,10 +33,24 @@ const PROFILES = [
     document: "package leaflet",
     manifest: "fhir/mappings/cap-pl-en.json",
     profile: "StructureDefinition-EUQRD-CAP-template-new-Package-Leaflet-en.json",
+    typeProfile: "StructureDefinition-EUEpiCompositionPackageLeaflet.json",
     own: 27,
     custom: 6,
   },
 ];
+
+// A file of the pinned EUePI package, parsed.
+function packageFile(file: string): unknown {
+  const read = spawnSync("tar", ["-xzOf", euepiPackage(), `package/${file}`], {
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (read.status !== 0) throw new Error(`could not read ${file} from the EUePI package`);
+  return JSON.parse(read.stdout);
+}
+
+type Profile = { url: string; differential: { element: ElementDefinition[] } };
+type Concepts = { url: string; concept: { code: string; display: string }[] };
 
 type ElementDefinition = {
   id: string;
@@ -95,23 +116,48 @@ function flatten(
 
 describe.each(PROFILES)(
   "the EMA's CAP $document template profile, read from the pinned EUePI package",
-  ({ manifest, profile: file, own, custom: customs }) => {
+  ({ manifest, profile: file, typeProfile, own, custom: customs }) => {
     let mapping: EmaMapping;
     let all: Slot[];
 
     beforeAll(async () => {
       mapping = await loadEmaMapping(manifest);
-      const read = spawnSync("tar", ["-xzOf", euepiPackage(), `package/${file}`], {
-        encoding: "utf8",
-        maxBuffer: 64 * 1024 * 1024,
-      });
-      if (read.status !== 0) throw new Error(`could not read ${file} from the EUePI package`);
-      const profile = JSON.parse(read.stdout) as {
-        url: string;
-        differential: { element: ElementDefinition[] };
-      };
+      const profile = packageFile(file) as Profile;
       expect(profile.url).toBe(mapping.profiles.composition.at(-1));
       all = slots(profile);
+    });
+
+    // The EMA's document type of the manifest's document (src/fhir/mapping.ts, DOCUMENTS): the
+    // code its EUEpiComposition profile fixes, and the display the EMA's document type code system
+    // gives it, both read from the package.
+    it("types its document as the EMA's profile and code system do", () => {
+      const document = DOCUMENTS[mapping.root.sourceKey as keyof typeof DOCUMENTS];
+      const typed = packageFile(typeProfile) as Profile;
+      expect(mapping.profiles.composition).toContain(typed.url);
+      const fixed = (id: string) =>
+        typed.differential.element.find((element) => element.id === id) as
+          (ElementDefinition & { patternUri?: string }) | undefined;
+      expect(fixed("Composition.type.coding.system")?.patternUri).toBe(EMA_DOCUMENT_TYPE_SYSTEM);
+      expect(fixed("Composition.type.coding.code")?.patternCode).toBe(document.emaCode);
+      const types = packageFile("CodeSystem-100000155531.json") as Concepts;
+      expect(types.url).toBe(EMA_DOCUMENT_TYPE_SYSTEM);
+      expect(types.concept.find(({ code }) => code === document.emaCode)?.display).toBe(
+        document.display,
+      );
+    });
+
+    // Each rule's coding display is the EMA section code system's own display for its code: the
+    // rule's title, or its display where the two differ (the validator refuses any other).
+    it("displays every code as the EMA's section code system does", () => {
+      const codes = packageFile("CodeSystem-200000029659.json") as Concepts;
+      expect(codes.url).toBe(mapping.targetCodeSystem);
+      const displays = new Map(codes.concept.map(({ code, display }) => [code, display]));
+      for (const [rule] of flatten(mapping.root)) {
+        expect([rule.sourceKey, rule.display ?? rule.title]).toEqual([
+          rule.sourceKey,
+          displays.get(rule.targetCode),
+        ]);
+      }
     });
 
     it(`has ${own + customs} section slots: ${own} of the template's own sections and ${customs} for custom subsections`, () => {

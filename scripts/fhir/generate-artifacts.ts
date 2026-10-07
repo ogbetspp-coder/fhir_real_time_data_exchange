@@ -3,7 +3,14 @@ import path from "node:path";
 import { crc32 } from "node:zlib";
 
 import { ApproverRole } from "../../src/contracts/index.js";
-import { loadEmaMapping, type SectionRule } from "../../src/fhir/mapping.js";
+import {
+  DOCUMENTS,
+  DOCUMENT_TYPE_SYSTEM,
+  loadEmaMapping,
+  mappingId,
+  type EmaMapping,
+  type SectionRule,
+} from "../../src/fhir/mapping.js";
 import {
   ACTIVITY_SYSTEM,
   APPROVAL_CONTENT_EXTENSION_URL,
@@ -50,9 +57,10 @@ import {
 const output = path.resolve("fhir/generated");
 await mkdir(output, { recursive: true });
 const mapping = await loadEmaMapping();
+const leaflet = await loadEmaMapping(path.resolve(`fhir/mappings/${DOCUMENTS.pl.mappingId}.json`));
 
 const PACKAGE_NAME = "dev.khs.fhir.epi";
-const PACKAGE_VERSION = "0.5.0";
+const PACKAGE_VERSION = "0.6.0";
 const PACKAGE_FILE = `${PACKAGE_NAME}.tgz`;
 const CANONICAL = KHS_CANONICAL;
 
@@ -111,30 +119,40 @@ const sectionConcept = (rule: SectionRule): Concept => ({
   ...(rule.children === undefined ? {} : { concept: rule.children.map(sectionConcept) }),
 });
 
-const terminology = [
-  ...codeSystem(
-    mapping.sourceCodeSystem,
-    mapping.mappingVersion,
-    "CanonicalSmpcSections",
-    "Canonical SmPC sections",
-    "The canonical SmPC section keys of the mapping manifest (fhir/mappings/cap-smpc-en.json), each with its QRD heading, nested as the sections are, and the keys of the EMA profile's slots the crosswalk does not carry (the manifest's unmapped list, each with its reason). A key identifies a section of the canonical record; it is not a clinical concept.",
+// A manifest's canonical section keys: its tree, and the slots it leaves unmapped.
+const sectionCodeSystem = (manifest: EmaMapping, name: string, title: string, what: string) =>
+  codeSystem(
+    manifest.sourceCodeSystem,
+    manifest.mappingVersion,
+    name,
+    title,
+    `The canonical ${what} section keys of the mapping manifest (fhir/mappings/${mappingId(manifest)}.json), each with its QRD heading, nested as the sections are, and the keys of the EMA profile's slots the crosswalk does not carry (the manifest's unmapped list, each with its reason). A key identifies a section of the canonical record; it is not a clinical concept.`,
     [
-      sectionConcept(mapping.root),
-      ...(mapping.unmapped ?? []).map((slot) => ({
+      sectionConcept(manifest.root),
+      ...(manifest.unmapped ?? []).map((slot) => ({
         code: slot.sourceKey,
         display: slot.title,
         definition: `Not carried by the crosswalk (EMA code ${slot.targetCode}): ${slot.reason}`,
       })),
     ],
     "part-of",
+  );
+
+const terminology = [
+  ...sectionCodeSystem(mapping, "CanonicalSmpcSections", "Canonical SmPC sections", "SmPC"),
+  ...sectionCodeSystem(
+    leaflet,
+    "CanonicalPlSections",
+    "Canonical package leaflet sections",
+    "package leaflet",
   ),
   ...codeSystem(
-    `${CANONICAL}/CodeSystem/document-type`,
+    DOCUMENT_TYPE_SYSTEM,
     PACKAGE_VERSION,
     "DocumentType",
     "Document type",
     "The type of a canonical record's Composition.",
-    [{ code: "smpc", display: "Summary of Product Characteristics" }],
+    Object.entries(DOCUMENTS).map(([code, { display }]) => ({ code, display })),
   ),
   ...codeSystem(
     ACTIVITY_SYSTEM,
@@ -480,31 +498,36 @@ const epiPublishedTopic = {
   notificationShape: [{ resource: "Bundle" }],
 };
 
-const EMA_SMPC_SECTION_CODES = "http://ema.europa.eu/fhir/ValueSet/EUepismpcqrdcodesVs";
-
-const conceptMap = {
+// One ConceptMap per manifest, each scoped to the EMA IG's section-code value set of its document.
+const conceptMap = (
+  manifest: EmaMapping,
+  name: string,
+  title: string,
+  profile: string,
+  targetScope: string,
+) => ({
   resourceType: "ConceptMap",
-  id: "canonical-to-ema-cap-smpc-en",
-  url: "https://khs.dev/fhir/ConceptMap/canonical-to-ema-cap-smpc-en",
-  version: mapping.mappingVersion,
-  name: "CanonicalToEmaCapSmpcEnglish",
-  title: "Canonical SmPC sections to EMA CAP SmPC English QRD sections",
+  id: `canonical-to-ema-${mappingId(manifest)}`,
+  url: `https://khs.dev/fhir/ConceptMap/canonical-to-ema-${mappingId(manifest)}`,
+  version: manifest.mappingVersion,
+  name,
+  title,
   status: "active",
   experimental: true,
-  description:
-    "Deterministic terminology map. It maps section identifiers only and does not generate or alter regulated narrative. Every section slot of the EMA profile EUQRD-CAP-template-new-SmPC-en has a key here: each of the template's own sections maps equivalent to its EMA code, and a slot the crosswalk does not carry is noMap, its reason in the source code system's definition of the key.",
+  description: `Deterministic terminology map. It maps section identifiers only and does not generate or alter regulated narrative. Every section slot of the EMA profile ${profile} has a key here: each of the template's own sections maps equivalent to its EMA code, and a slot the crosswalk does not carry is noMap, its reason in the source code system's definition of the key.`,
   // A scope is a value set: R5 types it canonical(ValueSet), and the validator resolves a uri
   // scope as well and refuses a code system there. The source's is the value set of every
-  // canonical section key, above; the target's is the EMA IG's SmPC section-code value set, the
-  // one EUEpiCompositionSmPC binds Composition.section.code to, which holds every target code.
-  sourceScopeCanonical: valueSetUrl(mapping.sourceCodeSystem),
-  targetScopeCanonical: EMA_SMPC_SECTION_CODES,
+  // canonical section key, above; the target's is the EMA IG's section-code value set of the
+  // document, the one its EUEpiComposition profile (SmPC, PackageLeaflet) binds
+  // Composition.section.code to, which holds every target code.
+  sourceScopeCanonical: valueSetUrl(manifest.sourceCodeSystem),
+  targetScopeCanonical: targetScope,
   group: [
     {
-      source: mapping.sourceCodeSystem,
-      target: mapping.targetCodeSystem,
+      source: manifest.sourceCodeSystem,
+      target: manifest.targetCodeSystem,
       element: [
-        ...flatten(mapping.root).map((rule) => ({
+        ...flatten(manifest.root).map((rule) => ({
           code: rule.sourceKey,
           display: rule.title,
           target: [
@@ -515,7 +538,7 @@ const conceptMap = {
             },
           ],
         })),
-        ...(mapping.unmapped ?? []).map((slot) => ({
+        ...(manifest.unmapped ?? []).map((slot) => ({
           code: slot.sourceKey,
           display: slot.title,
           noMap: true,
@@ -523,7 +546,24 @@ const conceptMap = {
       ],
     },
   ],
-};
+});
+
+const conceptMaps = [
+  conceptMap(
+    mapping,
+    "CanonicalToEmaCapSmpcEnglish",
+    "Canonical SmPC sections to EMA CAP SmPC English QRD sections",
+    "EUQRD-CAP-template-new-SmPC-en",
+    "http://ema.europa.eu/fhir/ValueSet/EUepismpcqrdcodesVs",
+  ),
+  conceptMap(
+    leaflet,
+    "CanonicalToEmaCapPlEnglish",
+    "Canonical package leaflet sections to EMA CAP package leaflet English QRD sections",
+    "EUQRD-CAP-template-new-Package-Leaflet-en",
+    "http://ema.europa.eu/fhir/ValueSet/EUepiplqrdcodesVs",
+  ),
+];
 
 // The StructureMap twin as the pinned validator compiled it from fhir/maps/ (scripts/fhir/
 // compile-map.mjs, which needs Java; CI's Official validation job compiles it again and fails on
@@ -543,7 +583,7 @@ const resources: Record<string, unknown>[] = [
   euProductIdentity,
   ...namingSystems,
   epiPublishedTopic,
-  conceptMap,
+  ...conceptMaps,
   structureMap,
 ];
 const files = new Map<string, Buffer>(

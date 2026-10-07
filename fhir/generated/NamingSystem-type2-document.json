@@ -2,7 +2,7 @@
   "resourceType": "NamingSystem",
   "id": "type2-document",
   "url": "https://khs.dev/fhir/NamingSystem/type2-document",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "name": "Type2Document",
   "title": "Synthetic Type 2 document",
   "status": "active",

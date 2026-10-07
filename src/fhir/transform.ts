@@ -2,8 +2,13 @@ import { canonicalJson, sha256, stableUuid } from "../lib/hash.js";
 import { isGap } from "../fidelity/normalize.js";
 import { isGridMarker, xhtmlToText } from "../fidelity/xhtml.js";
 import {
+  EMA_DOCUMENT_TYPE_SYSTEM,
+  LEAFLET_TITLES_NOT_CARRIED,
+  documentOf,
   duplicateRuleIssues,
   permittedTitles,
+  sourceDocumentTypes,
+  titlesCarried,
   type EmaMapping,
   type SectionRule,
   type TitleRule,
@@ -23,8 +28,6 @@ import {
   type FhirResource,
 } from "./types.js";
 
-const EMA_DOCUMENT_TYPE_SYSTEM = "http://ema.europa.eu/fhir/CodeSystem/100000155531";
-const EMA_SMPC_CODE = "100000155532";
 // The List indexes every document of the ePI package. EMA's Document Type code system has no
 // "master list" concept; the concept it does have for the whole set of documents is
 // 100000155539, and the EMA EPI-23-1022 English sample (fhir/standards.lock.json) codes its
@@ -242,6 +245,20 @@ function sourceSectionIssues(sections: SourceSection[], mapping: EmaMapping): st
     } else if (!keys.has(code)) {
       issues.push(`Unmapped source section ${code} at ${path}`);
     }
+  }
+  return issues;
+}
+
+// The manifest maps one document (an SmPC, a package leaflet), so a source that says it is another
+// is refused rather than published as this one. A source that says nothing is held to the manifest
+// by its sections alone, as before a second document was mapped.
+function sourceDocumentIssues(bundle: FhirBundle, mapping: EmaMapping): string[] {
+  const issues = documentOf(mapping) === undefined ? ["The mapping maps no EMA document type"] : [];
+  const named = [...sourceDocumentTypes(bundle)];
+  if (named.some((document) => document !== mapping.root.sourceKey)) {
+    issues.push(
+      `Source Composition.type names another document than the mapping's ${mapping.root.sourceKey}`,
+    );
   }
   return issues;
 }
@@ -677,6 +694,8 @@ export function transformType2ToEma(
   const decisions: MappingDecision[] = [];
   const issues: string[] = [
     ...duplicateRuleIssues(mapping.root, mapping.unmapped),
+    ...sourceDocumentIssues(sourceBundle, mapping),
+    ...(titlesCarried(mapping, titles) ? [] : [LEAFLET_TITLES_NOT_CARRIED]),
     ...sourceLanguageIssues(sourceBundle, sourceComposition),
   ];
   const root = mapSection(
@@ -690,8 +709,9 @@ export function transformType2ToEma(
     titles,
   );
   issues.push(...sourceSectionIssues(sections, mapping));
+  const document = documentOf(mapping);
 
-  if (issues.length > 0 || root === undefined) {
+  if (issues.length > 0 || root === undefined || document === undefined) {
     throw new TransformationError("EMA QRD transformation failed closed", issues);
   }
   // Every id the run persists derives from this one checked value, so a run writes only into its
@@ -728,12 +748,14 @@ export function transformType2ToEma(
     ],
     // Set below, once the rest of the Composition is assembled.
     identifier: [],
+    // The document the mapping maps, as the EMA's document type code system codes it (the SmPC's
+    // or the package leaflet's, which EUEpiCompositionSmPC and EUEpiCompositionPackageLeaflet fix).
     type: {
       coding: [
         {
           system: EMA_DOCUMENT_TYPE_SYSTEM,
-          code: EMA_SMPC_CODE,
-          display: "Summary of Product Characteristics",
+          code: document.emaCode,
+          display: document.display,
         },
       ],
     },

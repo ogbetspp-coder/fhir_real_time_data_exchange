@@ -2,7 +2,7 @@ import { Hono } from "hono";
 
 import { loadConfig, type AppConfig } from "./config.js";
 import { RunRequestSchema, SubmissionRejectedError } from "./contracts/index.js";
-import { loadEmaMapping } from "./fhir/mapping.js";
+import { loadEmaMappings } from "./fhir/mapping.js";
 import { OfficialValidatorError } from "./fhir/official-validator.js";
 import { TransformationError } from "./fhir/transform.js";
 import type { FhirBundle } from "./fhir/types.js";
@@ -25,6 +25,7 @@ import { runPipeline, type PipelineDependencies, type PipelineInput } from "./pi
 // `unclassified`. test/failure-reasons.test.ts holds every literal thrown there to an entry.
 export const FAILURE_REASONS: Readonly<Record<string, string>> = {
   "runId must be a UUID": "bad-run-id",
+  "A package leaflet is not published until its readers can read it": "leaflet-not-readable",
   "Run source is disabled": "source-disabled",
   "Canonical preflight failed": "source-preflight-failed",
   "EMA structural preflight failed": "ema-preflight-failed",
@@ -77,6 +78,8 @@ export const FAILURE_REASONS: Readonly<Record<string, string>> = {
 // missing identifier); a reused runId is a replay, which must not be retried as it is.
 const FAILURE_STATUS: Readonly<Record<string, 409 | 422>> = {
   "crosswalk-refused": 422,
+  // A leaflet runs dry only until the query service and the signer read one (src/pipeline.ts).
+  "leaflet-not-readable": 422,
   // The submission is not the document's approved head (docs/design/approval.md, D8).
   "not-approved": 422,
   // The HTTP surface refuses a disabled source before the pipeline, with the same code and status.
@@ -118,7 +121,8 @@ type AppEnvironment = { Variables: { runId?: string } };
 export function createApp(overrides: AppOverrides = {}): Hono<AppEnvironment> {
   const app = new Hono<AppEnvironment>();
   const config = overrides.config ?? loadConfig();
-  const mappingPromise = loadEmaMapping();
+  // Every manifest Zone B carries; a run's source picks its own by its document type.
+  const mappingsPromise = loadEmaMappings();
   const submissionReader =
     overrides.submissionReader ??
     (config.SUBMISSION_BUCKET === undefined ? undefined : new GcsSubmissionReader(config));
@@ -169,7 +173,7 @@ export function createApp(overrides: AppOverrides = {}): Hono<AppEnvironment> {
     // under the same runId as the pipeline they feed.
     const runId = request.runId ?? crypto.randomUUID();
     context.set("runId", runId);
-    const mapping = await mappingPromise;
+    const mappings = await mappingsPromise;
     let input: PipelineInput;
 
     if (request.source === "fixture") {
@@ -180,7 +184,7 @@ export function createApp(overrides: AppOverrides = {}): Hono<AppEnvironment> {
       input = {
         runId,
         sourceKind: "fixture",
-        source: createSyntheticType2Bundle(mapping, { product: SMOKE_PRODUCT_ID }),
+        source: createSyntheticType2Bundle(mappings.smpc, { product: SMOKE_PRODUCT_ID }),
         sourceResource: `fixture:${SMOKE_PRODUCT_ID}`,
       };
     } else if (request.source === "healthcare-api") {
@@ -205,7 +209,7 @@ export function createApp(overrides: AppOverrides = {}): Hono<AppEnvironment> {
 
     const result = await runPipeline(
       input,
-      mapping,
+      [mappings.smpc, mappings.pl],
       config,
       overrides.approvals === undefined ? {} : { approvals: overrides.approvals },
     );

@@ -174,7 +174,7 @@ def test_an_optional_named_section_stays_text() -> None:
     at = lines.index(CONTENTS[2], 10) + 2
     lines.insert(at, "If you take more X than you should")
     result = structure(_paragraphs(lines), REGISTRY, MAPPING)
-    assert "pl.3.too-much" not in _by_key(result)
+    assert "pl.3.toomuch" not in _by_key(result)
     assert at in _by_key(result)["pl.3"]["paragraphs"]
 
 
@@ -197,7 +197,7 @@ def test_a_person_names_a_numbered_heading_and_its_named_sections_are_found() ->
     assert result["ready"], result["summary"]
     sections = _by_key(result)
     assert sections["pl.2"]["status"] == "assigned"
-    assert sections["pl.2.do-not-take"]["status"] == "mapped"
+    assert sections["pl.2.donottake"]["status"] == "mapped"
     with pytest.raises(ValueError, match="assigned twice"):
         structure(_paragraphs(lines), REGISTRY, MAPPING, {"pl.2": at, "pl.3": at})
 
@@ -218,7 +218,7 @@ def test_a_leaflet_whose_section_1_lines_name_two_medicines_has_no_name() -> Non
     assert result["name"] is None
     assert not result["ready"]
     statuses = {s["key"]: s["status"] for s in result["sections"]}
-    assert statuses["pl.1"] == statuses["pl.2.do-not-take"] == "missing"
+    assert statuses["pl.1"] == statuses["pl.2.donottake"] == "missing"
     # A heading without X is found; with no name the list of sections is not told from steps, so
     # its "4. Possible side effects" is found too, and the two are for a person.
     assert statuses["pl.4"] == "duplicate"
@@ -346,7 +346,7 @@ def test_steps_at_the_end_of_a_leaflet_are_a_list_and_a_seventh_is_no_step() -> 
 
 
 def test_a_choice_of_two_takes_at_least_one() -> None:
-    assert forms(HEADS["pl.2.do-not-take"])[0] == {
+    assert forms(HEADS["pl.2.donottake"])[0] == {
         "Do not take X",
         "Do not use X",
         "Do not take use X",

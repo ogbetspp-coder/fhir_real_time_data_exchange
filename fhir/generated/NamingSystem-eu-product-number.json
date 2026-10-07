@@ -2,7 +2,7 @@
   "resourceType": "NamingSystem",
   "id": "eu-product-number",
   "url": "https://khs.dev/fhir/NamingSystem/eu-product-number",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "name": "EuProductNumber",
   "title": "EU product number",
   "status": "active",

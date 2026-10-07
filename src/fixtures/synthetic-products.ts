@@ -24,7 +24,11 @@
 //    (docs/design/version-identity.md).
 
 export type SyntheticProductId =
-  "synthetic-paracetamol" | "synthetic-demoxetine" | "synthetic-placebolol" | "synthetic-smoketest";
+  | "synthetic-paracetamol"
+  | "synthetic-demoxetine"
+  | "synthetic-placebolol"
+  | "synthetic-smoketest"
+  | "synthetic-exampline";
 
 export type SyntheticVersion = 1 | 2;
 
@@ -306,6 +310,55 @@ const SMOKETEST: SyntheticProduct = {
   },
 };
 
+// The package leaflet's product (docs/design/pl-structure.md, "Zone B"): its Type 2 record is
+// built with the leaflet's mapping (fhir/mappings/cap-pl-en.json), as the others' are with the
+// SmPC's, and is the fixture of a refusal: Zone B carries a leaflet only with its titles as
+// written, from a certified Word source, never a Type 2 leaflet under the template's titles. It is
+// neither a demonstration label nor the smoke product, so it is not in SYNTHETIC_PRODUCTS, whose
+// products the SmPC tests iterate and the demonstration seeds.
+const EXAMPLINE: SyntheticProduct = {
+  id: "synthetic-exampline",
+  productName: "Synthetic Exampline 10 mg film-coated tablets",
+  substanceName: "Exampline",
+  documentTitle: "Synthetic Exampline 10 mg film-coated tablets package leaflet",
+  strengthMg: 10,
+  organizationId: "synthetic-pharma",
+  organizationName: "Synthetic Pharma Ltd",
+  organizationIdentifier: "SYN-ORG-0001",
+  compositionId: "synthetic-exampline-pl",
+  compositionIdentifier: "synthetic-exampline-pl-v1",
+  bundleId: "synthetic-exampline-type2-pl",
+  bundleIdentifier: "synthetic-exampline-type2-pl-v1",
+  productIdentifier: "SYN-EXAM-010",
+  authorizationId: "synthetic-exampline-authorization",
+  marketingAuthorizationNumber: "EU/SYN/0005",
+  packageId: "synthetic-exampline-package",
+  itemId: "synthetic-exampline-tablet",
+  administrableId: "synthetic-exampline-administrable",
+  ingredientId: "synthetic-exampline-active-ingredient",
+  substanceId: "synthetic-exampline-substance",
+  substanceIdentifier: "SYN-EXAMPLINE",
+  sourceFilenameStem: "synthetic-exampline-pl",
+  namedInNarrative: true,
+  additionalSentences: {},
+  submissions: {
+    1: {
+      submissionId: "9c0d1e2f-3a4b-4c5d-8e6f-7a8b9c0d1e2f",
+      extractionRunId: "0d1e2f3a-4b5c-4d6e-9f7a-8b9c0d1e2f3a",
+      createdAt: VERSION_ONE_APPROVAL,
+      approvedAt: VERSION_ONE_APPROVAL,
+    },
+    2: {
+      submissionId: "1e2f3a4b-5c6d-4e7f-8a8b-9c0d1e2f3a4b",
+      extractionRunId: "2f3a4b5c-6d7e-4f8a-9b9c-0d1e2f3a4b5c",
+      createdAt: VERSION_TWO_APPROVAL,
+      approvedAt: VERSION_TWO_APPROVAL,
+    },
+  },
+};
+
+export const LEAFLET_PRODUCT_ID: SyntheticProductId = EXAMPLINE.id;
+
 // Declaration order is demonstration order: the default product first, the smoke product last
 // because it is not demonstrated.
 export const SYNTHETIC_PRODUCTS: readonly SyntheticProduct[] = [
@@ -335,7 +388,7 @@ export const SYNTHETIC_VERSIONS: readonly SyntheticVersion[] = [1, 2];
 export function syntheticProduct(
   id: SyntheticProductId = DEFAULT_SYNTHETIC_PRODUCT_ID,
 ): SyntheticProduct {
-  const found = SYNTHETIC_PRODUCTS.find((product) => product.id === id);
+  const found = [...SYNTHETIC_PRODUCTS, EXAMPLINE].find((product) => product.id === id);
   if (found === undefined) throw new Error(`Unknown synthetic product ${id}`);
   return found;
 }

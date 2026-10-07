@@ -30,7 +30,7 @@ import {
   normalizeText,
   xhtmlToText,
 } from "../fidelity/index.js";
-import type { EmaMapping, SectionRule } from "../fhir/mapping.js";
+import { sourceDocumentTypes, type EmaMapping, type SectionRule } from "../fhir/mapping.js";
 import {
   APPROVAL_CONTENT_EXTENSION_URL,
   APPROVER_IDENTIFIER_SYSTEM,
@@ -331,6 +331,14 @@ async function loadDocument<T>(
   const first = bundle.entry[0]?.resource;
   if (first === undefined || !isComposition(first)) {
     return fail<T>(tool, "unavailable", { bundleId: selector.bundleId });
+  }
+  // A document is answered from only by the manifest of its own document type: the service
+  // indexes sections by the one it loaded (the SmPC's), so another document (a package leaflet)
+  // would be answered partly, its sections unknown. It is not found, as one the store does not
+  // hold; the worker publishes no leaflet (src/pipeline.ts).
+  const named = sourceDocumentTypes(bundle);
+  if (named.size !== 1 || !named.has(context.mapping.root.sourceKey)) {
+    return fail<T>(tool, "document-not-found", { bundleId: selector.bundleId });
   }
 
   // Every returned fact names the exact version it came from; a stored document that cannot say

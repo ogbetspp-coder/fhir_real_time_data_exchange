@@ -1,4 +1,9 @@
-import type { EmaMapping, SectionRule } from "../fhir/mapping.js";
+import {
+  DOCUMENT_TYPE_SYSTEM,
+  documentOf,
+  type EmaMapping,
+  type SectionRule,
+} from "../fhir/mapping.js";
 import { GLOBAL_EPI_PROFILE_BASE } from "../fhir/standards.js";
 import type {
   CompositionSection,
@@ -88,6 +93,8 @@ export function createSyntheticType2Bundle(
   const productUrl = `https://khs.dev/fhir/MedicinalProductDefinition/${product.id}`;
   const organizationUrl = `https://khs.dev/fhir/Organization/${product.organizationId}`;
   const itemUrl = `https://khs.dev/fhir/ManufacturedItemDefinition/${product.itemId}`;
+  const document = documentOf(mapping);
+  if (document === undefined) throw new Error("The mapping maps no document the fixtures build");
 
   const composition: FhirComposition = {
     resourceType: "Composition",
@@ -104,9 +111,9 @@ export function createSyntheticType2Bundle(
     type: {
       coding: [
         {
-          system: "https://khs.dev/fhir/CodeSystem/document-type",
-          code: "smpc",
-          display: "Summary of Product Characteristics",
+          system: DOCUMENT_TYPE_SYSTEM,
+          code: mapping.root.sourceKey,
+          display: document.display,
         },
       ],
     },

@@ -243,6 +243,8 @@ describe("what the importer refuses, by stage", () => {
       },
       { ...request, product: { ...product, euAuthorisationNumbers: ["EU/1/24/9999/001-002"] } },
       { ...request, product: { ...product, euAuthorisationNumbers: ["EU/1/24/9999"] } },
+      // An SmPC states at least one in its section 8.
+      { ...request, product: { ...product, euAuthorisationNumbers: [] } },
       { ...request, approval: { ...request.approval, approverId: "a person@example.org" } },
     ]) {
       expect(refusedWith(json, changed)).toBe("request: request-shape");
@@ -324,10 +326,12 @@ describe("what the importer refuses, by stage", () => {
         }),
       ).toBe("binding: assignments-differ");
     }
-    // A leaflet: Zone B carries the SmPC only.
-    expect(refusal(() => imported("pl"))).toBe("binding: document-not-carried");
+    // A result made for another document than the mapping maps.
     const leaflet = await loadEmaMapping("fhir/mappings/cap-pl-en.json");
     expect(refusedWith(json, request, leaflet)).toBe("binding: mapping-of-another-document");
+    expect(refusedWith(recomputed("pl"), caseRequest(found("pl")))).toBe(
+      "binding: mapping-of-another-document",
+    );
     const other = { ...versions, mappingVersion: "9.9.9" };
     expect(
       refusedWith(
@@ -588,5 +592,171 @@ describe("what the importer refuses, by stage", () => {
     const text = readFileSync("test/fixtures/certified-word/recompute/smpc.json", "utf8");
     expect(text.endsWith("\n")).toBe(true);
     expect(text.split("\n")).toHaveLength(2);
+  });
+});
+
+// The package leaflet (ADR 0006 owner decision 8; docs/design/pl-structure.md, "Zone B"), mapped by
+// its own manifest: its name is what stands for X in its section 1 heading, its holder the first
+// line of section 6's holder section, and it states no EU number.
+describe("a package leaflet", () => {
+  let leaflet: EmaMapping;
+
+  beforeAll(async () => {
+    leaflet = await loadEmaMapping("fhir/mappings/cap-pl-en.json");
+  });
+
+  const pl = (): { json: Json; request: ReturnType<typeof caseRequest> } => ({
+    json: result("pl"),
+    request: caseRequest(found("pl")),
+  });
+  const refusedWith = (json: unknown, request: unknown): string =>
+    refusal(() =>
+      importCertifiedWord(json instanceof Uint8Array ? json : bytes(json), request, leaflet, RUN),
+    );
+  const withSection = (json: Json, key: string, change: Json): Json => ({
+    ...json,
+    sections: sections(json).map((entry) => (entry.key === key ? { ...entry, ...change } : entry)),
+  });
+
+  it("is carried as its recompute gave it, a Type 1 record of its name and holder only", () => {
+    const { json, request } = pl();
+    const { submission, sourceText, fidelityReport } = importCertifiedWord(
+      recomputed("pl"),
+      request,
+      leaflet,
+      RUN,
+    );
+    const record = recordSections(submission);
+    expect(record.map(({ key }) => key)).toEqual(sections(json).map(({ key }) => key));
+    record.forEach(({ section: carried }, index) => {
+      const from = at(sections(json), index);
+      expect(carried.title).toBe(from.title);
+      expect((carried.text as { div?: string } | undefined)?.div ?? null).toBe(from.narrative);
+      expect(sourceText.pages[index]?.text).toBe(from.page);
+    });
+    expect(fidelityReport.status).toBe("passed");
+    expect(CanonicalSubmissionSchema.safeParse(submission).success).toBe(true);
+
+    const resources = submission.bundle.entry.map(({ resource }) => resource as Json);
+    expect(resources.map(({ resourceType }) => resourceType)).toEqual([
+      "Composition",
+      "MedicinalProductDefinition",
+      "Organization",
+    ]);
+    const [composition, medicinal, holder] = resources;
+    expect(composition?.type).toEqual({
+      coding: [
+        {
+          system: "https://khs.dev/fhir/CodeSystem/document-type",
+          code: "pl",
+          display: "Package Leaflet",
+        },
+      ],
+    });
+    expect(composition?.title).toBe("Synthetic Exampline");
+    expect(medicinal?.identifier).toEqual([
+      { system: CANONICAL_PRODUCT_SYSTEM, value: request.product.id },
+    ]);
+    expect(medicinal?.name).toEqual([{ productName: "Synthetic Exampline" }]);
+    expect(holder?.name).toBe("Synthetic Holder B.V.");
+    // Where each confirmed value stands in the leaflet, and the mapping that coded it.
+    const decided = (target: string): unknown =>
+      submission.provenance.decisions.find((decision) => decision.target === target)?.sourceKey;
+    expect([
+      decided("Composition.title"),
+      decided("MedicinalProductDefinition.name"),
+      decided("Organization.name"),
+    ]).toEqual(["pl.1", "pl.1", "pl.6.holder"]);
+    expect(submission.provenance.extraction.terminologyService?.name).toBe("cap-pl-en");
+    const preflight = validateCanonicalPreflight(
+      submission.bundle as unknown as FhirBundle,
+      "type1",
+    );
+    expect(preflight.issue.map(({ severity }) => severity)).toEqual(["success"]);
+  });
+
+  it("is refused where its section 1 heading does not give the confirmed name", () => {
+    const { json, request } = pl();
+    const structure = json.structure as Json;
+    const named = (name: string) => ({ ...request, product: { ...request.product, name } });
+    // Another name, a name in another case, a part of the name.
+    for (const name of ["Synthetic Exampline 10 mg", "SYNTHETIC EXAMPLINE", "Exampline"]) {
+      expect([name, refusedWith(json, named(name))]).toEqual([
+        name,
+        "product: name-not-in-section-1",
+      ]);
+    }
+    for (const changed of [
+      // The structure gives no name, or another, than the heading as written.
+      { ...json, structure: { ...structure, name: null } },
+      { ...json, structure: { ...structure, name: "Exampline" } },
+      { ...json, structure: { ...structure, name: undefined } },
+      // A heading the template does not word, or with the name written otherwise.
+      withSection(json, "pl.1", { title: "1. What Synthetic Exampline is" }),
+      withSection(json, "pl.1", {
+        title: "1. What Synthetic  Exampline is and what it is used for",
+      }),
+      withSection(json, "pl.1", { title: "1. What X is and what it is used for" }),
+    ]) {
+      expect(refusedWith(changed, request)).toBe("product: name-not-in-section-1");
+    }
+  });
+
+  it("is refused where section 6 does not begin with the confirmed holder", () => {
+    const { json, request } = pl();
+    const holderPage = (page: string): Json =>
+      withSection(json, "pl.6.holder", {
+        page,
+        narrative: `<div xmlns="http://www.w3.org/1999/xhtml">${page
+          .trim()
+          .split("\n")
+          .map((line) => `<p>${line}</p>`)
+          .join("")}</div>`,
+      });
+    expect(
+      refusedWith(
+        holderPage("\nMarketing Authorisation Holder\nSynthetic Holder B.V.\nSynthetic text.\n"),
+        request,
+      ),
+    ).toBe("product: holder-not-in-section-6");
+    expect(
+      refusedWith(json, {
+        ...request,
+        product: {
+          ...request.product,
+          holder: { ...request.product.holder, name: "1 Example Street" },
+        },
+      }),
+    ).toBe("product: holder-not-in-section-6");
+    // A first line only the page writes: a table's.
+    const narrative = `<div xmlns="http://www.w3.org/1999/xhtml"><table><tr><td><p>Synthetic Holder B.V.</p></td></tr></table><p>not for clinical use</p></div>`;
+    expect(
+      refusedWith(
+        withSection(json, "pl.6.holder", { narrative, page: xhtmlToText(narrative) }),
+        request,
+      ),
+    ).toBe("product: section-6-begins-with-no-text");
+  });
+
+  it("is refused with an EU number, which a leaflet does not state", () => {
+    const { json, request } = pl();
+    for (const numbers of [["EU/1/24/9999/001"], ["EU/1/24/9999/001", "EU/1/24/9999/002"]]) {
+      expect(
+        refusedWith(json, {
+          ...request,
+          product: { ...request.product, euAuthorisationNumbers: numbers },
+        }),
+      ).toBe("product: eu-numbers-not-in-leaflet");
+    }
+  });
+
+  it("is refused by the SmPC's mapping, and an SmPC by the leaflet's", () => {
+    const { json, request } = pl();
+    expect(refusal(() => importCertifiedWord(bytes(json), request, mapping, RUN))).toBe(
+      "binding: mapping-of-another-document",
+    );
+    expect(refusedWith(recomputed("smpc"), caseRequest(found("smpc")))).toBe(
+      "binding: mapping-of-another-document",
+    );
   });
 });

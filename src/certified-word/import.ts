@@ -24,7 +24,13 @@ import {
   type FidelityReport,
   type SourceDocumentText,
 } from "../fidelity/index.js";
-import { EMA_MAPPING_ID, type EmaMapping, type SectionRule } from "../fhir/mapping.js";
+import {
+  DOCUMENTS,
+  DOCUMENT_TYPE_SYSTEM,
+  mappingId,
+  type EmaMapping,
+  type SectionRule,
+} from "../fhir/mapping.js";
 import { EU_AUTHORISATION_NUMBER_SYSTEM, EU_PRODUCT_NUMBER_SYSTEM } from "../fhir/standards.js";
 import { sha256, sha256Utf8, stableUuid } from "../lib/hash.js";
 import { AuthorityBytesError, readAuthorityJson } from "../authority/json.js";
@@ -48,7 +54,7 @@ import {
 // The importer's version: with the recompute's versions it names the extractor (ADR 0006 decision
 // 6), and it is locked to the hash of this directory's code and of its golden vectors
 // (importer.lock.json, `npm run certified-word:lock`), so a change of what it makes changes it.
-export const IMPORTER_VERSION = "1.1.1";
+export const IMPORTER_VERSION = "1.2.0";
 export const CERTIFIED_WORD_IMPORTER = `certified-word-import/${IMPORTER_VERSION}`;
 
 export const CERTIFIED_WORD_IDENTIFIER_SYSTEM = "https://khs.dev/fhir/identifier/certified-word";
@@ -60,15 +66,22 @@ const GLOBAL_EPI_PROFILE_BASE =
   "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/";
 const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
-// The canonical document type of each document the importer carries. A package leaflet is not
-// yet: Zone B's crosswalk and preflight are the SmPC's (cap-smpc-en).
-const DOCUMENT_TYPES: Partial<Record<RecomputeResult["document"], object>> = {
-  smpc: {
-    system: "https://khs.dev/fhir/CodeSystem/document-type",
-    code: "smpc",
-    display: "Summary of Product Characteristics",
-  },
-};
+// The canonical document type of a document the importer carries: an SmPC or a package leaflet,
+// each mapped by its own manifest (fhir/mappings/cap-smpc-en.json, cap-pl-en.json).
+function documentType(document: RecomputeResult["document"]): object {
+  return { system: DOCUMENT_TYPE_SYSTEM, code: document, display: DOCUMENTS[document].display };
+}
+
+// Where each document states what a person confirmed of its product (ADR 0006 decision 5): the
+// section whose first line names it, the one whose first line is its holder, and the one that
+// states its EU authorisation numbers. A package leaflet names its medicine in the heading of its
+// section 1 ("1. What X is and what it is used for"), states its holder in section 6, and states
+// no authorisation number: its QRD template has no place for one.
+// `section` names the holder's numbered section in a refusal.
+const PRODUCT_SECTIONS = {
+  smpc: { name: "smpc.1", holder: "smpc.7", section: "7", numbers: "smpc.8" },
+  pl: { name: "pl.1", holder: "pl.6.holder", section: "6", numbers: undefined },
+} as const;
 
 // The stage that refused, and a closed reason; never narrative.
 export class CertifiedWordRefusedError extends Error {
@@ -139,6 +152,10 @@ function readRequest(request: unknown): CertifiedWordRequest {
   const synthetic = ids.filter((id) => id.startsWith(CERTIFIED_WORD_SYNTHETIC_BLOCK)).length;
   if (synthetic !== 0 && synthetic !== ids.length) refuse("request", "synthetic-and-real-ids");
   const numbers = product.euAuthorisationNumbers;
+  // An SmPC states at least one, in its section 8; a leaflet none (checkProduct).
+  if (numbers.length === 0 && parsed.data.recompute.document === "smpc") {
+    refuse("request", "request-shape");
+  }
   if (new Set(numbers).size !== numbers.length) refuse("request", "eu-number-repeated");
   return parsed.data;
 }
@@ -192,7 +209,6 @@ function checkBinding(
   ) {
     refuse("binding", "assignments-differ");
   }
-  if (DOCUMENT_TYPES[result.document] === undefined) refuse("binding", "document-not-carried");
   if (mapping.root.sourceKey !== result.document) refuse("binding", "mapping-of-another-document");
   if (versions.mappingVersion !== mapping.mappingVersion)
     refuse("binding", "other-mapping-version");
@@ -302,27 +318,56 @@ function namesOf(title: string): string[] {
 // A slash, or a character drawn as one (division slash, fraction slash, fullwidth solidus).
 const SLASH = /[/\u2215\u2044\uff0f]/u;
 
+// The name a leaflet's section 1 heading gives its medicine (docs/design/pl-structure.md, "The
+// name"): the structure's name, which `zone_a.leaflet` read the same in every section 1 line of the
+// leaflet, its list of sections included, and which stands for X in the heading as the label
+// writes it, the mapping's form exactly, character for character ("1. What Exampline is and what
+// it is used for"). Anything else, a heading the template does not word among it, names none.
+function leafletName(placed: Placed[], result: RecomputeResult): string | undefined {
+  const called: unknown = (result.structure as { name?: unknown }).name;
+  const one = placed.find(({ section }) => section.key === "pl.1");
+  if (typeof called !== "string" || one === undefined) return undefined;
+  const [before, after, ...more] = one.rule.title.split("X");
+  if (before === undefined || after === undefined || more.length > 0) return undefined;
+  return one.section.title === `${before}${called}${after}` ? called : undefined;
+}
+
 // The product a person confirmed is this label's (ADR 0006 decision 5):
-// - its name is section 1's whole first line, or that line up to its strength (namesOf), and does
-//   not end in punctuation;
-// - its holder is section 7's first line, exactly;
+// - its name is, in an SmPC, section 1's whole first line, or that line up to its strength
+//   (namesOf); in a package leaflet, the name its section 1 heading gives the medicine
+//   (leafletName); and does not end in punctuation;
+// - its holder is the first line of the SmPC's section 7, or of the leaflet's "Marketing
+//   Authorisation Holder" section in section 6, exactly;
 // - neither first line is a line only the page writes (a table's or a picture's);
-// - its EU authorisation numbers are exactly those section 8 states, each standing alone, with no
-//   other "EU/" there in any case or spacing, and no line of section 8 holds a slash, or a
-//   character drawn as one, unless it begins with a number read.
-function checkProduct(placed: Placed[], product: CertifiedWordRequest["product"]): void {
+// - its EU authorisation numbers are exactly those the SmPC's section 8 states, each standing
+//   alone, with no other "EU/" there in any case or spacing, and no line of section 8 holds a
+//   slash, or a character drawn as one, unless it begins with a number read; a leaflet states
+//   none, so a person confirms none for it.
+function checkProduct(
+  placed: Placed[],
+  result: RecomputeResult,
+  product: CertifiedWordRequest["product"],
+): void {
   const page = (key: string): string =>
     placed.find(({ section }) => section.key === key)?.section.page ?? "";
+  const where = PRODUCT_SECTIONS[result.document];
   const { name } = product;
-  const title = firstLine(page("smpc.1"));
-  if (hasMarker(title)) refuse("product", "section-1-begins-with-no-text");
-  if (!namesOf(title).includes(name) || /\p{P}$/u.test(name)) {
-    refuse("product", "name-not-in-section-1");
+  if (result.document === "pl") {
+    if (leafletName(placed, result) !== name) refuse("product", "name-not-in-section-1");
+  } else {
+    const title = firstLine(page(where.name));
+    if (hasMarker(title)) refuse("product", "section-1-begins-with-no-text");
+    if (!namesOf(title).includes(name)) refuse("product", "name-not-in-section-1");
   }
-  const holder = firstLine(page("smpc.7"));
-  if (hasMarker(holder)) refuse("product", "section-7-begins-with-no-text");
-  if (holder !== product.holder.name) refuse("product", "holder-not-in-section-7");
-  const numbers = page("smpc.8");
+  if (/\p{P}$/u.test(name)) refuse("product", "name-not-in-section-1");
+  const holder = firstLine(page(where.holder));
+  if (hasMarker(holder)) refuse("product", `section-${where.section}-begins-with-no-text`);
+  if (holder !== product.holder.name) refuse("product", `holder-not-in-section-${where.section}`);
+  if (where.numbers === undefined) {
+    if (product.euAuthorisationNumbers.length > 0) refuse("product", "eu-numbers-not-in-leaflet");
+    return;
+  }
+  const numbers = page(where.numbers);
   const found = [...numbers.matchAll(EU_NUMBER)];
   if (found.length !== [...numbers.matchAll(EU_START)].length) {
     refuse("product", "eu-number-unread");
@@ -371,7 +416,8 @@ export function importCertifiedWord(
   checkTitles(placed);
   const pages = checkNarratives(placed);
   const { product } = request;
-  checkProduct(placed, product);
+  checkProduct(placed, result, product);
+  const at = PRODUCT_SECTIONS[result.document];
 
   const identifierValue = `${CERTIFIED_WORD_PREFIX}${request.documentId}`;
   const id = (resourceType: string, at = ""): string =>
@@ -389,21 +435,23 @@ export function importCertifiedWord(
     decision("Composition.language", "defaulted-by-rule", rule("language-en")),
     decision("Composition.status", "defaulted-by-rule", rule("status-from-attestation")),
     decision("Composition.type", "defaulted-by-rule", rule("type-from-document")),
-    decision("Composition.title", "extracted-verbatim", { sourceKey: "smpc.1" }),
+    decision("Composition.title", "extracted-verbatim", { sourceKey: at.name }),
     decision("Composition.date", "defaulted-by-rule", rule("time-of-assembly")),
     decision("Composition.subject", "defaulted-by-rule", rule("subject-is-the-product")),
     decision("Composition.author", "defaulted-by-rule", rule("author-is-the-holder")),
     decision("MedicinalProductDefinition.identifier[0]", "defaulted-by-rule", {
       ...rule("canonical-product-confirmed"),
     }),
-    ...productNumbers.map((_, position) =>
-      decision(`MedicinalProductDefinition.identifier[${position + 1}]`, "extracted-verbatim", {
-        sourceKey: "smpc.8",
-      }),
-    ),
-    decision("MedicinalProductDefinition.name", "extracted-verbatim", { sourceKey: "smpc.1" }),
+    ...(at.numbers === undefined
+      ? []
+      : productNumbers.map((_, position) =>
+          decision(`MedicinalProductDefinition.identifier[${position + 1}]`, "extracted-verbatim", {
+            sourceKey: at.numbers,
+          }),
+        )),
+    decision("MedicinalProductDefinition.name", "extracted-verbatim", { sourceKey: at.name }),
     decision("Organization.identifier", "defaulted-by-rule", rule("canonical-holder-confirmed")),
-    decision("Organization.name", "extracted-verbatim", { sourceKey: "smpc.7" }),
+    decision("Organization.name", "extracted-verbatim", { sourceKey: at.holder }),
   ];
 
   type Section = {
@@ -469,7 +517,7 @@ export function importCertifiedWord(
       { system: CERTIFIED_WORD_IDENTIFIER_SYSTEM, value: `${identifierValue}:composition` },
     ],
     status: "final",
-    type: { coding: [DOCUMENT_TYPES[result.document]] },
+    type: { coding: [documentType(result.document)] },
     subject: [{ reference: url("MedicinalProductDefinition") }],
     date: run.createdAt,
     author: [{ reference: url("Organization") }],
@@ -524,7 +572,8 @@ export function importCertifiedWord(
     ],
   };
   // Each entry's fullUrl, id and profile are the importer's, by rule; an authorisation's number is
-  // section 8's, and its links are to the product and the holder.
+  // section 8's, and its links are to the product and the holder. A leaflet's record has none.
+  const numbersAt = PRODUCT_SECTIONS[result.document].numbers;
   bundle.entry.forEach(({ resource }, position) => {
     const at = `Bundle.entry[${position}]`;
     decisions.push(
@@ -532,9 +581,9 @@ export function importCertifiedWord(
       decision(`${at}.resource.id`, "defaulted-by-rule", rule("id-from-identifier")),
       decision(`${at}.resource.meta.profile`, "defaulted-by-rule", rule("epi-profile")),
     );
-    if (resource.resourceType === "RegulatedAuthorization") {
+    if (resource.resourceType === "RegulatedAuthorization" && numbersAt !== undefined) {
       decisions.push(
-        decision(`${at}.resource.identifier`, "extracted-verbatim", { sourceKey: "smpc.8" }),
+        decision(`${at}.resource.identifier`, "extracted-verbatim", { sourceKey: numbersAt }),
         decision(`${at}.resource.subject`, "defaulted-by-rule", rule("subject-is-the-product")),
         decision(`${at}.resource.holder`, "defaulted-by-rule", rule("holder-is-the-holder")),
       );
@@ -619,7 +668,7 @@ export function importCertifiedWord(
         version: extractor.slice(`${CERTIFIED_WORD_IMPORTER_NAME}/`.length),
       },
       terminologyService: {
-        name: EMA_MAPPING_ID,
+        name: mappingId(mapping),
         version: mapping.mappingVersion,
         snapshotSha256: sha256(mapping),
       },

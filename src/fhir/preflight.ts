@@ -1,4 +1,14 @@
-import { permittedTitles, type EmaMapping, type SectionRule, type TitleRule } from "./mapping.js";
+import {
+  EMA_DOCUMENT_TYPE_SYSTEM,
+  LEAFLET_TITLES_NOT_CARRIED,
+  documentOf,
+  permittedTitles,
+  sourceDocumentTypes,
+  titlesCarried,
+  type EmaMapping,
+  type SectionRule,
+  type TitleRule,
+} from "./mapping.js";
 import {
   EU_AUTHORISATION_NUMBER_PATTERN,
   EU_AUTHORISATION_NUMBER_SYSTEM,
@@ -44,7 +54,9 @@ function issue(
 // Composition, the product scope, its holder and its authorisations, and nothing else: exactly one
 // of each but the RegulatedAuthorization, of which there is one per authorisation
 // (docs/design/version-identity.md: one per EU authorisation number). Packs, items, ingredients
-// and substances are declared not supplied by their absence; none may be inferred.
+// and substances are declared not supplied by their absence; none may be inferred. A package
+// leaflet states no authorisation number (its QRD template has no place for one), so a leaflet's
+// record may have no RegulatedAuthorization; an SmPC's has at least one, from its section 8.
 const TYPE1_RESOURCES = [
   "Composition",
   "MedicinalProductDefinition",
@@ -110,7 +122,11 @@ function type1GraphIssues(bundle: FhirBundle): OperationOutcomeIssue[] {
   const composition = one("Composition");
   const product = one("MedicinalProductDefinition");
   const holder = one("Organization");
-  const authorisations = all("RegulatedAuthorization");
+  const named = sourceDocumentTypes(bundle);
+  const leaflet = named.size === 1 && named.has("pl");
+  const authorisations = leaflet
+    ? (byType.get("RegulatedAuthorization") ?? [])
+    : all("RegulatedAuthorization");
   if (composition === undefined || product === undefined || holder === undefined) return issues;
 
   const expectLink = (actual: string | undefined, expected: string, where: string): void => {
@@ -423,6 +439,29 @@ export function validateEmaPreflight(
       issue("error", "structure", "EMA Bundle first entry is not Composition", "Bundle.entry[0]"),
     );
   } else {
+    if (!titlesCarried(mapping, titles)) {
+      issues.push(issue("error", "value", LEAFLET_TITLES_NOT_CARRIED, "Composition.section"));
+    }
+    // The document the mapping maps, as the EMA codes it (EUEpiCompositionSmPC and
+    // EUEpiCompositionPackageLeaflet each fix their code).
+    const document = documentOf(mapping);
+    const coded = (composition.type as { coding?: unknown } | undefined)?.coding;
+    if (
+      document === undefined ||
+      !Array.isArray(coded) ||
+      !(coded as { system?: unknown; code?: unknown }[]).some(
+        ({ system, code }) => system === EMA_DOCUMENT_TYPE_SYSTEM && code === document.emaCode,
+      )
+    ) {
+      issues.push(
+        issue(
+          "error",
+          "value",
+          `EMA Composition type is not the ${mapping.root.sourceKey} document's`,
+          "Composition.type",
+        ),
+      );
+    }
     for (const profile of mapping.profiles.composition) {
       if (!composition.meta?.profile?.includes(profile)) {
         issues.push(

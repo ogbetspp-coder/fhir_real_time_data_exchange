@@ -2,7 +2,7 @@
   "resourceType": "SubscriptionTopic",
   "id": "epi-published",
   "url": "https://khs.dev/fhir/SubscriptionTopic/epi-published",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "name": "EpiPublished",
   "title": "ePI document published or superseded",
   "status": "active",

@@ -2,7 +2,7 @@
   "resourceType": "NamingSystem",
   "id": "ema-document",
   "url": "https://khs.dev/fhir/NamingSystem/ema-document",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "name": "EmaDocument",
   "title": "EMA document Bundle",
   "status": "active",

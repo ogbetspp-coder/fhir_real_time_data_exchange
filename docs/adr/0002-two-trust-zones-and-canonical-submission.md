@@ -450,3 +450,36 @@ its SHA-256.
 **Not yet:** the invariant for D4's bytes (Zone B reads the .docx from the submissions bucket
 under its own identity and requires the pinned hash and length), the recompute (D2) and the
 drawing records (D3), each with the change that builds it.
+
+## Amendment (2026-10-07, the package leaflet)
+
+ADR 0006 decision 8 puts the package leaflet in scope with the SmPC (`docs/design/pl-structure.md`,
+"Zone B"; the change record is `docs/validation/changes/2026-10-07-leaflet-zone-b.md`). Zone B now
+maps two documents, each by its own manifest (`cap-smpc-en`, `cap-pl-en`). The worker loads both
+and takes for each source the one its `Composition.type` names, and refuses a source that names
+none, two, or one no manifest maps. A caller that gives one manifest maps a source that names none
+by that manifest's sections, as before: the signer and `scripts/dev/run-pipeline.ts`, which load
+the SmPC's. Whoever calls it, the crosswalk refuses a source that names another document than its
+manifest's. The decision above is otherwise unchanged.
+
+- **The contract does not change.** A certified Word source's request already names `pl` among
+  its documents; the document type and the section codes are not in the contract. A leaflet's
+  section keys are `SourceKey`s since its mapping's three hyphenated keys lost their hyphens
+  (mapping 1.1.0). The reservation of `CanonicalSubmission` 4.0.0 for the renderer gate's and the
+  withheld design's change stands.
+- **The Type 1 set.** A package leaflet's record may have no RegulatedAuthorization: its template
+  has no place for an authorisation number, so a certified Word leaflet states none and a person
+  confirms none. An SmPC's record has one per EU authorisation number, as before.
+- **The transform and the preflights.** The crosswalk types the EMA Composition as its manifest's
+  document, from the EMA's document type code system, and refuses a source that says it is another
+  document; the EMA preflight holds the type. A leaflet is carried only with its titles as written
+  (a certified Word source): the crosswalk and the EMA preflight refuse one under the template's
+  titles (`leaflet-titles-not-carried`), which write X and the template's choices.
+- **No leaflet persists yet.** The query service and the signer read the SmPC's manifest only, so
+  the worker refuses a leaflet's run that is not a dry run (`leaflet-not-readable`), whatever
+  approvals say; the query service answers `document-not-found` for a stored document of another
+  type than its manifest's.
+- **Found, not fixed.** Two optional SmPC keys of mapping 1.4.0, `smpc.4.6.breast-feeding` and
+  `smpc.5.2.pk-pd`, are not `SourceKey`s, so no submission can carry those sections (it is refused
+  at the contract). Their fix is a `SourceKey` with a hyphen (a major, taking `CanonicalSubmission`
+  4.0.0) or the two keys renamed (SmPC mapping 1.5.0).

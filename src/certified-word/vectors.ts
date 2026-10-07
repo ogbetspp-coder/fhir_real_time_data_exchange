@@ -88,15 +88,22 @@ function outcome(result: Uint8Array, request: unknown, mapping: EmaMapping): Vec
 
 type Json = Record<string, unknown>;
 
-export function importerVectors(mapping: EmaMapping): Vector[] {
+// The manifest of the document a case's recompute was asked for.
+export function caseMapping(found: RecomputedCase, mappings: readonly EmaMapping[]): EmaMapping {
+  const mapping = mappings.find(({ root }) => root.sourceKey === found.request.document);
+  if (mapping === undefined) throw new Error(`no mapping for ${found.request.document}`);
+  return mapping;
+}
+
+export function importerVectors(mappings: readonly EmaMapping[]): Vector[] {
   const cases = recomputedCases();
-  const vector = (name: string, result: Uint8Array, request: unknown): Vector => ({
+  const vector = (found: RecomputedCase, name: string, result: Uint8Array, request: unknown) => ({
     name,
     resultSha256: sha256Bytes(result),
-    outcome: outcome(result, request, mapping),
+    outcome: outcome(result, request, caseMapping(found, mappings)),
   });
-  const vectors = cases.map((found) =>
-    vector(found.name, recomputed(found.name), caseRequest(found)),
+  const vectors: Vector[] = cases.map((found) =>
+    vector(found, found.name, recomputed(found.name), caseRequest(found)),
   );
   const [first] = cases;
   if (first === undefined) return vectors;
@@ -116,33 +123,61 @@ export function importerVectors(mapping: EmaMapping): Vector[] {
   const bytes = recomputed(first.name);
   vectors.push(
     vector(
+      first,
       `${first.name}-other-versions`,
       changed((json) => ((json.versions as Json).builder = "word-epi/0.0.0")),
       request,
     ),
     vector(
+      first,
       `${first.name}-sections-swapped`,
       changed((json) => sections(json).reverse()),
       request,
     ),
     vector(
+      first,
       `${first.name}-title-of-two-lines`,
       changed((json) => (section1(json).title = "1. NAME OF THE\nMEDICINAL PRODUCT")),
       request,
     ),
     vector(
+      first,
       `${first.name}-narrative-not-the-page`,
       changed((json) => (section1(json).page = "\nAnother text.\n")),
       request,
     ),
-    vector(`${first.name}-name-retyped`, bytes, {
+    vector(first, `${first.name}-name-retyped`, bytes, {
       ...request,
       product: { ...request.product, name: "SYNTHETIC EXAMPLINE" },
     }),
-    vector(`${first.name}-a-number-left-out`, bytes, {
+    vector(first, `${first.name}-a-number-left-out`, bytes, {
       ...request,
       product: { ...request.product, euAuthorisationNumbers: ["EU/1/24/9999/001"] },
     }),
+  );
+  // Where the leaflet's product check refuses (docs/design/pl-structure.md, "Zone B").
+  const leaflet = cases.find(({ name }) => name === "pl");
+  if (leaflet === undefined) return vectors;
+  const asked = caseRequest(leaflet);
+  const product = (change: Partial<CertifiedWordRequest["product"]>): CertifiedWordRequest => ({
+    ...asked,
+    product: { ...asked.product, ...change },
+  });
+  const leafletBytes = recomputed(leaflet.name);
+  vectors.push(
+    vector(leaflet, "pl-name-retyped", leafletBytes, product({ name: "SYNTHETIC EXAMPLINE" })),
+    vector(
+      leaflet,
+      "pl-holder-retyped",
+      leafletBytes,
+      product({ holder: { ...asked.product.holder, name: "Synthetic Holder BV" } }),
+    ),
+    vector(
+      leaflet,
+      "pl-a-number-confirmed",
+      leafletBytes,
+      product({ euAuthorisationNumbers: ["EU/1/24/9999/001"] }),
+    ),
   );
   return vectors;
 }

@@ -46,7 +46,8 @@ import {
   type CanonicalSubmission,
   type DocumentSubmissionInput,
 } from "../../src/contracts/index.js";
-import { loadEmaMapping, type EmaMapping } from "../../src/fhir/mapping.js";
+import { loadEmaMapping, loadEmaMappings, type EmaMapping } from "../../src/fhir/mapping.js";
+import type { FhirComposition } from "../../src/fhir/types.js";
 import type { GcsObjectFetcher } from "../../src/gcp/submission-reader.js";
 import { sha256 } from "../../src/lib/hash.js";
 import { runPipeline } from "../../src/pipeline.js";
@@ -626,6 +627,47 @@ describe(`the gate, recomputing (${PYTHON === undefined ? "the committed results
     const dry = await run(true);
     expect([dry.status, dry.certifiedWordCheck]).toEqual(["validated", "recomputed"]);
     expect((await rejection(run(false))).reason).toBe("certified-word-drawing-missing");
+  });
+
+  // A package leaflet (docs/design/pl-structure.md, "Zone B"): the worker, given every mapping,
+  // takes the leaflet's by the record's document type, and the gate makes it again from its upload.
+  it("carries a package leaflet through the worker's pipeline dry, by the leaflet's mapping", async () => {
+    const { smpc, pl: leaflet } = await loadEmaMappings();
+    const found = recomputedCases().find(({ name }) => name === "pl");
+    if (found === undefined) throw new Error("no leaflet");
+    const input = importCertifiedWord(
+      recomputed("pl"),
+      { ...caseRequest(found), upload: { filename: "pl.docx", storageUri: uri(label("pl")) } },
+      leaflet,
+      RUN,
+    );
+    const config = loadConfig({
+      ALLOW_SYNTHETIC_SOURCES: "true",
+      NODE_ENV: "test",
+      DRY_RUN: "true",
+    });
+    const result = await runPipeline(
+      {
+        runId: "00000000-0000-4000-8000-00000000c0d2",
+        sourceKind: "document",
+        sourceResource: "document:certified-word-leaflet",
+        ...input,
+      },
+      [smpc, leaflet],
+      config,
+      { certifiedWord: sources() },
+    );
+    expect([result.status, result.certifiedWordCheck]).toEqual(["validated", "recomputed"]);
+    const composition = result.emaBundle.entry[0]?.resource as FhirComposition;
+    expect(composition.type.coding?.[0]?.code).toBe("100000155538");
+    expect(composition.meta?.profile).toEqual(leaflet.profiles.composition);
+    expect(composition.section[0]?.section?.[0]?.title).toBe(
+      "1. What Synthetic Exampline is and what it is used for",
+    );
+    expect(result.evidence.manifest.standards.mappingVersion).toBe(leaflet.mappingVersion);
+    expect(result.evidence.manifest.validation.profiles).toContain(
+      "http://ema.europa.eu/fhir/StructureDefinition/EUQRD-CAP-template-new-Package-Leaflet-en",
+    );
   });
 });
 
