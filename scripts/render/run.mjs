@@ -14,7 +14,8 @@ import { fileURLToPath } from "node:url";
 
 export const IMAGE = "renderer:local";
 
-export const ISOLATION = [
+// The hardening itself, which the Word drawing's image shares (scripts/render/word-drawing.mjs).
+export const HARDENING = [
   "--network",
   "none",
   "--read-only",
@@ -25,9 +26,9 @@ export const ISOLATION = [
   "--security-opt=no-new-privileges",
   "--pids-limit=2048",
   "--memory=6g",
-  "--env",
-  "RENDERER_NO_SANDBOX=1",
 ];
+
+export const ISOLATION = [...HARDENING, "--env", "RENDERER_NO_SANDBOX=1"];
 
 // What the scripts under scripts/render read: their code and its dependencies, the fixtures and
 // the pinned labels.

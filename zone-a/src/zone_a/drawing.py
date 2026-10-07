@@ -27,11 +27,33 @@ them from both texts the fidelity check reads).
 ``check`` gives the verdicts; ``refuse`` turns a section that differs, or one Chrome did not draw,
 into a refusal (``drawn-otherwise``, ``not-drawn``). Chrome is not a dependency of Zone A; where it
 is not installed, ``check`` raises ``BrowserError``.
+
+The drawing record's fields (``docs/design/certified-word-drawing.md``, section 3), as the pinned
+drawing image makes them:
+
+    python -m zone_a.drawing LABEL.docx < REQUEST.json
+
+The request on standard input, its canonical JSON exactly, is ``{docxSha256, recompute}``: the
+.docx's SHA-256 and ``zone_a.recompute``'s request. ``record`` hashes the .docx and requires that
+hash, makes the sections with ``zone_a.recompute`` and checks every narrative by ``check``'s rules
+against the very read it was made from. Only where every section agrees are the fields written,
+canonical JSON and a line feed: the record's version, the request, the .docx's SHA-256 and length,
+the SHA-256 of what ``python -m zone_a.recompute`` writes for it, this check's version and
+Chrome's, and each drawn narrative's key and SHA-256 (of its UTF-8, as the importer hashes it), in
+the recompute's order. The build adds the environment, the commit, the image and the key version
+before it signs. Otherwise nothing is written to standard output and the status is 1 (2 for a
+wrong command line); standard error gives the closed code, or each section that differs and where,
+never the text. The registry and mapping files are read as the recompute's command reads them
+(``ZONE_A_ROOT``).
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
+import os
 import re
+import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Final
@@ -39,10 +61,13 @@ from typing import Any, Final
 from label_docx import browser
 from label_docx.reader import Paragraph
 
+from zone_a import recompute
+from zone_a.canonical_json import CanonicalJsonError, canonical_json, sha256_utf8
 from zone_a.certified import Body
 from zone_a.word_epi import CAPITALS, GREY, WHITESPACE, blank, text_labels, unchanged_by_capitals
 
-DRAWING_VERSION: Final = "word-drawing/1.1.2"
+DRAWING_VERSION: Final = "word-drawing/1.2.0"
+RECORD_VERSION: Final = "word-drawing-record/1.0.0"
 LEFT_OUT: Final = frozenset({"underline"})
 # The template's grey as Chrome reports the narrative's silver span (``label_docx.browser``).
 DRAWN_GREY: Final = "shading-#c0c0c0"
@@ -200,3 +225,95 @@ def refuse(built: Mapping[str, Any], verdict: Mapping[str, Any] | None) -> dict[
         "sections": sections,
         "refused": sum(1 for s in sections if s["refusal"] is not None),
     }
+
+
+class DrawnOtherwiseError(Exception):
+    """Chrome drew a section otherwise than it was read, or reported an error for it."""
+
+    def __init__(self, verdicts: Sequence[Mapping[str, Any]]) -> None:
+        super().__init__("; ".join(f"{v['key']}: {v['where']}" for v in verdicts))
+
+
+def record(
+    data: bytes, request: object, chrome: Path = browser.CHROME, root: Path = recompute.ROOT
+) -> dict[str, Any]:
+    """The record's fields for the .docx and the drawing request (the module docstring).
+
+    Raises:
+        recompute.RefusedError: The request is malformed or names other bytes (``request``,
+            ``document``), or the recompute refuses.
+        browser.BrowserError: Chrome could not be asked.
+        DrawnOtherwiseError: A section Chrome drew otherwise than read.
+    """
+    if not isinstance(request, Mapping) or set(request) != {"docxSha256", "recompute"}:
+        raise recompute.RefusedError("request", "the request holds exactly docxSha256, recompute")
+    sha256 = hashlib.sha256(data).hexdigest()
+    if request["docxSha256"] != sha256:
+        raise recompute.RefusedError("document", "the .docx is not the one the request names")
+    result, body = recompute.recompute_with_read(data, request["recompute"], root)
+    verdict = check(body, result, chrome)
+    differs = [v for v in verdict["sections"] if not v["agrees"]]
+    if differs:
+        raise DrawnOtherwiseError(differs)
+    return {
+        "recordVersion": RECORD_VERSION,
+        "request": dict(request),
+        "document": {"sha256": sha256, "byteLength": len(data)},
+        "recompute": {
+            "outputSha256": hashlib.sha256(recompute.written(result).encode("utf-8")).hexdigest()
+        },
+        "drawing": {"version": DRAWING_VERSION, "chrome": verdict["application"]},
+        # What check drew: every section with a narrative (the recompute refuses any refused one).
+        "sections": [
+            {"key": s["key"], "narrativeDivSha256": sha256_utf8(s["narrative"])}
+            for s in result["sections"]
+            if s["narrative"]
+        ],
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Reads the label named and the request on standard input; writes the record's fields.
+
+    Returns:
+        The exit status: 0 with the fields, 1 with nothing written, 2 for a wrong command line.
+    """
+    args = sys.argv[1:] if argv is None else argv
+    if len(args) != 1:
+        sys.stderr.write("usage: python -m zone_a.drawing LABEL.docx < REQUEST.json\n")
+        return 2
+    try:
+        raw = sys.stdin.buffer.read()
+        request = json.loads(raw.decode("utf-8"))
+        # Its canonical JSON exactly, the bytes whose hash keys the record: no repeated key.
+        if canonical_json(request).encode("utf-8") != raw:
+            return _fail("refused: request")
+    except ValueError, CanonicalJsonError:
+        return _fail("refused: request")
+    try:
+        data = Path(args[0]).read_bytes()
+    except OSError:
+        return _fail("refused: label")
+    # Standard error is a build's log: a closed code or a place, never the label's text (an
+    # exception's message may quote it, so only its type is named).
+    try:
+        fields = record(data, request, root=Path(os.environ.get("ZONE_A_ROOT", recompute.ROOT)))
+    except recompute.RefusedError as refused:
+        return _fail(f"refused: {refused.code}")
+    except browser.BrowserError:
+        return _fail("browser-failed")
+    except DrawnOtherwiseError as differs:
+        return _fail(f"drawn-otherwise: {differs}")
+    except Exception as error:  # noqa: BLE001 - its type only, as above
+        return _fail(f"error: {type(error).__name__}")
+    sys.stdout.write(canonical_json(fields) + "\n")
+    return 0
+
+
+def _fail(why: str) -> int:
+    sys.stderr.write(why + "\n")
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

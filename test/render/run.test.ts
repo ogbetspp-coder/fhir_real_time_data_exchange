@@ -27,7 +27,7 @@ describe("the renderer image's run", () => {
       ]);
     }
     expect(scripts["renderer:image"]).toBe(
-      `docker build --file Dockerfile.renderer --tag ${IMAGE} .`,
+      `docker build --file Dockerfile.renderer --target renderer --tag ${IMAGE} .`,
     );
     // Every script under scripts/render that draws is run by one of them.
     const run = new Set(runs.map(([, command]) => command.split(" ")[2]));

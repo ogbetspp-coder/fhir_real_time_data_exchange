@@ -5,7 +5,9 @@
 # its own CI job for the same reason. The renderer image (`npm run renderer:image` and the
 # `renderer:*` checks run in it, with the step that decides whether they run) is left out too: it
 # needs Docker and ~200 MB of downloads, and it is its own CI job. So is the build of the worker,
-# query and validator images (`bash scripts/ci/build-images.sh`, CI's Images job).
+# query and validator images (`bash scripts/ci/build-images.sh`, CI's Images job), and the Word
+# drawing's image and its checks (`npm run word-drawing:image` and `word-drawing:check`, CI's
+# Word drawing job).
 # test/ci/check-all.test.ts reads the commands each `# --- ... (job: <id>) ---` section below
 # executes (not its `step` labels) and fails unless they are the commands that job runs in CI, in
 # its order and its working directory, so the two cannot drift apart silently.

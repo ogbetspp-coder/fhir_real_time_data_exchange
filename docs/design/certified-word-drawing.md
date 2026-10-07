@@ -1,7 +1,8 @@
 # The drawing record: Zone B's proof that Chrome draws a certified Word label as it was read (ADR 0006 P4, D3)
 
 - Status: proposed 2026-10-07; revised the same day after an independent review of #197, whose
-  recommendations the owner said to go ahead on. Docs only; nothing here is built
+  recommendations the owner said to go ahead on. Build order step 1 measured and PR 1 built the
+  same day ("Step 1: measured, and PR 1 as built", below); PR 2 to 4 not
 - Implements: `docs/design/certified-word-import.md` D3 (a), the owner's choice of 2026-10-06
   ("extend the renderer gate's attested records"), and that note's "The gate", steps 5 and 6
 - Fits: `docs/design/authority-import-renderer.md` R1 (attested records), frozen, its architecture
@@ -50,9 +51,11 @@ change named):
 
 - chrome-headless-shell runs `label_docx.browser`'s two pages (one read with `--dump-dom`, one over
   the DevTools pipe) as Google Chrome does, and gives the same verdicts on the fixtures and on the
-  EMA's SmPCs and leaflets.
+  EMA's SmPCs and leaflets. (Measured: the same raw answers on every SmPC and leaflet that builds,
+  with the shell's macOS build; the Linux image on the fixtures. "Step 1", below.)
 - What the check compares does not depend on the window's width or on the fonts: it reads text by
   block, styles as Chrome computes them, list labels and picture sizes, never glyph positions.
+  (Measured: the width and the device pixel ratio on the corpus; the fonts on the fixtures only.)
 - Cloud Build, for a trigger fired by a Pub/Sub message (PR 2): it runs the build as the trigger's
   own service account without the publisher holding `actAs` on it; it binds a field of the
   message's JSON body to a substitution; its CEL filter can refuse a message before any build
@@ -161,7 +164,9 @@ rule), never what. Zone A's preview shows the producer the same.
 - chrome-headless-shell 154.0.8037.57, through a one-line launcher. PR 1 tries Chrome's own
   sandbox inside the hardened container (section 4); if it cannot start there, the launcher adds
   `--no-sandbox`, as the renderer gate runs it, and the residual is recorded;
-- Python 3.14.7, installed as the worker image installs it.
+- Python 3.14.7, installed as the worker image installs it (as built: by uv 0.12.17, pinned by
+  digest, in a stage built on the renderer's, since that image installs nothing from Debian outside
+  its dated snapshot and has the certificates uv needs).
 
 The two packages, with the registry and mapping files the recompute reads, come from the build's
 checkout of main. They are not installed in the image, so a code change does not change the image.
@@ -449,7 +454,8 @@ counts and times only, no text kept). "Builds" means with no heading left for a 
 Each check starts Chrome twice (once for the text, once for the list labels). The build runs two
 checks, side by side.
 
-**Estimated, to be measured first** (build order, step 1): about 2 to 4 build-minutes per label.
+**Estimated, to be measured in PR 2** on Cloud Build's machine (step 1 measured an M2's, below):
+about 2 to 4 build-minutes per label.
 Most of it is fixed: fetching main's source, `npm ci`, pulling the image and signing. Each drawing
 container runs a read and a check: under 5 s for the largest carried SmPC here, under 7 s for the
 largest carried leaflet, and about 45 s for the slowest read. Cloud Build's default machine is
@@ -548,10 +554,119 @@ and fonts; R1's trust root.
 
 **Not touched:** R2 to R11 for authority imports. Their dropped parts (3c-C3 to C5) stay dropped.
 
+## Step 1: measured, and PR 1 as built (2026-10-07)
+
+**Where it was measured.** The Mac this was built on (Apple M2, 8 GB) has no container runtime,
+and the EMA corpus must not leave it, so step 1 was split in two:
+
+- **The corpus, on the Mac.** Each label was drawn through `zone_a.drawing` itself, one at a time,
+  in two Chromes: chrome-headless-shell 154.0.8037.57 for macOS (the image's Chrome for Testing
+  release, built for arm64) and Google Chrome 154.0.8037.98. Only counts and times were kept.
+- **The image, in CI.** The `Word drawing` job builds it on ubuntu-24.04 (x86_64, Docker) and runs
+  it hardened on the committed fixtures.
+
+**Parity on the corpus.** Reads are by the accepted view where a label is tracked (187 of 241
+parts). "Builds" means with no heading left for a person and not refused whole by the builder (20
+more SmPCs and 2 leaflets are ready but refused whole: a floating table, a character scale, a page
+break between words).
+
+- **SmPCs:** 296 files. 131 SmPCs build and were drawn: 3,277 narratives, 4.5 million characters of
+  markup. 11 carry every section. "What exists" above counted 130; the one more here is not
+  investigated.
+- **Leaflets:** 286 files. 110 build and were drawn: 1,372 narratives. 12 carry every section.
+- **Every one of the 4,649 sections agrees in both Chromes.** Chrome's raw answers are byte for byte
+  the same in both Chromes for all 241 parts. Those answers are each section's text, each text
+  node's computed facts, each picture's decoded size and the list markers. Any verdict computed from
+  them is therefore the same too.
+- **No corpus section differs.** A verdict that differs is exercised by the seeded tests
+  (`zone-a/tests/test_word_epi.py`, `test_drawing_record.py`), not by the corpus.
+
+**The window and the fonts.** The shell drew every part again at 375 by 812 pixels and a device
+pixel ratio of 2, and gave the same raw answers on all 241 parts. The fonts were macOS's for the
+corpus. The image's pinned fonts were measured on the fixtures in CI only: IMAGE_FONTS. The corpus in
+the Linux image, with its pinned fonts, is not measured (PR 2).
+
+**Repeatability.**
+
+- The shell drew every part a second time: the same raw answers, 241 of 241.
+- `python -m zone_a.drawing` ran with the shell on every label it can sign: the 23 corpus labels
+  that carry every section and the 4 committed labels it signs. Each ran 20 times one after another
+  and 20 times two at a time. That is 1,080 runs: every one exited 0, and each label's 40
+  outputs were byte for byte the same.
+- In the image (CI), each committed label ran twice, in two processes: IMAGE_REPEAT.
+
+**HTML and XML.** Every narrative drawn was parsed by Chrome's HTML parser, as the drawing page
+parses it, and by its XML parser, as XHTML. The two trees were the same every time:
+
+- 4,649 narratives on the corpus, in the shell and in Google Chrome;
+- IMAGE_PARSE in the image.
+
+The check finds the seeded differences it should: an HTML-closed `p`, a `pre`'s first line feed, a
+CDATA section, an entity XML lacks, and text after the root.
+
+**Chrome's sandbox in the hardened container.** SANDBOX
+
+**Time and memory on the M2.** One label ran at a time, but the Mac was swapping throughout, so the
+tails are loose: the slowest check, 8.5 s, took 2.6 s when repeated.
+
+- **`zone_a.drawing.check`, per SmPC or leaflet:**
+  - with the shell: median 0.9 s (90th percentile 1.5 s for SmPCs, 1.3 s for leaflets);
+  - with Google Chrome: median 2.8 s for SmPCs and 3.1 s for leaflets;
+  - the largest SmPC that carries every section (28 narratives, 260,247 characters): 1.5 s.
+- **The parse check:** median 0.2 s per part.
+- **Reads:** median 2.5 s. The slowest among files that build took 59 s: 2,280 paragraphs, its
+  refused read first and then its accepted view. That file peaked at 895 MB resident in Python. The
+  largest single Chrome process was 223 MB.
+- **The entry point, per label it signs** (read, recompute and check, Python's start included): on
+  average 1.0 to 3.5 s for an SmPC and 1.2 to 2.1 s for a leaflet, one after another. One leaflet
+  of 2,023 paragraphs took 5.7 s. Two at a time added up to 1.2 s a run. No single process, Python
+  or Chrome, went above 178 MB.
+- **In the image (CI, x86_64):** IMAGE_TIMES.
+
+**PR 1's choices, where this note left them open:**
+
+1. **Where Python comes from.** uv installs it in a stage built on the renderer, not on Debian. The
+   renderer installs nothing from Debian outside its dated snapshot (`scripts/ci/renderer-pins.mjs`
+   refuses any other apt install, and now any later stage not built on the renderer or pinned by
+   digest), and it already has the certificates.
+2. **Who writes `recordVersion`.** The container writes it with the fields it computes. The signing
+   step adds the environment, the commit, `drawing.imageDigest` and the key version (section 4,
+   step 4).
+3. **The request.** On standard input it must be its canonical JSON exactly: the very bytes whose
+   hash is the record's key, so no repeated key or other spelling reaches a record.
+4. **Exit statuses.** Status 1 is every refusal or failure, and 2 a wrong command line. Standard
+   error is `refused: <code>`, `browser-failed`, `drawn-otherwise: <key>: <where>` or
+   `error: <type>`; only the type is named, since an exception's message may quote the label.
+5. **The launcher.** `scripts/render/word-drawing.mjs` uses the renderer's hardening (`HARDENING`,
+   with its 6 GiB and 2,048 processes). It mounts, read-only, Zone A's and the reader's sources,
+   the registry, the mappings, Zone A's scripts and the fixtures CI draws; PR 2's build adds the
+   label. The check also reads the container's isolation from inside, as the renderer's smoke check
+   does.
+6. **The lock.** It is `{version, imageDigests: {dev, validation, prod}}`, each digest null until
+   PR 3. A test holds the version to `DRAWING_VERSION`.
+7. **HTML against XML** is a test (CI and the corpus), as section 1 has it, not a rule the entry
+   point applies. Making it a rule would cost about 0.2 s per label and change what a record says,
+   so it is the owner's choice.
+8. **CI.** `Word drawing` is a job of its own. It runs on every change, since Zone A's code, the
+   reader's and the image are all its inputs. The deploy does not wait for it, as for Renderer,
+   since nothing the deploy ships reads a drawing yet. It is not yet a required check, which only
+   the owner can add.
+
+**Left for PR 2, which needs the cloud:**
+
+- **The image on Cloud Build's machines.** An e2-standard-2 runs on an Intel or an AMD CPU, so the
+  image runs twice on each, and every output must be byte for byte the CI run's.
+- **e2-standard-2 timings:** per label, for the slowest read, and for the whole build. The build's
+  timeout and the two containers' memory are set from them.
+- **The corpus in the Linux image**, with its pinned fonts, on a machine with a container runtime
+  where the corpus may go.
+- **The trigger's tests:** payload binding, the CEL filter, `actAs` and the inline clone.
+
 ## Build order, each change reviewed on its own
 
-1. **Measure first**, with nothing merged: build the `word-drawing` image locally from a scratch
-   copy of the target. In it, measure:
+1. **Measure first** (done 2026-10-07, below; the corpus with the pinned build of
+   chrome-headless-shell for macOS, since the Mac it ran on has no container runtime), with nothing
+   merged: build the `word-drawing` image locally from a scratch copy of the target. In it, measure:
    - **parity:** the same verdicts as Google Chrome on the five Word-made SmPCs, the synthetic
      certified Word fixtures (SmPC and leaflet), and the EMA's SmPCs and leaflets that build;
    - **repeatability:** two runs, byte for byte;
@@ -561,7 +676,7 @@ and fonts; R1's trust root.
 
    If parity fails anywhere, the design stops there and the difference is understood first.
 
-2. **PR 1, the code and the image target:**
+2. **PR 1, the code and the image target** (built 2026-10-07):
    - `recompute/1.2.0`'s function, and `zone_a.drawing`'s entry point (`word-drawing/1.2.0`);
    - the `word-drawing` target and its launcher;
    - a CI job that draws the fixtures in the image and requires the recorded verdicts, two

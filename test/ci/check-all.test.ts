@@ -14,7 +14,7 @@ const script = readFileSync("scripts/check-all.sh", "utf8");
 
 // Jobs the script leaves out whole, as its header says: each needs Java or Docker and ~200 MB of
 // downloads, and is its own CI job for that reason.
-const CI_ONLY_JOBS = new Set(["official-validation", "renderer", "images"]);
+const CI_ONLY_JOBS = new Set(["official-validation", "renderer", "images", "word-drawing"]);
 
 // Commands of the compared jobs the script does not run. Installing Node dependencies is the
 // caller's `npm ci`. lock-base.sh names the importer lock's base for CI's test (from the pushed
@@ -112,7 +112,15 @@ describe("scripts/check-all.sh", () => {
   it("reads every job of the CI workflow, and the script's three sections", () => {
     const jobs = workflowCommands(workflow);
     expect([...jobs.keys()].sort()).toEqual(
-      ["agent", "check", "images", "official-validation", "renderer", "zone-a"].sort(),
+      [
+        "agent",
+        "check",
+        "images",
+        "official-validation",
+        "renderer",
+        "word-drawing",
+        "zone-a",
+      ].sort(),
     );
     const sections = scriptCommands(script);
     expect([...sections].map(([job, commands]) => [job, commands.length])).toEqual([
@@ -134,6 +142,7 @@ describe("scripts/check-all.sh", () => {
     expect(script).not.toMatch(/^\s*npm ci\b/m);
     expect(script).not.toMatch(/^\s*npm run validate:official\b/m);
     expect(script).not.toMatch(/^\s*npm run renderer:/m);
+    expect(script).not.toMatch(/^\s*npm run word-drawing:/m);
     expect(script).not.toMatch(/^\s*bash scripts\/ci\/build-images\.sh/m);
   });
 

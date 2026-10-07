@@ -2,7 +2,7 @@
 
 - Status: decided, 2026-10-06 (the owner took the recommendations: D2 (a), D3 (a), and D4's
   narrow upload path in the existing CMEK submissions bucket); being built in steps (below,
-  "Progress"): D1, D2 and D4 built, D3 not
+  "Progress"): D1, D2 and D4 built; of D3, the drawing's code and image (its PR 1), not its record
 - Implements: ADR 0006 decisions 1, 5, 6 and 7, prerequisite P4
 - Related: ADR 0002 (invariants 7, 8, 11), ADR 0004 (service boundaries), ADR 0005's amendment
   (the renderer gate's attested records), `docs/design/authority-import-contract.md` (D1, the
@@ -400,5 +400,13 @@ bucket, before the label gateway.
    leaflet's mapping, the worker takes each source's mapping by its document type, and a certified
    Word leaflet runs through the worker's pipeline dry, its EMA output the EMA's leaflet document,
    which passes the official validator.
-5. Next: the drawing records (D3); and P5's form, which supplies what
+5. **The drawing's code and image** (D3's PR 1, 2026-10-07, importer 1.2.3;
+   `docs/design/certified-word-drawing.md`, "Step 1: measured, and PR 1 as built"):
+   `zone_a.recompute` gives its result with the read it was made from (`recompute/1.2.0`, the
+   command's bytes unchanged but for the version); `python -m zone_a.drawing` makes a drawing
+   record's fields from a .docx and its request, only where every section agrees
+   (`word-drawing/1.2.0`); `Dockerfile.renderer`'s `word-drawing` target runs it, hardened, and CI's
+   Word drawing job draws the committed labels and the Word-made SmPCs in it. Nothing signs a record
+   yet, and the gate still refuses every run that is not dry with `certified-word-drawing-missing`.
+6. Next: the drawing records (D3's PR 2 to 4); and P5's form, which supplies what
    the request says a person confirmed, and the registry that binds the document id.

@@ -1,3 +1,9 @@
+# Two targets: `renderer`, the renderer gate's image, and `word-drawing`, the Word drawing's
+# (docs/design/certified-word-drawing.md), which is `renderer` unchanged with Python added.
+#
+#   docker build --file Dockerfile.renderer --target renderer --tag renderer:local .
+#   docker build --file Dockerfile.renderer --target word-drawing --tag word-drawing:local .
+#
 # The renderer gate's image (docs/design/authority-import-renderer.md, R6): a pinned
 # chrome-headless-shell, the pinned fonts and a fontconfig that knows only them. Every download is
 # checked against its SHA-256 here. scripts/ci/renderer-pins.mjs is the one reader of these pins
@@ -8,7 +14,7 @@
 # image to one digest). Its shared libraries come from a dated snapshot.debian.org mirror, so a
 # rebuild installs the same packages; the image is used by digest once pushed, so a draw never
 # downloads Chrome or depends on the mirror.
-FROM node:22.22.0-bookworm-slim@sha256:dd9d21971ec4395903fa6143c2b9267d048ae01ca6d3ea96f16cb30df6187d94
+FROM node:22.22.0-bookworm-slim@sha256:dd9d21971ec4395903fa6143c2b9267d048ae01ca6d3ea96f16cb30df6187d94 AS renderer
 
 ARG DEBIAN_SNAPSHOT=20260926T000000Z
 # The Date of each suite's signed Release at DEBIAN_SNAPSHOT (read over HTTPS from the snapshot
@@ -141,3 +147,37 @@ ENV FONTCONFIG_FILE=/opt/renderer/fonts.conf \
 
 USER node
 WORKDIR /work
+
+# The Word drawing's image (docs/design/certified-word-drawing.md, section 2): the renderer above,
+# unchanged, with Python 3.14.7 installed as the worker image installs it (uv 0.12.17 by digest;
+# python-build-standalone, its archive checked against the SHA-256 uv carries for it) and the
+# launcher zone_a.drawing runs Chrome through (LABEL_CHROME). zone_a and label_docx are not
+# installed: they, and the registry and mapping files the recompute reads, are mounted from the
+# checkout (scripts/render/word-drawing.mjs), so a code change does not change the image. Both
+# packages use Python's standard library only. The certificates uv downloads with are the
+# renderer's own.
+FROM ghcr.io/astral-sh/uv:0.12.17@sha256:10787c682e4184e4f290de1171fd4703dc63de99221f10fe1c99002ce7fa9acc AS uv
+
+FROM renderer AS python
+USER root
+COPY --from=uv /uv /usr/local/bin/uv
+ENV UV_PYTHON_INSTALL_DIR=/opt/python \
+    UV_PYTHON_PREFERENCE=only-managed \
+    UV_NO_CACHE=1
+RUN uv python install 3.14.7 && ln -s "$(uv python find 3.14.7)" /opt/python/python
+
+FROM renderer AS word-drawing
+COPY --from=python /opt/python /opt/python
+COPY src/render/image/word-drawing-chrome.sh /opt/renderer/chrome.sh
+# The checkout is mounted under /work; nothing is read from the working directory, a user's site,
+# or bytecode written, and text is UTF-8 whatever the locale.
+ENV LABEL_CHROME=/opt/renderer/chrome.sh \
+    PYTHONPATH=/work/zone-a/src:/work/label-docx-reader/src \
+    ZONE_A_ROOT=/work \
+    PYTHONSAFEPATH=1 \
+    PYTHONNOUSERSITE=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUTF8=1
+# The Python, its Unicode (ADR 0003, as the worker asserts) and the launcher's Chrome, asserted in
+# the image: another fails the build here.
+RUN ["/opt/python/python", "-c", "import subprocess, sys, unicodedata; v = sys.version.split()[0]; u = unicodedata.unidata_version; c = subprocess.run(['/opt/renderer/chrome.sh', '--version'], capture_output=True, text=True, check=True).stdout.strip(); (v, u) == ('3.14.7', '16.0.0') or sys.exit('Python ' + v + ' with Unicode ' + u); c.endswith(' 154.0.8037.57') or sys.exit(c); print('Python', v, 'Unicode', u, c)"]
