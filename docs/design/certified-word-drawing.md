@@ -956,12 +956,18 @@ nothing of step 6.
   `certified-word-drawing-invalid` and `-mismatch` refuse; a dry run answers `drawn` where the
   record verified and `recomputed` where none was found; a run that is not dry is refused with
   `certified-word-document-unbound` once a record verified and `certified-word-drawing-missing`
-  where none was found. `SubmissionRefusal` gains the three new codes, which the HTTP caller
+  where none was found (none at any pinned key version's path, or, with no image, key or record
+  bucket, none looked for). `SubmissionRefusal` gains the three new codes, which the HTTP caller
   learns as it learns the others.
 - **The worker**: its image copies `src/render/word-drawing/` (root's, read-only to the service)
   to its working directory, where the gate reads it; and Terraform names it the record bucket
   (`WORD_DRAWING_BUCKET`) and its environment (`WORD_DRAWING_ENVIRONMENT`, `var.environment`),
-  which select the pins. Its read of the bucket was granted in PR 2.
+  which select the pins. Its read of the bucket was granted in PR 2. The image's recompute smoke
+  (`scripts/ci/worker-recompute-smoke.mjs`, in CI's Images job and in Cloud Build before the push)
+  reads the pins there as the gate does, so an image without them fails before it is pushed.
+- **The build** (`scripts/word-drawing/build.sh`, `sign`, after the review of #207): a stored
+  object over the worker's 64 KiB cap, signature and all, is refused before it is written, since
+  written create-if-absent it would hold its path for good and be refused at every run.
 
 **Choices where this note left them open:**
 
@@ -984,7 +990,8 @@ committed synthetic SmPC, copied byte for byte into `test/fixtures/certified-wor
 - `test/certified-word/drawing.test.ts`:
   - its path is the one made from the submission's .docx and request and dev's pins; it verifies
     against the pinned key, and its 32 sections are the provenance's, in order;
-  - `invalid`: another signature, one by another key, a section's hash or the commit changed, its
+  - `invalid`: another signature, one in another base64 spelling (`==` more), one with no salt
+    instead of 32 bytes, one by another key, a section's hash or the commit changed, its
     bytes spelled otherwise, a repeated key, not JSON, empty, a byte-order mark, another field, a
     `keyVersion` or a request not its path's, and a record over 64 KiB (which, 500 sections long
     instead of 700, is a `mismatch`: the cap acts first);

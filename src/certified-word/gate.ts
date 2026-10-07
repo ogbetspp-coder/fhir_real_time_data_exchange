@@ -45,7 +45,7 @@ import {
 export const CERTIFIED_WORD_NOT_RECOMPUTED =
   "certified-word-not-recomputed: this worker cannot recompute a certified Word source, so it runs only as a dry run";
 export const CERTIFIED_WORD_DRAWING_MISSING =
-  "certified-word-drawing-missing: the sections were recomputed, but no drawing record (D3) is stored for them";
+  "certified-word-drawing-missing: the sections were recomputed, but no drawing record (D3) was found for them: none at any key version this worker pins, or no image, key or record bucket to look with";
 export const CERTIFIED_WORD_DRAWING_INVALID =
   "certified-word-drawing-invalid: the object at the drawing record's path is not a record this build verifies";
 export const CERTIFIED_WORD_DRAWING_MISMATCH =

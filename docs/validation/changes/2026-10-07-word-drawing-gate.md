@@ -21,14 +21,21 @@ as built". Step 6 and run manifest 7.0.0 wait for P5.
 2. **Closed codes** (`SubmissionRefusal`): `certified-word-drawing-invalid`,
    `certified-word-drawing-mismatch` (both dry or not) and `certified-word-document-unbound` (a run
    that is not dry whose record verified, until P5). `certified-word-drawing-missing` now means
-   only that no record was found.
+   that no record was found: none at any key version the worker pins, or, where it pins no image
+   or key or is given no record bucket, none looked for.
 3. **The dry run's answer** (`certifiedWordCheck`): `drawn` where the record verified, beside
    `recomputed` (none found) and `submission-only`.
 4. **The PSS check** (`src/approval/statement.ts`): `verifyPss` factored out of `verifySignature`,
    which calls it; behaviour unchanged.
 5. **The worker**: `Dockerfile`'s worker target copies `src/render/word-drawing/`; `infra/run.tf`
-   sets `WORD_DRAWING_BUCKET` and `WORD_DRAWING_ENVIRONMENT`; `src/config.ts` reads them.
-6. **The certified Word importer** (1.2.3 → 1.3.0): what it makes is unchanged but for the version
+   sets `WORD_DRAWING_BUCKET` and `WORD_DRAWING_ENVIRONMENT`; `src/config.ts` reads them. The
+   image's recompute smoke (`scripts/ci/worker-recompute-smoke.mjs`, in CI's Images job and in
+   Cloud Build before the push) also reads the pins as the gate does, so an image without them
+   fails there rather than at a run.
+6. **The drawing build** (`scripts/word-drawing/build.sh`, `sign`): a stored object over the
+   worker's 64 KiB cap, signature and all, is refused before it is written. Written
+   create-if-absent, it would hold its path for good and be refused at every run.
+7. **The certified Word importer** (1.2.3 → 1.3.0): what it makes is unchanged but for the version
    in the extractor token, so its vectors move in their hashes only; its lock covers the new file.
 
 **Why.** ADR 0006 decision 1's third leg: Zone B may trust a Word narrative only where a drawing it
@@ -44,7 +51,8 @@ drawing build; dev holds its first signed record. This is the gate's check of it
   unchanged but for the rebuilt `statement.ts`, whose behaviour is the same.
 - Infrastructure: two environment variables on the worker. No grant: the worker's read of the
   record bucket was made in PR 2.
-- Zone A, the drawing build and its records: unchanged.
+- The drawing build: `sign` refuses an object over 64 KiB before writing it; every record it has
+  signed (the one in dev, 4,895 bytes) is under that. Zone A and the records: unchanged.
 - Contracts: no version moves. `SubmissionRefusal` and `certifiedWordCheck` are the HTTP answer's
   closed fields, not a published contract.
 - Evidence: a certified Word submission made at importer 1.2.3 is refused by this build (another
@@ -59,7 +67,10 @@ record verified; every way an object is `invalid`, a signed record a `mismatch`,
 `missing`; the first object deciding; a Storage error; the pins) and the gate's step 5 in
 `test/certified-word/recompute.test.ts` (the synthetic SmPC's dry run `drawn`, alone and through
 the pipeline; not dry, `certified-word-document-unbound`); each rule removed in turn from
-`drawing.ts` fails a test. 5: ADR 0002's invariant 11 restated. 6: UR-14. 7: no approval is
+`drawing.ts` fails a test, as do the one base64 spelling and the 32-byte salt removed from
+`verifyPss` (`drawing.test.ts`; `test/approval/statement.test.ts` for the spelling);
+`test/infra/word-drawing.test.ts` refuses an object over 64 KiB in `sign` and writes one just
+under. 5: ADR 0002's invariant 11 restated. 6: UR-14. 7: no approval is
 affected.
 
 **Blast radius.** A dry run of a certified Word submission now reads the record bucket, and is
@@ -68,7 +79,8 @@ fails it. A run that is not dry is refused as before, with a more exact code. No
 record until step 6 and P5.
 
 **Tests.** `test/certified-word/drawing.test.ts`, `test/certified-word/recompute.test.ts`,
-`test/infra/word-drawing.test.ts`, `test/ci/images.test.ts`.
+`test/approval/statement.test.ts`, `test/infra/word-drawing.test.ts`, `test/ci/images.test.ts`;
+the pins in the image by `scripts/ci/worker-recompute-smoke.mjs`.
 
 **Not verified here.** The deployed worker's read of the record bucket under its own identity: the
 worker runs with `DRY_RUN=false` and the run request has no dry-run field, so after the deploy a

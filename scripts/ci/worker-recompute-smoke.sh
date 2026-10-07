@@ -2,7 +2,8 @@
 # The certified Word recompute inside a built worker image (docs/design/certified-word-import.md,
 # D2), with no network: scripts/ci/worker-recompute-smoke.mjs and the committed synthetic labels
 # are copied into a container of the image (docker cp, so it works where a bind mount names the
-# wrong host, as in Cloud Build) and run there. Fails on any difference from what was committed.
+# wrong host, as in Cloud Build) and run there. Fails on any difference from what was committed,
+# or if the Word drawing's pins the gate verifies a record against do not parse in the image.
 # CI's Images job (scripts/ci/build-images.sh) and Cloud Build (cloudbuild.images.yaml, before the
 # image is pushed) both run it.
 #

@@ -57,12 +57,12 @@ beforeAll(async () => {
   own = generateKeyPairSync("rsa", { modulusLength: 3072 });
 });
 
-// A record stored as the build stores one, signed by `key` as Cloud KMS signs.
-function stored(record: unknown, key = own.privateKey): Buffer {
+// A record stored as the build stores one, signed by `key` as Cloud KMS signs (salt 32).
+function stored(record: unknown, key = own.privateKey, saltLength = 32): Buffer {
   const signature = sign("sha256", Buffer.from(canonicalJson(record)), {
     key,
     padding: constants.RSA_PKCS1_PSS_PADDING,
-    saltLength: 32,
+    saltLength,
   });
   return Buffer.from(canonicalJson({ record, signatureBase64: signature.toString("base64") }));
 }
@@ -142,6 +142,21 @@ describe("an object that is not a record this build verifies", () => {
       const pins = why === "more fields" ? testPins() : dev;
       expect([why, await verdict({ [PATH]: bytes }, pins)]).toEqual([why, "invalid"]);
     }
+  });
+
+  it("is invalid: its signature in another base64 spelling, or with another salt length", async () => {
+    // 384 bytes are 512 base64 characters and no padding: with "==" more, the same bytes.
+    expect(real.signatureBase64).toHaveLength(512);
+    const padded = REAL_RECORD.toString("utf8").replace(
+      real.signatureBase64,
+      `${real.signatureBase64}==`,
+    );
+    expect(await verdict({ [PATH]: Buffer.from(padded) })).toBe("invalid");
+    // The test key's signature with Cloud KMS's salt, 32 bytes, verifies; with none, it does not.
+    expect(await verdict({ [PATH]: stored(real.record) }, testPins())).toBe("drawn");
+    expect(await verdict({ [PATH]: stored(real.record, own.privateKey, 0) }, testPins())).toBe(
+      "invalid",
+    );
   });
 
   it("is invalid: its keyVersion or request is not its path's", async () => {
