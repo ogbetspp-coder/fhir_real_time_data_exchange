@@ -191,7 +191,10 @@ sign() {
   commit="$(<"$RUN/commit")"
   # Still a first-parent commit of main (R1): fetched again, it is on main's first-parent line.
   git fetch -q --depth=100 origin refs/heads/main
-  git rev-list --first-parent FETCH_HEAD | grep -qx "$commit" ||
+  # Into a file, then searched: piped into `grep -q`, which leaves at its first match (the newest
+  # commit is the first line), git dies on the closed pipe and pipefail fails the match.
+  git rev-list --first-parent FETCH_HEAD >"$RUN/first-parent"
+  grep -qx "$commit" "$RUN/first-parent" ||
     fail "${commit} is not a first-parent commit of main"
   version="$(<"$RUN/key-version")"
   digest="$(openssl dgst -sha256 -binary "$RUN/record.json" | base64 -w0)"
