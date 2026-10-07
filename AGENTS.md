@@ -55,7 +55,9 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
   `test/fixtures/fidelity/vectors.json` and the importer's `test/fixtures/authority/vectors.json`
   and fails on drift). A contract version change also needs
   `npm run contracts:lock -- --record <change record>` (`contracts/versions.lock.json`). A change to
-  `src/authority/` changes `IMPORTER_VERSION`, then `npm run authority:lock` (ADR 0004's amendment)
+  `src/authority/` changes `IMPORTER_VERSION`, then `npm run authority:lock` (ADR 0004's amendment);
+  a change to `src/certified-word/` changes its `IMPORTER_VERSION`, then
+  `npm run certified-word:lock` (its vectors are regenerated under `contracts:check`)
 
 ## Workflow
 
