@@ -97,7 +97,7 @@ from another web page.
      "offset": 8, "part": "word/media/image1.png", "pixels": [8, 8], "reason": null,
      "sha256": "…", "type": "png"}],
    "style": "Heading2", "table": [0, 1, 0], "text": "x 109/l \ufffc"}],
- "reader": "docx-reader/1.31.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
+ "reader": "docx-reader/1.32.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
  "tables": [{"grid": {"columns": 2, "rows": [
    {"after": 0, "before": 0, "cells": [{"column": 0, "merge": null, "span": 2}],
     "exactHeight": false},

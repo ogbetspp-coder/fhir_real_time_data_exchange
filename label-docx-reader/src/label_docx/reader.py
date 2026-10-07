@@ -439,7 +439,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 # The version of the rules above; versions.lock.json ties it to this file (tests/test_locks.py).
-READER_VERSION = "docx-reader/1.31.0"
+READER_VERSION = "docx-reader/1.32.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -504,9 +504,13 @@ SYMBOL_FONT: dict[int, str] = {
     0x61: "\u03b1",  # GREEK SMALL LETTER ALPHA
     0x62: "\u03b2",  # GREEK SMALL LETTER BETA
     0x64: "\u03b4",  # GREEK SMALL LETTER DELTA
+    0x65: "\u03b5",  # GREEK SMALL LETTER EPSILON
     0x67: "\u03b3",  # GREEK SMALL LETTER GAMMA
+    0x68: "\u03b7",  # GREEK SMALL LETTER ETA
+    0x6C: "\u03bb",  # GREEK SMALL LETTER LAMDA
     0x6D: "\u03bc",  # GREEK SMALL LETTER MU; symbol.txt also gives U+00B5 MICRO SIGN
     0x74: "\u03c4",  # GREEK SMALL LETTER TAU
+    0x77: "\u03c9",  # GREEK SMALL LETTER OMEGA
     0x7B: "{",
     0x7C: "|",
     0x7D: "}",
@@ -516,6 +520,7 @@ SYMBOL_FONT: dict[int, str] = {
     0xAB: "\u2194",  # LEFT RIGHT ARROW
     0xAD: "\u2191",  # UPWARDS ARROW
     0xAE: "\u2192",  # RIGHTWARDS ARROW
+    0xAF: "\u2193",  # DOWNWARDS ARROW
     0xB0: "\u00b0",  # DEGREE SIGN
     0xB1: "\u00b1",  # PLUS-MINUS SIGN
     0xB3: "\u2265",  # GREATER-THAN OR EQUAL TO
