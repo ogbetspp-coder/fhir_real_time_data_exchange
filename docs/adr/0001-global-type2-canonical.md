@@ -37,3 +37,14 @@ An authority's published ePI may enter the record as a Global ePI Type 1 graph: 
 Composition, the product name, the marketing authorisation holder and the authorisation, all
 from the authority's structured index. Packs, ingredients and substances are declared not
 supplied, never inferred from narrative. Every other submission stays a complete Type 2 graph.
+
+## Amendment (2026-10-06, ADR 0006: a certified Word source)
+
+A company's Word label that the label reader read exactly (a `certified-word` source, ADR 0006;
+`docs/design/certified-word-import.md`) may also enter the record as a Type 1 graph: the
+Composition, the product, its marketing authorisation holder and one authorisation per EU
+authorisation number, from the canonical product a person confirmed once for it (our ids; the name
+and holder chosen from the label's own sections 1 and 7, never retyped; the numbers its section 8
+states, which the importer holds to the label). Packs, ingredients and substances are declared not
+supplied, never inferred from narrative. Every other submission but an authority import stays a
+complete Type 2 graph.

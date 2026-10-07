@@ -21,12 +21,17 @@ import {
   CanonicalBundleSchema,
   LooseCompositionSchema,
   type CanonicalBundle,
+  type LooseSection,
 } from "./canonical-bundle.js";
 
-export const CANONICAL_SUBMISSION_VERSION = "2.0.0";
+// 3.0.0 (ADR 0006 P4, D1): the `certified-word` source kind (ingestion-provenance 3.0.0). A major
+// under ADR 0002's rule: Zone B branches on the source's `kind`. The renderer gate's and the
+// withheld design's change, which reserved 3.0.0, takes the next major.
+export const CANONICAL_SUBMISSION_VERSION = "3.0.0";
 
-// Type 2: the full product graph. Type 1: an authority import's text-only record, whose product
-// identity comes from the authority's index (docs/design/authority-import-contract.md, D9).
+// Type 2: the full product graph. Type 1: a text-only record whose product identity comes from
+// the authority's index for an authority import (docs/design/authority-import-contract.md, D9),
+// and from the product a person confirmed for a certified Word source (ADR 0006 decision 5).
 export const GraphType = z.enum(["type1", "type2"]).meta({ id: "GraphType" });
 
 // An identifier value in this namespace is written only by the authority importer
@@ -37,6 +42,25 @@ export const AUTHORITY_IMPORT_PREFIX = "authority-import:";
 export const AUTHORITY_IMPORTER_NAME = "authority-import";
 // What a synthetic extractor, terminology service or identifier value begins with.
 export const SYNTHETIC_PREFIX = "synthetic-";
+
+// A certified Word source's record (docs/design/certified-word-import.md, D1): its extractor, and
+// the namespace of its identifier value, `certified-word:` and the ePI's document id, which only
+// its importer writes. A synthetic one's document id is in the block the synthetic authority's ids
+// are in (docs/design/authority-import-contract.md, D7).
+export const CERTIFIED_WORD_IMPORTER_NAME = "certified-word";
+export const CERTIFIED_WORD_PREFIX = "certified-word:";
+export const CERTIFIED_WORD_SYNTHETIC_BLOCK = "00000000-5979-4e74-8000-";
+// The composite extractor record of a certified Word source (ADR 0006 decision 6): the TypeScript
+// importer and every version the recompute names. Its SHA-256 is the extractor's version.
+export function certifiedWordExtractorRecord(source: {
+  importer: string;
+  recompute: { versions: Record<string, string> };
+}): { importer: string; recompute: Record<string, string> } {
+  return { importer: source.importer, recompute: source.recompute.versions };
+}
+
+const CERTIFIED_WORD_IDENTIFIER =
+  /^certified-word:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 // Bounds on strings anywhere in the Bundle outside the verified narratives. Product-graph
 // fields are names, codes, identifiers, and URLs; regulated prose is longer than this and must
@@ -134,6 +158,38 @@ function sourceIssues(submission: CanonicalSubmission): string[] {
     if (graphType !== "type2") issues.push("A drawn source carries a type2 graph");
     if (approval.method === "authority-publication") {
       issues.push("An authority-publication approval requires an authority-publication source");
+    }
+    return issues;
+  }
+
+  // ADR 0002 invariant 7, as ADR 0006 amends it: a type1 graph, an attestation, and the extractor
+  // `certified-word` whose version is the hash of the importer and every version the recompute
+  // names (certifiedWordExtractorRecord).
+  if (source.kind === "certified-word") {
+    if (graphType !== "type1") issues.push("A certified Word source carries a type1 graph");
+    if (parser.name !== CERTIFIED_WORD_IMPORTER_NAME) {
+      issues.push(`A certified Word source's extractor is ${CERTIFIED_WORD_IMPORTER_NAME}`);
+    }
+    if (parser.version !== sha256(certifiedWordExtractorRecord(source))) {
+      issues.push(
+        "A certified Word source's extractor version is the hash of its importer and recompute",
+      );
+    }
+    if (extraction.model !== undefined || extraction.promptTemplate !== undefined) {
+      issues.push("A certified Word import uses no model and no prompt template");
+    }
+    if (extraction.terminologyService?.version !== source.recompute.versions.mappingVersion) {
+      issues.push("A certified Word import's terminology is the mapping its recompute used");
+    }
+    source.sectionPages.forEach(({ page }, position) => {
+      if (page !== position + 1) issues.push("sourceDocument.sectionPages must number pages 1..n");
+    });
+    const keys = source.sectionPages.map(({ key }) => key);
+    if (new Set(keys).size !== keys.length) {
+      issues.push("sourceDocument.sectionPages repeats a section key");
+    }
+    if (approval.method === "authority-publication") {
+      issues.push("A certified Word source's approval is an attestation");
     }
     return issues;
   }
@@ -253,10 +309,15 @@ export const CanonicalSubmissionSchema = CanonicalSubmissionBase.superRefine(
     "Approved hand-off from Zone A structuring to Zone B publishing. Zone B recomputes every hash and re-executes the fidelity check before transforming anything.",
 });
 
+// A refusal the HTTP caller learns by its closed code (src/app.ts); every other rejection says only
+// that the submission was rejected.
+export type SubmissionRefusal = "certified-word-not-recomputed";
+
 export class SubmissionRejectedError extends Error {
   public constructor(
     message: string,
     public readonly issues: string[],
+    public readonly reason?: SubmissionRefusal,
   ) {
     super(message);
     this.name = "SubmissionRejectedError";
@@ -363,6 +424,10 @@ function unverifiedTextIssues(bundle: unknown, verifiedDivPaths: Set<string>): s
 export type GateOptions = {
   allowSyntheticSources: boolean;
   recomputedImport?: { submissionSha256: string } | undefined;
+  // A certified Word submission the gate let through unrecomputed because the run is a dry run
+  // (docs/design/certified-word-import.md, D2): set only by src/certified-word/gate.ts, and only
+  // while DRY_RUN is true, until the gate recomputes it.
+  certifiedWordDryRun?: { submissionSha256: string } | undefined;
 };
 
 // The marker every synthetic narrative carries (test/synthetic-only.test.ts).
@@ -391,11 +456,17 @@ function syntheticIssues(
     terminology: terminology?.startsWith(SYNTHETIC_PREFIX) === true,
     identifier:
       identifier.startsWith(SYNTHETIC_PREFIX) ||
-      identifier.startsWith(`${AUTHORITY_IMPORT_PREFIX}synthetic:`),
+      identifier.startsWith(`${AUTHORITY_IMPORT_PREFIX}synthetic:`) ||
+      identifier.startsWith(`${CERTIFIED_WORD_PREFIX}${CERTIFIED_WORD_SYNTHETIC_BLOCK}`),
     authority: source.kind === "authority-publication" && source.authority === "synthetic",
     narrative: marked > 0,
   };
-  const synthetic = source.kind === "drawn" ? marks.extractor : marks.authority;
+  const synthetic =
+    source.kind === "drawn"
+      ? marks.extractor
+      : source.kind === "authority-publication"
+        ? marks.authority
+        : marks.identifier;
 
   if (!options.allowSyntheticSources) {
     if (source.kind === "drawn") {
@@ -410,8 +481,9 @@ function syntheticIssues(
   }
   const issues: string[] = [];
   if (synthetic) {
-    // A drawn synthetic submission names a synthetic terminology service; an import's is the
-    // mapping manifest, for synthetic and real publications alike (D7's table).
+    // A drawn synthetic submission names a synthetic terminology service; an import's, of an
+    // authority's publication or a certified Word label, is the mapping manifest, synthetic or
+    // not (D7's table).
     if (source.kind === "drawn" && terminology !== undefined && !marks.terminology) {
       issues.push("A synthetic submission's terminology service is synthetic");
     }
@@ -425,13 +497,46 @@ function syntheticIssues(
   return issues;
 }
 
-// A structured source has one page per section of the authority's document, each wholly body
+// A certified Word source's pages are its record's sections (fidelity §7): page i is the record's
+// i-th section in pre-order, keyed as `sectionPages` says, and every narrative's span is on its own
+// section's page. The narrative binding proves each narrative's words; this proves which page they
+// are on, which the importer gives and Zone B's recompute (D2) will make again.
+function certifiedWordPageIssues(
+  source: CanonicalSubmission["provenance"]["sourceDocument"],
+  sections: LooseSection[],
+  provenance: CanonicalSubmission["provenance"]["sections"],
+  sourceCodeSystem: string,
+): string[] {
+  if (source.kind !== "certified-word") return [];
+  const keys: (string | undefined)[] = [];
+  const walk = (list: LooseSection[]): void => {
+    for (const section of list) {
+      const codes = (section.code?.coding ?? []).filter(
+        ({ system }) => system === sourceCodeSystem,
+      );
+      keys.push(codes.length === 1 ? codes[0]?.code : undefined);
+      walk(section.section ?? []);
+    }
+  };
+  walk(sections);
+  const paged = source.sectionPages.map(({ key }) => key);
+  if (keys.length !== paged.length || keys.some((key, at) => key !== paged[at])) {
+    return ["sourceDocument.sectionPages are not the record's sections in order"];
+  }
+  return provenance.some(({ sourceKey, spans }) =>
+    spans.some(({ page }) => paged[page - 1] !== sourceKey),
+  )
+    ? ["A section's span is not on its own section's page"]
+    : [];
+}
+
+// A structured source, and a certified Word source, has one page per section, each wholly body
 // (fidelity §7; docs/design/authority-import-contract.md, D4).
 function structuredPageIssues(
   source: CanonicalSubmission["provenance"]["sourceDocument"],
   text: z.infer<typeof SourceDocumentTextSchema>,
 ): string[] {
-  if (source.kind !== "authority-publication") return [];
+  if (source.kind === "drawn") return [];
   const issues: string[] = [];
   if (text.pages.length !== source.sectionPages.length) {
     issues.push("A structured source has one page per section");
@@ -547,10 +652,33 @@ export function verifyDocumentSubmission(
   }
 
   issues.push(...syntheticIssues(submission, narrativeSections, options));
+  issues.push(
+    ...certifiedWordPageIssues(
+      submission.provenance.sourceDocument,
+      composition.data.section,
+      submission.provenance.sections,
+      sourceCodeSystem,
+    ),
+  );
   const identifier = submission.bundle.identifier.value;
   const source = submission.provenance.sourceDocument;
-  if (source.kind === "drawn" && identifier.startsWith(AUTHORITY_IMPORT_PREFIX)) {
+  if (source.kind !== "authority-publication" && identifier.startsWith(AUTHORITY_IMPORT_PREFIX)) {
     issues.push("The authority-import namespace is written only by the importer");
+  }
+  if (source.kind !== "certified-word" && identifier.startsWith(CERTIFIED_WORD_PREFIX)) {
+    issues.push("The certified-word namespace is written only by its importer");
+  }
+  if (source.kind === "certified-word") {
+    if (!CERTIFIED_WORD_IDENTIFIER.test(identifier)) {
+      issues.push("A certified Word import's Bundle identifier is its certified-word value");
+    }
+    // Zone B does not yet make the sections again from the bytes (ADR 0002 invariant 11, as ADR
+    // 0006 amends it): until it does, a certified Word source passes only a dry run.
+    if (options.certifiedWordDryRun?.submissionSha256 !== sha256(submission)) {
+      issues.push(
+        "A certified Word source is accepted only as a dry run until Zone B recomputes it",
+      );
+    }
   }
   if (source.kind === "authority-publication") {
     const segment = source.authority === "EMA" ? "ema" : "synthetic";
@@ -596,9 +724,13 @@ export function verifyDocumentSubmission(
       if (fresh.reportHash !== report.reportHash) {
         issues.push("Re-executed fidelity check does not reproduce the declared report");
       }
-      // A structured source's page without a span must draw nothing (fidelity §7, ADR 0005).
+      // A structured source's page without a span must draw nothing (fidelity §7, ADR 0005), and
+      // so must a certified Word source's.
       if (source.kind === "authority-publication" && fresh.coverage.uncoveredGaps !== 0) {
         issues.push("A page of the authority's document that no narrative covers is not blank");
+      }
+      if (source.kind === "certified-word" && fresh.coverage.uncoveredGaps !== 0) {
+        issues.push("A page of the Word label that no narrative covers is not blank");
       }
     } catch (error) {
       if (error instanceof FidelityError) {

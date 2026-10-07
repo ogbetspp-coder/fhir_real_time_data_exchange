@@ -8,7 +8,8 @@ import { z } from "zod";
 // test/contracts/run-manifest-frozen.test.ts holds this file to importing zod alone, and reads
 // real manifests each version's own code emitted (test/fixtures/run-manifest/).
 //
-// The copies are the grammars as they stand at 5.0.0, and every run that ever completed was
+// The copies are the grammars as they stand at 5.0.0 (5.0.0's own, from `GitCommit` on, as they
+// stood when 6.0.0 was released), and every run that ever completed was
 // validated under them: they reached their present form on 2026-09-19 (1a70910, where `HttpUrl`
 // stopped being `z.url()`) and 2026-09-28 (#145, which respelt `\d` as `[0-9]`, the same language),
 // and no run had completed before 2026-09-20 (docs/validation/README.md, "Official validation
@@ -34,6 +35,9 @@ const PackageRef = z
   .max(256);
 const NormalizationVersion = z.string().regex(/^fidelity-norm\/[0-9]+\.[0-9]+\.[0-9]+$/);
 const AuthorityId = z.string().regex(/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/);
+const GitCommit = z.string().regex(/^[0-9a-f]{40}$/);
+const ImageDigest = z.string().regex(/^sha256:[0-9a-f]{64}$/);
+const Development = z.literal("development");
 
 const FidelityPassed = z.literal("passed");
 const ApproverRole = z.enum(["content-reviewer", "qa-reviewer"]);
@@ -57,24 +61,32 @@ const legacyStandards = {
 // Up to 3.0.0: the standards by literal.
 const LegacyStandardsSchema = z.strictObject(legacyStandards);
 
-// 4.0.0: every package the validator loaded, the two named packages among them.
-const StandardsV4Schema = z
-  .strictObject({
-    ...legacyStandards,
-    globalEpiPackage: PackageRef,
-    packages: z.array(z.strictObject({ package: PackageRef, sha256: Sha256Hex })).min(1),
-  })
-  .superRefine((standards, context) => {
-    const named = standards.packages.map(({ package: ref }) => ref);
-    for (const field of ["globalEpiPackage", "emaPackage"] as const) {
-      if (!named.includes(standards[field])) {
-        context.addIssue({ code: "custom", message: `${field} is not among the pinned packages` });
-      }
+// 4.0.0: every package the validator loaded, the two named packages among them. 5.0.0: the
+// template and the mapping by token.
+function packagesPinned(
+  standards: { globalEpiPackage: string; emaPackage: string; packages: { package: string }[] },
+  context: z.RefinementCtx,
+): void {
+  const named = standards.packages.map(({ package: ref }) => ref);
+  for (const field of ["globalEpiPackage", "emaPackage"] as const) {
+    if (!named.includes(standards[field])) {
+      context.addIssue({ code: "custom", message: `${field} is not among the pinned packages` });
     }
-    if (new Set(named).size !== named.length) {
-      context.addIssue({ code: "custom", message: "a package is pinned more than once" });
-    }
-  });
+  }
+  if (new Set(named).size !== named.length) {
+    context.addIssue({ code: "custom", message: "a package is pinned more than once" });
+  }
+}
+
+const standardsV4 = {
+  ...legacyStandards,
+  globalEpiPackage: PackageRef,
+  packages: z.array(z.strictObject({ package: PackageRef, sha256: Sha256Hex })).min(1),
+};
+const StandardsV4Schema = z.strictObject(standardsV4).superRefine(packagesPinned);
+const StandardsV5Schema = z
+  .strictObject({ ...standardsV4, qrdTemplate: Token, mappingVersion: Token })
+  .superRefine(packagesPinned);
 
 const ValidationSchema = z.strictObject({
   preflightErrors: Count,
@@ -111,6 +123,12 @@ const legacyRuntime = {
 
 const LegacyRuntimeSchema = z.strictObject(legacyRuntime);
 const RuntimeV4Schema = z.strictObject({ ...legacyRuntime, validatorImageDigest: NonEmptyString });
+const RuntimeV5Schema = z.strictObject({
+  sourceCommit: z.union([GitCommit, Development]),
+  imageDigest: z.union([ImageDigest, Development]),
+  validatorImageDigest: z.union([ImageDigest, Development]),
+  workflowRevision: Token,
+});
 
 const legacyBody = {
   runId: Uuid,
@@ -192,7 +210,7 @@ const ApprovalV2Schema = z.discriminatedUnion("method", [
   }),
 ]);
 
-// The ingestion block of 2.0.0, 3.0.0 and 4.0.0: a `CanonicalSubmission` 2.0.0 run.
+// The ingestion block of 2.0.0, 3.0.0, 4.0.0 and 5.0.0: a `CanonicalSubmission` 2.0.0 run.
 const IngestionEvidenceV2Schema = z
   .strictObject({
     submissionId: Uuid,
@@ -285,15 +303,19 @@ export const RunManifestV2Schema = z
   .superRefine(documentRunsCarryIngestion)
   .meta({ id: "RunManifestV2" });
 
-// 3.0.0 and 4.0.0: signed before the transaction, a discriminated union on `status`.
-function signedBeforeTransaction<Shape extends z.core.$ZodLooseShape>(shape: Shape) {
+// 3.0.0, 4.0.0 and 5.0.0: signed before the transaction, a discriminated union on `status`; 5.0.0
+// names the store by token.
+function signedBeforeTransaction<Shape extends z.core.$ZodLooseShape>(
+  shape: Shape,
+  persistence: z.ZodType = PersistenceSchema,
+) {
   return z.discriminatedUnion("status", [
     z.strictObject({ ...shape, status: z.literal("validated"), dryRun: z.literal(true) }),
     z.strictObject({
       ...shape,
       status: z.literal("authorised"),
       dryRun: z.literal(false),
-      persistence: PersistenceSchema,
+      persistence,
     }),
   ]);
 }
@@ -319,5 +341,21 @@ export const RunManifestV4Schema = signedBeforeTransaction({
 })
   .superRefine(documentRunsCarryIngestion)
   .meta({ id: "RunManifestV4" });
+
+// 5.0.0: what names the code, the images and the store in its own grammar; a `CanonicalSubmission`
+// 2.0.0 run.
+export const RunManifestV5Schema = signedBeforeTransaction(
+  {
+    schemaVersion: z.literal("5.0.0"),
+    source: runSource,
+    ...legacyBody,
+    standards: StandardsV5Schema,
+    runtime: RuntimeV5Schema,
+    ingestion: IngestionEvidenceV2Schema.optional(),
+  },
+  z.strictObject({ targetStore: Token, transactionSha256: Sha256Hex }),
+)
+  .superRefine(documentRunsCarryIngestion)
+  .meta({ id: "RunManifestV5" });
 
 export type RunManifestV1 = z.infer<typeof RunManifestV1Schema>;

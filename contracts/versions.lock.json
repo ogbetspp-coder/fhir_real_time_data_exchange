@@ -55,6 +55,12 @@
         "sha256": "222552ef9804bd1f73ffee1da3d6a34bda64f8c70e0dc82b51dc6c2646440529",
         "record": "docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md"
       }
+    ],
+    "3.0.0": [
+      {
+        "sha256": "7109c8f6595527912e8d0bbff2c5bc19562e227353d07712cc92f8bdb1112a67",
+        "record": "docs/validation/changes/2026-10-06-certified-word-source-kind.md"
+      }
     ]
   },
   "fidelity-report": {
@@ -96,6 +102,12 @@
       {
         "sha256": "4aa09b94d82464390bfc588cc1cb9804fc02164648b00b32ec334875ef64edcf",
         "record": "docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md"
+      }
+    ],
+    "3.0.0": [
+      {
+        "sha256": "6a425e74de2215abbba0bc700cc2b5482d8d5ccd116535bdb920b31a0e9872af",
+        "record": "docs/validation/changes/2026-10-06-certified-word-source-kind.md"
       }
     ]
   },
@@ -190,6 +202,12 @@
       {
         "sha256": "2cdb10777fadccf4e49871104e3bd14d13c764faf022aacd0000557c4d27fdd4",
         "record": "docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md"
+      }
+    ],
+    "6.0.0": [
+      {
+        "sha256": "826f296ae286868c2bd9ffd312ee074dd21af0c7baaab476fe64ac5ebfd9eea2",
+        "record": "docs/validation/changes/2026-10-06-certified-word-source-kind.md"
       }
     ]
   },

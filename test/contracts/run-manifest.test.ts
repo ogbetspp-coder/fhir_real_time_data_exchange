@@ -114,7 +114,7 @@ describe("run manifest contract", () => {
     expect(parsed.success).toBe(true);
     expect(manifest.schemaVersion).toBe(RUN_MANIFEST_VERSION);
     expect(manifest.source.kind).toBe("document");
-    expect(manifest.ingestion?.contractVersion).toBe("2.0.0");
+    expect(manifest.ingestion?.contractVersion).toBe("3.0.0");
   });
 
   it("rejects a document run without an ingestion block", () => {
@@ -131,10 +131,13 @@ describe("run manifest contract", () => {
     delete standards.packages;
     const runtime: Record<string, unknown> = { ...manifest.runtime };
     delete runtime.validatorImageDigest;
+    // A 2.0.0 manifest recorded a `CanonicalSubmission` 2.0.0 run.
+    const ingestion = { ...manifest.ingestion, contractVersion: "2.0.0" };
     const v2 = {
       ...manifest,
       standards,
       runtime,
+      ingestion,
       schemaVersion: "2.0.0",
       status: "persisted",
       dryRun: false,

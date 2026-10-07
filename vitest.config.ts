@@ -51,6 +51,7 @@ export default defineConfig({
         "src/app.ts": { lines: 100, statements: 97, functions: 100, branches: 87 },
         "src/lib/**": { lines: 94, statements: 94, functions: 100, branches: 91 },
         "src/authority/**": { lines: 98, statements: 97, functions: 99, branches: 92 },
+        "src/certified-word/**": { lines: 98, statements: 96, functions: 100, branches: 88 },
         "src/render/**": { lines: 97, statements: 96, functions: 99, branches: 87 },
         "src/fixtures/**": { lines: 94, statements: 94, functions: 100, branches: 80 },
         // The approval library and the signer (docs/design/approval.md), measured 2026-10-06. The

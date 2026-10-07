@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://khs.dev/contracts/run-manifest/5.0.0/schema.json",
+  "$id": "https://khs.dev/contracts/run-manifest/6.0.0/schema.json",
   "$ref": "#/$defs/RunManifest",
   "$defs": {
     "RunManifest": {
@@ -37,7 +37,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "5.0.0"
+          "const": "6.0.0"
         },
         "source": {
           "type": "object",
@@ -311,11 +311,11 @@
         },
         "contractVersion": {
           "type": "string",
-          "const": "2.0.0"
+          "const": "3.0.0"
         },
         "sourceKind": {
           "type": "string",
-          "enum": ["drawn", "authority-publication"]
+          "enum": ["drawn", "authority-publication", "certified-word"]
         },
         "graphType": {
           "$ref": "#/$defs/GraphType"
@@ -654,7 +654,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "5.0.0"
+          "const": "6.0.0"
         },
         "source": {
           "type": "object",

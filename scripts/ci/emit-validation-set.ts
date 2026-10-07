@@ -1,8 +1,15 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { loadEmaMapping } from "../../src/fhir/mapping.js";
+import { loadEmaMapping, type TitleRule } from "../../src/fhir/mapping.js";
 import { importPublication } from "../../src/authority/import.js";
+import { importCertifiedWord } from "../../src/certified-word/import.js";
+import {
+  RUN as CERTIFIED_WORD_RUN,
+  caseRequest,
+  recomputed,
+  recomputedCases,
+} from "../../src/certified-word/vectors.js";
 import { syntheticPublication } from "../../src/authority/synthetic.js";
 import type { CanonicalSubmission } from "../../src/contracts/index.js";
 import type { FidelityReport } from "../../src/fidelity/index.js";
@@ -80,21 +87,29 @@ const provenanceFixtures = {
 
 // The resources a document run of `source` sends to the validator, after the preflights the
 // worker runs.
-function caseOf(source: FhirBundle, graphType: "type1" | "type2", suffix: string): SetEntry[] {
+type ProvenanceOf = { submission: CanonicalSubmission; report: FidelityReport; fetchedAt?: string };
+
+function caseOf(
+  source: FhirBundle,
+  graphType: "type1" | "type2",
+  files: { source: string; suffix: string },
+  provenanceOf: ProvenanceOf,
+  titles: TitleRule = "template",
+): SetEntry[] {
   const sourcePreflight = validateCanonicalPreflight(source, graphType);
   if (hasValidationErrors(sourcePreflight)) {
     throw new Error(
       `Canonical ${graphType} preflight failed (${sourcePreflight.issue.length} issues); the worker would refuse this source before official validation`,
     );
   }
-  const target = transformType2ToEma(source, mapping);
-  const emaPreflight = validateEmaPreflight(target.list, target.documentBundle, mapping);
+  const target = transformType2ToEma(source, mapping, undefined, titles);
+  const emaPreflight = validateEmaPreflight(target.list, target.documentBundle, mapping, titles);
   if (hasValidationErrors(emaPreflight)) {
     throw new Error(
       `EMA structural preflight failed (${emaPreflight.issue.length} issues); the worker would refuse this transform before official validation`,
     );
   }
-  const { submission, report, ...fetched } = provenanceFixtures[graphType];
+  const { submission, report, ...fetched } = provenanceOf;
   const provenance = toProvenanceResource(submission, report, {
     bundleId: target.documentBundle.id ?? "",
     compositionId: target.documentBundle.entry[0]?.resource.id ?? "",
@@ -102,7 +117,7 @@ function caseOf(source: FhirBundle, graphType: "type1" | "type2", suffix: string
   });
   return officialValidationTargets(source, target, mapping, provenance).map(
     ({ name, resource, profiles }) => ({
-      file: name === "source" ? `source-${graphType}.json` : `${name}${suffix}.json`,
+      file: name === "source" ? files.source : `${name}${files.suffix}.json`,
       resource,
       profiles,
     }),
@@ -123,6 +138,18 @@ const imported = importPublication(publication.request, publication, mapping, {
 
 // Every committed file, not a fresh generation: `npm run artifacts:check` holds them to the
 // generator, and these are the bytes the repository publishes.
+// A certified Word source's Type 1 record (ADR 0006 P4, D1), from the first synthetic label's
+// recompute, with its own Provenance; its titles are carried as written, as the pipeline carries
+// them.
+const [label] = recomputedCases();
+if (label === undefined) throw new Error("no recomputed Word label");
+const word = importCertifiedWord(
+  recomputed(label.name),
+  caseRequest(label),
+  mapping,
+  CERTIFIED_WORD_RUN,
+);
+
 const generated = path.resolve("fhir/generated");
 const artifactFiles = (await readdir(generated)).filter((file) => file.endsWith(".json")).sort();
 if (artifactFiles.length === 0) throw new Error(`${generated} holds no artifacts`);
@@ -135,8 +162,25 @@ const artifacts: SetEntry[] = await Promise.all(
 );
 
 const set: SetEntry[] = [
-  ...caseOf(createSyntheticType2Bundle(mapping, { product: SMOKE_PRODUCT_ID }), "type2", ""),
-  ...caseOf(imported.submission.bundle as unknown as FhirBundle, "type1", "-type1"),
+  ...caseOf(
+    createSyntheticType2Bundle(mapping, { product: SMOKE_PRODUCT_ID }),
+    "type2",
+    { source: "source-type2.json", suffix: "" },
+    provenanceFixtures.type2,
+  ),
+  ...caseOf(
+    imported.submission.bundle as unknown as FhirBundle,
+    "type1",
+    { source: "source-type1.json", suffix: "-type1" },
+    provenanceFixtures.type1,
+  ),
+  ...caseOf(
+    word.submission.bundle as unknown as FhirBundle,
+    "type1",
+    { source: "source-certified-word.json", suffix: "-certified-word" },
+    { submission: word.submission, report: word.fidelityReport },
+    "as-written",
+  ),
   ...artifacts,
 ];
 

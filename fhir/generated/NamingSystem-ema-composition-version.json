@@ -2,7 +2,7 @@
   "resourceType": "NamingSystem",
   "id": "ema-composition-version",
   "url": "https://khs.dev/fhir/NamingSystem/ema-composition-version",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "name": "EmaCompositionVersion",
   "title": "EMA Composition version",
   "status": "active",

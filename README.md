@@ -595,7 +595,7 @@ All external packages, examples, and validator binaries are recorded in
 verified and excluded from git. The repository's own definitions (the `https://khs.dev/fhir/` code
 systems and value sets, the approval-content extension, a NamingSystem for every identifier system
 the pipeline and its fixtures write, the EU number profile, the ConceptMap and the StructureMap) are
-a FHIR package, `dev.khs.fhir.epi#0.3.0`, that `npm run artifacts:generate` builds byte for byte
+a FHIR package, `dev.khs.fhir.epi#0.4.0`, that `npm run artifacts:generate` builds byte for byte
 reproducibly into `fhir/generated/dev.khs.fhir.epi.tgz`. It is committed, pinned by SHA-256 in the
 lock and `Dockerfile.validator`, and loaded by the official validator as a fifth package; the FHIR
 store does not import it. The StructureMap is the crosswalk's executed twin: written in FML

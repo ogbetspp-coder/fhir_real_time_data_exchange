@@ -1,0 +1,93 @@
+{
+  "imports": [
+    {
+      "name": "smpc",
+      "resultSha256": "d1b380ced13077b46c587f45c7a397d501cccfafd6cadcbb55fe0b2ed59a64ae",
+      "outcome": {
+        "imported": {
+          "submissionSha256": "e75ad2893d646291ae2105b7c0b03ef653e99c845139c99de9c6b44124301bb8",
+          "sourceTextSha256": "5664403c2a3d31496b40ca15c54ed47c2ee23f1b0d6f1f216213ec7b8d916cc0",
+          "reportSha256": "89488580ed6a08224625eea14918ef841989aafce7519f81a37922293737c91f"
+        }
+      }
+    },
+    {
+      "name": "smpc-tracked",
+      "resultSha256": "43b95ebc08f587bc1f634eb3e47eb46524a97f74e88e7d94f387aa7c3bf1c735",
+      "outcome": {
+        "imported": {
+          "submissionSha256": "3d521a90b8ebc48dd6c8ab2384b6c74d452b4e09639b376d88ab4cfe3f818a6d",
+          "sourceTextSha256": "fdab6908c5d7de2163ebc0e6e8cab58bfb4a1a16bec02f0a38a1b2e765427e40",
+          "reportSha256": "c2a22774ed9b054cea875f75767edca7f30da424c9acf921f7325452b69ef92f"
+        }
+      }
+    },
+    {
+      "name": "smpc-assigned",
+      "resultSha256": "4bbbeeb966f08206ef442a7279696418b0f0befb9199f7cbb2abdc0479f64894",
+      "outcome": {
+        "imported": {
+          "submissionSha256": "e64f29ba42e91d295beb1f861cb58365f1bd3c083eba36f3134d91f6598fa9e7",
+          "sourceTextSha256": "5664403c2a3d31496b40ca15c54ed47c2ee23f1b0d6f1f216213ec7b8d916cc0",
+          "reportSha256": "89488580ed6a08224625eea14918ef841989aafce7519f81a37922293737c91f"
+        }
+      }
+    },
+    {
+      "name": "smpc-refused",
+      "resultSha256": "c4c27333d3a2d664cb094fce96f669710f041a5dabc2961dc4b3cdbfda349f8f",
+      "outcome": {
+        "refused": "recompute: recompute-refused"
+      }
+    },
+    {
+      "name": "pl",
+      "resultSha256": "04a756237583bfdd80a8af22340857ae7650a4177a6b9e6eb59174fff3d66cef",
+      "outcome": {
+        "refused": "binding: document-not-carried"
+      }
+    },
+    {
+      "name": "smpc-other-versions",
+      "resultSha256": "5910e153cd9a40e65fe5a1a91193b0930dd6899e66795ce6642e5951d43001b7",
+      "outcome": {
+        "refused": "binding: other-versions"
+      }
+    },
+    {
+      "name": "smpc-sections-swapped",
+      "resultSha256": "e66be9cefb9d114d3e4b56b78fabf309bfa58e0ddfc39981aa9e239bd6aad2cd",
+      "outcome": {
+        "refused": "tree: section-tree-differs"
+      }
+    },
+    {
+      "name": "smpc-title-of-two-lines",
+      "resultSha256": "7e47274699ede2efd36e766f5f992d18c4c04c1fa3d685462feeb58f834aa724",
+      "outcome": {
+        "refused": "titles: title-not-one-line"
+      }
+    },
+    {
+      "name": "smpc-narrative-not-the-page",
+      "resultSha256": "b20ee84f4595671d679d4b917b09ca15d8f4d62efea6a9a8de24e8f0185bd534",
+      "outcome": {
+        "refused": "narrative: narrative-differs-from-page"
+      }
+    },
+    {
+      "name": "smpc-name-retyped",
+      "resultSha256": "d1b380ced13077b46c587f45c7a397d501cccfafd6cadcbb55fe0b2ed59a64ae",
+      "outcome": {
+        "refused": "product: name-not-in-section-1"
+      }
+    },
+    {
+      "name": "smpc-a-number-left-out",
+      "resultSha256": "d1b380ced13077b46c587f45c7a397d501cccfafd6cadcbb55fe0b2ed59a64ae",
+      "outcome": {
+        "refused": "product: eu-numbers-differ"
+      }
+    }
+  ]
+}

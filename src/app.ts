@@ -29,6 +29,7 @@ export const FAILURE_REASONS: Readonly<Record<string, string>> = {
   "Canonical preflight failed": "source-preflight-failed",
   "EMA structural preflight failed": "ema-preflight-failed",
   "Source identifier is in the reserved authority-import namespace": "reserved-namespace",
+  "Source identifier is in the reserved certified-word namespace": "reserved-namespace",
   "The EMA document Bundle and Composition require ids": "document-ids-missing",
   "Ingestion Provenance requires an id": "provenance-id-missing",
   "Only a passed fidelity report reaches run evidence": "fidelity-not-passed",
@@ -256,8 +257,17 @@ export function createApp(overrides: AppOverrides = {}): Hono<AppEnvironment> {
         stage: "http",
         errorType: error.name,
         errorCount: error.issues.length,
+        ...(error.reason === undefined ? {} : { reason: error.reason }),
       });
-      return context.json({ error: "submission-rejected", errorType: error.name }, 422);
+      // A closed refusal code, where the gate gave one, so the caller learns why; never an issue.
+      return context.json(
+        {
+          error: "submission-rejected",
+          errorType: error.name,
+          ...(error.reason === undefined ? {} : { reason: error.reason }),
+        },
+        422,
+      );
     }
     if (error instanceof ApprovalRefusedError) {
       // A closed code (src/approval/statement.ts, ApprovalRefusal), so the caller learns why.

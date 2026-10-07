@@ -2,7 +2,7 @@
   "resourceType": "NamingSystem",
   "id": "epi-package",
   "url": "https://khs.dev/fhir/NamingSystem/epi-package",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "name": "EpiPackage",
   "title": "EMA ePI List",
   "status": "active",

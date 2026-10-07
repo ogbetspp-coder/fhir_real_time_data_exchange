@@ -1,4 +1,4 @@
-import { permittedTitles, type EmaMapping, type SectionRule } from "./mapping.js";
+import { permittedTitles, type EmaMapping, type SectionRule, type TitleRule } from "./mapping.js";
 import {
   EU_AUTHORISATION_NUMBER_PATTERN,
   EU_AUTHORISATION_NUMBER_SYSTEM,
@@ -314,6 +314,7 @@ function validateTargetSection(
   mapping: EmaMapping,
   path: string,
   issues: OperationOutcomeIssue[],
+  titles: TitleRule,
 ): void {
   if (section === undefined) {
     issues.push(issue("error", "required", `Missing EMA section ${rule.targetCode}`, path));
@@ -330,7 +331,12 @@ function validateTargetSection(
       ),
     );
   }
-  if (!permittedTitles(rule).includes(section.title)) {
+  // A certified Word source's title is its label's heading line, carried as written (D6).
+  if (titles === "as-written") {
+    if (typeof section.title !== "string" || section.title.length === 0) {
+      issues.push(issue("error", "required", "A section carries its title", `${path}.title`));
+    }
+  } else if (!permittedTitles(rule).includes(section.title)) {
     issues.push(issue("error", "value", `Expected title "${rule.title}"`, `${path}.title`));
   }
 
@@ -346,7 +352,7 @@ function validateTargetSection(
     const [position, ...others] = positions;
     if (position === undefined) {
       if (childRule.required) {
-        validateTargetSection(undefined, childRule, mapping, `${path}.section`, issues);
+        validateTargetSection(undefined, childRule, mapping, `${path}.section`, issues, titles);
       }
       continue;
     }
@@ -377,6 +383,7 @@ function validateTargetSection(
       mapping,
       `${path}.section[${position}]`,
       issues,
+      titles,
     );
   }
   // A child no rule names is refused rather than passed over unchecked.
@@ -400,6 +407,7 @@ export function validateEmaPreflight(
   list: FhirResource,
   bundle: FhirBundle,
   mapping: EmaMapping,
+  titles: TitleRule = "template",
 ): OperationOutcome {
   const issues: OperationOutcomeIssue[] = [];
   if (!list.meta?.profile?.includes(mapping.profiles.list)) {
@@ -433,6 +441,7 @@ export function validateEmaPreflight(
       mapping,
       "Composition.section[0]",
       issues,
+      titles,
     );
   }
 

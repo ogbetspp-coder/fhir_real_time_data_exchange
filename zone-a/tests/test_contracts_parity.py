@@ -203,8 +203,9 @@ def _published_version(name: str) -> str:
 def test_the_emitted_manifests_verify_and_round_trip() -> None:
     """The current version's manifests, as the worker's own code emitted them, verify here.
 
-    A fixture run and a document run, so the ingestion block, its approval union and the rules
-    between fields (``VerifiedRunManifest``) are all read, and each dumps back to its own bytes.
+    A fixture run, a document run and (from 6.0.0) a certified Word source's dry run, so the
+    ingestion block, its approval union and the rules between fields (``VerifiedRunManifest``) are
+    all read, and each dumps back to its own bytes.
     """
     version = _published_version("run-manifest")
     manifests = {
@@ -212,7 +213,11 @@ def test_the_emitted_manifests_verify_and_round_trip() -> None:
         for name, manifest in run_manifest_fixtures().items()
         if manifest["schemaVersion"] == version
     }
-    assert sorted(manifests) == [f"{version}-document.json", f"{version}-fixture.json"]
+    assert sorted(manifests) == [
+        f"{version}-certified-word.json",
+        f"{version}-document.json",
+        f"{version}-fixture.json",
+    ]
     for document in manifests.values():
         parsed = VerifiedRunManifest.model_validate(document)
         dumped = parsed.model_dump(by_alias=True, exclude_none=True, mode="json")

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "2.0.0",
+  "schemaVersion": "3.0.0",
   "submissionId": "5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b",
   "createdAt": "2026-09-19T00:00:00Z",
   "graphType": "type2",
@@ -1564,6 +1564,6 @@
     "approvedAt": "2026-09-19T00:00:00Z",
     "method": "api-attestation",
     "meaning": "reviewed-fidelity-and-structure",
-    "approvedContentSha256": "2f977201c5ae9227852cb772e744f88f2febdcc371d0b8ccb98191fd5b23630d"
+    "approvedContentSha256": "4ea279ddf4e8c032f1321358e5fb7964e8e4c7c14e35a2f353301373e601b628"
   }
 }

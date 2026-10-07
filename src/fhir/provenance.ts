@@ -150,7 +150,12 @@ export function toProvenanceResource(
       ],
     };
   }
-  if (source.kind !== "drawn") throw new Error("An attested approval has a drawn source");
+  // An attestation approves a drawn source or a certified Word source: the person attests the
+  // record made from the document named by its hash.
+  if (source.kind === "authority-publication") {
+    throw new Error("An attested approval has a drawn or a certified Word source");
+  }
+  const documentSha256 = source.kind === "drawn" ? source.sha256 : source.document.sha256;
   return {
     ...common,
     recorded: approval.approvedAt,
@@ -163,6 +168,6 @@ export function toProvenanceResource(
         { system: APPROVER_ROLE_SYSTEM, code: approval.approverRole },
       ),
     ],
-    entity: [sourceEntity(SOURCE_DOCUMENT_IDENTIFIER_SYSTEM, source.sha256), reportEntity],
+    entity: [sourceEntity(SOURCE_DOCUMENT_IDENTIFIER_SYSTEM, documentSha256), reportEntity],
   };
 }

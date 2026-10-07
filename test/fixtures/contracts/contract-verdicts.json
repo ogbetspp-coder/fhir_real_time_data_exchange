@@ -8320,7 +8320,7 @@
       "base": "contracts/run-request.json",
       "mutation": "sha256 newline",
       "path": ["submissionRef", "sha256"],
-      "value": "afe0f09e3ea32d2e9fd4db7f7fcc2776ef4eb56c9c08c5b9b31c6b720750af21\n",
+      "value": "6d1fcb86e29979f20c1a00797c7de5cbfbd75c61102662b4278691abb31e2a9c\n",
       "accepted": false
     },
     {
@@ -8333,14 +8333,14 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.0.0-fixture.json",
+      "base": "run-manifest/6.0.0-fixture.json",
       "mutation": "unchanged",
       "path": [],
       "accepted": true
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.0.0-fixture.json",
+      "base": "run-manifest/6.0.0-fixture.json",
       "mutation": "sourceCommit not a commit id",
       "path": ["runtime", "sourceCommit"],
       "value": "local",
@@ -8348,7 +8348,7 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.0.0-fixture.json",
+      "base": "run-manifest/6.0.0-fixture.json",
       "mutation": "imageDigest upper case",
       "path": ["runtime", "imageDigest"],
       "value": "sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -8356,7 +8356,7 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.0.0-fixture.json",
+      "base": "run-manifest/6.0.0-fixture.json",
       "mutation": "dryRun as a string",
       "path": ["dryRun"],
       "value": "true",
@@ -8364,7 +8364,7 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.0.0-fixture.json",
+      "base": "run-manifest/6.0.0-fixture.json",
       "mutation": "officialValidationExecuted as a number",
       "path": ["validation", "officialValidationExecuted"],
       "value": 0,
@@ -8372,7 +8372,7 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.0.0-fixture.json",
+      "base": "run-manifest/6.0.0-fixture.json",
       "mutation": "preflightErrors as a boolean",
       "path": ["validation", "preflightErrors"],
       "value": false,
@@ -8380,7 +8380,7 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.0.0-fixture.json",
+      "base": "run-manifest/6.0.0-fixture.json",
       "mutation": "qrdTemplate with a space",
       "path": ["standards", "qrdTemplate"],
       "value": "10.4 ",
@@ -8388,12 +8388,12 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.0.0-fixture.json",
+      "base": "run-manifest/6.0.0-fixture.json",
       "mutation": "a fixture run with an ingestion block",
       "path": ["ingestion"],
       "value": {
         "submissionId": "4b1d2c3e-5f60-4a71-8b92-0c1d2e3f4a5b",
-        "contractVersion": "2.0.0",
+        "contractVersion": "3.0.0",
         "sourceKind": "drawn",
         "graphType": "type2",
         "allowSyntheticSources": true,
@@ -8402,10 +8402,10 @@
         "parser": "synthetic-extractor@1.0.0",
         "fidelity": {
           "status": "passed",
-          "normalizationVersion": "fidelity-norm/3.1.0",
+          "normalizationVersion": "fidelity-norm/3.3.0",
           "sectionsChecked": 32,
           "sectionsMatched": 32,
-          "reportSha256": "d47998d567e2cfd73b0b71125e0610d3b4072bdbbbecf66bc01982dcd3d502be",
+          "reportSha256": "9522996f89d165c566f356105ac2a322dfae35baa950a02449d067e88b7ec141",
           "narrativeBindingSha256": "dbc8cf153c23e248a34c79d2bb6176030b2b206646e92060ac9c7ce6e7b786dd",
           "coverage": {
             "pageCodePoints": 2433,
@@ -8420,7 +8420,7 @@
           "approvedAt": "2026-09-19T00:00:00Z",
           "method": "api-attestation",
           "meaning": "reviewed-fidelity-and-structure",
-          "approvedContentSha256": "3f74ae046b294a2ac0529437c22b5d7d6bad7708b59818159300929a2cb3b30e"
+          "approvedContentSha256": "bee82adb2ad640c6d397360e4110a8fc9eae53c05803476397692748a6663164"
         },
         "provenanceResourceId": "cabf3a37-fd9f-50f7-ab33-3ce39360ab90"
       },
@@ -8428,14 +8428,14 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.0.0-document.json",
+      "base": "run-manifest/6.0.0-document.json",
       "mutation": "unchanged",
       "path": [],
       "accepted": true
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.0.0-document.json",
+      "base": "run-manifest/6.0.0-document.json",
       "mutation": "a document run without its ingestion block",
       "path": ["ingestion"],
       "delete": true,
@@ -8443,7 +8443,7 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.0.0-document.json",
+      "base": "run-manifest/6.0.0-document.json",
       "mutation": "a drawn source that records an authority fetch",
       "path": ["ingestion", "authority"],
       "value": {
@@ -8467,7 +8467,7 @@
     },
     {
       "contract": "run-manifest",
-      "base": "run-manifest/5.0.0-document.json",
+      "base": "run-manifest/6.0.0-document.json",
       "mutation": "modelId null",
       "path": ["ingestion", "modelId"],
       "value": null,

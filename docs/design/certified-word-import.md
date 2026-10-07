@@ -37,9 +37,114 @@ extractedText                                            the pages (SourceDocume
 
 Invariant 7's single extractor token becomes the SHA-256 of the canonical JSON of
 `{reader, structure, builder, drawing.checker}` (decision 6), named `certified-word/<hash>`.
-Contract versions: `ingestion-provenance` and `CanonicalSubmission` next minor (a new variant of a
-discriminated union refuses nothing that parsed before); the run manifest records the source
-kind.
+Contract versions: `ingestion-provenance` and `CanonicalSubmission` next major (a new value of
+`kind`, which Zone B branches on: ADR 0002's rule); the run manifest records the source kind.
+(Corrected 2026-10-06, after the review of #193: this said "next minor", on the ground that a new
+variant of a discriminated union refuses nothing that parsed before; ADR 0002 makes an enum
+addition on a field Zone B branches on a major.)
+
+**D1, as built (2026-10-06).** The recompute (D2, below) names every version that decides its
+result, so the source pins its request rather than each version apart, and the drawing waits for
+D3:
+
+```text
+kind: "certified-word"
+mediaType: the .docx media type
+document: { sha256, byteLength, filename, storageUri }   the .docx as uploaded (D4)
+recompute: { document: smpc | pl, view, part,             zone_a.recompute's request: what a
+             assignments: { key: paragraph },             person named and confirmed, and every
+             versions: { recompute, reader, format,      version the recompute names
+                         structurer, registryVersion,
+                         mappingVersion, builder } }
+importer: "certified-word-import/<version>"              the TypeScript importer
+changes                                                   the tracked changes the view settled
+sectionPages: [{ page, key, code }]                      one page per section
+extractedText                                            the pages (SourceDocumentText)
+```
+
+The extractor token is `certified-word/` and the SHA-256 of the canonical JSON of
+`{ importer, recompute: recompute.versions }`, so neither the Python nor the TypeScript side can
+change under the same token; the gate checks it from the source alone, and refuses a submission
+another importer version made. The importer's version is locked to the hash of
+`src/certified-word/` (with the fidelity scanner's two files and the strict JSON reader it uses)
+and of its golden vectors (`src/certified-word/importer.lock.json`, `npm run certified-word:lock`,
+`test/certified-word/lock.test.ts`), as the authority importer's is. The drawing record (D3) joins
+the source when it is built, a new version again. `CanonicalSubmission` and `ingestion-provenance`
+are 3.0.0 and the run manifest 6.0.0, majors (its `contractVersion` follows the submission's;
+5.0.0 is frozen); the renderer gate's and the withheld design's change, which had reserved
+`CanonicalSubmission` 3.0.0, takes 4.0.0 and the run manifest's next major after 6.0.0.
+
+The importer (`src/certified-word/`) is a pure, deterministic function of the recompute's bytes
+and what a person confirmed, as the authority importer is of the authority's bytes:
+
+- **The request** (`CertifiedWordRequestSchema`, not a published contract: every value in it
+  reaches the record): the upload's name and storage URI; the recompute's request; the ePI's
+  document id, our id for the ePI this label's part is a version of, confirmed once (never derived
+  from the part's position in the file, which a later version of the file may change); the
+  canonical product (our id; the name and holder exactly as chosen from the label's text, with
+  our id for the holder; every EU authorisation number in `zone_a.product`'s strict form); and the
+  approval placeholder, an attestation as a drawn source's.
+- **What it checks**, refusing at the first stage that fails with a closed reason: the request;
+  the bytes (strict UTF-8 and JSON, the authority's reader); the recompute's own refusal; the
+  result's shape; that the result is the one the request names (versions, document, view, part,
+  assignments) made with the mapping this build carries, of an SmPC; the mapping's tree, codes
+  included; each title one line of plain text that draws something; each narrative read by Zone
+  B's scanner as its page, and a section without a narrative having the empty page and being
+  neither a leaf nor one whose narrative the mapping requires; and the product (tightened after the
+  review of #193, which found a substring check accepting "Synthetic Exampli", "mg" and the
+  holder's address):
+  - **the name** is section 1's whole first line, or that line up to just before its first
+    whitespace-separated token that begins with a digit (the strength), the whitespace before it
+    left out: "BRUKINSA" or "BRUKINSA 80 mg hard capsules" of "BRUKINSA 80 mg hard capsules", and
+    nothing else, not "BRUKINSA 80" (the re-review of #193 found a cut at any word boundary
+    accepted); it does not end in punctuation;
+  - **the holder** is section 7's first line, exactly;
+  - neither first line may be one only the page writes (a table's or a picture's, holding a grid
+    marker or U+FFFC), and neither the name nor the holder may hold a noncharacter or U+FFFC;
+  - **the EU authorisation numbers** are exactly those standing alone on section 8 (after a line's
+    start, a space, a tab or one of `,;:(`, before its end, a space, a tab, one of `,;:()`, or a
+    full stop that ends the line or comes before whitespace); every `E U /` there, in any case
+    and with any whitespace inside it, is the start of one of them; and every line of section 8
+    that holds a slash or a character drawn as one (U+2215, U+2044, U+FF0F) begins with one of
+    them, so a number with a look-alike letter ("ЕU", a Cyrillic E) or slash is refused, not passed
+    over. A run of presentations (`.../001-003`) is refused rather than expanded.
+
+  The headings a person assigned are bound both ways: the result's assigned headings (its
+  structure's sections with status `assigned`, each key with its paragraph) are exactly the
+  request's.
+
+- **What it makes:** narratives, pages and titles exactly as the recompute gave them; a Type 1
+  graph of the confirmed product only (the MedicinalProductDefinition with our id and the EU
+  product numbers, the Organization with our id, one RegulatedAuthorization per EU authorisation
+  number), packs, ingredients and substances declared not supplied; the Bundle's identifier
+  `certified-word:<document id>` in our system `https://khs.dev/fhir/identifier/certified-word`;
+  `Bundle.timestamp` and `Composition.date` the run's `createdAt`; `Composition.title` the
+  product's name.
+- **The leaflet** is refused (`binding: document-not-carried`): Zone B's crosswalk and preflights
+  are the SmPC's, and the canonical document types name the SmPC only.
+- **False refusals these rules make**, accepted until a label shows the need:
+  - a name that is neither section 1's whole first line nor that line up to its strength: a name
+    whose strength is written without a space ("Brand10 mg"), whose invented name itself begins
+    with a digit or holds a token that does (cut there, or taken whole), whose line names a form
+    before the strength, or that is a section 1 opening otherwise (a list label, a sentence);
+  - a name that ends in punctuation ("X (recombinant)");
+  - a holder whose name is not section 7's first line exactly (a name over two lines, in a table,
+    or after other text), and a section 1 or 7 that begins with a table or a picture;
+  - a line of section 8 that holds a slash and does not begin with a number (a date "01/2024", a
+    note), a number written otherwise than the strict form, a run included;
+  - a leaflet.
+- **Open: the document id is bound to nothing.** The importer takes the ePI's document id as a
+  person confirmed it and writes the record's identifier from it, and nothing checks that the id
+  names this product's ePI and no other: two labels could be filed under one ePI, or one label's
+  versions under two. P5's canonical-product registry, which keeps each document id with its
+  product, and the gate before anything persists (D2 lifts the dry-run refusal only with it) must
+  bind it.
+
+Cross-language fixtures: the Node gate cannot run Python, so
+`zone-a/scripts/certified_word_fixtures.py` builds synthetic Word labels in Python and commits
+what `python -m zone_a.recompute` writes for each, byte for byte
+(`test/fixtures/certified-word/recompute/`), with `--check`; the importer's tests and golden
+vectors read them.
 
 **D2. The recompute (decision 1's second leg).** Zone B must make, from the uploaded bytes and the
 recorded assignments, the very pages and narratives the submission carries, as invariant 8 does
@@ -89,9 +194,42 @@ identifiers preflight requires come from the record, never from narrative.
 it. An assigned heading (a remediation finding the label team accepted) is carried as written, and
 `src/fhir/transform.ts` does not substitute the template's title for this source kind.
 
+As built: the title is the heading line the recompute gives (`zone_a.word_epi`), assigned or
+not; the crosswalk carries it as written for a certified Word source (`TitleRule`
+`as-written`), and the EMA preflight holds it only to being there, not to the template's titles.
+Every other source keeps the template's rule.
+
 **D7. The approval (decision 7).** The approver signs the statement `docs/design/approval.md`
 designs, naming the submission's hash, which covers the pages, the narratives, the structure's
 assignments and the canonical product it is for.
+
+## The gate, once it recomputes
+
+Until the worker runs the recompute (D2), `src/certified-word/gate.ts` accepts a certified Word
+submission only as a dry run and refuses it when `DRY_RUN` is false, with the closed code
+`certified-word-not-recomputed`, which the HTTP answer carries (`reason`). In a dry run it compares
+nothing but what the submission holds: the extractor token with the importer and the recompute's
+versions, the importer with its own version, and each page with the record's section of the same
+place in pre-order (`sectionPages[i].key` is the (i+1)th section, and each narrative's span is on its
+own section's page). With D2 and D4 built, the gate will, before the ordinary gate:
+
+1. read the .docx at `document.storageUri` under its own identity and require its SHA-256 and
+   length (D4);
+2. run `python -m zone_a.recompute` on those bytes with `sourceDocument.recompute` as its request,
+   in a subprocess with no network; its refusal refuses the run, and so does a request naming
+   versions the worker's build does not have;
+3. make the importer's request again from the submission: the upload from the source, the
+   recompute's request from the source, the document id from the Bundle's identifier, the product
+   from the record (the MedicinalProductDefinition's id and name, the Organization's id and name,
+   the RegulatedAuthorizations' numbers) and the approval's fields, with the run's free fields
+   (`submissionId`, `createdAt`, `extractionRunId`, `serviceVersion`, the page text's and the
+   report's URIs);
+4. run the importer its build contains on the recompute's bytes and require the very submission,
+   page text and fidelity report it was sent, by SHA-256, as the authority gate does;
+5. with D3, require the renderer gate's signed drawing record for the submission's narratives;
+6. then run the ordinary gate with that proof bound to the submission's hash, in place of
+   `certifiedWordDryRun`, and record the recompute's versions and the worker's image in the run
+   manifest.
 
 ## ADR amendments this carries
 
@@ -123,6 +261,13 @@ bucket, before the label gateway.
    that decides the result; a request naming other versions is refused, so only the build that
    made a submission recomputes it. It refuses unless every section of the part is carried. No
    network, clock or browser; tested on synthetic SmPCs and leaflets, byte for byte twice.
-2. Next: the `certified-word` source kind and the TypeScript importer that builds a submission
-   from the recompute's result (D1); then the worker image and the gate's subprocess (D2), the
-   upload path (D4) and the drawing records (D3).
+2. **The source kind and the importer** (D1, 2026-10-06; "D1, as built" above): the
+   `certified-word` source in `CanonicalSubmission` and `ingestion-provenance` 3.0.0 (run manifest
+   6.0.0), the importer `src/certified-word/` (`certified-word-import/1.0.0`, locked) with its
+   golden vectors over the recompute's results
+   for synthetic Word labels, the titles carried as written (D6), the ADR 0001 and ADR 0002
+   amendments, and the gate's dry-run-only acceptance. A certified Word submission runs through
+   the worker's pipeline dry, and its record and EMA output pass the official validator.
+3. Next: the worker image and the gate's subprocess (D2, "The gate, once it recomputes"), the
+   upload path (D4) and the drawing records (D3); the leaflet through Zone B; and P5's form, which
+   supplies what the request says a person confirmed.

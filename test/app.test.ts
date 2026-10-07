@@ -1,6 +1,13 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { createApp } from "../src/app.js";
+import { importCertifiedWord } from "../src/certified-word/import.js";
+import {
+  RUN as CERTIFIED_WORD_RUN,
+  caseRequest,
+  recomputed,
+  recomputedCases,
+} from "../src/certified-word/vectors.js";
 import { loadConfig, type AppConfig } from "../src/config.js";
 import type { DocumentSubmissionInput } from "../src/contracts/index.js";
 import { loadEmaMapping, type EmaMapping } from "../src/fhir/mapping.js";
@@ -169,6 +176,35 @@ describe("run API", () => {
       errorType: "SubmissionRejectedError",
     });
     expect(body).not.toContain("approvedContentSha256");
+    expect(body).not.toContain("Synthetic");
+  });
+
+  // A certified Word source is refused when the run is not a dry run, until Zone B recomputes it:
+  // the caller learns that by its closed code, and nothing else (review of #193).
+  it("gives a certified Word submission's closed code when the run is not a dry run", async () => {
+    const [label] = recomputedCases();
+    if (label === undefined) throw new Error("no recomputed label");
+    const word = importCertifiedWord(
+      recomputed(label.name),
+      caseRequest(label),
+      mapping,
+      CERTIFIED_WORD_RUN,
+    );
+    const app = createApp({
+      // The gate refuses before anything the persisted path needs is read.
+      config: { ...configFor({ SUBMISSION_BUCKET: SYNTHETIC_SUBMISSION_BUCKET }), DRY_RUN: false },
+      submissionReader: readerReturning(() => word),
+    });
+
+    const response = await post(app, documentRequest());
+    const body = await response.text();
+
+    expect(response.status).toBe(422);
+    expect(JSON.parse(body)).toEqual({
+      error: "submission-rejected",
+      errorType: "SubmissionRejectedError",
+      reason: "certified-word-not-recomputed",
+    });
     expect(body).not.toContain("Synthetic");
   });
 });

@@ -75,7 +75,7 @@ export const REFINEMENTS: Readonly<Record<string, RefinementDisposition>> = {
   CanonicalSubmission: {
     checks: 1,
     unexpressed:
-      "Zone B's gate (structuralInvariantIssues): recomputed hashes, fidelity counts, span limits and unique source keys, which JSON Schema cannot compute; and the fields each decision action requires, which it could state but which would change canonical-submission 2.0.0's published language (listed for 3.0.0).",
+      "Zone B's gate (structuralInvariantIssues): recomputed hashes, fidelity counts, span limits and unique source keys, which JSON Schema cannot compute; and the fields each decision action requires, which it could state but which would change canonical-submission 3.0.0's published language (listed for its next major, 4.0.0).",
   },
   SourceSpan: {
     checks: 1,

@@ -11,6 +11,7 @@ from enum import StrEnum
 from typing import Annotated, Any, Literal
 
 from pydantic import ConfigDict, Field, RootModel, StrictInt, StrictStr
+from typing_extensions import TypeAliasType
 from zone_a.contract_model import ContractModel
 
 
@@ -141,6 +142,50 @@ class SectionPath(RootModel[StrictStr]):
     root: Annotated[StrictStr, Field(pattern="^Composition(?:\\.section\\[[0-9]{1,4}\\]){1,16}$")]
 
 
+class Document(ContractModel):
+    model_config = ConfigDict(extra="forbid")
+    sha256: Sha256Hex
+    byteLength: Annotated[StrictInt, Field(gt=0, le=9007199254740991)]
+    filename: Annotated[StrictStr, Field(pattern="^[A-Za-z0-9][A-Za-z0-9._ -]{0,254}$")]
+    storageUri: StorageUri
+
+
+class Document1(StrEnum):
+    smpc = "smpc"
+    pl = "pl"
+
+
+class View(StrEnum):
+    accepted = "accepted"
+    original = "original"
+
+
+AssignmentsAdditionalProperty = TypeAliasType(
+    "AssignmentsAdditionalProperty", Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+)
+
+
+class SourceKey(RootModel[StrictStr]):
+    root: Annotated[
+        StrictStr,
+        Field(
+            description="Canonical SmPC section identifier from the mapping manifest, e.g. smpc.4.2.posology.",
+            pattern="^[a-z0-9]+(?:\\.[a-z0-9]+)*$",
+        ),
+    ]
+
+
+class RecomputeVersions(ContractModel):
+    model_config = ConfigDict(extra="forbid")
+    recompute: Token
+    reader: Token
+    format: Token
+    structurer: Token
+    registryVersion: Token
+    mappingVersion: Token
+    builder: Token
+
+
 class ToolVersion(ContractModel):
     model_config = ConfigDict(extra="forbid")
     name: Token
@@ -165,16 +210,6 @@ class TerminologyServiceRef(ContractModel):
     name: Token
     version: Token
     snapshotSha256: Sha256Hex
-
-
-class SourceKey(RootModel[StrictStr]):
-    root: Annotated[
-        StrictStr,
-        Field(
-            description="Canonical SmPC section identifier from the mapping manifest, e.g. smpc.4.2.posology.",
-            pattern="^[a-z0-9]+(?:\\.[a-z0-9]+)*$",
-        ),
-    ]
 
 
 class SourceSpan(ContractModel):
@@ -359,6 +394,22 @@ class Picture(RootModel[Picture1 | Picture2]):
     root: Picture1 | Picture2
 
 
+class SectionPage1(ContractModel):
+    model_config = ConfigDict(extra="forbid")
+    page: Annotated[StrictInt, Field(gt=0, le=9007199254740991)]
+    key: SourceKey
+    code: Token
+
+
+class RecomputeRequest(ContractModel):
+    model_config = ConfigDict(extra="forbid")
+    document: Document1
+    view: View | None
+    part: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    assignments: dict[SourceKey, AssignmentsAdditionalProperty]
+    versions: RecomputeVersions
+
+
 class ExtractionTooling(ContractModel):
     model_config = ConfigDict(extra="forbid")
     extractionRunId: Uuid
@@ -449,12 +500,26 @@ class AuthoritySourceDocument(ContractModel):
     extractedText: ExtractedTextRef
 
 
+class CertifiedWordSourceDocument(ContractModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["certified-word"]
+    mediaType: Literal["application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
+    document: Document
+    recompute: RecomputeRequest
+    importer: Token
+    changes: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    sectionPages: Annotated[list[SectionPage1], Field(max_length=2000, min_length=1)]
+    extractedText: ExtractedTextRef
+
+
 class Approval(RootModel[AttestedApproval | AuthorityApproval]):
     root: AttestedApproval | AuthorityApproval
 
 
-class SourceDocument(RootModel[DrawnSourceDocument | AuthoritySourceDocument]):
-    root: DrawnSourceDocument | AuthoritySourceDocument
+class SourceDocument(
+    RootModel[DrawnSourceDocument | AuthoritySourceDocument | CertifiedWordSourceDocument]
+):
+    root: DrawnSourceDocument | AuthoritySourceDocument | CertifiedWordSourceDocument
 
 
 class IngestionProvenance(ContractModel):
@@ -468,7 +533,7 @@ class IngestionProvenance(ContractModel):
 
 class CanonicalSubmission(ContractModel):
     model_config = ConfigDict(extra="forbid")
-    schemaVersion: Literal["2.0.0"]
+    schemaVersion: Literal["3.0.0"]
     submissionId: Uuid
     createdAt: IsoDateTime
     graphType: GraphType
