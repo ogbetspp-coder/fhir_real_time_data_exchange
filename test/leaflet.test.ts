@@ -1,10 +1,14 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { pipelineFailure } from "../src/app.js";
+import { importCertifiedWord } from "../src/certified-word/import.js";
+import { RUN, caseRequest, recomputed, recomputedCases } from "../src/certified-word/vectors.js";
 import { loadConfig, type AppConfig } from "../src/config.js";
 import { SourceKey } from "../src/contracts/index.js";
 import {
   DOCUMENT_TYPE_SYSTEM,
   EMA_DOCUMENT_TYPE_SYSTEM,
+  LEAFLET_TITLES_NOT_CARRIED,
   loadEmaMappings,
   mappingFor,
   mappingReference,
@@ -24,9 +28,11 @@ import { createSyntheticType2Bundle } from "../src/fixtures/synthetic.js";
 import { runPipeline } from "../src/pipeline.js";
 
 // The package leaflet in Zone B (ADR 0006 owner decision 8; docs/design/pl-structure.md, "Zone
-// B"): its manifest is taken by the source's document type, its EMA Composition is the leaflet's,
-// and the record it comes from is a Type 2 graph or, for a certified Word leaflet, a Type 1 record
-// with no authorisation (test/certified-word/ holds that one).
+// B"): its manifest is taken by the source's document type and its EMA Composition is the
+// leaflet's. It is carried only with its titles as written, from a certified Word source, whose
+// Type 1 record has no authorisation (test/certified-word/ holds that one): a Type 2 leaflet,
+// under the template's titles, is refused. No leaflet persists: a run that is not a dry run is
+// refused. The synthetic Type 2 leaflet is the refusal's fixture.
 
 let smpc: EmaMapping;
 let leaflet: EmaMapping;
@@ -50,6 +56,13 @@ function typed(bundle: FhirBundle, coding: { system: string; code: string }[]): 
   const copy = structuredClone(bundle);
   composition(copy).type = { coding };
   return copy;
+}
+
+// The certified Word leaflet's Type 1 record (test/fixtures/certified-word/recompute/pl.json).
+function wordLeaflet() {
+  const found = recomputedCases().find(({ name }) => name === "pl");
+  if (found === undefined) throw new Error("no leaflet");
+  return importCertifiedWord(recomputed("pl"), caseRequest(found), leaflet, RUN);
 }
 
 function issues(run: () => unknown): string[] {
@@ -121,54 +134,69 @@ describe("the mapping for a source", () => {
   });
 });
 
-describe("a Type 2 package leaflet through the crosswalk", () => {
-  it.each([false, true])(
-    "is the EMA's leaflet document, every section in place (optional sections %s)",
-    (optional) => {
-      const record = source(optional);
-      expect(hasValidationErrors(validateCanonicalPreflight(record, "type2"))).toBe(false);
-      const { list, documentBundle } = transformType2ToEma(record, leaflet);
-      expect(hasValidationErrors(validateEmaPreflight(list, documentBundle, leaflet))).toBe(false);
-      const target = composition(documentBundle);
-      expect(target.type).toEqual({
-        coding: [
-          {
-            system: EMA_DOCUMENT_TYPE_SYSTEM,
-            code: "100000155538",
-            display: "Package Leaflet",
-          },
-        ],
-      });
-      expect(target.meta?.profile).toEqual(leaflet.profiles.composition);
-      const codes: string[] = [];
-      const walk = (sections: FhirComposition["section"]): void => {
-        for (const section of sections) {
-          codes.push(section.code.coding?.[0]?.code ?? "");
-          walk(section.section ?? []);
-        }
-      };
-      walk(target.section);
-      const rules: SectionRule[] = [];
-      const visit = (rule: SectionRule): void => {
-        if (optional || rule.required) {
-          rules.push(rule);
-          (rule.children ?? []).forEach(visit);
-        }
-      };
-      visit(leaflet.root);
-      expect(codes).toEqual(rules.map(({ targetCode }) => targetCode));
-      // The List names the leaflet's document and carries the product's one EU product number.
-      expect(list.entry).toEqual([
-        { item: { reference: `urn:uuid:${documentBundle.id}`, display: target.title } },
+describe("a package leaflet through the crosswalk", () => {
+  it("is the EMA's leaflet document, carried with its titles as written", () => {
+    const record = wordLeaflet().submission.bundle as unknown as FhirBundle;
+    const { list, documentBundle } = transformType2ToEma(record, leaflet, undefined, "as-written");
+    expect(
+      hasValidationErrors(validateEmaPreflight(list, documentBundle, leaflet, "as-written")),
+    ).toBe(false);
+    const target = composition(documentBundle);
+    expect(target.type).toEqual({
+      coding: [
+        { system: EMA_DOCUMENT_TYPE_SYSTEM, code: "100000155538", display: "Package Leaflet" },
+      ],
+    });
+    expect(target.meta?.profile).toEqual(leaflet.profiles.composition);
+    expect(target.section[0]?.section?.[0]?.title).toBe(
+      "1. What Synthetic Exampline is and what it is used for",
+    );
+    expect(list.entry).toEqual([
+      { item: { reference: `urn:uuid:${documentBundle.id}`, display: target.title } },
+    ]);
+  });
+
+  // The tree with every optional section, under the rule a certified Word source is carried by
+  // (Zone A finds the required sections only): each section in place, in the manifest's order.
+  it("places every section of the manifest, optional ones included", () => {
+    const { documentBundle } = transformType2ToEma(source(true), leaflet, undefined, "as-written");
+    const codes: string[] = [];
+    const walk = (sections: FhirComposition["section"]): void => {
+      for (const section of sections) {
+        codes.push(section.code.coding?.[0]?.code ?? "");
+        walk(section.section ?? []);
+      }
+    };
+    walk(composition(documentBundle).section);
+    const rules: SectionRule[] = [];
+    const visit = (rule: SectionRule): void => {
+      rules.push(rule);
+      (rule.children ?? []).forEach(visit);
+    };
+    visit(leaflet.root);
+    expect(codes).toEqual(rules.map(({ targetCode }) => targetCode));
+  });
+
+  // The template's titles write X and the template's choices ("Do not take use X"), which no
+  // label says.
+  it("is refused under the template's titles, by the crosswalk and the EMA preflight", () => {
+    for (const optional of [false, true]) {
+      expect(issues(() => transformType2ToEma(source(optional), leaflet))).toEqual([
+        LEAFLET_TITLES_NOT_CARRIED,
       ]);
-      expect(list.extension).toEqual([
-        {
-          url: "http://ema.europa.eu/fhir/StructureDefinition/ext-epi-eu-number",
-          valueIdentifier: { system: "http://ema.europa.eu/fhir/euNumber/", value: "EU/1/24/9999" },
-        },
-      ]);
-    },
-  );
+    }
+    const word = wordLeaflet().submission.bundle as unknown as FhirBundle;
+    expect(issues(() => transformType2ToEma(word, leaflet, undefined, "template"))).toEqual([
+      LEAFLET_TITLES_NOT_CARRIED,
+    ]);
+    const { list, documentBundle } = transformType2ToEma(word, leaflet, undefined, "as-written");
+    // The preflight also holds each title to the template's, which a heading as written is not.
+    expect(
+      validateEmaPreflight(list, documentBundle, leaflet).issue.map(
+        ({ diagnostics }) => diagnostics,
+      )[0],
+    ).toBe(LEAFLET_TITLES_NOT_CARRIED);
+  });
 
   it("is refused by the SmPC's mapping, and an SmPC by the leaflet's", () => {
     expect(issues(() => transformType2ToEma(source(), smpc))).toContain(
@@ -180,55 +208,74 @@ describe("a Type 2 package leaflet through the crosswalk", () => {
   });
 
   it("is refused by the EMA preflight where its Composition is not typed the leaflet", () => {
-    const { list, documentBundle } = transformType2ToEma(source(), leaflet);
+    const word = wordLeaflet().submission.bundle as unknown as FhirBundle;
+    const { list, documentBundle } = transformType2ToEma(word, leaflet, undefined, "as-written");
     const wrong = typed(documentBundle, [
       { system: EMA_DOCUMENT_TYPE_SYSTEM, code: "100000155532" },
     ]);
     expect(
-      validateEmaPreflight(list, wrong, leaflet).issue.map(({ diagnostics }) => diagnostics),
+      validateEmaPreflight(list, wrong, leaflet, "as-written").issue.map(
+        ({ diagnostics }) => diagnostics,
+      ),
     ).toEqual(["EMA Composition type is not the pl document's"]);
   });
 });
 
 describe("a package leaflet through the worker's pipeline", () => {
-  it("runs dry from the fixture route, by the mapping its document type names", async () => {
-    const result = await runPipeline(
-      {
-        runId: "00000000-0000-4000-8000-0000000001e0",
-        source: source(true),
-        sourceKind: "fixture",
-        sourceResource: "fixture:leaflet",
-      },
-      mappings,
-      config,
-    );
-    expect(result.status).toBe("validated");
-    expect(composition(result.emaBundle).type.coding?.[0]?.code).toBe("100000155538");
-    expect(result.evidence.manifest.standards.mappingVersion).toBe(leaflet.mappingVersion);
-  });
-
-  it("runs dry from an approved drawn submission, through the document gate", async () => {
+  const drawn = () => {
     const { submission, fidelityReport, sourceText } = createSyntheticSubmission(leaflet, {
       product: LEAFLET_PRODUCT_ID,
-      optional: true,
     });
-    const result = await runPipeline(
-      {
-        runId: "00000000-0000-4000-8000-0000000001e1",
-        sourceKind: "document",
-        sourceResource: "document:leaflet",
-        submission,
-        fidelityReport,
-        sourceText,
-      },
-      mappings,
-      config,
-    );
-    expect(result.status).toBe("validated");
-    expect(result.evidence.manifest.ingestion?.fidelity.sectionsMatched).toBe(
-      submission.provenance.sections.length,
-    );
+    return { sourceKind: "document" as const, submission, fidelityReport, sourceText };
+  };
+
+  it("refuses a Type 2 leaflet in a dry run, from the fixture route or an approved drawn submission", async () => {
+    for (const input of [{ sourceKind: "fixture" as const, source: source(true) }, drawn()]) {
+      const error: unknown = await runPipeline(
+        { runId: "00000000-0000-4000-8000-0000000001e0", sourceResource: "leaflet", ...input },
+        mappings,
+        config,
+      ).then(
+        () => undefined,
+        (cause: unknown) => cause,
+      );
+      expect(error).toBeInstanceOf(TransformationError);
+      expect((error as TransformationError).issues).toEqual([LEAFLET_TITLES_NOT_CARRIED]);
+    }
   });
+
+  // No leaflet persists until the query service and the signer read one: whatever approvals say,
+  // a run that is not a dry run is refused before the gate or anything else reads.
+  it.each([false, true])(
+    "refuses to persist a leaflet, with its closed reason (approval enforcement %s)",
+    async (enforced) => {
+      const persisting = { ...config, DRY_RUN: false, APPROVAL_ENFORCEMENT: enforced };
+      const word = wordLeaflet();
+      for (const input of [
+        drawn(),
+        {
+          sourceKind: "document" as const,
+          submission: word.submission,
+          fidelityReport: word.fidelityReport,
+          sourceText: word.sourceText,
+        },
+      ]) {
+        const error: unknown = await runPipeline(
+          { runId: "00000000-0000-4000-8000-0000000001e1", sourceResource: "leaflet", ...input },
+          mappings,
+          persisting,
+        ).then(
+          () => undefined,
+          (cause: unknown) => cause,
+        );
+        expect(error).toBeInstanceOf(Error);
+        expect(pipelineFailure(error as Error)).toEqual({
+          reason: "leaflet-not-readable",
+          status: 422,
+        });
+      }
+    },
+  );
 
   it("is refused where its document type names no mapping, or another than the one given", async () => {
     const run = (bundle: FhirBundle, given: EmaMapping | [EmaMapping, EmaMapping]) =>
@@ -260,13 +307,6 @@ describe("a Type 1 package leaflet record", () => {
           resource.resourceType,
         ),
       );
-      for (const { resource } of copy.entry) {
-        if (resource.resourceType === "MedicinalProductDefinition") {
-          resource.identifier = (resource.identifier as { system: string }[]).filter(
-            ({ system }) => !system.includes("eu-product-number"),
-          );
-        }
-      }
       return copy;
     };
     expect(hasValidationErrors(validateCanonicalPreflight(type1(record, "pl"), "type1"))).toBe(

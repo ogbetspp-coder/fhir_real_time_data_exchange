@@ -108,8 +108,8 @@ describe("the synthetic package leaflet", () => {
       true,
     ]);
     for (const version of SYNTHETIC_VERSIONS) {
-      const options = { product: LEAFLET_PRODUCT_ID, version, optional: true };
-      const bundle = createSyntheticType2Bundle(leaflet, options);
+      const options = { product: LEAFLET_PRODUCT_ID, version };
+      const bundle = createSyntheticType2Bundle(leaflet, { ...options, optional: true });
       const ids = [bundle.id, ...bundle.entry.map(({ resource }) => resource.id)];
       expect(ids.filter((id) => !String(id).startsWith(PREFIX))).toEqual([]);
       const { submission, sourceText } = createSyntheticSubmission(leaflet, options);

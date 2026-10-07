@@ -2,8 +2,9 @@
 
 - Status: Built (`pl-structure/1.0.0`, `zone-a/src/zone_a/leaflet.py`); run on the EMA's QRD
   template, on synthetic leaflets and, counts only, on the EMA's published Word product
-  information (internal corpus). No company label is in the repository. Zone B carries a leaflet
-  to the EMA's leaflet ePI Bundle since 2026-10-07 ("Zone B", below).
+  information (internal corpus). No company label is in the repository. Zone B carries a
+  certified Word leaflet to the EMA's leaflet ePI Bundle since 2026-10-07, in a dry run only
+  ("Zone B", below).
 - Date: 2026-10-06; Zone B 2026-10-07
 - Related: `docs/design/smpc-structure.md` (the same step for the SmPC, whose statuses this
   shares), `docs/design/qrd-registry.md` (the headings), `fhir/mappings/cap-pl-en.json` (the tree
@@ -98,16 +99,18 @@ On the EMA's published Word product information in English (internal corpus, cou
 
 ## Zone B
 
-A leaflet in the canonical record, a Type 2 graph or a certified Word source's Type 1 record, is
-transformed to an EMA ePI Bundle as an SmPC is, by its own manifest
+A leaflet from a certified Word source (its Type 1 record, its titles as written) is transformed
+to an EMA ePI Bundle as an SmPC is, by its own manifest, in a dry run
 (`docs/validation/changes/2026-10-07-leaflet-zone-b.md`):
 
 - **The manifest, by the document type.** The worker loads both manifests and takes, for each
   source, the one its `Composition.type` names: our document type `smpc` or `pl`, or the EMA's
   (CodeSystem 100000155531 of the pinned EUePI package: `100000155532` and `100000155538`, read
-  from the package by `test/official/profile-slots.test.ts`). A source that names none, two, or
-  one no manifest maps is refused, and so is one that names another document than the manifest
-  it is given (`src/fhir/mapping.ts`, `mappingFor`).
+  from the package by `test/official/profile-slots.test.ts`; `src/fhir/mapping.ts`,
+  `mappingFor`). There a source that names none, two, or one no manifest maps is refused. A caller
+  that gives one manifest (the signer and `scripts/dev/run-pipeline.ts`, the SmPC's) maps a source
+  that names none by that manifest's sections, as before; the crosswalk refuses, whoever calls it,
+  a source that names another document than its manifest's.
 - **The EMA document.** Its Composition is typed `100000155538` "Package Leaflet" and claims the
   four leaflet profiles (`EUEpiComposition`, `EUEpiCompositionPackageLeaflet`,
   `EUEpiCompositionCAP`, `EUQRD-CAP-template-new-Package-Leaflet-en`); the EMA preflight holds
@@ -117,14 +120,17 @@ transformed to an EMA ePI Bundle as an SmPC is, by its own manifest
   generated from the mapping as the SmPC's are. The mapping (1.1.0) carries the EMA's display
   where it is not the title, and its keys hold no hyphen (`pl.2.donottake`, `pl.3.toomuch`,
   `pl.6.othersources`), since a contract `SourceKey` has none.
-- **Titles.** A certified Word leaflet's are its heading lines as written, the medicine's name for
-  X included (ADR 0006 decision 4, D6). A Type 2 leaflet's follow the template rule, which keeps a
-  source heading only where it is the mapping's title: since that title writes X and both choices
-  ("2. What you need to know before you take use X"), a Type 2 leaflet is published with the
-  template's headings, never with a name put in for X.
+- **Titles, as written only.** A certified Word leaflet's are its heading lines as written, the
+  medicine's name for X included (ADR 0006 decision 4, D6). Under the template's rule a leaflet
+  would be published with the mapping's titles, which write X and keep the template's choices
+  ("Do not take use X", "This leaflet was last revised in {MM/YYYY}{month YYYY}."): text the
+  label never says. So the crosswalk and the EMA preflight refuse a leaflet under the template's
+  rule (`leaflet-titles-not-carried`): a Type 2 leaflet, whose titles take that rule, is not
+  carried. The synthetic Type 2 leaflet (`synthetic-exampline`) is that refusal's fixture.
 - **Required sections.** Every section the profile requires must be there (the root, the six
-  numbered sections and ten named ones), each coded; an optional one is carried where the source
-  has it (a Type 2 graph: Zone A finds only the required ones, "What it does", 4).
+  numbered sections and ten named ones), each coded; an optional one would be carried where the
+  record has it, which a certified Word record does not yet (Zone A finds only the required ones,
+  "What it does", 4).
 - **The product, for a certified Word leaflet** (`src/certified-word/import.ts`): its name is the
   structure's `name`, which must stand for X in section 1's heading as the label writes it, the
   mapping's form exactly; its holder is the first line of section 6's holder section, exactly; and
@@ -132,15 +138,34 @@ transformed to an EMA ePI Bundle as an SmPC is, by its own manifest
   RegulatedAuthorization (the Type 1 preflight allows that for a leaflet only). Each refusal is
   closed: `name-not-in-section-1`, `holder-not-in-section-6`, `section-6-begins-with-no-text`,
   `eu-numbers-not-in-leaflet`.
-- **Validated.** The synthetic leaflet product (`synthetic-exampline`, EU/1/24/9999/001) with every
-  optional section, as its drawn submission carries it, and the certified Word leaflet, each with
-  its Provenance, pass the pinned official validator with no error, every warning the SmPC's
-  own kind with the SmPC's reason.
+- **Validated.** The certified Word leaflet's record and its EMA output, with its Provenance, pass
+  the pinned official validator with no error, every warning the SmPC's own kind with the SmPC's
+  reason.
+- **No leaflet persists.** The query service and the signer load the SmPC's manifest only, so
+  until both read a leaflet the worker refuses a leaflet's run that is not a dry run, whatever
+  approvals say, before anything is read (`leaflet-not-readable`). A dry run still runs. As a
+  defence, the query service answers `document-not-found` for a stored document whose type is not
+  its manifest's, never a partial answer (it used to answer `verify_quote` with `no-match` over no
+  section and list the product in `find_product` with no sections). The signer's crosswalk refuses
+  a leaflet's review. The StructureMap twin is the SmPC's alone
+  (`docs/design/structuremap-twin.md`, "The package leaflet: not twinned").
 
-What Zone B does not do for a leaflet yet: the query service and the signer load the SmPC's
-manifest only (the signer's crosswalk refuses a leaflet's review; the query service answers
-`section-not-found` for a leaflet's keys), and the StructureMap twin is the SmPC's alone
-(`docs/design/structuremap-twin.md`, "The package leaflet: not twinned").
+**Residuals, each to close before a leaflet persists:**
+
+- **Two Lists, one code.** Each document has its own EMA List, coded `100000155539` "Combined File
+  of all Documents" (`src/fhir/transform.ts`), so a product's SmPC and leaflet would be two Lists
+  each claiming to be the whole set. The fix: one List per product, indexing every document of it,
+  its identity the product's, not a document's.
+- **The run manifest's mapping version.** `standards.mappingVersion` records the version alone,
+  and the leaflet's 1.1.0 could be read as the SmPC mapping's old 1.1.0; today only the manifest's
+  `validation.profiles` tells them apart. The fix: name the mapping in the manifest, a change of
+  its contract.
+- **The holder under the combined heading.** Under "Marketing Authorisation Holder and
+  Manufacturer" the importer takes the section's first line as the holder. The annotated template
+  allows that heading only where the two are one company, so a label that breaks the rule, its
+  manufacturer first, would pass the manufacturer as the holder a person confirmed. No narrow rule
+  on the leaflet alone tells the two apart; P5's cross-check against the product's confirmed
+  SmPC holder (section 7) closes it.
 
 ## Next
 

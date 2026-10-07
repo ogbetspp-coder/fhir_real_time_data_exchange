@@ -201,11 +201,7 @@ export function createSyntheticSubmission(
   options: SyntheticSubmissionOptions = {},
 ): SyntheticSubmission {
   const { product, version } = resolve(options);
-  const bundle = createSyntheticType2Bundle(mapping, {
-    product: product.id,
-    version,
-    ...(options.optional === undefined ? {} : { optional: options.optional }),
-  });
+  const bundle = createSyntheticType2Bundle(mapping, { product: product.id, version });
   const composition = bundle.entry[0]?.resource;
   if (composition === undefined || !isComposition(composition)) {
     throw new Error("Synthetic Type 2 fixture must have Composition as its first entry");

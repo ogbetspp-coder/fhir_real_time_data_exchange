@@ -1,8 +1,10 @@
 import {
   EMA_DOCUMENT_TYPE_SYSTEM,
+  LEAFLET_TITLES_NOT_CARRIED,
   documentOf,
   permittedTitles,
   sourceDocumentTypes,
+  titlesCarried,
   type EmaMapping,
   type SectionRule,
   type TitleRule,
@@ -437,6 +439,9 @@ export function validateEmaPreflight(
       issue("error", "structure", "EMA Bundle first entry is not Composition", "Bundle.entry[0]"),
     );
   } else {
+    if (!titlesCarried(mapping, titles)) {
+      issues.push(issue("error", "value", LEAFLET_TITLES_NOT_CARRIED, "Composition.section"));
+    }
     // The document the mapping maps, as the EMA codes it (EUEpiCompositionSmPC and
     // EUEpiCompositionPackageLeaflet each fix their code).
     const document = documentOf(mapping);

@@ -25,6 +25,7 @@ import { runPipeline, type PipelineDependencies, type PipelineInput } from "./pi
 // `unclassified`. test/failure-reasons.test.ts holds every literal thrown there to an entry.
 export const FAILURE_REASONS: Readonly<Record<string, string>> = {
   "runId must be a UUID": "bad-run-id",
+  "A package leaflet is not published until its readers can read it": "leaflet-not-readable",
   "Run source is disabled": "source-disabled",
   "Canonical preflight failed": "source-preflight-failed",
   "EMA structural preflight failed": "ema-preflight-failed",
@@ -77,6 +78,8 @@ export const FAILURE_REASONS: Readonly<Record<string, string>> = {
 // missing identifier); a reused runId is a replay, which must not be retried as it is.
 const FAILURE_STATUS: Readonly<Record<string, 409 | 422>> = {
   "crosswalk-refused": 422,
+  // A leaflet runs dry only until the query service and the signer read one (src/pipeline.ts).
+  "leaflet-not-readable": 422,
   // The submission is not the document's approved head (docs/design/approval.md, D8).
   "not-approved": 422,
   // The HTTP surface refuses a disabled source before the pipeline, with the same code and status.

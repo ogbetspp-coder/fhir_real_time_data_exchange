@@ -109,6 +109,18 @@ export type EmaMapping = z.infer<typeof MappingSchema>;
 // accepted included, never replaced by the template's. The crosswalk and the EMA preflight read it.
 export type TitleRule = "template" | "as-written";
 
+// A package leaflet's template titles write X for the medicine's name and keep the template's
+// choices ("Do not take use X", "This leaflet was last revised in {MM/YYYY}{month YYYY}."), text no
+// label says. So Zone B carries a leaflet only with its titles as written, from a certified Word
+// source (docs/design/pl-structure.md, "Zone B"); the crosswalk and the EMA preflight refuse one
+// under the template's rule.
+export const LEAFLET_TITLES_NOT_CARRIED =
+  "leaflet-titles-not-carried: a package leaflet is carried only with its titles as written";
+
+export function titlesCarried(mapping: EmaMapping, titles: TitleRule): boolean {
+  return titles === "as-written" || mapping.root.sourceKey !== "pl";
+}
+
 // Every heading a rule permits: its title first, then the QRD template's shorter forms.
 export function permittedTitles(rule: SectionRule): string[] {
   return [rule.title, ...(rule.alternativeTitles ?? [])];

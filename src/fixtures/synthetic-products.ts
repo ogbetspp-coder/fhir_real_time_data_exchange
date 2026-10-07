@@ -72,10 +72,6 @@ export type SyntheticProduct = {
   productIdentifier: string;
   authorizationId: string;
   marketingAuthorizationNumber: string;
-  // An EU authorisation number (EU/1/YY/NNN/PPP) in the reserved example block EU/1/24/9999, on
-  // the RegulatedAuthorization, with its product number on the MedicinalProductDefinition. Only
-  // the leaflet's product has one; the others' frozen graphs have none.
-  euAuthorisationNumber?: string;
   packageId: string;
   itemId: string;
   administrableId: string;
@@ -314,12 +310,12 @@ const SMOKETEST: SyntheticProduct = {
   },
 };
 
-// The package leaflet's product (docs/design/pl-structure.md, ADR 0006 owner decision 8): its
-// Type 2 record is built with the leaflet's mapping (fhir/mappings/cap-pl-en.json), as the others'
-// are with the SmPC's, and runs through the crosswalk and the official validator
-// (scripts/ci/emit-validation-set.ts). It is neither a demonstration label nor the smoke product,
-// so it is not in SYNTHETIC_PRODUCTS, whose products the SmPC tests iterate and the demonstration
-// seeds.
+// The package leaflet's product (docs/design/pl-structure.md, "Zone B"): its Type 2 record is
+// built with the leaflet's mapping (fhir/mappings/cap-pl-en.json), as the others' are with the
+// SmPC's, and is the fixture of a refusal: Zone B carries a leaflet only with its titles as
+// written, from a certified Word source, never a Type 2 leaflet under the template's titles. It is
+// neither a demonstration label nor the smoke product, so it is not in SYNTHETIC_PRODUCTS, whose
+// products the SmPC tests iterate and the demonstration seeds.
 const EXAMPLINE: SyntheticProduct = {
   id: "synthetic-exampline",
   productName: "Synthetic Exampline 10 mg film-coated tablets",
@@ -336,7 +332,6 @@ const EXAMPLINE: SyntheticProduct = {
   productIdentifier: "SYN-EXAM-010",
   authorizationId: "synthetic-exampline-authorization",
   marketingAuthorizationNumber: "EU/SYN/0005",
-  euAuthorisationNumber: "EU/1/24/9999/001",
   packageId: "synthetic-exampline-package",
   itemId: "synthetic-exampline-tablet",
   administrableId: "synthetic-exampline-administrable",

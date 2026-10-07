@@ -67,7 +67,7 @@ included: 6.5 and 6.6), and what differs is data, which is held elsewhere:
   slot, every display to the EMA's section code system and its document type to the package;
 - the official validator checks the leaflet's EMA output against the leaflet's template profile,
   whose closed slicing fixes every code at its place, and `EUEpiCompositionPackageLeaflet`, which
-  fixes the type (`scripts/ci/emit-validation-set.ts`, two leaflet cases);
+  fixes the type (`scripts/ci/emit-validation-set.ts`, the certified Word leaflet);
 - `test/leaflet.test.ts` and the EMA preflight hold the tree, the order and the type.
 
 Reconsider when the crosswalk gains logic that only a leaflet runs.

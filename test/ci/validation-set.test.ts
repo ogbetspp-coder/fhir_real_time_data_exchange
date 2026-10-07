@@ -8,7 +8,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { CanonicalSubmission } from "../../src/contracts/index.js";
 import type { FidelityReport } from "../../src/fidelity/index.js";
 import { loadEmaMapping, type EmaMapping } from "../../src/fhir/mapping.js";
-import { createSyntheticSubmission } from "../../src/fixtures/synthetic-submission.js";
 import { toProvenanceResource } from "../../src/fhir/provenance.js";
 import { transformType2ToEma } from "../../src/fhir/transform.js";
 import type { FhirBundle, FhirResource } from "../../src/fhir/types.js";
@@ -19,12 +18,12 @@ import {
   recomputed,
   recomputedCases,
 } from "../../src/certified-word/vectors.js";
-import { LEAFLET_PRODUCT_ID, SMOKE_PRODUCT_ID } from "../../src/fixtures/synthetic-products.js";
+import { SMOKE_PRODUCT_ID } from "../../src/fixtures/synthetic-products.js";
 import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 import { officialValidationTargets } from "../../src/pipeline.js";
 
 // The set CI's "Official validation" job validates (scripts/ci/emit-validation-set.ts) is the
-// pipeline's own list of targets (officialValidationTargets), for each of its five cases, and not a
+// pipeline's own list of targets (officialValidationTargets), for each of its four cases, and not a
 // copy of it: until audit B15 the script restated the profile and the four resources by hand, so
 // a resource the pipeline began validating would have left the gate green on the old set. Each
 // case's targets end with the Provenance a document run persists, built from the contract
@@ -145,47 +144,39 @@ describe("the official validation set", () => {
     expect(provenance.activity.coding[0]?.code).toBe("structuring");
   });
 
-  // The package leaflet (docs/design/pl-structure.md, "Zone B"): the synthetic leaflet product's
-  // Type 2 record with every optional section, and a certified Word leaflet's Type 1 record, each
-  // through the leaflet's mapping and against its profiles.
-  it("is the same targets for a package leaflet's Type 2 and certified Word records", () => {
-    const { submission, fidelityReport } = createSyntheticSubmission(leaflet, {
-      product: LEAFLET_PRODUCT_ID,
-      optional: true,
-    });
-    const typeTwo = submission.bundle as unknown as FhirBundle;
+  // The package leaflet (docs/design/pl-structure.md, "Zone B"): a certified Word leaflet's Type 1
+  // record, through the leaflet's mapping, its titles as written, against the leaflet's profiles.
+  // No Type 2 leaflet is in the set: the crosswalk refuses one under the template's titles.
+  it("is the same targets for a certified Word leaflet's record, and has no Type 2 leaflet", () => {
     const [label] = recomputedCases().filter(({ name }) => name === "pl");
     if (label === undefined) throw new Error("no recomputed Word leaflet");
-    const word = importCertifiedWord(
+    const source = importCertifiedWord(
       recomputed(label.name),
       caseRequest(label),
       leaflet,
       CERTIFIED_WORD_RUN,
     ).submission.bundle as unknown as FhirBundle;
-    const cases = [
-      { source: typeTwo, suffix: "leaflet", titles: "template" as const },
-      { source: word, suffix: "certified-word-leaflet", titles: "as-written" as const },
-    ];
-    cases.forEach(({ source, suffix, titles }, position) => {
-      const transformed = transformType2ToEma(source, leaflet, undefined, titles);
-      const targets = officialValidationTargets(source, transformed, leaflet, {
-        resourceType: "Provenance",
-      });
-      const at = (3 + position) * targets.length;
-      expect(entries.slice(at, at + targets.length)).toEqual(
-        targets.map(({ name, resource, profiles }) => ({
-          file: name === "source" ? `source-${suffix}.json` : `${name}-${suffix}.json`,
-          resourceType: resource.resourceType,
-          profiles,
-        })),
-      );
-      for (const { name, resource } of targets.filter((target) => target.name !== "provenance")) {
-        const file = name === "source" ? `source-${suffix}.json` : `${name}-${suffix}.json`;
-        const emitted = JSON.parse(readFileSync(path.join(output, file), "utf8")) as FhirResource;
-        expect([file, emitted]).toEqual([file, resource]);
-      }
+    const transformed = transformType2ToEma(source, leaflet, undefined, "as-written");
+    const targets = officialValidationTargets(source, transformed, leaflet, {
+      resourceType: "Provenance",
     });
-    expect(fidelityReport.status).toBe("passed");
+    const named = (name: string): string =>
+      name === "source"
+        ? "source-certified-word-leaflet.json"
+        : `${name}-certified-word-leaflet.json`;
+    expect(entries.slice(3 * targets.length, 4 * targets.length)).toEqual(
+      targets.map(({ name, resource, profiles }) => ({
+        file: named(name),
+        resourceType: resource.resourceType,
+        profiles,
+      })),
+    );
+    for (const { name, resource } of targets.filter((target) => target.name !== "provenance")) {
+      const emitted = JSON.parse(
+        readFileSync(path.join(output, named(name)), "utf8"),
+      ) as FhirResource;
+      expect([name, emitted]).toEqual([name, resource]);
+    }
     const composition = JSON.parse(
       readFileSync(path.join(output, "ema-composition-certified-word-leaflet.json"), "utf8"),
     ) as { meta: { profile: string[] }; type: { coding: { code: string }[] } };
@@ -193,16 +184,19 @@ describe("the official validation set", () => {
       "http://ema.europa.eu/fhir/StructureDefinition/EUQRD-CAP-template-new-Package-Leaflet-en",
     );
     expect(composition.type.coding[0]?.code).toBe("100000155538");
+    expect(
+      entries.some(({ file }) => file.endsWith("-leaflet.json") && !file.includes("word")),
+    ).toBe(false);
   });
 
   it("adds the repository's own definitions, against no profile, and nothing else", () => {
     const artifacts = readdirSync("fhir/generated")
       .filter((file) => file.endsWith(".json"))
       .sort();
-    expect(entries.slice(25).map(({ file, profiles }) => ({ file, profiles }))).toEqual(
+    expect(entries.slice(20).map(({ file, profiles }) => ({ file, profiles }))).toEqual(
       artifacts.map((file) => ({ file, profiles: [] })),
     );
-    expect(entries).toHaveLength(25 + artifacts.length);
+    expect(entries).toHaveLength(20 + artifacts.length);
   });
 
   it("restates no profile of its own", () => {

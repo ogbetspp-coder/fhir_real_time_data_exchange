@@ -381,6 +381,13 @@ export async function runPipeline(
   if (config.APPROVAL_ENFORCEMENT && !config.DRY_RUN && input.sourceKind !== "document") {
     throw new ApprovalRefusedError("ungated-source");
   }
+  // No package leaflet persists until every reader of the store can read one (the query service
+  // and the signer load the SmPC's manifest only; docs/design/pl-structure.md, "Zone B"): a run
+  // that is not a dry run is refused, whatever approvals say, before anything is read. Its
+  // document is the one the source says it is, held below to the record the gate passes.
+  if (!config.DRY_RUN && mapping.root.sourceKey === "pl") {
+    throw new Error("A package leaflet is not published until its readers can read it");
+  }
   const runId = input.runId ?? randomUUID();
   const startedAt = new Date().toISOString();
   const stageStarted = Date.now();

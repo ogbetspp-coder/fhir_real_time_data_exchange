@@ -3,10 +3,12 @@ import { isGap } from "../fidelity/normalize.js";
 import { isGridMarker, xhtmlToText } from "../fidelity/xhtml.js";
 import {
   EMA_DOCUMENT_TYPE_SYSTEM,
+  LEAFLET_TITLES_NOT_CARRIED,
   documentOf,
   duplicateRuleIssues,
   permittedTitles,
   sourceDocumentTypes,
+  titlesCarried,
   type EmaMapping,
   type SectionRule,
   type TitleRule,
@@ -693,6 +695,7 @@ export function transformType2ToEma(
   const issues: string[] = [
     ...duplicateRuleIssues(mapping.root, mapping.unmapped),
     ...sourceDocumentIssues(sourceBundle, mapping),
+    ...(titlesCarried(mapping, titles) ? [] : [LEAFLET_TITLES_NOT_CARRIED]),
     ...sourceLanguageIssues(sourceBundle, sourceComposition),
   ];
   const root = mapSection(

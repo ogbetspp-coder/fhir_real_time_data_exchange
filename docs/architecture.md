@@ -251,11 +251,15 @@ EMA's profile `EUQRD-CAP-template-new-Package-Leaflet-en` written out, 27 rules,
 required, and its custom subsection slot unmapped, held to the profile by the same test, with its
 own code system (`canonical-pl-sections`) and ConceptMap. The worker loads both manifests and
 takes, for each source, the one its `Composition.type` names, in our document type code system or
-the EMA's (`loadEmaMappings`, `mappingFor` in `src/fhir/mapping.ts`); a source that names none, two,
-or one no manifest maps is refused, and the crosswalk refuses a source that names another document
-than its manifest's. The EMA Composition is typed as the manifest's document (`100000155532` SmPC,
-`100000155538` Package Leaflet, from the EMA's code system in the pinned package), which the EMA
-preflight holds (`docs/design/pl-structure.md`, "Zone B").
+the EMA's (`loadEmaMappings`, `mappingFor` in `src/fhir/mapping.ts`), and refuses a source that
+names none, two, or one no manifest maps; a caller that gives one manifest (the signer,
+`scripts/dev/run-pipeline.ts`) maps an untyped source by its sections, as before, and the crosswalk
+refuses a source that names another document than its manifest's. The EMA Composition is typed as
+the manifest's document (`100000155532` SmPC, `100000155538` Package Leaflet, from the EMA's code
+system in the pinned package), which the EMA preflight holds. A leaflet is carried only from a
+certified Word source, its titles as written (a Type 2 leaflet's template titles would write X:
+`leaflet-titles-not-carried`), and in a dry run only until the query service and the signer read
+one (`leaflet-not-readable`; `docs/design/pl-structure.md`, "Zone B").
 
 The StructureMap is the crosswalk's twin in the FHIR mapping language (`fhir/maps/`), compiled by the
 pinned validator and executed on its transform engine in CI against this crosswalk on every fixture

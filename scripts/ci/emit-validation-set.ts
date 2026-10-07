@@ -23,8 +23,7 @@ import { toProvenanceResource } from "../../src/fhir/provenance.js";
 import { transformType2ToEma } from "../../src/fhir/transform.js";
 import type { FhirBundle, FhirResource } from "../../src/fhir/types.js";
 import { officialValidationTargets } from "../../src/pipeline.js";
-import { LEAFLET_PRODUCT_ID, SMOKE_PRODUCT_ID } from "../../src/fixtures/synthetic-products.js";
-import { createSyntheticSubmission } from "../../src/fixtures/synthetic-submission.js";
+import { SMOKE_PRODUCT_ID } from "../../src/fixtures/synthetic-products.js";
 import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 
 // Emits the resources the deployed worker sends to the official HL7 validator for a
@@ -48,10 +47,10 @@ import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 // attested submission for the first case, the authority import for the second, each pointing at
 // its case's EMA Bundle and Composition.
 //
-// The package leaflet takes the same two routes (docs/design/pl-structure.md, "Zone B"): the
-// synthetic leaflet product's Type 2 record with every optional section, as its drawn submission
-// carries it, and a certified Word leaflet's Type 1 record, each with its own Provenance, mapped
-// by the leaflet's manifest.
+// The package leaflet is a fourth case (docs/design/pl-structure.md, "Zone B"): a certified Word
+// leaflet's Type 1 record, mapped by the leaflet's manifest, its titles as written, with its own
+// Provenance. Zone B carries a leaflet only so: a Type 2 leaflet, under the template's titles, is
+// refused.
 //
 // A third is the repository's own definitions, fhir/generated/ (the code systems, value sets,
 // extension, ConceptMap and StructureMap the package carries), as committed, against the base R5
@@ -163,10 +162,6 @@ const wordOf = (name: string) => {
 };
 const word = wordOf("smpc");
 const wordLeaflet = wordOf("pl");
-const leafletSubmission = createSyntheticSubmission(leaflet, {
-  product: LEAFLET_PRODUCT_ID,
-  optional: true,
-});
 
 const generated = path.resolve("fhir/generated");
 const artifactFiles = (await readdir(generated)).filter((file) => file.endsWith(".json")).sort();
@@ -198,14 +193,6 @@ const set: SetEntry[] = [
     { source: "source-certified-word.json", suffix: "-certified-word" },
     { submission: word.made.submission, report: word.made.fidelityReport },
     "as-written",
-  ),
-  ...caseOf(
-    leafletSubmission.submission.bundle as unknown as FhirBundle,
-    "type2",
-    { source: "source-leaflet.json", suffix: "-leaflet" },
-    { submission: leafletSubmission.submission, report: leafletSubmission.fidelityReport },
-    "template",
-    leaflet,
   ),
   ...caseOf(
     wordLeaflet.bundle,
