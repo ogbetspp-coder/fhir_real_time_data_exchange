@@ -136,7 +136,7 @@
     ],
     "5.0.0": [
       {
-        "sha256": "84d0b4db09ba302493bc7f275e1cfc4405674dddf3b3632d9a66ddb832ba0ce1",
+        "sha256": "556962b9140c00404820b793bd9802552264427d22f087b99efb8bba424c7401",
         "record": "docs/validation/changes/2026-10-06-signed-approvals-query-tools-5-0-0.md"
       }
     ]

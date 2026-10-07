@@ -221,9 +221,10 @@ export const SectionContentSchema = z
     narrativeDivSha256: Sha256Hex,
     normalizedTextSha256: Sha256Hex,
     normalizationVersion: NormalizationVersion,
-    // Given for the document's current version only: nothing yet binds an earlier version to
-    // its own approval, and the most recently written approval — the only one the service can
-    // find — is not it.
+    // Without approval verification, given for the document's current version only: nothing
+    // else binds an earlier version to its own approval, and the most recently written approval —
+    // the only one the service can find — is not it. With it, the version's own approval link
+    // (docs/design/approval.md, D5), whatever version was named.
     provenanceResourceId: Uuid.optional(),
     approval: ApprovalCitationSchema.optional(),
     contentNotice: ContentNotice,
@@ -231,7 +232,7 @@ export const SectionContentSchema = z
   .meta({
     id: "SectionContent",
     description:
-      "One QRD section, verbatim. `div` is the stored XHTML; `text` is its normalised plain text; the hashes are recomputable from `div` by anyone. `provenanceResourceId` is given for the document's current version only.",
+      "One QRD section, verbatim. `div` is the stored XHTML; `text` is its normalised plain text; the hashes are recomputable from `div` by anyone. Without approval verification, `provenanceResourceId` is given for the document's current version only; with it, `provenanceResourceId` is the version's own approval link and `approval` its verified approval.",
   });
 
 // --- get_provenance ----------------------------------------------------------------------------
@@ -266,7 +267,7 @@ export const ProvenanceDetailSchema = z
   .meta({
     id: "ProvenanceDetail",
     description:
-      "Who and what put this document in the store: source document hash, extractor and model identities, fidelity report hash, approver and approval content hash, all from the persisted Provenance resource; per-section hashes recomputed live. Answered for the document's current version only; a named earlier version is `unavailable`.",
+      "Who and what put this document in the store: source document hash, extractor and model identities, fidelity report hash, approver and approval content hash, all from the persisted Provenance resource; per-section hashes recomputed live. Without approval verification, answered for the document's current version only, and a named earlier version is `unavailable`; with it, the approver is the version's own verified approval's (`approval`), and a named version a later approval supersedes is answered and marked superseded.",
   });
 
 // --- verify_quote ------------------------------------------------------------------------------

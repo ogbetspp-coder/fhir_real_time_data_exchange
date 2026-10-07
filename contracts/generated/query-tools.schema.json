@@ -283,7 +283,7 @@
         "contentNotice"
       ],
       "additionalProperties": false,
-      "description": "One QRD section, verbatim. `div` is the stored XHTML; `text` is its normalised plain text; the hashes are recomputable from `div` by anyone. `provenanceResourceId` is given for the document's current version only."
+      "description": "One QRD section, verbatim. `div` is the stored XHTML; `text` is its normalised plain text; the hashes are recomputable from `div` by anyone. Without approval verification, `provenanceResourceId` is given for the document's current version only; with it, `provenanceResourceId` is the version's own approval link and `approval` its verified approval."
     },
     "TargetPath": {
       "type": "string",
@@ -493,7 +493,7 @@
         "approver"
       ],
       "additionalProperties": false,
-      "description": "Who and what put this document in the store: source document hash, extractor and model identities, fidelity report hash, approver and approval content hash, all from the persisted Provenance resource; per-section hashes recomputed live. Answered for the document's current version only; a named earlier version is `unavailable`."
+      "description": "Who and what put this document in the store: source document hash, extractor and model identities, fidelity report hash, approver and approval content hash, all from the persisted Provenance resource; per-section hashes recomputed live. Without approval verification, answered for the document's current version only, and a named earlier version is `unavailable`; with it, the approver is the version's own verified approval's (`approval`), and a named version a later approval supersedes is answered and marked superseded."
     },
     "VerifyQuoteInput": {
       "type": "object",

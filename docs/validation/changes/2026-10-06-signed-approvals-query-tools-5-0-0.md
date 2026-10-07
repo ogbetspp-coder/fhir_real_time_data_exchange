@@ -31,8 +31,10 @@ libraries" (steps 0–8). Roadmap item 2, phase 1 build steps 2 to 5 of `docs/de
 major. `query-tools`' added fields are optional, so with the query service's
 `APPROVAL_VERIFICATION` off (the default) every answer it gives is one 4.1.0 also accepts: no
 answer carries `approval` and none is `not-approved`. What does change with it off: audit records
-say `contractVersion` 5.0.0, and `tools/list` advertises the optional `approval` and the
-`not-approved` code. With it on, every answer carries `approval`,
+say `contractVersion` 5.0.0; `tools/list` shows the optional `approval` in the `get_section` and
+`get_provenance` output schemas, and the descriptions of `SectionContent`, `ProvenanceDetail` and
+`get_provenance` now state both modes; `not-approved` is in the published contract, which
+`tools/list` does not carry. With it on, every answer carries `approval`,
 which a 4.1.0 reader refuses (its objects are strict).
 
 **Impact assessment (step 0).**

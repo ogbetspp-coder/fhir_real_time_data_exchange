@@ -695,8 +695,10 @@ approval.
 scan horizon is 50 documents (four reads each, half the request's budget). `get_provenance` names the
 statement's approver, never the ingestion Provenance's unverified attester. With it off, no answer
 carries `approval` and none is `not-approved`, so every answer is one `query-tools` 4.1.0 also
-accepts; the audit records say `contractVersion` 5.0.0, and `tools/list` advertises the optional
-`approval` and the `not-approved` code.
+accepts. What does change: the audit records say `contractVersion` 5.0.0; `tools/list` shows the
+optional `approval` in the `get_section` and `get_provenance` output schemas, and descriptions that
+state both modes; the published contract (not `tools/list`, which lists no error codes) carries
+`not-approved`.
 
 **What is not built here, and stays as stated.**
 

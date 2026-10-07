@@ -406,7 +406,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
     "get_provenance",
     {
       title: "Prove where a document came from",
-      description: `Return the persisted provenance of a document: source document hash, extractor and model identities, fidelity report hash, approver and approval content hash, and — when a section is named — that section's hashes recomputed live from the stored narrative. Answered for the document's current version only; a named earlier version is unavailable, because its own approval cannot yet be told apart from a later one. ${CONTENT_WARNING}`,
+      description: `Return the persisted provenance of a document: source document hash, extractor and model identities, fidelity report hash, approver and approval content hash, and — when a section is named — that section's hashes recomputed live from the stored narrative. Without approval verification, answered for the document's current version only, and a named earlier version is unavailable, because its own approval cannot be told apart from a later one; with it, every answer names the version's own verified approval, and a named version a later approval supersedes is answered and marked superseded. ${CONTENT_WARNING}`,
       inputSchema: GetProvenanceInputSchema.shape,
       outputSchema: ProvenanceDetailSchema.shape,
       annotations: READ_ONLY,

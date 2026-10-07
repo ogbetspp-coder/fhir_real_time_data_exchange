@@ -482,8 +482,9 @@ not a mode of the worker. It is tested under `test/query/` and deployed in `dev`
   the whole stored Bundle and every served section are re-hashed against it, and a version without
   a valid approval is `not-approved` (`query-tools` 5.0.0; `docs/design/approval.md`, D9 and the
   amendment of 2026-10-06). Off, no answer carries `approval` and none is `not-approved`; audit
-  records say `contractVersion` 5.0.0, and `tools/list` advertises the optional `approval` and the
-  `not-approved` code.
+  records say `contractVersion` 5.0.0, `tools/list` shows the optional `approval` in the
+  `get_section` and `get_provenance` output schemas and descriptions that state both modes, and the
+  published contract, not `tools/list`, carries the `not-approved` code.
 
 ## Approval signer
 

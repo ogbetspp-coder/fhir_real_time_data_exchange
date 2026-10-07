@@ -41,7 +41,7 @@
       "version": "5.0.0",
       "$id": "https://khs.dev/contracts/query-tools/5.0.0/schema.json",
       "file": "query-tools.schema.json",
-      "sha256": "cf29624a0f62961b57313430ddb6de14ae91fd73b68b128d6a7aa25cc182b46d"
+      "sha256": "8258ce3891cb6febfb977f3bc4e7adbc40504edbd40421e99382d4e9fac14162"
     },
     {
       "name": "agent-turn",

@@ -246,7 +246,8 @@ identity, and shares only pure libraries with the worker.
   and the audit record `approverSub` and `statementSha256`. Each verification is three store reads
   beyond the Bundle, so `find_product` scans at most 50 entitled documents. With it off, no answer
   carries `approval` and none is `not-approved`, so every answer is one 4.1.0 also accepts (audit
-  records say `contractVersion` 5.0.0, and `tools/list` advertises the new optional fields), and the
+  records say `contractVersion` 5.0.0, and `tools/list` shows the new optional fields and
+  descriptions that state both modes), and the
   rule below ("An approval is stated only for the current version")
   is the one in force.
 - **Image.** `cloudbuild.images.yaml` builds `Dockerfile --target query` and publishes it as the
