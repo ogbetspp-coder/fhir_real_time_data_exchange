@@ -227,8 +227,8 @@ assignments and the canonical product it is for.
 As built (2026-10-07), `src/certified-word/gate.ts` checks a certified Word submission as follows,
 after the shape bound and the lossless parse, and refuses at the first that fails:
 
-1. the importer that made it is the one the gate runs (`certified-word-import/1.1.0`), before
-   anything is read;
+1. the importer that made it is the one the gate runs (`certified-word-import/<IMPORTER_VERSION>`
+   of this build), before anything is read;
 2. it reads the .docx at `document.storageUri` under its own identity (D4, above) and requires its
    SHA-256 and length;
 3. it runs `python -I -X utf8 -m zone_a.recompute LABEL.docx` with `sourceDocument.recompute` on

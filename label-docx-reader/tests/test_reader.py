@@ -170,6 +170,13 @@ def test_symbol_font_glyphs_become_their_unicode_characters() -> None:
     codes = ("2A", "74", "7E", "AB", "AD", "D7")
     symbols = "".join(r(f'<w:sym w:font="Symbol" w:char="F0{c}"/>') for c in codes)
     assert text_of(p(symbols)) == ["\u2217\u03c4\u223c\u2194\u2191\u22c5"]
+    # And epsilon, eta, lambda, omega and arrowdown, as EMA's published SmPCs and leaflets use them
+    # (symbol.txt of 2011-07-12: 03B5 65, 03B7 68, 03BB 6C, 03C9 77, 2193 AF), stored either way.
+    greek = ("65", "68", "6C", "77", "AF")
+    symbols = "".join(r(f'<w:sym w:font="Symbol" w:char="F0{c}"/>') for c in greek)
+    assert text_of(p(symbols)) == ["\u03b5\u03b7\u03bb\u03c9\u2193"]
+    stored = r("<w:t>ehlw</w:t>", '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/>')
+    assert text_of(p(stored)) == ["\u03b5\u03b7\u03bb\u03c9"]
 
 
 def test_symbol_in_the_east_asian_slot_alone_leaves_other_text_as_stored() -> None:
