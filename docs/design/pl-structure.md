@@ -88,8 +88,12 @@ On the EMA's published Word product information in English (internal corpus, cou
 
 ## Next
 
-- The leaflet's own refusals: list labels and nested lists are its commonest, as bulleted lists
-  are its commonest form.
+- The leaflet's own refusals. The commonest (105 sections of ready leaflets) is a list whose level
+  is Word 6 numbering (`w:legacy`), as the template's own dash list is: the reader reports its
+  suffix as `legacy`, and the builder refuses it, since ISO 29500 (17.9.5) says the text starts
+  exactly `legacySpace` after the label, and these levels set `legacySpace` to 0 with a
+  `legacyIndent` of 360. Whether Word draws a gap there is Word's answer to record with the
+  reader's Word oracle, not a rule to infer. Then a tab (44), nested lists (26) and shading (35).
 - Candidates for a named section a person must confirm (a line in its section that starts with
   the template's wording), for the review screen.
 - Zone B: the leaflet's EMA Bundle from its sections, as the SmPC's.
