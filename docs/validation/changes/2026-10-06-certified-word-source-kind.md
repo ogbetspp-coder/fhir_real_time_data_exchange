@@ -113,6 +113,20 @@ change "for 3.0.0" now lists it for 4.0.0.
    holding U+2028 or U+2029 is refused; the gate checks each page's section key;
 8. the Python `--check` compares bytes.
 
+**The re-review of #193** (of 97cccb2), each with a test that fails on 97cccb2's importer:
+
+1. the name could be cut at any word boundary ("Synthetic", "Synthetic Exampline 10"): now it is
+   section 1's whole first line, or that line up to its strength; the false refusals this makes are
+   listed in the design note;
+2. a name or holder of a page's marker matched a section that begins with a table: names and
+   holders refuse noncharacters and U+FFFC, and a section 1 or 7 whose first line is a marker line
+   refuses (`section-1-begins-with-no-text`, `section-7-begins-with-no-text`);
+3. a number with a look-alike letter or slash passed the guard: every line of section 8 holding a
+   slash or a character drawn as one must begin with a number read;
+4. stale text (ADR 0002, `docs/design/approval.md`, a Zone A docstring) names the versions as they
+   now are;
+5. UR-57 is the certified Word importer lock's control, beside UR-49.
+
 **Impact assessment (step 0).**
 
 - Zone B (`src/`): the gate, the pipeline, the crosswalk and the preflights. For a drawn source
@@ -157,7 +171,7 @@ forward.
 and a drawn source whose identifier value begins `certified-word:`. One it accepts that the
 previous refused: a certified Word submission, as a dry run only.
 
-**Tests.** `test/certified-word/` (40 tests, the importer lock's among them),
+**Tests.** `test/certified-word/` (42 tests, the importer lock's among them),
 `zone-a/tests/test_certified_word_fixtures.py`, `test/contracts/run-manifest-frozen.test.ts`
 (5.0.0 frozen; 6.0.0 reads a certified Word run that 5.0.0 refuses), `test/version-identity.test.ts`
 (the record's identifier systems have their NamingSystems), `test/ci/validation-set.test.ts` (the

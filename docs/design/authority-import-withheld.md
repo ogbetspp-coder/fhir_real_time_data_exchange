@@ -9,7 +9,7 @@
 - Decides: how an authority import carries a section it cannot accept, instead of refusing the
   whole publication
 - Amends: `AGENTS.md` ("fail closed on … mandatory QRD sections", a scoped exception); ADR 0002
-  (invariants 3, 4, 6 and 10: a coded section with a verified notice instead of a verified narrative; its 2026-09-24 amendment's contract, 3.0.0, and who judges content: an attested requester);
+  (invariants 3, 4, 6 and 10: a coded section with a verified notice instead of a verified narrative; its 2026-09-24 amendment's contract, its next major (3.0.0 when written; 4.0.0 since a certified Word source took 3.0.0 on 2026-10-06), and who judges content: an attested requester);
   ADR 0003 (the verifier's scope); ADR 0005 decision 3 and its consequence;
   `docs/design/authority-import-contract.md` D1 (the dry-run lift's condition), D2, D3, D4, D6, D7,
   D8 (the placeholder requester), D9, D10, D12, D13;

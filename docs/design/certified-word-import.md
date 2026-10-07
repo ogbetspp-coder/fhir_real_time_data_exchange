@@ -93,15 +93,21 @@ and what a person confirmed, as the authority importer is of the authority's byt
   neither a leaf nor one whose narrative the mapping requires; and the product (tightened after the
   review of #193, which found a substring check accepting "Synthetic Exampli", "mg" and the
   holder's address):
-  - **the name** begins section 1's first line and ends where a word does (the line's end or
-    whitespace follows it), has no whitespace at either end, and does not end in punctuation:
-    "BRUKINSA" of "BRUKINSA 80 mg hard capsules";
+  - **the name** is section 1's whole first line, or that line up to just before its first
+    whitespace-separated token that begins with a digit (the strength), the whitespace before it
+    left out: "BRUKINSA" or "BRUKINSA 80 mg hard capsules" of "BRUKINSA 80 mg hard capsules", and
+    nothing else, not "BRUKINSA 80" (the re-review of #193 found a cut at any word boundary
+    accepted); it does not end in punctuation;
   - **the holder** is section 7's first line, exactly;
+  - neither first line may be one only the page writes (a table's or a picture's, holding a grid
+    marker or U+FFFC), and neither the name nor the holder may hold a noncharacter or U+FFFC;
   - **the EU authorisation numbers** are exactly those standing alone on section 8 (after a line's
     start, a space, a tab or one of `,;:(`, before its end, a space, a tab, one of `,;:()`, or a
-    full stop that ends the line or comes before whitespace), and every `E U /` there, in any case
-    and with any whitespace inside it, is the start of one of them. A run of presentations
-    (`.../001-003`) is refused rather than expanded.
+    full stop that ends the line or comes before whitespace); every `E U /` there, in any case
+    and with any whitespace inside it, is the start of one of them; and every line of section 8
+    that holds a slash or a character drawn as one (U+2215, U+2044, U+FF0F) begins with one of
+    them, so a number with a look-alike letter ("ЕU", a Cyrillic E) or slash is refused, not passed
+    over. A run of presentations (`.../001-003`) is refused rather than expanded.
 
   The headings a person assigned are bound both ways: the result's assigned headings (its
   structure's sections with status `assigned`, each key with its paragraph) are exactly the
@@ -116,11 +122,17 @@ and what a person confirmed, as the authority importer is of the authority's byt
   product's name.
 - **The leaflet** is refused (`binding: document-not-carried`): Zone B's crosswalk and preflights
   are the SmPC's, and the canonical document types name the SmPC only.
-- **False refusals these rules make**, accepted until a label shows the need: a name that is not at
-  the start of section 1's first line (a section 1 that opens otherwise, or a name after a list
-  label), or that ends in punctuation ("X (recombinant)"); a holder whose name is not section 7's
-  first line exactly (a name over two lines, in a table, or after other text); a number in section
-  8 written otherwise than the strict form, a run included; a leaflet.
+- **False refusals these rules make**, accepted until a label shows the need:
+  - a name that is neither section 1's whole first line nor that line up to its strength: a name
+    whose strength is written without a space ("Brand10 mg"), whose invented name itself begins
+    with a digit or holds a token that does (cut there, or taken whole), whose line names a form
+    before the strength, or that is a section 1 opening otherwise (a list label, a sentence);
+  - a name that ends in punctuation ("X (recombinant)");
+  - a holder whose name is not section 7's first line exactly (a name over two lines, in a table,
+    or after other text), and a section 1 or 7 that begins with a table or a picture;
+  - a line of section 8 that holds a slash and does not begin with a number (a date "01/2024", a
+    note), a number written otherwise than the strict form, a run included;
+  - a leaflet.
 - **Open: the document id is bound to nothing.** The importer takes the ePI's document id as a
   person confirmed it and writes the record's identifier from it, and nothing checks that the id
   names this product's ePI and no other: two labels could be filed under one ePI, or one label's

@@ -31,7 +31,21 @@ const LabelText = z
     (value) => !/[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u.test(value),
     "a control or format character",
   )
-  .refine((value) => value.trim() === value, "whitespace at an end");
+  .refine((value) => value.trim() === value, "whitespace at an end")
+  .refine((value) => !hasMarker(value), "a page's marker or a noncharacter");
+
+// Whether text holds what only the page writes or what is no character: a noncharacter (U+FDD0 to
+// U+FDEF, the scanner's grid markers among them, and the last two code points of every plane) or
+// U+FFFC, a picture's mark.
+export function hasMarker(text: string): boolean {
+  for (const character of text) {
+    const point = character.codePointAt(0) ?? 0;
+    if ((point >= 0xfdd0 && point <= 0xfdef) || (point & 0xfffe) === 0xfffe || point === 0xfffc) {
+      return true;
+    }
+  }
+  return false;
+}
 
 // Our own ids, as the record's identifier value and the gate write them: a lower-case UUID.
 const OurId = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);

@@ -553,7 +553,8 @@ signer's egress to the authority and the wider surface of the process holding th
   `versionNumber` and hash, whatever fields the settled mechanics add (proposed:
   `productSequence` and `previousProductEntrySha256`), `sections` entries with `status: withheld`, the notice's hash and defect kinds, and the import
   review's shape. Item 2's majors of `CanonicalSubmission` and the query tools and roadmap 3a's (the
-  renderer and withheld notes' 3.0.0) are one major each if they land together, and consecutive
+  renderer and withheld notes' next major, 4.0.0 since a certified Word source took 3.0.0 on
+  2026-10-06) are one major each if they land together, and consecutive
   otherwise; whichever lands second takes the next number. The contract table above gains the
   `request` kind, `ReviewRecord`'s import review, `record-inconsistent` and `get_section`'s
   `section-withheld`.

@@ -30,6 +30,7 @@ import { sha256, sha256Utf8, stableUuid } from "../lib/hash.js";
 import { AuthorityBytesError, readAuthorityJson } from "../authority/json.js";
 import {
   CertifiedWordRequestSchema,
+  hasMarker,
   RecomputeRefusalSchema,
   RecomputeResultSchema,
   type CertifiedWordRequest,
@@ -289,29 +290,50 @@ function firstLine(page: string): string {
   return page.split("\n").find((line) => line.length > 0) ?? "";
 }
 
+// The names section 1's first line allows: the whole line, or the line up to its strength, the
+// first whitespace-separated token that begins with a digit ("BRUKINSA" of "BRUKINSA 80 mg hard
+// capsules"), without the whitespace before it.
+function namesOf(title: string): string[] {
+  const strength = [...title.matchAll(/\S+/gu)].find(([token]) => /^\p{Nd}/u.test(token));
+  const before = strength === undefined ? "" : title.slice(0, strength.index).trimEnd();
+  return before.length === 0 ? [title] : [title, before];
+}
+
+// A slash, or a character drawn as one (division slash, fraction slash, fullwidth solidus).
+const SLASH = /[/\u2215\u2044\uff0f]/u;
+
 // The product a person confirmed is this label's (ADR 0006 decision 5):
-// - its name begins section 1's first line and ends where a word does (the line's end or
-//   whitespace follows it), and does not end in punctuation ("BRUKINSA" of "BRUKINSA 80 mg hard
-//   capsules", never a part of a word, a later word or the whole line's sentence);
+// - its name is section 1's whole first line, or that line up to its strength (namesOf), and does
+//   not end in punctuation;
 // - its holder is section 7's first line, exactly;
+// - neither first line is a line only the page writes (a table's or a picture's);
 // - its EU authorisation numbers are exactly those section 8 states, each standing alone, with no
-//   other "EU/" there, in any case or spacing.
+//   other "EU/" there in any case or spacing, and no line of section 8 holds a slash, or a
+//   character drawn as one, unless it begins with a number read.
 function checkProduct(placed: Placed[], product: CertifiedWordRequest["product"]): void {
   const page = (key: string): string =>
     placed.find(({ section }) => section.key === key)?.section.page ?? "";
   const { name } = product;
   const title = firstLine(page("smpc.1"));
-  const after = title.slice(name.length);
-  if (!title.startsWith(name) || !(after === "" || /^\s/u.test(after)) || /\p{P}$/u.test(name)) {
+  if (hasMarker(title)) refuse("product", "section-1-begins-with-no-text");
+  if (!namesOf(title).includes(name) || /\p{P}$/u.test(name)) {
     refuse("product", "name-not-in-section-1");
   }
-  if (firstLine(page("smpc.7")) !== product.holder.name) {
-    refuse("product", "holder-not-in-section-7");
-  }
+  const holder = firstLine(page("smpc.7"));
+  if (hasMarker(holder)) refuse("product", "section-7-begins-with-no-text");
+  if (holder !== product.holder.name) refuse("product", "holder-not-in-section-7");
   const numbers = page("smpc.8");
   const found = [...numbers.matchAll(EU_NUMBER)];
   if (found.length !== [...numbers.matchAll(EU_START)].length) {
     refuse("product", "eu-number-unread");
+  }
+  // A number written with a look-alike letter or slash is in no strict form: every line that holds
+  // a slash must begin with a number read.
+  const starts = new Set(found.map(({ index }) => index));
+  let offset = 0;
+  for (const line of numbers.split("\n")) {
+    if (SLASH.test(line) && !starts.has(offset)) refuse("product", "eu-number-unread");
+    offset += line.length + 1;
   }
   const stated = new Set(found.map(([number]) => number));
   const confirmed = new Set(product.euAuthorisationNumbers);

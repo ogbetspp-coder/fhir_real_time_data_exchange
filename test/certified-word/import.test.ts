@@ -22,6 +22,7 @@ import { CanonicalSubmissionSchema, type CanonicalSubmission } from "../../src/c
 import { loadEmaMapping, type EmaMapping } from "../../src/fhir/mapping.js";
 import { validateCanonicalPreflight } from "../../src/fhir/preflight.js";
 import type { FhirBundle } from "../../src/fhir/types.js";
+import { xhtmlToText } from "../../src/fidelity/index.js";
 import { sha256 } from "../../src/lib/hash.js";
 
 // The certified Word importer (docs/design/certified-word-import.md, D1) on what zone_a.recompute
@@ -77,6 +78,14 @@ function recordSections(submission: CanonicalSubmission): { key: string; section
   };
   walk((submission.bundle.entry[0]?.resource as { section?: Section[] }).section);
   return out;
+}
+
+// The first line of a section's page in a result.
+function firstPageLine(json: Json, key: string): string | undefined {
+  const page = sections(json).find((entry) => entry.key === key)?.page;
+  return String(page)
+    .split("\n")
+    .find((line) => line.length > 0);
 }
 
 function refusal(run: () => unknown): string {
@@ -428,13 +437,18 @@ describe("what the importer refuses, by stage", () => {
       "Synthetic text",
       "tablets Synthetic text",
       "Synthetic Exampline 10 mg film-coated tablets,",
+      // Cut at a word boundary, but not at the strength (re-review of #193).
+      "Synthetic",
+      "Synthetic Exampline 10",
+      "Synthetic Exampline 10 mg film-coated",
     ]) {
       expect([name, refusedWith(json, asked({ name }))]).toEqual([
         name,
         "product: name-not-in-section-1",
       ]);
     }
-    for (const name of ["Synthetic", "Synthetic Exampline 10 mg film-coated tablets"]) {
+    // The whole first line, or the line up to its strength.
+    for (const name of ["Synthetic Exampline", "Synthetic Exampline 10 mg film-coated tablets"]) {
       expect([name, refusedWith(json, asked({ name }))]).toEqual([name, "imported"]);
     }
     // The holder is section 7's first line, exactly.
@@ -500,6 +514,72 @@ describe("what the importer refuses, by stage", () => {
       "\nEU/1/24/9999/001.\nEU/1/24/9999/002. Synthetic text\n",
     ]) {
       expect([page, refusedWith(withSection8(page), request)]).toEqual([page, "imported"]);
+    }
+  });
+
+  // Re-review of #193: a section 1 or 7 that begins with a table begins with a line only the page
+  // writes, which a name or a holder of "\ufdd0" matched.
+  it("a name or holder from a line only the page writes", () => {
+    const { json, request } = smpc();
+    const { product } = request;
+    const asked = (change: Partial<typeof product>): unknown => ({
+      ...request,
+      product: { ...product, ...change },
+    });
+    const withTable = (key: string, cell: string): Json => {
+      const narrative = `<div xmlns="http://www.w3.org/1999/xhtml"><table><tr><td><p>${cell}</p></td></tr></table><p>not for clinical use</p></div>`;
+      return {
+        ...json,
+        sections: sections(json).map((entry) =>
+          entry.key === key ? { ...entry, narrative, page: xhtmlToText(narrative) } : entry,
+        ),
+      };
+    };
+    const tabled = withTable("smpc.1", "Synthetic Exampline 10 mg film-coated tablets");
+    expect(firstPageLine(tabled, "smpc.1")).toBe("\ufdd0");
+    expect(refusedWith(tabled, request)).toBe("product: section-1-begins-with-no-text");
+    expect(refusedWith(withTable("smpc.7", "Synthetic Holder B.V."), request)).toBe(
+      "product: section-7-begins-with-no-text",
+    );
+    for (const name of ["\ufdd0", "Synthetic\ufffcExampline", "Synthetic Exampline\uffff"]) {
+      expect([name, refusedWith(tabled, asked({ name }))]).toEqual([
+        name,
+        "request: request-shape",
+      ]);
+      expect(refusedWith(tabled, asked({ holder: { ...product.holder, name } }))).toBe(
+        "request: request-shape",
+      );
+    }
+  });
+
+  // Re-review of #193: a look-alike letter or slash put a third number past the guard.
+  it("a number written with a look-alike letter or slash", () => {
+    const { json, request } = smpc();
+    for (const extra of [
+      "\u0415U/1/24/9999/003",
+      "EU\u22151/24/9999/003",
+      "EU\u20441/24/9999/003",
+      "EU\uff0f1/24/9999/003",
+      "See 1/24/9999/003",
+    ]) {
+      const page = `\nEU/1/24/9999/001\nEU/1/24/9999/002\n${extra}\n`;
+      const changed = {
+        ...json,
+        sections: sections(json).map((entry) =>
+          entry.key === "smpc.8"
+            ? {
+                ...entry,
+                page,
+                narrative: `<div xmlns="http://www.w3.org/1999/xhtml">${page
+                  .trim()
+                  .split("\n")
+                  .map((line) => `<p>${line}</p>`)
+                  .join("")}</div>`,
+              }
+            : entry,
+        ),
+      };
+      expect([extra, refusedWith(changed, request)]).toEqual([extra, "product: eu-number-unread"]);
     }
   });
 

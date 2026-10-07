@@ -203,7 +203,7 @@ def _published_version(name: str) -> str:
 def test_the_emitted_manifests_verify_and_round_trip() -> None:
     """The current version's manifests, as the worker's own code emitted them, verify here.
 
-    A fixture run, a document run and (from 5.1.0) a certified Word source's dry run, so the
+    A fixture run, a document run and (from 6.0.0) a certified Word source's dry run, so the
     ingestion block, its approval union and the rules between fields (``VerifiedRunManifest``) are
     all read, and each dumps back to its own bytes.
     """

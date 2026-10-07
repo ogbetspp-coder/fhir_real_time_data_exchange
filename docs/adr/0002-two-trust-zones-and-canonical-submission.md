@@ -290,8 +290,8 @@ current one frozen._
 - **`CanonicalSubmission` 3.0.0** (now 4.0.0: the note above), a major under this ADR's rule (fields required for an authority
   import; enums the gate branches on): the request's `renderEvidence`, `acknowledgedContacts` and
   `withheld`, and the source record's `rendering` and `withheldSections`, are approved content,
-  covered by `approvedContentSha256` (invariant 2) as the request is. The run manifest moves to 3.0.0
-  with it, its 2.0.0 ingestion block frozen.
+  covered by `approvedContentSha256` (invariant 2) as the request is. The run manifest moves to its
+  next major with it (after 6.0.0: the note above), the version it replaces frozen.
 - **Who judges content.** The 2026-09-24 amendment's "whether the words are right is what invariant 8
   proves, not what a person attests" stays true of the words. Two judgements of drawing now rest on
   a person, both stated exceptions: acknowledging a contact the renderer gate cannot prove harmless
@@ -345,8 +345,8 @@ Schema can state are published as `if`/`then`/`else` (run manifest 5.0.0: a docu
 one, carries an ingestion block; an authority import, and only one, records what Zone B fetched);
 the others (`startOffset < endOffset`, the manifest's package rules, the gate's recomputed hashes)
 are named with where they are enforced. The conditional fields of a structuring decision could be
-stated too; doing so would change `CanonicalSubmission` 2.0.0's published language, so it waits for
-3.0.0.
+stated too; doing so would change `CanonicalSubmission`'s published language, so it waits for its
+next major (4.0.0, since a certified Word source took 3.0.0 on 2026-10-06).
 
 **Python readers read the schema's dialect.** A reader of the published schemas in another language
 must reproduce Zod's verdicts, not its own language's defaults. Zone A's models are generated with
