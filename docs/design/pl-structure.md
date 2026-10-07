@@ -2,8 +2,9 @@
 
 - Status: Built (`pl-structure/1.0.0`, `zone-a/src/zone_a/leaflet.py`); run on the EMA's QRD
   template, on synthetic leaflets and, counts only, on the EMA's published Word product
-  information (internal corpus). No company label is in the repository.
-- Date: 2026-10-06
+  information (internal corpus). No company label is in the repository. Zone B carries a leaflet
+  to the EMA's leaflet ePI Bundle since 2026-10-07 ("Zone B", below).
+- Date: 2026-10-06; Zone B 2026-10-07
 - Related: `docs/design/smpc-structure.md` (the same step for the SmPC, whose statuses this
   shares), `docs/design/qrd-registry.md` (the headings), `fhir/mappings/cap-pl-en.json` (the tree
   and the EMA codes), ADR 0006 (owner decision 8)
@@ -95,6 +96,52 @@ On the EMA's published Word product information in English (internal corpus, cou
   (list-label 83, formatting 45, tab 35, list-level 24, picture 19, table-shape 15,
   anchored-object 12, heading-in-table 9, underline 1); one file is refused whole.
 
+## Zone B
+
+A leaflet in the canonical record, a Type 2 graph or a certified Word source's Type 1 record, is
+transformed to an EMA ePI Bundle as an SmPC is, by its own manifest
+(`docs/validation/changes/2026-10-07-leaflet-zone-b.md`):
+
+- **The manifest, by the document type.** The worker loads both manifests and takes, for each
+  source, the one its `Composition.type` names: our document type `smpc` or `pl`, or the EMA's
+  (CodeSystem 100000155531 of the pinned EUePI package: `100000155532` and `100000155538`, read
+  from the package by `test/official/profile-slots.test.ts`). A source that names none, two, or
+  one no manifest maps is refused, and so is one that names another document than the manifest
+  it is given (`src/fhir/mapping.ts`, `mappingFor`).
+- **The EMA document.** Its Composition is typed `100000155538` "Package Leaflet" and claims the
+  four leaflet profiles (`EUEpiComposition`, `EUEpiCompositionPackageLeaflet`,
+  `EUEpiCompositionCAP`, `EUQRD-CAP-template-new-Package-Leaflet-en`); the EMA preflight holds
+  both. The List names it, as an SmPC's does.
+- **The canonical sections** are a code system of our package,
+  `https://khs.dev/fhir/CodeSystem/canonical-pl-sections`, with a ConceptMap to the EMA's codes,
+  generated from the mapping as the SmPC's are. The mapping (1.1.0) carries the EMA's display
+  where it is not the title, and its keys hold no hyphen (`pl.2.donottake`, `pl.3.toomuch`,
+  `pl.6.othersources`), since a contract `SourceKey` has none.
+- **Titles.** A certified Word leaflet's are its heading lines as written, the medicine's name for
+  X included (ADR 0006 decision 4, D6). A Type 2 leaflet's follow the template rule, which keeps a
+  source heading only where it is the mapping's title: since that title writes X and both choices
+  ("2. What you need to know before you take use X"), a Type 2 leaflet is published with the
+  template's headings, never with a name put in for X.
+- **Required sections.** Every section the profile requires must be there (the root, the six
+  numbered sections and ten named ones), each coded; an optional one is carried where the source
+  has it (a Type 2 graph: Zone A finds only the required ones, "What it does", 4).
+- **The product, for a certified Word leaflet** (`src/certified-word/import.ts`): its name is the
+  structure's `name`, which must stand for X in section 1's heading as the label writes it, the
+  mapping's form exactly; its holder is the first line of section 6's holder section, exactly; and
+  it states no EU authorisation number, so a person confirms none and its Type 1 record has no
+  RegulatedAuthorization (the Type 1 preflight allows that for a leaflet only). Each refusal is
+  closed: `name-not-in-section-1`, `holder-not-in-section-6`, `section-6-begins-with-no-text`,
+  `eu-numbers-not-in-leaflet`.
+- **Validated.** The synthetic leaflet product (`synthetic-exampline`, EU/1/24/9999/001) with every
+  optional section, as its drawn submission carries it, and the certified Word leaflet, each with
+  its Provenance, pass the pinned official validator with no error, every warning the SmPC's
+  own kind with the SmPC's reason.
+
+What Zone B does not do for a leaflet yet: the query service and the signer read the SmPC's
+manifest only (the signer refuses a leaflet's review at the crosswalk, the query service does not
+resolve a leaflet's sections), and the StructureMap twin is the SmPC's alone
+(`docs/design/structuremap-twin.md`, "The package leaflet").
+
 ## Next
 
 - The leaflet's own refusals. The commonest (101 sections of ready leaflets) is a list whose level
@@ -105,7 +152,7 @@ On the EMA's published Word product information in English (internal corpus, cou
   reader's Word oracle, not a rule to infer. Then a tab (44), nested lists (26) and shading (35).
 - Candidates for a named section a person must confirm (a line in its section that starts with
   the template's wording), for the review screen.
-- Zone B: the leaflet's EMA Bundle from its sections, as the SmPC's.
+- The query service and the signer, by the record's manifest.
 - Who the leaflet is for (section 6: what it contains, the holder) for the product proposal.
 - The optional named sections, once a rule tells a repeated line from a heading.
 - Annex II, the labelling and other languages, each from its own template.

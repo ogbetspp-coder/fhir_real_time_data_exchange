@@ -297,5 +297,12 @@ recommendations ... the rest you are authorized to do as well"); each reading is
   length (D4), runs `python -m zone_a.recompute` on it in an isolated subprocess (D2), runs the
   importer again and requires the same submission, page text and report. A run that is not a dry
   run is still refused, now because the drawing (decision 1's third leg) is missing.
+- **The package leaflet in Zone B** (2026-10-07, `docs/design/pl-structure.md`, "Zone B"): the
+  worker takes each source's mapping by its document type, and a leaflet, from a Type 2 graph or
+  a certified Word source, is transformed to the EMA's leaflet document, which passes the official
+  validator. The certified Word importer (`certified-word-import/1.2.0`) carries `document: "pl"`
+  with the leaflet's own product check: the name is what stands for X in its section 1 heading
+  (the structure's `name`), the holder is section 6's, and the leaflet states no EU number, so its
+  Type 1 record has no RegulatedAuthorization.
 - **Still to do:** in the reader (P1), floating tables, frames, right-to-left tables and page
   breaks reported in place of the scan; P2; in P4, the drawing records (D3); P5.

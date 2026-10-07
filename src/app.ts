@@ -25,6 +25,8 @@ import { runPipeline, type PipelineDependencies, type PipelineInput } from "./pi
 // `unclassified`. test/failure-reasons.test.ts holds every literal thrown there to an entry.
 export const FAILURE_REASONS: Readonly<Record<string, string>> = {
   "runId must be a UUID": "bad-run-id",
+  "No mapping manifest is loaded": "mapping-not-loaded",
+  "The SmPC mapping is not loaded": "mapping-not-loaded",
   "Run source is disabled": "source-disabled",
   "Canonical preflight failed": "source-preflight-failed",
   "EMA structural preflight failed": "ema-preflight-failed",

@@ -51,6 +51,27 @@ The cases, 168 in all (2026-10-06):
   It carries Brukinsa and both Imatinib Teva labels whole (32 sections each) and refuses
   Jentadueto and Nuvaxovid by its narrative check.
 
+## The package leaflet: not twinned
+
+The crosswalk maps the package leaflet since 2026-10-07 (`docs/design/pl-structure.md`, "Zone
+B"), by its own manifest. The twin was not extended to it. A leaflet's twin would be this map again
+with the leaflet's data written into it: its 27 keys in the `check` list, its ConceptMap, its
+section-code value set, its document type and its four profiles; and, since 13 of its titles are
+not the EMA's displays (the displays bracket the template's choices), a heading per code where
+this map writes the display. That restates the manifest a second time in FML; it is not a second
+implementation of anything the leaflet adds. The leaflet adds no transform logic. The code it runs
+is the SmPC's, which the twin holds on every case above (a coding's display other than its title
+included: 6.5 and 6.6), and what differs is data, which is held elsewhere:
+
+- `test/official/profile-slots.test.ts` holds the leaflet's manifest to the EMA's profile slot by
+  slot, every display to the EMA's section code system and its document type to the package;
+- the official validator checks the leaflet's EMA output against the leaflet's template profile,
+  whose closed slicing fixes every code at its place, and `EUEpiCompositionPackageLeaflet`, which
+  fixes the type (`scripts/ci/emit-validation-set.ts`, two leaflet cases);
+- `test/leaflet.test.ts` and the EMA preflight hold the tree, the order and the type.
+
+Reconsider when the crosswalk gains logic that only a leaflet runs.
+
 ## Where it fails closed
 
 A `check` clause aborts the transform on a source that is not a document, a first entry that is

@@ -6,9 +6,11 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { EmaMapping } from "../src/fhir/mapping.js";
 import { loadEmaMapping } from "../src/fhir/mapping.js";
 import {
+  LEAFLET_PRODUCT_ID,
   SYNTHETIC_PRODUCTS,
   SYNTHETIC_PRODUCT_IDS,
   SYNTHETIC_VERSIONS,
+  syntheticProduct,
 } from "../src/fixtures/synthetic-products.js";
 import { createSyntheticSubmission } from "../src/fixtures/synthetic-submission.js";
 import { createSyntheticType2Bundle } from "../src/fixtures/synthetic.js";
@@ -91,6 +93,30 @@ describe("synthetic product identity", () => {
           true,
         ]);
       }
+    }
+  });
+});
+
+// The package leaflet's product is built with the leaflet's mapping and is not among the products
+// above (src/fixtures/synthetic-products.ts), so it is held to the same rules here.
+describe("the synthetic package leaflet", () => {
+  it("names its product and every resource as synthetic, and marks every narrative", async () => {
+    const leaflet = await loadEmaMapping("fhir/mappings/cap-pl-en.json");
+    const product = syntheticProduct(LEAFLET_PRODUCT_ID);
+    expect([product.id.startsWith(PREFIX), product.productName.startsWith("Synthetic ")]).toEqual([
+      true,
+      true,
+    ]);
+    for (const version of SYNTHETIC_VERSIONS) {
+      const options = { product: LEAFLET_PRODUCT_ID, version, optional: true };
+      const bundle = createSyntheticType2Bundle(leaflet, options);
+      const ids = [bundle.id, ...bundle.entry.map(({ resource }) => resource.id)];
+      expect(ids.filter((id) => !String(id).startsWith(PREFIX))).toEqual([]);
+      const { submission, sourceText } = createSyntheticSubmission(leaflet, options);
+      const divs = [...xhtmlNarratives(bundle), ...xhtmlNarratives(submission)];
+      expect(divs.length).toBeGreaterThan(0);
+      expect(divs.filter((div) => !div.includes(MARKER))).toEqual([]);
+      expect(sourceText.pages.filter(({ text }) => !text.includes(MARKER))).toEqual([]);
     }
   });
 });
