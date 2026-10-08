@@ -138,7 +138,7 @@ describe("the real record", () => {
   });
 
   it("is found by no later build: its request and drawing's version have other paths", async () => {
-    // This build (word-epi/1.4.0, word-drawing/1.2.1) on the same label, with dev's pins now.
+    // This build (word-epi/1.5.0, word-drawing/1.2.2) on the same label, with dev's pins now.
     expect(real.record.drawing.version).toBe("word-drawing/1.2.0");
     const later = importCertifiedWord(recomputed("smpc"), caseRequest(smpcCase()), mapping, RUN);
     const asked: string[] = [];
@@ -320,7 +320,7 @@ describe("the pins", () => {
     expect(pins.keys.map(([version]) => version)).toEqual([10, 2, 1]);
     expect([pins.environment, pins.version, pins.imageDigest]).toEqual([
       "dev",
-      "word-drawing/1.2.1",
+      "word-drawing/1.2.2",
       dev.imageDigest,
     ]);
     // Nothing pinned for validation.

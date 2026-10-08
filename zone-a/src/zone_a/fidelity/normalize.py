@@ -16,7 +16,7 @@ from __future__ import annotations
 import unicodedata
 from typing import Final
 
-NORMALIZATION_VERSION: Final = "fidelity-norm/3.4.0"
+NORMALIZATION_VERSION: Final = "fidelity-norm/3.5.0"
 
 # ADR 0003: NFC output depends on the Unicode Character Database of the runtime, so the UCD is
 # pinned as tightly as the code. Zone B runs node:22.22.0 (ICU 77.1, Unicode 16.0).

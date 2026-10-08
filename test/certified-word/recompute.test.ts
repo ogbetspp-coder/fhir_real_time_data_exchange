@@ -489,7 +489,7 @@ describe(`the gate, recomputing (${PYTHON === undefined ? "the committed results
   });
 
   it("refuses with the recompute's refusal, by its closed code", async () => {
-    // A section of the label the recompute refuses (a tab in 4.2), with the label's own request.
+    // A section of the label the recompute refuses (two tabs in 4.2), with the label's own request.
     const found = recomputedCases().find(({ name }) => name === "smpc-refused");
     if (found === undefined) throw new Error("no refused case");
     const input = uploaded("smpc");

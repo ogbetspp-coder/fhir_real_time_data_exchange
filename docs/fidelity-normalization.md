@@ -1,6 +1,6 @@
 # Narrative fidelity normalisation specification
 
-Version: `fidelity-norm/3.4.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
+Version: `fidelity-norm/3.5.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
 in section 9)
 
 This document is the language-neutral specification of the text normalisation and XHTML
@@ -866,7 +866,32 @@ An extractor must:
     superscript mark and of bidi class L, EN, ES, ET, CS or ON, since a tab separates bidi
     segments and a space does not); then any number of U+0020. (In 3.2.0, a step 4 bullet glyph
     only.) A bare letter or number that is not raised is not a label: before a tab it reads as a
-    column. In the text a code point inside a superscript or subscript mark is written by the
+    column (from 3.5.0 that tab is written as U+0020 where the lone-tab rule below says so). From
+    3.5.0, in a paragraph that draws no label, each U+0009 before its text begins (in the section
+    3 step 5 whitespace before its first other code point, U+000A ending it) is its indent and is
+    written as U+0020, and the typed label is read past it (ADR 0006, owner decision 12); and
+    where no typed label's U+0009 is found and the text past the indent holds exactly one
+    U+0009, that U+0009 is written as U+0020 (decision 11), unless it is inside a superscript or
+    subscript mark or the text holds a code point of bidi class R, AL or AN or an explicit
+    embedding, override or isolate (a space joins bidi segments that a tab separates). No U+0009
+    is written as U+0020, an indent's, a typed label's or this one, where as a space it would
+    join a number to what stands before it: where the text after it begins with a number and the
+    last code point before it that is not a section 6 gap (a line break is one, which a cell
+    writes as a space), read to its base past combining marks (general category M), is numeric
+    or a dash or minus (general category Pd, or U+2212, U+207B, U+208B, U+FE63, U+FF0D, U+2796,
+    U+2043, U+02D7), so the two would read as one number, or the dash as its
+    sign ("–" U+0009 "2 to 8 °C" as −2 °C). A code point is numeric where it has a Unicode
+    numeric value (a digit of any script, as the read holds a raised or lowered one, a script
+    digit of the fold tables below, a vulgar fraction, a circled digit, a Roman numeral, a CJK
+    numeral); a text begins with a number where its first code point that is not a gap is
+    numeric, or is a run of U+002E, U+002C, U+00B7, U+066B, U+FF0C, U+FF0E, U+FE50, U+FE52,
+    U+00B1, U+002B and dashes or minus signs (as above) before one, read past gaps ("5" U+0009
+    "–20 °C", an en dash as a minus, would read as the range 5–20 °C; a bracket or a comparison
+    sign is not one: a number after it reads as no sign's). So "1" U+0009 "000", "Day 1" U+0009 "½",
+    "1" U+0009 ",5", "Storage:" U+000A "-" U+0009 "2" and U+2212 U+0009 "2" each keep the
+    U+0009; for a typed label, a fix to the 3.4.0 rule, from 3.5.0: "Table 1" U+0009 "2-year"
+    would read "Table 1 2-year", and a raised "1" U+0009 "2" "¹ 2". Any other U+0009 is refused,
+    two or more past the indent included. In the text a code point inside a superscript or subscript mark is written by the
     raised or lowered rule below (inside a subscript mark, U+221E and U+00BD are kept as they are, as section 5 keeps
     them inside `sub`); each picture (U+FFFC) is U+FFFC, the SHA-256 of the `data:` URI of the
     exact bytes the reader names for it (`data:image/png;base64,` or `data:image/jpeg;base64,`,
@@ -874,13 +899,22 @@ An extractor must:
     reader reports (U+000A) is kept, with U+0009 inserted after it where the line it starts
     begins, past section 3 step 5 whitespace, with a section 3 step 4 bullet glyph;
   - a table is U+FDD0 U+000A, then each row of the grid the reader reports for it, read row by
-    row on its own, as U+FDD2, one slot per grid column, and U+000A, then U+FDD1 U+000A. A slot is
+    row on its own, as U+FDD2, one slot per grid column, and U+000A, then U+FDD1 U+000A. From
+    3.5.0 the grid is first laid as the narrative lays it: in each row the grid columns the
+    reader reports left out at its start (`before`) or its end (`after`) are a cell of their own
+    with no text, an empty cell (ADR 0006, owner decision 10; Word draws no cell there); then
+    every grid column but the first at which no cell starts, in any row, is dropped, and each
+    cell covers only the columns kept. Every cell over such a column covers the one before it as
+    well, so section 5's HTML table model draws it at no width and section 5 rejects it
+    (`table-shape`), where Word draws it inside the cells that span it; the table without it is
+    the same table, each value in the same cell. A slot is
     U+0009 U+FDD3 U+0009 and the cell's text where a cell starts, U+0009 U+FDD4 U+0009 where the
     cell to its left spans it, and U+0009 U+FDD5 U+0009 for each column of a cell that continues a
     vertical merge. A cell's text is its paragraphs that are not blank, joined by U+0020, each
     written as outside a table (the tab after a typed label included, from 3.4.0) but with no label
     that is a step 4 bullet glyph, its line breaks as U+0020 and no U+000A of its own.
 
+  The narrative writes an empty cell as a `td` with its `colspan` and no content, from 3.5.0.
   The narrative carries the QRD template's grey (a light grey highlight or D9D9D9 shading) as a
   `span` styled `background-color: silver;` (section 5, from 3.3.0), which the page does not
   mark; from 3.4.0 so too C0C0C0 shading, which Word draws in the light grey highlight's colour
@@ -888,29 +922,44 @@ An extractor must:
   highlight or shading refuses the section, a pattern included: Word prints 15% of the automatic
   colour on an automatic or white fill as D9D9D9, but the reader does not yet spell a pattern's
   theme colour, and what Word draws for an automatic fill over a painted cell or paragraph is not
-  on record. A list whose labels an HTML list without `start` or `type` cannot draw as Word does
+  on record. From 3.5.0 a strike, a highlight of one of Word's sixteen colours (the reader marks
+  `highlight-black` to `highlight-lightGray`, ST_HighlightColor but `none`) or a solid shading
+  (`shading-` and six hex digits, a clear pattern's fill) is left out where every code point from
+  its start to the paragraph's end is U+0020: Word paints nothing over trailing spaces, by its
+  own print of synthetic probes (2026-10-08: a strike, a yellow highlight and solid black shading
+  over ten trailing U+0020, and a paragraph or a table cell of only such spaces, drew exactly the
+  unmarked text; over spaces between words, or over trailing U+00A0, each drew). Any other such
+  mark still refuses the section, a pattern's or a theme's shading over trailing spaces
+  included, which no print has shown. A list whose labels an HTML list without `start` or `type` cannot draw as Word does
   (other than all "•", or "1.", "2.", ... from one) is written in the narrative as Word draws it,
   from 3.3.0: each item a `p` of its label, U+0020 and its text, which is the line the page already
   writes for it; in a table cell, where the page leaves a step 4 bullet glyph's label out, such
-  a label that is one refuses the section.
+  a label that is one refuses the section. From 3.5.0 a label so written refuses the section where
+  it and the space after it would join a number to it, by the rule for a U+0009 above: a label
+  that ends in a number or is a dash or minus, before an item whose text begins with a number
+  (the label "1" before "000 mg" would read "1 000 mg", and "–" before "2 to 8 °C" −2 °C).
 
   The extractor refuses the section where the read holds anything ADR 0006 decision 3's closed
   lists do not carry (`zone_a.word_epi` names each refusal): a mark other than bold, italic,
-  superscript, subscript and the template's grey, except an underline that cannot change the text
-  and capitals over text they draw the same; a list label not followed by a tab or a space, or two
+  superscript, subscript and the template's grey, except an underline that cannot change the text,
+  capitals over text they draw the same and, from 3.5.0, a strike, a highlight or a solid shading
+  over trailing spaces; a list label not followed by a tab or a space, or two
   list levels in the section; a picture the reader does not vouch for, over 1 MiB, or drawn by Word larger than its
-  own size or out of its own proportions by more than 2%; a tab (but the one after a typed label
+  own size or out of its own proportions by more than 2%; a tab (but those written as U+0020
   above), a soft hyphen, U+2028 or U+2029,
   a bullet glyph starting a line after a line break, a comment or a hidden paragraph mark; a
-  heading drawn otherwise than its title; where the reader's grid is not on record, a row leaves
-  grid columns out, a vertically merged cell has text or no cell of its columns above, or a table
+  heading drawn otherwise than its title; where the reader's grid is not on record, a row of no
+  cells leaves grid columns out (until 3.5.0, any row that left grid columns out), a vertically
+  merged cell has text or no cell of its columns in the row above (an empty cell starts none), or
+  a table
   is nested, lies in two sections or holds a heading; where a raised or lowered run holds what
   section 5 refuses inside the corresponding element; and where section 5's scanner does not read
   the narrative built from the same read (ADR 0006 decision 3) as this page. It refuses a
   document with a floating picture or shape, a floating table, a frame, a right-to-left table, or
   a page or column break with a drawn character on both sides. The page rule and the narrative
-  builder are written separately (the page reads the grid row by row, the builder works out each
-  merged cell's rows), so the check between them compares two things; ADR 0006 decision 1's
+  builder are written separately (from 3.5.0 both lay the grid by the rule above, each by its
+  own code; the page then reads it row by row, the builder works out each merged cell's rows),
+  so the check between them compares two things; ADR 0006 decision 1's
   drawing check holds the narrative to what a browser draws, and Zone B recomputes the pages from
   the pinned bytes. The drawn-document rules of this section (line layout, continuation lines
   across pages, discretionary hyphens, tables across page breaks, body ranges) do not apply. The
@@ -959,6 +1008,29 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
 
 ## 9. Version history
 
+- `fidelity-norm/3.5.0` (minor) — section 7's certified Word rule lays a table's grid as the
+  narrative does: the grid columns a row leaves out at its start or end are an empty cell (ADR
+  0006, owner decision 10), and a grid column at which no cell starts is dropped (the HTML table
+  model draws it at no width, which section 5 rejects; the table without it is the same table). It writes as
+  U+0020 the tabs of a paragraph's indent (decision 12) and its one tab past the indent where it
+  has exactly one (decision 11), but not one raised or lowered, or one in text holding a
+  right-to-left code point or an explicit bidi control; two or more past the indent and a tab
+  after a list label are still refused, and decisions 1, 7 and 9's typed labels keep precedence.
+  No tab is written as a space, and no label as text before its item, where it would join a
+  number to a number or to a dash or minus before it, read past every gap (any numeric code
+  point counted, and a sign or decimal separator before one after it): fixes to 3.3.0's labels as
+  text and 3.4.0's typed labels ("Table 1", a tab, "2-year"; "–", a tab, "2 to 8 °C"; the label
+  "1" before "000 mg").
+  It leaves
+  out a strike, a highlight of Word's colours or a solid shading over the U+0020 that end a
+  paragraph's text, which Word paints over nothing by its own print; a pattern's or a theme's
+  shading waits for a print. Two
+  verify vectors are added, reviewed by hand: a page with a dropped column, empty cells at a
+  row's start and end, a lone tab, an indent and a strike over trailing spaces against its
+  narrative (passed), and the same page against a narrative with an empty cell on the wrong side
+  of its value (failed). Sections 1 to 6 and the code point table do not change. The withheld
+  section of an authority import (`docs/design/authority-import-withheld.md`, not built) moves
+  to 3.6.0. The change record is `docs/validation/changes/2026-10-08-fidelity-norm-3-5-0.md`.
 - `fidelity-norm/3.4.0` (minor) — section 7's certified Word rule writes as U+0020 the tab after
   a typed label in a table cell as well as outside one, and a typed label is also U+2011, a
   caption's number ("Table 1:", "Table 12a:", "Figure 3.") and a raised footnote key of one to
@@ -969,7 +1041,8 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   is added, reviewed by hand: a page with a caption, a raised key and a non-breaking hyphen as
   typed labels, in table cells and outside them, against its narrative (passed). Sections 1 to 6
   and the code point table do not change. The withheld section of an authority import
-  (`docs/design/authority-import-withheld.md`, not built) moves to 3.5.0. The same rule carries as
+  (`docs/design/authority-import-withheld.md`, not built) moves to 3.5.0 (and with 3.5.0 to
+  3.6.0). The same rule carries as
   the template's grey C0C0C0 shading, which Word draws as the light grey highlight (no new
   reading, by Word's own print); a pattern's grey waits for the reader to spell a pattern's theme
   colour and for Word's answer over painted backgrounds. The change record is
@@ -986,7 +1059,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   (passed), and the same dashes drawn as an HTML list (failed). Sections 1 to 4 and 6 and the code
   point table do not change. The withheld section of an authority import
   (`docs/design/authority-import-withheld.md`, not built) moves to 3.4.0 (and with 3.4.0 to
-  3.5.0). The change record is `docs/validation/changes/2026-10-06-fidelity-norm-3-3-0.md`.
+  3.5.0, with 3.5.0 to 3.6.0). The change record is `docs/validation/changes/2026-10-06-fidelity-norm-3-3-0.md`.
 - `fidelity-norm/3.2.0` (minor) — section 7 qualifies a third kind of source, a certified Word
   source (ADR 0006): a Word SmPC the pinned label reader read exactly, whose conservation check
   accounted for every character, structured by the QRD template's own headings, with one page
@@ -1000,7 +1073,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   list numbered from one later, and a page that writes a bullet after a line break as content
   against a narrative that draws it after a `br` (each failed). 3.2.0 was first reserved for the withheld section of
   an authority import (`docs/design/authority-import-withheld.md`, not built), which then took
-  3.3.0, then 3.4.0, and now takes 3.5.0.
+  3.3.0, then 3.4.0, then 3.5.0, and now takes 3.6.0.
   The change record is `docs/validation/changes/2026-10-05-fidelity-norm-3-2-0.md`.
 - `fidelity-norm/3.1.0` (minor) — inside `sub`, U+221E INFINITY is kept unchanged instead of
   rejecting (`unmappable-script`), and U+00BD VULGAR FRACTION ONE HALF is kept under the

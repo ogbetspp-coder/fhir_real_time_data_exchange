@@ -151,8 +151,12 @@ def _assigned(key: str, blocks: list[str]) -> list[str]:
 
 
 def _jump(key: str, blocks: list[str]) -> list[str]:
-    """A tab in 4.2's text, which Word draws as a jump to a tab stop: the section is refused."""
-    return [*blocks, _p("Dose\t1 tablet, not for clinical use.")] if key == "smpc.4.2" else blocks
+    """Two tabs in 4.2's text, Word's jumps to tab stops (columns): the section is refused.
+
+    One alone is a space, from word-epi 1.5.0.
+    """
+    tabs = _p("Dose\t1 tablet\tdaily, not for clinical use.")
+    return [*blocks, tabs] if key == "smpc.4.2" else blocks
 
 
 def _leaflet() -> list[str]:
@@ -195,7 +199,7 @@ def _cases() -> list[tuple[str, str, list[str], dict[str, Any]]]:
             assigned,
             plain | {"assignments": {"smpc.4.1": _index(assigned, "4.1 Indications")}},
         ),
-        ("smpc-refused", "an SmPC the recompute refuses: a tab in 4.2", _smpc(_jump), plain),
+        ("smpc-refused", "an SmPC the recompute refuses: two tabs in 4.2", _smpc(_jump), plain),
         ("pl", "a package leaflet the importer carries", _leaflet(), plain | {"document": "pl"}),
     ]
 

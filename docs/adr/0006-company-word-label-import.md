@@ -87,7 +87,9 @@ The record does not admit this today, for reasons this ADR has to answer rather 
      "not printed" text (amended 2026-10-06, owner decision 5 below; until then it was dropped
      where the registry named it, the 4.8 reporting statement only), and so is C0C0C0 shading,
      which Word draws as the light grey highlight (amended 2026-10-07, owner decision 9 below).
-     Any other strike, faint text, highlight, shading or right-to-left text refuses the section.
+     Any other strike, faint text, highlight, shading or right-to-left text refuses the section,
+     but a strike, a highlight or a solid shading over the spaces that end a paragraph's text,
+     which Word paints over nothing (amended 2026-10-08, by Word's own print, below).
    - **Lists:** `ul` for "•", and `ol` only for "1.", "2.", ... from one (amended 2026-10-05:
      FHIR's narrative rule txt-1 allows no `start` or `type` on `ol`, and the official validator
      with the EMA profiles refuses both). Any other list, "a)", "–" or "3." included, is written as
@@ -188,7 +190,8 @@ The record does not admit this today, for reasons this ADR has to answer rather 
 1. **A tab after a typed bullet:** a tab right after a bullet glyph (§3 step 4's) that begins a
    paragraph's text, outside a table and after no list label, is written as a space in the
    narrative and on the page (§7, `fidelity-norm/3.2.0`), as the EMA's own ePIs carry no tab. Any
-   other tab is still refused: Word draws it as a jump to a tab stop.
+   other tab is still refused: Word draws it as a jump to a tab stop (amended by decisions 11 and
+   12: a paragraph's lone tab and its indent's tabs are spaces too).
 2. **A label with tracked changes:** imported only by the view a person names, every change
    accepted or every one rejected (`zone_a.certified.read_body`, `epi_from_word.py --view`). The
    result records the view and the number of changes; with no view named it is refused, as
@@ -218,15 +221,21 @@ silver;">`, the one style `fidelity-norm/3.3.0` allows (§5, exactly that value,
    written as Word draws it, a `p` of its label, a space and its text, as a typed label is: the
    page already writes that line (§7), and the drawing check reads the label as the line's start.
    Nesting is still refused (one list level in a section), and so is a non-disc bullet glyph in a
-   table cell, where the page leaves a bullet glyph out.
+   table cell, where the page leaves a bullet glyph out. (Narrowed 2026-10-08,
+   `fidelity-norm/3.5.0`, a fix with no new decision: a label so written is refused,
+   `list-label`, where it and its space would join a number to it, by decision 11's test below:
+   a label that is a dash or minus, or ends in a number, before an item whose text begins with
+   a number, since "– 2 to 8 °C" reads as −2 °C, a storage temperature, and the label "1" before
+   "000 mg" as "1 000 mg".)
 7. **A tab after a typed label:** decision 1 above, widened. The tab after a label typed at the
    start of a paragraph is written as a space: a bullet glyph or a dash, one to three of the same
    footnote mark (`*`, `†`, `§`, ...), or an enumerator with its punctuation ("1.", "a)", "(iv)"),
    outside a table (amended by decision 9: in a table cell too) and after no list label (§7,
    `fidelity-norm/3.3.0`). A bare letter or number
    before a tab is no label ("n" then a tab then "= 50" is a column) and is still refused, as is
-   every other tab. On the EMA SmPC cuts it carries 228 of the 845 body paragraphs still refused
-   for a tab.
+   every other tab (amended by decision 11: where that tab is the paragraph's only one, it is a
+   space as a lone tab). On the EMA SmPC cuts it carries 228 of the 845 body paragraphs still
+   refused for a tab.
 
 ## Owner decision (2026-10-06, night)
 
@@ -276,7 +285,16 @@ Taken as recommended, under the owner's authorisation of 2026-10-06 (decision 8'
    more than three raised code points, a lead mixing raised and level code points, a raised
    right-to-left key, "Tables 1",
    "Table" with no number, a second tab, a tab after a list label. The tab is written as a space
-   where it is raised or lowered with its label too, as the narrative already wrote it.
+   where it is raised or lowered with its label too, as the narrative already wrote it. (Amended
+   by decisions 11 and 12, 2026-10-08: a leading tab is an indent, read past before the label,
+   and a lead that is no label but holds the paragraph's only tab has that tab written as a space
+   as a lone tab; a typed label keeps precedence, so its tab is a space where decision 11 would
+   refuse it, raised with its key. Fixed the same day, `fidelity-norm/3.5.0`, for the reason of
+   decision 11's number guard and with no new decision: a typed label's tab is not a space where,
+   as decision 11 tests it, it would join a number to a number or to a dash before it: "Table
+   1", a tab, "2-year", a raised "1", a tab, "2", and "–", a tab, "2 to 8 °C" (as −2 °C, a
+   storage temperature) keep their tab, refused; "Table 1:", a tab, "2-year", a raised "a", a
+   tab, "2", and "–", a tab, "Tablets" carry.)
 
    Evidence (EMA's published English Word PI cuts, 296 SmPC and 286 leaflet files; internal, counts
    only): among the SmPCs whose structure is ready but a section is refused, the refused tabs in
@@ -309,6 +327,105 @@ Taken as recommended, under the owner's authorisation of 2026-10-06 (decision 8'
    paragraph is not on record; both are the reader's to say, planned for `docx-reader/1.34.0`.
    Any other shading is still refused. In the built but blocked files of the same cuts, C0C0C0
    stands in 3 leaflet files.
+
+## Owner decisions (2026-10-08)
+
+Taken as recommended, under the owner's authorisation of 2026-10-08, night ("fully authorized ...
+you know the strategic intent"); each is **for the owner's review**. Section 7,
+`fidelity-norm/3.5.0`, `word-epi/1.5.0`; the change record is
+`docs/validation/changes/2026-10-08-fidelity-norm-3-5-0.md`.
+
+10. **Grid columns a row leaves out:** a row whose grid columns Word leaves out at its start
+    (`gridBefore`) or end (`gridAfter`) is written with an empty cell over those columns, a `td`
+    with their `colspan`, one row high and with no content, at the row's start or end, and the
+    page writes the same empty cell. Word draws no cell there and no text; the ePI holds the same
+    text in the same columns, and only an empty cell's box may be drawn where Word draws none. A
+    row may leave columns out at both ends. Still refused (`table-shape`): a vertical merge that
+    would run through or start under an empty cell (an empty cell starts no merge, so the cell
+    below is under no cell of its columns), and a row of no cells of its own that leaves columns
+    out. Evidence (EMA's English Word PI cuts, internal, counts only): rows that leave columns
+    out stand in 8 SmPC and 12 leaflet files; the leaflets' rows leave them out at the start 106
+    times, the SmPCs' at the end 155 times.
+11. **A lone tab is a space:** in a paragraph that draws no list label, in a table cell or outside
+    one, whose text past its indent (decision 12) holds exactly one tab, that tab is written as a
+    space where no number stands on both sides of it (read past every gap, as §6 reads "1 000" as
+    one number: "1", a tab, "000" never reads as "1 000"; a typed label's tab is held to the same
+    guard), it is not inside a raised or lowered run, and the text holds no right-to-left code point or explicit bidi control (a tab separates
+    bidi segments and a space does not, so a space between two right-to-left words, or one and a
+    number, is drawn with them reversed; a narrowing of the recommendation, for exactness). Two or
+    more tabs stay refused (`tab`): a column layout. Decisions 1, 7 and 9 keep precedence, so a
+    typed label's tab raised with its key is a space where this rule would refuse it; decisions
+    7 and 9 are narrowed by the same guard, and decision 6 too (above). **The guard, one test for
+    every tab written as a space (an indent's, a typed label's, a lone one) and every label
+    written as text:** no space where it would join a number to what stands before it, that is,
+    where the text after it begins with a number and the last code point before it, read
+    backwards past every §6 gap (a line break too, which a cell writes as a space) and to its
+    base past combining marks, is numeric or a dash or minus (general category Pd, or U+2212,
+    U+207B, U+208B, U+FE63, U+FF0D, U+2796, U+2043, U+02D7; the reader maps a Symbol font's minus
+    to U+2212). Numeric is a Unicode numeric value: a digit
+    of any script, as the read holds a raised one, a script digit such as "¹", a vulgar fraction
+    such as "½", a circled digit, a Roman numeral, a CJK numeral. A text begins with a number
+    where its first code point past gaps is numeric, or a run of ".", ",", "·", U+066B, their
+    fullwidth and small forms, "±", "+" and any dash or minus stands before one ("1", a tab, ",5
+    mg"; "1", a tab, "+.5"; "5", a tab, "–20 °C", an en dash as the EMA writes a minus, which as a
+    space would read as the range 5–20 °C); not a bracket or a comparison sign ("(", "≥", "<", "~"), after which a
+    number reads as no sign's. So "Storage:", a line break, "-", a tab, "2 to 8 °C" and "5", a
+    line break, a tab, "2" keep their tab. Rationale: the text, its order and its
+    code points are Word's; a lone tab's gap becomes a space, as the EMA's own ePIs write it.
+    With it, the SmPC files with tab blockers fall from 32 to 11, and those left all have several
+    tabs (the coordinator's scan). **A gap, and its follow-up:** the reader reads `w:tab` and
+    `w:ptab` as U+0009 and reports neither tab stops nor leaders, so a tab whose stop draws a dot
+    or an underscore leader, or a `w:ptab` whose own `w:leader` attribute draws one, would be
+    written as a space, its leader dropped; this holds for decisions 1, 7 and 9, already live,
+    too. On the EMA's English cuts no paragraph holding a tab (0 of 32 048) has a tab stop with a
+    leader set directly or by its paragraph's own style (the coordinator's count, which did not
+    cover a numbering level's tabs, the document defaults or a style's `basedOn` chain);
+    `docx-reader/1.34.0` is to refuse a leader of any of these on any paragraph that holds a tab.
+12. **An indent:** the tabs before a paragraph's text starts (in the §3 step 5 whitespace before
+    its first other code point, a line feed ending it) are its indent, each written as a space;
+    the tabs after it are judged by decisions 7, 9 and 11 as if it were absent. So a tab, "●", a
+    tab and text carries (an indent, then a typed bullet), and a tab, "a", a tab, "b", a tab, "c"
+    stays refused. In a paragraph that draws a list label it is refused, as every tab there is (a
+    narrowing of the recommendation, which named no list label: the gap is then Word's between
+    the label and the text). The section 5 scanner and the drawing check read leading spaces as
+    nothing, as a browser draws them; the page and the narrative write the same spaces. Evidence:
+    "tab:leading" in 6 leaflet files, and "several" tabs with "●" in 7.
+
+Not owner decisions, each the same drawing (2026-10-08, the same change):
+
+- **A grid column at which no cell starts is dropped**, and each cell spans the columns kept: a
+  fix of the builder's grid. Every cell over such a column also covers the one before it, so
+  §5's HTML table model draws it at no width, which §5 rejects (`table-shape`, its zero-width
+  rule), where Word draws it inside the cells that span it; without it Chrome draws the same
+  table, each value in the same cell, merges kept. The page and the narrative lay the grid by the
+  same rule, each by its own code (`zone_a.word_epi._slots` and `_rows`, held to each other on
+  random grids), so the fidelity check still compares two readings. Evidence: 13 narratives
+  refused `table-shape` in the SmPC built files, rows such as two cells, the first of two
+  columns, then one of three, where column 1 never starts a cell.
+- **A strike, a highlight or a solid shading Word paints over nothing is left out:** a `strike`,
+  a highlight of one of Word's sixteen colours (`highlight-black` to `highlight-lightGray`) or a
+  solid shading (`shading-` and six hex digits, a clear pattern's fill), whose text, from its
+  start to the paragraph's end, is only U+0020 (a paragraph or table cell of only such spaces
+  included). Word's own print of two synthetic probes (Word for Mac to PDF, 2026-10-08,
+  `zone-a/tests/fixtures/word-oracle/`; the ink of each line counted at 288 dpi):
+
+  | probe paragraph ("Alpha beta" and ten spaces)  | Word draws                               |
+  | ---------------------------------------------- | ---------------------------------------- |
+  | ten U+0020 struck at the end                   | the unstruck text (ink 2501, as without) |
+  | ten U+0020 struck between "Alpha" and "beta"   | a line through the gap (ink 2695)        |
+  | ten U+00A0 struck at the end                   | a line (ink 2695)                        |
+  | ten U+0020 highlighted yellow at the end       | the text only, no yellow                 |
+  | ten U+0020 highlighted yellow between words    | yellow                                   |
+  | a paragraph, or a table cell, of them alone    | nothing                                  |
+  | ten U+0020 shaded 000000 at the end, or a cell | the text only, no black; a cell, nothing |
+
+  Every other strike, highlight or shading over whitespace (between words, over U+00A0, a tab
+  after it) is still refused (`formatting`), and so are a double strike, a pattern's shading
+  (`shading-pct15-...`, `shading-solid-...`) and a theme's (`shading-THEME-...`) over trailing
+  spaces, which the print did not show: a follow-up, when Word is probed for them. Evidence: in the SmPC built files, a strike over whitespace stands 10 times at a
+  paragraph's end and 5 between words; a yellow highlight over whitespace 4 times in cells and 3
+  in the body (SmPC) and 4 in cells (leaflets); black shading over whitespace in cells 6 times
+  (SmPC) and 7 (leaflets).
 
 ## Progress
 

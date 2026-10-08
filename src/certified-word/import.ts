@@ -54,7 +54,7 @@ import {
 // The importer's version: with the recompute's versions it names the extractor (ADR 0006 decision
 // 6), and it is locked to the hash of this directory's code and of its golden vectors
 // (importer.lock.json, `npm run certified-word:lock`), so a change of what it makes changes it.
-export const IMPORTER_VERSION = "1.3.1";
+export const IMPORTER_VERSION = "1.3.2";
 export const CERTIFIED_WORD_IMPORTER = `certified-word-import/${IMPORTER_VERSION}`;
 
 export const CERTIFIED_WORD_IDENTIFIER_SYSTEM = "https://khs.dev/fhir/identifier/certified-word";

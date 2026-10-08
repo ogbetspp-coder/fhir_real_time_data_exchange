@@ -137,9 +137,9 @@ def test_what_cannot_be_made_whole_is_refused() -> None:
     with pytest.raises(recompute.RefusedError) as refused:
         recompute.recompute(_docx(*_smpc()[:-2]), _request())
     assert refused.value.code == "structure"
-    # One section the builder refuses (a tab Word draws as a jump) refuses the whole.
+    # One section the builder refuses (two tabs Word draws as jumps: columns) refuses the whole.
     with pytest.raises(recompute.RefusedError) as refused:
-        recompute.recompute(_docx(*_smpc("a\tb")), _request())
+        recompute.recompute(_docx(*_smpc("a\tb\tc")), _request())
     assert refused.value.code == "section"
     # A document with no leaflet.
     with pytest.raises(recompute.RefusedError) as refused:
