@@ -1029,6 +1029,19 @@ deployed worker is expected to be refused `certified-word-document-unbound`, whi
 the worker found under its own identity and verified with the key its image carries gives
 (the pull request's post-deploy steps).
 
+**Verified after the deploy (2026-10-08, main a00b4cd).** That run, through the deployed
+worker under `ema-flow-workflow-dev`, answered HTTP 422 `certified-word-document-unbound`: step 5
+read the record under the worker's identity and verified it with the key its image carries.
+
+**The record for `word-epi/1.4.0` (2026-10-08, main 1fa5212, #208).** A builder version is part of the
+request, so `fidelity-norm/3.4.0`'s build looks for the synthetic SmPC's record at another path. Its
+request (key `48c680712be78fa7…`) was published once to `ema-flow-dev-word-drawing-requests` at
+02:33:40 UTC; the build succeeded and stored
+`word/48c68071…/a69dd51c…/1.json`, which `scripts/word-drawing/stored.py` accepts against
+`keys/dev/1.pem`, dev, key version 1, image `sha256:eff4827a…`, `word-drawing/1.2.1` and that
+request (exit 0, commit 1fa5212). The gate's tests keep their own record for the current build,
+signed by a test key, since every reader or builder version moves the path again.
+
 ## Build order, each change reviewed on its own
 
 1. **Measure first** (partly done 2026-10-07, above, in "Step 1": the corpus with the pinned
