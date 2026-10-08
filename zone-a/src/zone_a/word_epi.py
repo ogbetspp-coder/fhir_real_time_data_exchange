@@ -130,7 +130,7 @@ from zone_a.structure import line
 from zone_a.underline import underline_changes
 
 # The narrative builder's and the page serialiser's version: one, as they are one closed list.
-WORD_EPI_VERSION: Final = "word-epi/1.5.0"
+WORD_EPI_VERSION: Final = "word-epi/1.5.1"
 
 CARRIED: Final = {"bold": "strong", "italic": "em", "superscript": "sup", "subscript": "sub"}
 # Section 3 step 4's bullet glyphs: a list bullet in page text, removed at a line start.
@@ -143,8 +143,10 @@ WHITESPACE: Final = frozenset(
 )
 # The template's grey, as the registry keeps it (``zone_a.qrd.registry``): highlight or shading;
 # and C0C0C0 shading, which Word draws in the highlight's colour (owner decision 2026-10-07, ADR
-# 0006 decision 9, by Word's own print). A solid fill is opaque, and a theme fill is another kind
-# (``shading-THEME-...``). A pattern's grey waits for the reader to spell a theme pattern colour.
+# 0006 decision 9, by Word's own print). A solid fill is opaque; a theme fill the reader resolves
+# is its colour's (``shading-D9D9D9``, docx-reader/1.34.0), one it does not another kind
+# (``shading-THEME-...``). The pattern greys (``shading-pct15-AUTO-AUTO``...) wait for a fidelity
+# norm: the reader spells a theme pattern colour apart from docx-reader/1.34.0.
 GREY: Final = frozenset({"highlight-lightGray", "shading-D9D9D9", "shading-C0C0C0"})
 # How the narrative draws it: the EMA ePI style guide's form for QRD "not printed" text.
 GREY_SPAN: Final = '<span style="background-color: silver;">'
@@ -432,8 +434,10 @@ def unpainted(paragraph: Paragraph, mark: Mark) -> bool:
     One whose text from its start to the paragraph's end is only U+0020, which Word draws
     unstruck and unpainted (its own print of synthetic probes, 2026-10-08: a strike, a yellow
     highlight and solid black shading over trailing spaces, and a paragraph or a table cell of
-    such spaces, drew nothing; over spaces between words, or over trailing U+00A0, each drew).
-    A pattern's or a theme's shading is not on record, and is refused.
+    such spaces, drew nothing; over spaces between words, or over trailing U+00A0, each drew). A
+    theme's shade the reader resolves to a solid kind is painted alike (the reader's
+    corpus/drawing-cases shading-trailing). A pattern's shading, or a theme's the reader leaves
+    named (``shading-THEME-...``), is not on record, and is refused.
     """
     kind = mark.kind
     return (
