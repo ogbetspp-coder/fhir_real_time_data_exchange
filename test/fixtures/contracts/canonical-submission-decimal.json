@@ -1573,12 +1573,12 @@
       }
     ],
     "fidelity": {
-      "normalizationVersion": "fidelity-norm/3.4.0",
+      "normalizationVersion": "fidelity-norm/3.5.0",
       "status": "passed",
       "sectionsChecked": 32,
       "sectionsMatched": 32,
       "narrativeBindingSha256": "ff84541ac9562bc2600567b55e7c5cf4f5343a4b2f691ee7e8fc9d77c3f2ba44",
-      "reportSha256": "53a7bb06836ff59ad223ae4f4ae6e147196d8a2d42858211033ba9cc8f95f67b",
+      "reportSha256": "d075ebb8f310f67b5d71c9d46a4336dbf18ca15768f3b715eb12c59561016212",
       "reportUri": "gs://synthetic-bucket/synthetic-smoketest-smpc.fidelity-report.json"
     }
   },
@@ -1588,6 +1588,6 @@
     "approvedAt": "2026-09-19T00:00:00Z",
     "method": "api-attestation",
     "meaning": "reviewed-fidelity-and-structure",
-    "approvedContentSha256": "c8eccd8608e1359e51bc5cea3e99cb35d894a857fee79d7ad30f2cf2031c5227"
+    "approvedContentSha256": "c2a31d2458c86e1652c44732b8e9c4f304a07b15e5c183340a1fe4f5476f0a4d"
   }
 }

@@ -34,6 +34,10 @@ Two outputs, written by separate code from the same read, so that the fidelity c
   per row of Word's grid, read row by row (U+FDD2, then each slot: U+0009 U+FDD3 U+0009 and the
   cell's text where a cell starts, U+0009 U+FDD4 U+0009 where a cell to the left spans it, U+0009
   U+FDD5 U+0009 where a merged cell above covers it), and U+FDD1. Every line ends in U+000A.
+  Both lay the grid by one rule, each by its own code (``_rows``, ``_slots``): the grid columns a
+  row leaves out at its start or end are an empty cell over them (owner decision 10, 2026-10-08),
+  and a grid column at which no cell starts is dropped, each cell spanning the columns kept (the
+  HTML table model draws such a column at no width).
 
 What is carried, a closed list. A section is refused on the first paragraph that holds anything
 else, with the code in parentheses:
@@ -43,7 +47,9 @@ else, with the code in parentheses:
   as the highlight (``GREY``; owner decisions of 2026-10-06 and 2026-10-07).
   An underline is left out where it cannot change what the text says (``zone_a.underline``, a
   hyphen inside an underlined word included), else (``underline``); so are capitals and small
-  capitals over text that capitals draw the same ("4."). Any other mark, capitals elsewhere,
+  capitals over text that capitals draw the same ("4."), and a strike, a highlight or a solid
+  shading over U+0020 that end the paragraph's text, which Word does not paint (``unpainted``).
+  Any other mark, capitals elsewhere,
   strike-through, another highlight or shading, faint, raised or lowered by position, or
   right-to-left text, is refused (``formatting``);
 - raised or lowered text: letters, the digits and signs of the specification's fold tables, and
@@ -54,12 +60,15 @@ else, with the code in parentheses:
   and one of "1.", "2.", ... from one an ``ol``; any other list is written as its labels' text
   (FHIR's narrative rule allows no ``start`` or ``type`` on ``ol``, and EMA's stylesheet draws
   every ``ul`` with discs), except a section 3 step 4 bullet glyph in a table cell, which the page
-  leaves out (``list-label``; owner decision 2026-10-06). One list level in the section, since
+  leaves out (``list-label``; owner decision 2026-10-06), and a label written as text that would
+  join the number its item begins with (``joins``: "1" before "000 mg", "-" before "2 to 8 C";
+  ``list-label``). One list level in the section, since
   nesting is not carried (``list-level``); no paragraph that draws a label and holds no text
   (``empty-numbered``);
-- tables: one level, with Word's grid on record, no grid columns left out at a row's ends, and
-  every vertically merged cell under a cell of the same columns that starts or continues the
-  merge, with no text of its own (``table-grid``, ``table-shape``, ``nested-table``); no row of
+- tables: one level, with Word's grid on record, no row of no cells that leaves grid columns
+  out, and every vertically merged cell under a cell of the same columns that starts or continues
+  the merge in the row above, with no text of its own (``table-grid``, ``table-shape``,
+  ``nested-table``); no row of
   exact height, whose text Word clips (``row-height``); a table wholly inside one section
   (``table-across-sections``);
 - pictures: in line, PNG or JPEG, uncropped and with nothing the reader found against them, at
@@ -67,11 +76,15 @@ else, with the code in parentheses:
   2%; a picture is an ``img`` of the ``data:`` URI of its exact bytes, and on the page U+FFFC, the
   SHA-256 of that URI, and U+FFFC (``picture``);
 - text: no soft hyphen (``soft-hyphen``), tab (``tab``: Word draws it as a jump to a tab stop),
-  but the one after a label typed at the start of a paragraph's text (a bullet glyph or dash, a
-  footnote mark, "1.", "a)", "(iv)", a caption's "Table 1:" or "Figure 3.", or a raised footnote
-  key of one to three code points) in a paragraph that draws no list label, in a table cell or
-  outside one, which the narrative and the page write as a space (``typed_tab``; owner decisions
-  of 2026-10-06 and 2026-10-07), line or paragraph separator (``line-separator``), or
+  but these, in a paragraph that draws no list label, in a table cell or outside one, which the
+  narrative and the page write as a space (``spaced``; owner decisions of 2026-10-06 to
+  2026-10-08): the tabs before the text starts (an indent); the one after a label typed at the
+  start of the text (a bullet glyph or dash, a footnote mark, "1.", "a)", "(iv)", a caption's
+  "Table 1:" or "Figure 3.", or a raised footnote key of one to three code points;
+  ``typed_tab``); else the one tab past the indent, where there is one, that is not raised or
+  lowered and stands in no right-to-left text; none where, as a space, it would join a number to
+  a number or a dash or minus before it (``joins``).
+  No line or paragraph separator (``line-separator``), or
   line that starts with a bullet glyph after a line break (``bullet-after-break``: section 3 step
   4 would read it as a list bullet);
 - no comment (``comment``) and no hidden paragraph mark (``hidden-mark``, the paragraph runs on
@@ -104,20 +117,20 @@ import hashlib
 import itertools
 import re
 import unicodedata
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
 from label_docx.reader import Mark, Paragraph, Picture
 
 from zone_a.certified import Body
-from zone_a.fidelity.normalize import NormalizationError, normalize_text
+from zone_a.fidelity.normalize import NormalizationError, is_gap, normalize_text
 from zone_a.fidelity.xhtml import XhtmlError, list_marker, xhtml_to_text
 from zone_a.structure import line
 from zone_a.underline import underline_changes
 
 # The narrative builder's and the page serialiser's version: one, as they are one closed list.
-WORD_EPI_VERSION: Final = "word-epi/1.4.0"
+WORD_EPI_VERSION: Final = "word-epi/1.5.0"
 
 CARRIED: Final = {"bold": "strong", "italic": "em", "superscript": "sup", "subscript": "sub"}
 # Section 3 step 4's bullet glyphs: a list bullet in page text, removed at a line start.
@@ -213,15 +226,113 @@ def typed_tab(paragraph: Paragraph) -> int | None:
     return None
 
 
+# Bidi classes beside which a space may be drawn otherwise than a tab: a tab ends a bidi segment
+# (it is drawn at the paragraph's level) and a space does not (it may join right-to-left text).
+REORDERING: Final = frozenset(
+    {"R", "AL", "AN", "LRE", "RLE", "LRO", "RLO", "PDF", "LRI", "RLI", "FSI", "PDI"}
+)
+
+
+def spaced(paragraph: Paragraph) -> str:
+    """The paragraph's text with each tab the narrative and the page write as a space, a space.
+
+    Only where the paragraph draws no list label (section 7; ADR 0006 owner decisions of
+    2026-10-06 to 2026-10-08), in a table cell or outside one; the EMA's own ePIs carry no tab:
+
+    - its indent: every tab before the text starts, past section 3 step 5 whitespace but the line
+      feed (decision 12);
+    - then, as if the indent were absent, the tab after a typed label (``typed_tab``; decisions
+      1, 7 and 9); else the one tab past the indent, where there is exactly one (decision 11),
+      unless it is inside a superscript or subscript mark, or the text holds a code point of a
+      class in ``REORDERING`` (a space between two right-to-left words, or one and a number, is
+      drawn between them reversed, a tab is not);
+    - each, unless as a space it would join a number to what stands before it (``joins``): a
+      number, as section 6 reads "1 000", or a dash or minus, which then reads as its sign
+      ("- 2 to 8 °C" as -2); from 3.5.0 for a typed label's tab too, a fix to decision 9's rule
+      ("Table 1", a tab, "2-year").
+
+    Every other tab stays, and is refused (``tab``): two or more past the indent are columns.
+    """
+    text = paragraph.text
+    if _label(paragraph):
+        return text
+    start = len(text) - len(text.lstrip(_INLINE_WHITESPACE))
+    spaces = [i for i in range(start) if text[i] == "\t"]
+    at = typed_tab(paragraph)
+    tabs = [i for i in range(start, len(text)) if text[i] == "\t"]
+    if at is None and len(tabs) == 1:
+        at = tabs[0]
+        scripted = any(
+            m.kind in ("superscript", "subscript") and m.start <= at < m.end
+            for m in paragraph.marks
+        )
+        if scripted or any(unicodedata.bidirectional(c) in REORDERING for c in text):
+            at = None
+    out = list(text)
+    for i in [*spaces, *([] if at is None else [at])]:
+        if not joins(text[:i], text[i + 1 :]):
+            out[i] = " "
+    return "".join(out)
+
+
+# What may stand before a number's digits and be read with them, one or more: a decimal
+# separator (".", ",", U+00B7, U+066B, their fullwidth and small forms), a sign (U+00B1, "+"), or
+# a dash or minus (``minus``): "1", a tab, ",5 mg" as a space reads "1 ,5 mg", and "5", a tab,
+# "-20" (an en dash, as the EMA writes a minus) "5 -20", a range. Not a bracket or a comparison
+# sign ("(", U+2265, "<", "~"): a number after one reads as no sign's.
+NUMBER_LEADS: Final = frozenset(".,\u00b7\u066b\uff0c\uff0e\ufe50\ufe52\u00b1+")
+# A dash or a minus, besides general category Pd: before a number, a space after it reads as the
+# number's sign ("- 2 to 8 °C", a storage temperature, as -2). The reader maps a Symbol font's
+# minus to U+2212.
+MINUS: Final = frozenset("\u2212\u207b\u208b\ufe63\uff0d\u2796\u2043\u02d7")
+
+
+def minus(character: str) -> bool:
+    """A dash or a minus: of general category Pd, or in ``MINUS``."""
+    return unicodedata.category(character) == "Pd" or character in MINUS
+
+
+def joins(before: str, after: str) -> bool:
+    """Whether a space between ``before`` and ``after`` would join a number to what precedes it.
+
+    ``after`` starts with a number (``_numeric_beside``, a sign or separator before one included),
+    and the last code point of ``before`` past every gap (``is_gap``; a line break is one, which a
+    table cell writes as a space) and every combining mark (to its base) is numeric, as section 6
+    reads "1 000" as one number, or is a dash or minus (``minus``), which then reads as the
+    number's sign. The one test for a tab written as a space (``spaced``) and for a label written
+    as text before its item (``_flow``).
+    """
+    shown = (c for c in reversed(before) if not is_gap(ord(c)))
+    last = next((c for c in shown if not unicodedata.category(c).startswith("M")), "")
+    return (
+        last != ""
+        and (unicodedata.numeric(last, None) is not None or minus(last))
+        and _numeric_beside(after, lead=True)
+    )
+
+
+def _numeric_beside(side: Iterable[str], lead: bool = False) -> bool:
+    """Whether ``side``, read past every gap (``is_gap``), starts with a number.
+
+    Its first code point is numeric (``unicodedata.numeric``: a digit of any script, a raised one
+    as the read holds it, a script digit, a vulgar fraction, a circled digit, a Roman numeral, a
+    CJK numeral); or, where ``lead``, a run of ``NUMBER_LEADS`` and dashes or minus signs
+    (``minus``) stands before such a code point.
+    """
+    shown = (c for c in side if not is_gap(ord(c)))
+    first = next(shown, "")
+    while lead and first != "" and (first in NUMBER_LEADS or minus(first)):
+        first = next(shown, "")
+    return first != "" and unicodedata.numeric(first, None) is not None
+
+
 def _check(index: int, paragraph: Paragraph, images: Mapping[str, bytes] | None = None) -> None:
     """The refusals of the module docstring that do not depend on marks.
 
     A paragraph drawn as nothing may hold a tab; its marks are judged as any others are. A tab
-    after a label typed at the start of the text is a space (``typed_tab``).
+    the narrative and the page write as a space is one (``spaced``).
     """
-    text = paragraph.text.replace("\t", " ") if blank(paragraph) else paragraph.text
-    if (at := typed_tab(paragraph)) is not None:
-        text = text[:at] + " " + text[at + 1 :]
+    text = paragraph.text.replace("\t", " ") if blank(paragraph) else spaced(paragraph)
     if paragraph.comments:
         raise RefusedError("comment", index, "a comment")
     if paragraph.mark_hidden:
@@ -303,12 +414,41 @@ def unchanged_by_capitals(text: str) -> bool:
     return all(character.upper() == character for character in text)
 
 
+# Word's highlight colours (ST_HighlightColor but "none"), each a solid paint, as the reader
+# spells them; and a solid shading, a clear pattern's fill of six hex digits, as it spells it.
+HIGHLIGHTS: Final = frozenset(
+    f"highlight-{colour}"
+    for colour in (
+        *("black", "blue", "cyan", "green", "magenta", "red", "yellow", "white", "darkBlue"),
+        *("darkCyan", "darkGreen", "darkMagenta", "darkRed", "darkYellow", "darkGray", "lightGray"),
+    )
+)
+SOLID_SHADING: Final = re.compile("shading-[0-9A-F]{6}")
+
+
+def unpainted(paragraph: Paragraph, mark: Mark) -> bool:
+    """A strike, highlight or solid shading that Word paints over nothing: it is left out.
+
+    One whose text from its start to the paragraph's end is only U+0020, which Word draws
+    unstruck and unpainted (its own print of synthetic probes, 2026-10-08: a strike, a yellow
+    highlight and solid black shading over trailing spaces, and a paragraph or a table cell of
+    such spaces, drew nothing; over spaces between words, or over trailing U+00A0, each drew).
+    A pattern's or a theme's shading is not on record, and is refused.
+    """
+    kind = mark.kind
+    return (
+        kind == "strike" or kind in HIGHLIGHTS or SOLID_SHADING.fullmatch(kind) is not None
+    ) and set(paragraph.text[mark.start :]) <= {" "}
+
+
 def _marks(index: int, paragraph: Paragraph) -> list[Mark]:
     """The paragraph's carried marks; refuses one that is neither carried nor left out."""
     out: list[Mark] = []
     for mark in paragraph.marks:
         if mark.kind in CARRIED or mark.kind in GREY:
             out.append(mark)
+        elif unpainted(paragraph, mark):
+            continue
         elif mark.kind == "underline":
             if underline_changes(paragraph.text, mark.start, mark.end, hyphens_in_words=True):
                 raise RefusedError("underline", index, "an underline that can change the text")
@@ -355,8 +495,40 @@ class _Cell:
     paragraphs: tuple[int, ...]
 
 
-def _grid(table: int, members: Sequence[int], body: Body) -> tuple[int, list[list[_Cell]]]:
-    """The table's grid width and, row by row, the cells that start in it."""
+# A cell as ``_rows`` lays it: its first column and its span on the grid as laid, its vertical
+# merge as Word stores it, and its index among its row's own cells (None: an empty cell).
+_Laid = tuple[int, int, str | None, int | None]
+
+
+def _rows(grid: Mapping[str, Any]) -> list[list[_Laid]]:
+    """Each row's cells as the narrative lays them (section 7; the page by ``_slots``).
+
+    The grid columns a row leaves out at its start or end (``before``, ``after``) are an empty
+    cell over them, where Word draws no cell and no text (ADR 0006 owner decision 10,
+    2026-10-08). Then every grid column at which no cell starts is dropped, and each cell spans
+    only the columns kept: every cell over such a column covers the one before it too, so the
+    HTML table model draws it at no width (section 5 refuses it, ``table-shape``), where Word
+    draws it inside the cells that span it; the table without it is the same table, each value in
+    the same cell. The reader lays each row's cells side by side over the columns exactly
+    (``label_docx.certify``), so a cell ends where another starts or at the grid's end.
+    """
+    laid: list[list[_Laid]] = []
+    for row in grid["rows"]:
+        cells: list[_Laid] = [
+            (c["column"], c["span"], c["merge"], n) for n, c in enumerate(row["cells"])
+        ]
+        if row["before"]:
+            cells.insert(0, (0, row["before"], None, None))
+        if row["after"]:
+            cells.append((grid["columns"] - row["after"], row["after"], None, None))
+        laid.append(cells)
+    kept = sorted({cell[0] for cells in laid for cell in cells})
+    at = {column: n for n, column in enumerate(kept)} | {grid["columns"]: len(kept)}
+    return [[(at[c], at[c + s] - at[c], m, n) for c, s, m, n in cells] for cells in laid]
+
+
+def _grid(table: int, members: Sequence[int], body: Body) -> list[list[_Cell]]:
+    """The table's cells that start in each row, row by row, on the grid as laid (``_rows``)."""
     entry = body.tables[table]
     first = members[0]
     by_cell: dict[tuple[int, int], list[int]] = {}
@@ -372,34 +544,67 @@ def _grid(table: int, members: Sequence[int], body: Body) -> tuple[int, list[lis
     if set(by_cell) != on_grid:
         raise RefusedError("table-shape", first, "cells and grid differ")
     # A cell as it is built: [column, span, rows, paragraphs]. ``merging`` maps a column to the
-    # cell whose vertical merge a cell there may continue.
+    # cell whose vertical merge a cell there may continue: an empty cell (decision 10) starts
+    # none, so a merge that would run through one is under no cell of its columns.
     starts: list[list[list[Any]]] = []
     merging: dict[int, list[Any]] = {}
-    for r, row in enumerate(grid["rows"]):
-        if row["before"] or row["after"]:
-            raise RefusedError("table-shape", first, "grid columns left out at a row's end")
+    for r, (row, cells) in enumerate(zip(grid["rows"], _rows(grid), strict=True)):
+        if not row["cells"] and (row["before"] or row["after"]):
+            raise RefusedError("table-shape", first, "a row of no cells that leaves columns out")
         if row.get("exactHeight"):
             raise RefusedError("row-height", first, "a row of exact height: Word clips its text")
         here: list[list[Any]] = []
         still: dict[int, list[Any]] = {}
-        for c, cell in enumerate(row["cells"]):
-            paragraphs = tuple(by_cell[r, c])
-            if cell["merge"] == "continue":
-                above = merging.get(cell["column"])
-                if above is None or above[1] != cell["span"]:
+        for column, span, merge, c in cells:
+            paragraphs = () if c is None else tuple(by_cell[r, c])
+            if merge == "continue":
+                above = merging.get(column)
+                if above is None or above[1] != span:
                     raise RefusedError("table-shape", first, "a merge under no cell of its columns")
                 if not all(blank(body.paragraphs[i]) for i in paragraphs):
                     raise RefusedError("table-shape", paragraphs[0], "text in a merged cell")
                 above[2] += 1
-                still[cell["column"]] = above
+                still[column] = above
                 continue
-            start = [cell["column"], cell["span"], 1, paragraphs]
+            start = [column, span, 1, paragraphs]
             here.append(start)
-            if cell["merge"] == "restart":
-                still[cell["column"]] = start
+            if merge == "restart":
+                still[column] = start
         merging = still
         starts.append(here)
-    return grid["columns"], [[_Cell(*cell) for cell in here] for here in starts]
+    return [[_Cell(*cell) for cell in here] for here in starts]
+
+
+def _slots(grid: Mapping[str, Any]) -> list[list[tuple[str, int | None]]]:
+    """Each row's slots as the page writes them: a grid marker and the cell's index (or None).
+
+    Written apart from ``_rows``, so that the fidelity check compares two readings of the grid.
+    Each grid column of a row has an owner: the cell over it, or the empty cell over the columns
+    the row leaves out at its start or at its end. A column is written where some row's owner
+    changes (the first always); each written column is U+FDD5 where its owner continues a
+    vertical merge, U+FDD4 where its owner covers the column before it, else U+FDD3.
+    """
+    owners: list[list[int | str]] = []
+    for row in grid["rows"]:
+        owner: list[int | str] = ["before"] * row["before"]
+        for c, cell in enumerate(row["cells"]):
+            owner += [c] * cell["span"]
+        owners.append(owner + ["after"] * row["after"])
+    written = [k for k in range(grid["columns"]) if k == 0 or any(o[k] != o[k - 1] for o in owners)]
+    out: list[list[tuple[str, int | None]]] = []
+    for row, owner in zip(grid["rows"], owners, strict=True):
+        slots: list[tuple[str, int | None]] = []
+        for k in written:
+            here = owner[k]
+            cell = here if isinstance(here, int) else None
+            if cell is not None and row["cells"][cell]["merge"] == "continue":
+                slots.append(("\ufdd5", cell))
+            elif k > 0 and owner[k - 1] == here:
+                slots.append(("\ufdd4", cell))
+            else:
+                slots.append(("\ufdd3", cell))
+        out.append(slots)
+    return out
 
 
 # ---- narrative ---------------------------------------------------------------------------------
@@ -421,9 +626,7 @@ def _source(picture: Picture, images: Mapping[str, bytes]) -> str:
 
 def _inline(paragraph: Paragraph, marks: Sequence[Mark], images: Mapping[str, bytes]) -> str:
     """The text as XHTML: a run of one set of marks in its elements, a break br, a picture img."""
-    text = paragraph.text
-    if (at := typed_tab(paragraph)) is not None:
-        text = text[:at] + " " + text[at + 1 :]
+    text = spaced(paragraph)
     pictures = {picture.offset: picture for picture in paragraph.pictures}
     cuts = sorted(
         {0, len(text), *(m.start for m in marks), *(m.end for m in marks)}
@@ -487,7 +690,7 @@ def _blocks(indices: Sequence[int], body: Body) -> Iterator[list[int]]:
         if table is None:
             yield [i for i in run if not blank(body.paragraphs[i])]
             continue
-        for row in _grid(table, run, body)[1]:
+        for row in _grid(table, run, body):
             for cell in row:
                 yield [i for i in cell.paragraphs if not blank(body.paragraphs[i])]
 
@@ -528,6 +731,10 @@ def _flow(
             if in_cell and label in BULLETS:
                 # The page leaves a bullet glyph's label out of a cell (section 7).
                 raise RefusedError("list-label", i, "a bullet no HTML list draws, in a cell")
+            if joins(label, body.paragraphs[i].text):
+                # A label written before a number would join it: "1" and "000 mg" as "1 000 mg",
+                # "-" and "2 to 8 °C" as -2 (section 7).
+                raise RefusedError("list-label", i, "a label that joins the number after it")
             out.append(f"<p>{_escape(label)} {text}</p>")
     return "".join(out)
 
@@ -540,7 +747,7 @@ def narrative(indices: Sequence[int], body: Body, marks: Mapping[int, list[Mark]
             out.append(_flow([i for i in run if not blank(body.paragraphs[i])], body, marks, False))
             continue
         out.append("<table>")
-        for row in _grid(table, run, body)[1]:
+        for row in _grid(table, run, body):
             out.append("<tr>")
             for cell in row:
                 attributes = "" if cell.span == 1 else f' colspan="{cell.span}"'
@@ -611,11 +818,9 @@ def _line(
 
     Each picture is U+FFFC, the SHA-256 of the ``data:`` URI of its bytes, and U+FFFC.
     """
-    # The tab after a label typed at the start of the text is a space (section 7), on the page as
-    # in the narrative, raised or lowered with its mark as a space is.
-    source = paragraph.text
-    if (tab := typed_tab(paragraph)) is not None:
-        source = source[:tab] + " " + source[tab + 1 :]
+    # A tab written as a space (section 7, ``spaced``) is one on the page as in the narrative,
+    # raised or lowered with its mark as a space is.
+    source = spaced(paragraph)
     text = list(source)
     for mark in marks:
         table = _RAISED if mark.kind == "superscript" else _LOWERED
@@ -650,27 +855,26 @@ def page(indices: Sequence[int], body: Body, marks: Mapping[int, list[Mark]]) ->
                 if not blank(body.paragraphs[i])
             ]
             continue
-        # The slots straight from Word's grid, each row on its own, by code apart from the
-        # builder's (which works out each merged cell's rows): the fidelity check then compares
-        # the two readings of the grid.
+        # The slots from Word's grid (``_slots``: decision 10's empty cells, the columns no cell
+        # starts at dropped), each row on its own, by code apart from the builder's (``_rows``,
+        # and each merged cell's rows): the fidelity check then compares the two readings.
         by_cell: dict[tuple[int, int], list[int]] = {}
         for i in run:
             where = body.paragraphs[i].table
             assert where is not None  # noqa: S101 - a table's run
             by_cell.setdefault((where[1], where[2]), []).append(i)
         out.append("\ufdd0\n")
-        for r, row in enumerate(body.tables[table]["grid"]["rows"]):
+        for r, row in enumerate(_slots(body.tables[table]["grid"])):
             slots: list[str] = []
-            for c, cell in enumerate(row["cells"]):
-                if cell["merge"] == "continue":
-                    slots += ["\t\ufdd5\t"] * cell["span"]
-                    continue
-                text = " ".join(
-                    _line(i, body.paragraphs[i], marks[i], True, body.images)
-                    for i in by_cell[r, c]
-                    if not blank(body.paragraphs[i])
-                )
-                slots += ["\t\ufdd3\t" + text] + ["\t\ufdd4\t"] * (cell["span"] - 1)
+            for marker, c in row:
+                text = ""
+                if marker == "\ufdd3" and c is not None:
+                    text = " ".join(
+                        _line(i, body.paragraphs[i], marks[i], True, body.images)
+                        for i in by_cell[r, c]
+                        if not blank(body.paragraphs[i])
+                    )
+                slots.append(f"\t{marker}\t{text}")
             out.append("\ufdd2" + "".join(slots) + "\n")
         out.append("\ufdd1\n")
     # Like the scanner's text, a page begins with a line break: the start of a text is no line
@@ -721,14 +925,15 @@ def _heading(index: int, paragraph: Paragraph) -> None:
 
     A tab is a gap the title reads as a space; capitals are taken as Word draws them in the title
     (``zone_a.structure.line``); any other mark but bold, italic, an underline that cannot change
-    the text and small capitals over text they draw the same, and a label run into the text, would
-    draw the title otherwise.
+    the text, small capitals over text they draw the same and one Word paints over nothing
+    (``unpainted``), and a label run into the text, would draw the title otherwise.
     """
     _check(index, dataclasses.replace(paragraph, text=paragraph.text.replace("\t", " ")))
     for mark in paragraph.marks:
         text = paragraph.text[mark.start : mark.end]
         if not (
             mark.kind in ("bold", "italic", "caps")
+            or unpainted(paragraph, mark)
             or (mark.kind == "smallCaps" and unchanged_by_capitals(text))
             or (
                 mark.kind == "underline"

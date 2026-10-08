@@ -540,6 +540,14 @@ const WORD_NARRATIVE =
   '<tr><td rowspan="2"><p>Under 50 kg</p></td><td><ul><li>5 mg</li></ul></td></tr>' +
   "<tr><td><p>2.5 mg in the elderly</p></td></tr></table></div>";
 
+// fidelity-norm/3.5.0's grid: as zone_a.word_epi builds it (the vectors below).
+const WORD_GRID_NARRATIVE = div(
+  "<p> Table 2: Dose by weight</p><table><tr><td><p>Weight</p></td><td><p>Dose</p></td></tr>" +
+    "<tr><td><p>Under 40 kg</p></td><td><p>5 mg (one tablet)</p></td></tr>" +
+    "<tr><td><p>40 kg or more</p></td><td></td></tr><tr><td></td><td><p>See 4.4</p></td></tr>" +
+    "</table><p>Take with food.  </p>",
+);
+
 export const verifyCases: VerifyCase[] = [
   // A body boundary inside a line, or a body that excludes more than a header/footer could hold,
   // invalidates the page: the extractor-declared range is bounded, not trusted.
@@ -2912,6 +2920,48 @@ export const verifyCases: VerifyCase[] = [
       return toInput(source, single("smpc.4.2.posology", narrative, [spanFor(source, 1, page)]));
     })(),
     expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  // fidelity-norm/3.5.0: a grid column no cell starts at is dropped; the grid columns a row leaves
+  // out at its start or end are an empty cell (ADR 0006 decision 10); a lone tab and an indent's
+  // tab are spaces (decisions 11 and 12); a strike over trailing spaces is left out. The page as
+  // zone_a.word_epi writes it from a read of three grid columns (column 1 starts no cell; the
+  // third row leaves out column 2, the fourth columns 0 and 1) and the narrative it builds from
+  // the same read. Reviewed by hand: two columns, each value in its cell, an empty cell where
+  // Word draws none, and the spaces written for the tabs.
+  {
+    name: "certified-word-dropped-column-and-empty-cells",
+    input: (() => {
+      const page =
+        "\n Table 2: Dose by weight\n﷐\n﷒\t﷓\tWeight\t﷓\tDose\n" +
+        "﷒\t﷓\tUnder 40 kg\t﷓\t5 mg (one tablet)\n" +
+        "﷒\t﷓\t40 kg or more\t﷓\t\n﷒\t﷓\t\t﷓\tSee 4.4\n﷑\n" +
+        "Take with food.  \n";
+      const source = wordSource(page);
+      return toInput(
+        source,
+        single("smpc.4.2.posology", WORD_GRID_NARRATIVE, [spanFor(source, 1, page)]),
+      );
+    })(),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  // ... and against a narrative with the third row's empty cell before its value, not after it:
+  // the value is in another column, and fails.
+  {
+    name: "certified-word-empty-cell-on-the-wrong-side",
+    input: (() => {
+      const page =
+        "\n Table 2: Dose by weight\n﷐\n﷒\t﷓\tWeight\t﷓\tDose\n" +
+        "﷒\t﷓\tUnder 40 kg\t﷓\t5 mg (one tablet)\n" +
+        "﷒\t﷓\t40 kg or more\t﷓\t\n﷒\t﷓\t\t﷓\tSee 4.4\n﷑\n" +
+        "Take with food.  \n";
+      const moved = WORD_GRID_NARRATIVE.replace(
+        "<tr><td><p>40 kg or more</p></td><td></td></tr>",
+        "<tr><td></td><td><p>40 kg or more</p></td></tr>",
+      );
+      const source = wordSource(page);
+      return toInput(source, single("smpc.4.2.posology", moved, [spanFor(source, 1, page)]));
+    })(),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
   },
 ];
 

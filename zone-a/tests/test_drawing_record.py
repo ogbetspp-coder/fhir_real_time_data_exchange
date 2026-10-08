@@ -103,7 +103,7 @@ def test_a_request_that_does_not_fit_the_bytes_is_refused(monkeypatch: pytest.Mo
             with pytest.raises(recompute.RefusedError) as refused:
                 drawing.record(label, asked)
             assert refused.value.code == code
-    # The label the recompute refuses (a tab in 4.2) draws nothing.
+    # The label the recompute refuses (two tabs in 4.2) draws nothing.
     refused_label = (FIXTURES / "smpc-refused.docx").read_bytes()
     with pytest.raises(recompute.RefusedError) as refused:
         drawing.record(refused_label, _request("smpc-refused"))

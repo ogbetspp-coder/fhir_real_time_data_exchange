@@ -30,7 +30,7 @@ from label_docx.reader import Anchored, CommentReference, Mark, Numbering, Parag
 from zone_a import certified, drawing, word_epi
 from zone_a.certified import Body, read_body
 from zone_a.fidelity.normalize import normalize_text
-from zone_a.fidelity.xhtml import xhtml_to_text
+from zone_a.fidelity.xhtml import XhtmlError, xhtml_to_text
 from zone_a.structure import structure
 from zone_a.word_epi import GREY_SPAN, ROOT, RefusedError, _section, blank, sections
 
@@ -61,15 +61,13 @@ def _p(
     return Paragraph(text, None, numbering, table, marks=tuple(Mark(*m) for m in marks), **extra)
 
 
-def _grid(
-    columns: int, *rows: list[tuple[int, int, str | None]], before: int = 0
-) -> dict[str, Any]:
+def _grid(columns: int, *rows: list[tuple[int, int, str | None]]) -> dict[str, Any]:
     return {
         "grid": {
             "columns": columns,
             "rows": [
                 {
-                    "before": before,
+                    "before": 0,
                     "after": 0,
                     "cells": [{"column": c, "span": s, "merge": m} for c, s, m in row],
                 }
@@ -305,57 +303,477 @@ def test_a_tab_after_a_raised_footnote_key_is_a_space(
     assert _same(div, page)
 
 
+# What decisions 7 and 9 do not read as a typed label: a bare letter or number that is not raised,
+# a decimal, four raised code points or a lead that mixes raised and level ones, a raised key that
+# is or may join right-to-left text, a caption's word with no number or another number. Under
+# decision 11 the lone tab after one is a space all the same, unless it is right-to-left text.
+NOT_TYPED = (
+    _p("a \u2022\tb"),
+    _p("n\t= 50"),
+    _p("1\tTake"),
+    _p("2.5\tmg"),
+    _p("Adults\t10 mg"),
+    _p("e.g.\tx"),
+    _p("\u2011\u2011\tx"),
+    _p("abcd\tx", (0, 4, "superscript")),
+    _p("ab\tx", (0, 1, "superscript")),
+    _p("ab\tx", (1, 2, "superscript")),
+    _p("a b\tx", (0, 1, "superscript"), (2, 3, "superscript")),
+    _p("a\tx", (0, 1, "subscript")),
+    _p("Tables 1\tx"),
+    _p("Table\tx"),
+    _p("Table \tx"),
+    _p("table 1\tx"),
+    _p("TABLE 1\tx"),
+    _p("Table  1\tx"),
+    _p("Table\u20091\tx"),
+    _p("Table 1234\tx"),
+    _p("Table 1A\tx"),
+    _p("Table 1ab\tx"),
+    _p("Table 1.2\tx"),
+    _p("Table 1)\tx"),
+    _p("Table 1:.\tx"),
+    _p("Fig. 1\tx"),
+)
+NOT_TYPED_RIGHT_TO_LEFT = (
+    _p("\u0627\t\u0646\u0635", (0, 1, "superscript")),
+    _p("\u200f\tx", (0, 1, "superscript")),
+    _p("a\u200f\tx", (0, 2, "superscript")),
+    _p("\u0661\tx", (0, 1, "superscript")),
+    _p("Table \u0661\tx"),
+)
+
+
+# Numbers that are not Nd: a vulgar fraction, a circled digit, a Roman numeral, a script digit.
+NUMERALS = ("\u00bd", "\u00bc", "\u2460", "\u216b", "\u00b3")
+
+
+@pytest.mark.parametrize("numeral", NUMERALS)
+def test_a_tab_between_a_number_and_a_numeral_is_refused(numeral: str) -> None:
+    """As a space, "Day 1", a tab, "\u00bd tablet" would read "1\u00bd": a number of any kind
+    on both sides keeps the tab, a lone tab or a typed label's, in a cell as outside."""
+    for paragraph in (
+        _p(f"Day 1\t{numeral} tablet"),
+        _p(f"Dose {numeral}\t2 tablets"),
+        _p(f"Dose {numeral}\t{numeral}"),
+        _p(f"Table 1\t{numeral} of patients"),
+        _p(f"1\t{numeral}", (0, 1, "superscript")),
+    ):
+        for tables, where in (((), None), (CELL, (0, 0, 0))):
+            with pytest.raises(RefusedError) as refused:
+                _build(dataclasses.replace(paragraph, table=where), tables=tables)
+            assert refused.value.code == "tab", (paragraph.text, where)
+    div, page = _build(_p(f"Dose {numeral}\tdaily"), _p(f"Day 1\tTablet {numeral}"))
+    assert _inner(div) == f"<p>Dose {numeral} daily</p><p>Day 1 Tablet {numeral}</p>"
+    assert _same(div, page)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "1\t,5 mg",
+        "1\t.5",
+        "1\t\u22122",
+        "5\t\u00b11",
+        "1\t+2",
+        "1\t-2",
+        "1\t\u00b7 5",
+        "1\t\u00b1\u20091",
+        "Table 1\t,5",
+        "Table 1\t\u066b5",
+        "1\t\uff0c5",
+        "1\t\uff0e5",
+        "1\t\ufe505",
+        "1\t\ufe525",
+        "1\t+.5",
+        "1\t\u2212,5",
+    ],
+)
+def test_a_tab_before_a_sign_or_a_decimal_separator_and_a_digit_is_refused(text: str) -> None:
+    """A decimal separator or a sign before a digit is read with it: "1", a tab, ",5 mg" as a
+    space would read "1 ,5 mg"."""
+    for tables, where in (((), None), (CELL, (0, 0, 0))):
+        with pytest.raises(RefusedError) as refused:
+            _build(_p(text, table=where), tables=tables)
+        assert refused.value.code == "tab", (text, where)
+
+
+@pytest.mark.parametrize(
+    "text", ["1\t, then 2", "1\t- see 4.4", "5\t\u00b1 SD", "1\t.", "Table 1\t+ placebo", "a\t-2"]
+)
+def test_a_tab_before_a_sign_or_a_separator_and_no_digit_is_a_space(text: str) -> None:
+    div, page = _build(_p(text))
+    assert _inner(div) == "<p>" + word_epi._escape(text.replace("\t", " ")) + "</p>"
+    assert _same(div, page)
+
+
+DASH_LABELS = ("-", "\u2011", "\u2013", "\u2014")
+
+
+@pytest.mark.parametrize("dash", DASH_LABELS)
+def test_a_typed_dash_before_a_number_keeps_its_tab(dash: str) -> None:
+    """As a space, "\u2013", a tab, "2 to 8 \u00b0C" would read as a minus: -2 \u00b0C, a storage
+    temperature. A fix narrowing decisions 7 and 9, in a cell as outside."""
+    for text in (
+        f"{dash}\t2 to 8 \u00b0C",
+        f"{dash}\t\u00bd tablet",
+        f"{dash}\t,5 mg",
+        f"{dash}\t\u22122",
+        f"{dash} \t2 tablets",
+        f"\t{dash}\t2 tablets",
+    ):
+        for tables, where in (((), None), (CELL, (0, 0, 0))):
+            with pytest.raises(RefusedError) as refused:
+                _build(_p(text, table=where), tables=tables)
+            assert refused.value.code == "tab", (text, where)
+    div, page = _build(_p(f"{dash}\tTablets"), _p(f"{dash}\tTake 2"), _p(f"{dash}\t, then"))
+    assert _inner(div) == f"<p>{dash} Tablets</p><p>{dash} Take 2</p><p>{dash} , then</p>"
+    assert _same(div, page)
+
+
+@pytest.mark.parametrize("dash", DASH_LABELS)
+def test_a_dash_list_label_before_a_number_is_refused(dash: str) -> None:
+    """Decision 6 writes a dash label as text: before a number it would read as a minus."""
+    for text in ("2 tablets", "\u00bd tablet", " \u22122 \u00b0C", ",5 mg", "\u2460"):
+        for tables, where in (((), None), (CELL, (0, 0, 0))):
+            with pytest.raises(RefusedError) as refused:
+                _build(_p(text, label=dash, table=where), tables=tables)
+            assert refused.value.code == "list-label", (text, where)
+    div, page = _build(_p("Tablets", label=dash), _p("Take 2", label=dash))
+    assert _inner(div) == f"<p>{dash} Tablets</p><p>{dash} Take 2</p>"
+    assert _same(div, page)
+    # A list HTML draws, of bullets or numbers, writes no label as text.
+    div, page = _build(_p("2 tablets", label="\u2022"), _p("2 mg", label="1.", num=2))
+    assert _inner(div) == "<ul><li>2 tablets</li></ul><ol><li>2 mg</li></ol>"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Storage:\n-\t2 to 8 \u00b0C",
+        "x\n\u2013\t2",
+        "- \t2",
+        "\u2013 \u2013\t2",
+        "Store at -\t2 to 8 \u00b0C",
+        "Store at\u00a0\u2013\t2",
+        # A Symbol font's minus, as the reader maps it, and the other dashes and minus signs.
+        *(
+            f"{dash}\t2 to 8 \u00b0C"
+            for dash in "\u2212\u2010\u2012\u2015\ufe63\uff0d\ufe58\u207b\u2796"
+        ),
+        "-\t+.5",
+        # Read across a line break, which a cell writes as a space.
+        "5\n\t2",
+    ],
+)
+def test_a_tab_after_any_dash_or_minus_before_a_number_is_refused(text: str) -> None:
+    """One test for every tab written as a space: the last code point before it, past every gap
+    (a line break included), a dash (Pd) or a minus, and a number after it keep the tab: as a
+    space, "- 2 to 8 \u00b0C" reads as -2 \u00b0C."""
+    for tables, where in (((), None), (CELL, (0, 0, 0))):
+        with pytest.raises(RefusedError) as refused:
+            _build(_p(text, table=where), tables=tables)
+        assert refused.value.code == "tab", (text, where)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Storage:\n-\tsee 6.4",
+        "- \tsee",
+        "\u2212\tsee",
+        "\u2010\tTablets",
+        "Store at -\tsee below",
+        # A bracket or a comparison sign before the number: no sign's.
+        "Store at -\t(2 to 8 \u00b0C)",
+        "-\t\u22652",
+        "-\t<2",
+        "-\t~2",
+    ],
+)
+def test_a_tab_after_a_dash_before_no_number_is_a_space(text: str) -> None:
+    div, page = _build(_p(text))
+    drawn = word_epi._escape(text.replace("\t", " ")).replace("\n", "<br/>")
+    assert _inner(div) == f"<p>{drawn}</p>"
+    assert _same(div, page)
+
+
+@pytest.mark.parametrize(
+    ("label", "text"),
+    [
+        ("\u2212", "2 to 8 \u00b0C"),
+        ("- ", "2 tablets"),
+        ("\u2010", "2 tablets"),
+        ("\u2015", " ,5 mg"),
+        # Two numbers joined through the label (section 7, decision 6).
+        ("1", "000 mg"),
+        ("1.1", "5 mg"),
+        ("12", "\u00bd tablet"),
+        ("\u2160", "2"),
+    ],
+)
+def test_a_label_written_as_text_that_joins_the_number_after_it_is_refused(
+    label: str, text: str
+) -> None:
+    for tables, where in (((), None), (CELL, (0, 0, 0))):
+        with pytest.raises(RefusedError) as refused:
+            _build(_p(text, label=label, table=where), tables=tables)
+        assert refused.value.code == "list-label", (label, text, where)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # A dash or minus after the tab is the number's sign: an en dash, as the EMA writes a
+        # minus ("5", a tab, "\u201320 \u00b0C" would read as the range 5\u201320 \u00b0C).
+        "5\t\u201320 \u00b0C",
+        "1\t\u20132",
+        "5\t\uff0d2",
+        "5\t\u2796 2",
+        "Day 1\t\u20142",
+        "1\t\u2010.5",
+        # A hyphen bullet or a modifier minus before the tab.
+        "\u2043\t2 to 8",
+        "\u02d7\t2",
+        # A combining mark is read to its base.
+        "-\u0301\t2 to 8",
+        "5\u0301\t2",
+        "-\u0332\t2",
+    ],
+)
+def test_a_dash_or_a_combining_mark_beside_a_number_keeps_the_tab(text: str) -> None:
+    for tables, where in (((), None), (CELL, (0, 0, 0))):
+        with pytest.raises(RefusedError) as refused:
+            _build(_p(text, table=where), tables=tables)
+        assert refused.value.code == "tab", (text, where)
+
+
+@pytest.mark.parametrize(("label", "text"), [("1", "\u20132"), ("\u02d7", "2"), ("\u2043", "2 mg")])
+def test_a_label_before_a_dash_number_or_a_minus_label_before_a_number_is_refused(
+    label: str, text: str
+) -> None:
+    with pytest.raises(RefusedError) as refused:
+        _build(_p(text, label=label))
+    assert refused.value.code == "list-label"
+
+
+def test_a_dash_after_the_tab_before_no_number_is_a_space() -> None:
+    div, page = _build(
+        _p("-\tTablets"), _p("\u2013\tTake 2"), _p("5\t\u2013 see 4.4"), _p("a\t\u20132")
+    )
+    assert _inner(div) == (
+        "<p>- Tablets</p><p>\u2013 Take 2</p><p>5 \u2013 see 4.4</p><p>a \u20132</p>"
+    )
+    assert _same(div, page)
+
+
+@pytest.mark.parametrize(
+    ("label", "text"),
+    [
+        ("\u2212", "Tablets"),
+        ("- ", "see 4.4"),
+        ("a)", "5 mg"),
+        ("(1)", "2 mg"),
+        ("3.", "5 mg"),
+        ("1", "mg"),
+    ],
+)
+def test_a_label_written_as_text_before_no_number_or_after_none_is_carried(
+    label: str, text: str
+) -> None:
+    div, page = _build(_p(text, label=label))
+    assert _inner(div) == f"<p>{word_epi._escape(label)} {text}</p>"
+    assert _same(div, page)
+
+
+@pytest.mark.parametrize(
+    ("marks", "drawn"),
+    [
+        # The tab inside a raised or lowered run: refused (None).
+        (((2, 5, "superscript"),), None),
+        (((3, 4, "superscript"),), None),
+        (((3, 6, "subscript"),), None),
+        (((0, 7, "subscript"),), None),
+        # A run that ends at the tab, or starts after it: the tab is level, a space.
+        (((2, 3, "superscript"),), "ab<sup>c</sup> de"),
+        (((4, 6, "subscript"),), "abc <sub>de</sub>"),
+        (((0, 3, "superscript"), (4, 6, "superscript")), "<sup>abc</sup> <sup>de</sup>"),
+    ],
+)
+def test_a_raised_or_lowered_tab_is_refused_and_a_level_one_beside_a_run_is_a_space(
+    marks: tuple[tuple[int, int, str], ...], drawn: str | None
+) -> None:
+    """Decision 11: a lone tab inside a superscript or subscript mark stays refused, unless a
+    raised key carries it (decision 9: ``test_a_typed_label_keeps_precedence_over_a_lone_tab``)."""
+    for tables, where in (((), None), (CELL, (0, 0, 0))):
+        paragraph = _p("abc\tde", *marks, table=where)
+        if drawn is None:
+            with pytest.raises(RefusedError) as refused:
+                _build(paragraph, tables=tables)
+            assert refused.value.code == "tab", (marks, where)
+            continue
+        div, page = _build(paragraph, tables=tables)
+        assert drawn in div
+        assert _same(div, page)
+
+
+# A raised combining mark: refused as script, whatever its tab is.
+@pytest.mark.parametrize(
+    "paragraph", [*NOT_TYPED, *NOT_TYPED_RIGHT_TO_LEFT, _p("a\u0301\tx", (0, 2, "superscript"))]
+)
+def test_what_decisions_7_and_9_read_as_no_typed_label(paragraph: Paragraph) -> None:
+    assert word_epi.typed_tab(paragraph) is None
+    assert word_epi.typed_tab(dataclasses.replace(paragraph, table=(0, 0, 0))) is None
+
+
+@pytest.mark.parametrize("paragraph", NOT_TYPED)
+def test_a_lone_tab_is_a_space(paragraph: Paragraph) -> None:
+    """Owner decision 11 (2026-10-08): the one tab of a paragraph's text, past its indent, is a
+    space in a table cell as outside one, where no digit stands on both sides of it and it is not
+    raised or lowered; the text, its order and its code points are Word's."""
+    text = paragraph.text.replace("\t", " ")
+    for tables, where in (((), None), (CELL, (0, 0, 0))):
+        div, page = _build(dataclasses.replace(paragraph, table=where), tables=tables)
+        assert "\t" not in div
+        assert page == (
+            f"\n{text}\n" if where is None else f"\n\ufdd0\n\ufdd2\t\ufdd3\t{text}\n\ufdd1\n"
+        )
+        assert _same(div, page)
+
+
+@pytest.mark.parametrize(
+    ("text", "drawn"),
+    [
+        ("Step 1\tTake one", "Step 1 Take one"),
+        ("10 mg\t 20 mg", "10 mg  20 mg"),
+        ("x\ny\tz", "x<br/>y z"),
+        ("a <\t5", "a &lt; 5"),
+    ],
+)
+def test_a_lone_tab_mid_text_is_a_space(text: str, drawn: str) -> None:
+    div, page = _build(_p(text))
+    assert _inner(div) == f"<p>{drawn}</p>"
+    assert page == "\n" + text.replace("\t", " ") + "\n"
+    assert _same(div, page)
+
+
+def test_a_typed_label_keeps_precedence_over_a_lone_tab() -> None:
+    """Decision 9's raised key carries its tab where decision 11 would not: the tab raised with
+    its key."""
+    div, page = _build(_p("a\tx", (0, 2, "superscript")), _p("a\t2 mg", (0, 1, "superscript")))
+    assert _inner(div) == "<p><sup>a </sup>x</p><p><sup>a</sup> 2 mg</p>"
+    assert page == "\na x\na 2 mg\n"
+    assert _same(div, page)
+
+
+@pytest.mark.parametrize(
+    "paragraph",
+    [
+        _p("Table 1\t2-year results"),
+        _p("Table 12 \t2-year results"),
+        _p("Figure 3\t\u00a010 mg"),
+        _p("1\t2 mg", (0, 1, "superscript")),
+        _p("1\t2 mg", (0, 2, "superscript")),
+        _p("a1\t2 mg", (0, 2, "superscript")),
+        _p("\u00b9\t2 mg", (0, 1, "superscript")),
+        _p("Table 2\t\u00b2"),
+        _p("Table 1\t\u2082"),
+        _p("\tTable 1\t2-year results"),
+    ],
+)
+def test_a_typed_labels_tab_between_two_digits_is_refused(paragraph: Paragraph) -> None:
+    """From 3.5.0, a fix to decision 9's rule: as a space, the tab after a label that ends in a
+    digit (a raised one, or a script digit, included) would join it to a digit after it into one
+    number, as section 6 reads "1 000"; the tab stays, refused, in a cell as outside."""
+    for tables, where in (((), None), (CELL, (0, 0, 0))):
+        with pytest.raises(RefusedError) as refused:
+            _build(dataclasses.replace(paragraph, table=where), tables=tables)
+        assert refused.value.code == "tab", (paragraph.text, where)
+
+
+@pytest.mark.parametrize(
+    ("paragraph", "drawn", "paged"),
+    [
+        (_p("Table 1:\t2-year results"), "Table 1: 2-year results", "Table 1: 2-year results"),
+        (_p("Table 1.\t2-year results"), "Table 1. 2-year results", "Table 1. 2-year results"),
+        (_p("Table 1a\t2-year results"), "Table 1a 2-year results", "Table 1a 2-year results"),
+        (_p("1.\t2 mg"), "1. 2 mg", "1. 2 mg"),
+        (_p("a\t2 mg", (0, 1, "superscript")), "<sup>a</sup> 2 mg", "a 2 mg"),
+        (_p("Table 1\tAge"), "Table 1 Age", "Table 1 Age"),
+    ],
+)
+def test_a_typed_labels_tab_with_no_digit_on_one_side_is_a_space(
+    paragraph: Paragraph, drawn: str, paged: str
+) -> None:
+    div, page = _build(paragraph)
+    assert _inner(div) == f"<p>{drawn}</p>"
+    assert page == f"\n{paged}\n"
+    assert _same(div, page)
+
+
+@pytest.mark.parametrize(
+    ("text", "drawn"),
+    [
+        ("\tTake once daily.", " Take once daily."),
+        ("\t\t- led", "  - led"),
+        ("\t\u2022\tled", " \u2022 led"),
+        ("\u00a0\t\u25cf\tled", "\u00a0 \u25cf led"),
+        ("\tTable 1:\tDose", " Table 1: Dose"),
+        ("\tAdults\t10 mg", " Adults 10 mg"),
+    ],
+)
+def test_the_tabs_of_an_indent_are_spaces(text: str, drawn: str) -> None:
+    """Owner decision 12 (2026-10-08): the tabs before a paragraph's text starts are its indent,
+    each a space; the tabs after it are judged as if it were absent."""
+    for tables, where in (((), None), (CELL, (0, 0, 0))):
+        div, page = _build(_p(text, table=where), tables=tables)
+        if where is None:
+            assert _inner(div) == f"<p>{drawn}</p>"
+            assert page == f"\n{drawn}\n"
+        else:
+            assert _inner(div) == f"<table><tr><td><p>{drawn}</p></td></tr></table>"
+            assert page == f"\n\ufdd0\n\ufdd2\t\ufdd3\t{drawn}\n\ufdd1\n"
+        assert _same(div, page)
+
+
 def test_every_other_tab_is_refused() -> None:
-    # A tab is still Word's jump to a tab stop: a second one, one before the label, one in the
-    # text, after a bare letter or number that is not raised (a column: "n<tab>= 50"), after a
-    # decimal, after a list label, after four raised code points or a lead that mixes raised and
-    # level ones, after a caption's word with no number or another number, in a table cell as
-    # outside one.
+    # A tab is still Word's jump to a tab stop: two or more past the indent (columns), one
+    # between two digits (read past every gap: "1 000" would read as one number), one raised or
+    # lowered that no raised key carries, one in right-to-left text (a space joins its bidi
+    # segments, a tab does not), and any tab after a list label, in a table cell as outside one.
     raised = "superscript"
     for paragraph in (
         _p("\u2022\t\tdouble"),
-        _p("\t\u2022\tled"),
-        _p("\t- led"),
-        _p("a \u2022\tb"),
         _p("\u2022\ta\tb"),
         _p("-\ta\tb"),
-        _p("n\t= 50"),
-        _p("1\tTake"),
-        _p("2.5\tmg"),
-        _p("Adults\t10 mg"),
-        _p("e.g.\tx"),
-        _p("\u2022\tx", label="1."),
-        _p("\u2011\u2011\tx"),
-        _p("abcd\tx", (0, 4, raised)),
-        _p("ab\tx", (0, 1, raised)),
-        _p("ab\tx", (1, 2, raised)),
-        _p("a b\tx", (0, 1, raised), (2, 3, raised)),
-        _p("a\tx", (0, 1, "subscript")),
-        # A raised key that is or may join right-to-left text: a tab separates bidi segments.
-        _p("\u0627\t\u0646\u0635", (0, 1, raised)),
-        _p("\u200f\tx", (0, 1, raised)),
-        _p("a\u200f\tx", (0, 2, raised)),
-        _p("\u0661\tx", (0, 1, raised)),
-        _p("a\u0301\tx", (0, 2, raised)),
+        _p("a\tb\tc"),
+        _p("\ta\tb\tc"),
+        _p("\t\u2022\ta\tb"),
         _p("a\tx\ty", (0, 1, raised)),
-        _p("a\tx", (0, 1, raised), label="1."),
-        _p("Tables 1\tx"),
-        _p("Table\tx"),
-        _p("Table \tx"),
-        _p("table 1\tx"),
-        _p("TABLE 1\tx"),
-        _p("Table  1\tx"),
-        _p("Table\u20091\tx"),
-        _p("Table 1234\tx"),
-        _p("Table 1A\tx"),
-        _p("Table 1ab\tx"),
-        _p("Table 1.2\tx"),
-        _p("Table 1)\tx"),
-        _p("Table 1:.\tx"),
-        _p("Table \u0661\tx"),
-        _p("Fig. 1\tx"),
         _p("Table 1:\tx\ty"),
+        _p("1\t000"),
+        _p("10\t 000"),
+        _p("10 \t\u00a0000"),
+        _p("1\t\u2009000"),
+        _p("1\u2007\t2"),
+        _p("1\t\n2"),
+        _p("\t1\t000"),
+        _p("Dose 10\t20"),
+        _p("10\t3", (3, 4, raised)),
+        _p("ab x\ty", (3, 6, raised)),
+        _p("10\t2", (2, 3, raised)),
+        _p("x\ty", (1, 2, "subscript")),
+        _p("\u05d0\t\u05d1"),
+        _p("\u0627\t\u0628"),
+        _p("\u05d0\t1"),
+        _p("a\t\u05d0"),
+        _p("x\t\u0661"),
+        *NOT_TYPED_RIGHT_TO_LEFT,
+        _p("\u2022\tx", label="1."),
+        _p("a\tx", (0, 1, raised), label="1."),
         _p("Table 1:\tx", label="1."),
+        _p("a\tb", label="1."),
+        _p("\tx", label="1."),
     ):
         for tables, where in (((), None), (CELL, (0, 0, 0))):
             with pytest.raises(RefusedError) as refused:
@@ -415,6 +833,201 @@ def test_a_table_carries_its_grid() -> None:
         "\ufdd1\nafter\n"
     )
     assert _same(div, text)
+
+
+def _rows_grid(columns: int, *rows: tuple[int, list[tuple[int, int, str | None]], int]) -> Any:
+    """A table whose rows each leave ``before`` and ``after`` grid columns out."""
+    table = _grid(columns, *(cells for _, cells, _ in rows))
+    for row, (before, _, after) in zip(table["grid"]["rows"], rows, strict=True):
+        row["before"], row["after"] = before, after
+    return table
+
+
+def _in_cells(*texts: list[str]) -> list[Paragraph]:
+    """One paragraph per cell, row by row: ``texts[r][c]`` in row r's cell c."""
+    return [_p(text, table=(0, r, c)) for r, row in enumerate(texts) for c, text in enumerate(row)]
+
+
+def test_a_grid_column_at_which_no_cell_starts_is_dropped() -> None:
+    """Section 7 (fidelity-norm/3.5.0): a column no cell starts at is drawn at no width, which
+    section 5 refuses (``table-shape``); without it the table is the same, each value in its cell.
+    """
+    table = _grid(3, [(0, 2, None), (2, 1, None)], [(0, 3, None)], [(0, 2, None), (2, 1, None)])
+    div, page = _build(*_in_cells(["a", "b"], ["c"], ["d", "e"]), tables=(table,))
+    assert _inner(div) == (
+        "<table><tr><td><p>a</p></td><td><p>b</p></td></tr>"
+        '<tr><td colspan="2"><p>c</p></td></tr>'
+        "<tr><td><p>d</p></td><td><p>e</p></td></tr></table>"
+    )
+    assert page == (
+        "\n\ufdd0\n\ufdd2\t\ufdd3\ta\t\ufdd3\tb\n\ufdd2\t\ufdd3\tc\t\ufdd4\t\n\ufdd2\t\ufdd3\td\t\ufdd3\te\n\ufdd1\n"
+    )
+    assert _same(div, page)
+    # The table as Word's grid has it is what section 5 refuses.
+    with pytest.raises(XhtmlError) as refused:
+        xhtml_to_text(
+            ROOT + '<table><tr><td colspan="2">a</td><td>b</td></tr><tr><td colspan="3">c</td></tr>'
+            '<tr><td colspan="2">d</td><td>e</td></tr></table></div>'
+        )
+    assert refused.value.code == "table-shape"
+
+
+def test_columns_dropped_keep_a_merge_and_every_other_boundary() -> None:
+    # Columns 1 and 2 start no cell: a merged cell spans one column; column 3 stays.
+    table = _grid(
+        4, [(0, 3, "restart"), (3, 1, None)], [(0, 3, "continue"), (3, 1, None)], [(0, 4, None)]
+    )
+    div, page = _build(*_in_cells(["a", "b"], ["", "c"], ["d"]), tables=(table,))
+    assert _inner(div) == (
+        '<table><tr><td rowspan="2"><p>a</p></td><td><p>b</p></td></tr>'
+        '<tr><td><p>c</p></td></tr><tr><td colspan="2"><p>d</p></td></tr></table>'
+    )
+    assert page == (
+        "\n\ufdd0\n\ufdd2\t\ufdd3\ta\t\ufdd3\tb\n\ufdd2\t\ufdd5\t\t\ufdd3\tc\n\ufdd2\t\ufdd3\td\t\ufdd4\t\n\ufdd1\n"
+    )
+    assert _same(div, page)
+
+
+def test_a_grid_whose_every_column_starts_a_cell_is_unchanged() -> None:
+    table = _grid(3, [(0, 2, None), (2, 1, None)], [(0, 1, None), (1, 2, None)])
+    paragraphs = _in_cells(["a", "b"], ["c", "d"])
+    assert word_epi._rows(table["grid"]) == [
+        [(0, 2, None, 0), (2, 1, None, 1)],
+        [(0, 1, None, 0), (1, 2, None, 1)],
+    ]
+    # Column 1 starts a cell but none of one column: section 5 refuses it still.
+    with pytest.raises(RefusedError) as refused:
+        _build(*paragraphs, tables=(table,))
+    assert (refused.value.code, refused.value.detail) == ("narrative", "table-shape")
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "drawn", "slots"),
+    [
+        (1, 0, "<td></td><td><p>x</p></td>", "\t\ufdd3\t\t\ufdd3\tx"),
+        (0, 1, "<td><p>x</p></td><td></td>", "\t\ufdd3\tx\t\ufdd3\t"),
+        (1, 1, "<td></td><td><p>x</p></td><td></td>", "\t\ufdd3\t\t\ufdd3\tx\t\ufdd3\t"),
+        (2, 0, '<td colspan="2"></td><td><p>x</p></td>', "\t\ufdd3\t\t\ufdd4\t\t\ufdd3\tx"),
+    ],
+)
+def test_grid_columns_a_row_leaves_out_are_an_empty_cell(
+    before: int, after: int, drawn: str, slots: str
+) -> None:
+    """Owner decision 10 (2026-10-08): Word draws no cell there and no text; the ePI holds the
+    same text in the same columns, with an empty cell over them."""
+    columns = 1 + before + after
+    table = _rows_grid(
+        columns,
+        (before, [(before, 1, None)], after),
+        (0, [(c, 1, None) for c in range(columns)], 0),
+    )
+    paragraphs = [_p("x", table=(0, 0, 0)), *(_p(f"{c}", table=(0, 1, c)) for c in range(columns))]
+    div, page = _build(*paragraphs, tables=(table,))
+    second = "".join(f"<td><p>{c}</p></td>" for c in range(columns))
+    assert _inner(div) == f"<table><tr>{drawn}</tr><tr>{second}</tr></table>"
+    row = "".join(f"\t\ufdd3\t{c}" for c in range(columns))
+    assert page == f"\n\ufdd0\n\ufdd2{slots}\n\ufdd2{row}\n\ufdd1\n"
+    assert _same(div, page)
+
+
+def test_an_empty_cell_and_a_dropped_column_together() -> None:
+    # Row 0 leaves out two columns at its start; no cell starts at column 1, so the empty cell
+    # spans one column of the grid as laid.
+    table = _rows_grid(3, (2, [(2, 1, None)], 0), (0, [(0, 2, None), (2, 1, None)], 0))
+    div, page = _build(*_in_cells(["x"], ["a", "b"]), tables=(table,))
+    assert _inner(div) == (
+        "<table><tr><td></td><td><p>x</p></td></tr>"
+        "<tr><td><p>a</p></td><td><p>b</p></td></tr></table>"
+    )
+    assert page == "\n\ufdd0\n\ufdd2\t\ufdd3\t\t\ufdd3\tx\n\ufdd2\t\ufdd3\ta\t\ufdd3\tb\n\ufdd1\n"
+    assert _same(div, page)
+
+
+def test_an_empty_cell_beside_a_merge() -> None:
+    # Two rows leave column 0 out beside a cell merged down over both, then a full row.
+    table = _rows_grid(
+        2,
+        (1, [(1, 1, "restart")], 0),
+        (1, [(1, 1, "continue")], 0),
+        (0, [(0, 1, None), (1, 1, None)], 0),
+    )
+    div, page = _build(*_in_cells(["x"], [""], ["a", "b"]), tables=(table,))
+    assert _inner(div) == (
+        '<table><tr><td></td><td rowspan="2"><p>x</p></td></tr><tr><td></td></tr>'
+        "<tr><td><p>a</p></td><td><p>b</p></td></tr></table>"
+    )
+    assert page == (
+        "\n\ufdd0\n\ufdd2\t\ufdd3\t\t\ufdd3\tx\n\ufdd2\t\ufdd3\t\t\ufdd5\t\n"
+        "\ufdd2\t\ufdd3\ta\t\ufdd3\tb\n\ufdd1\n"
+    )
+    assert _same(div, page)
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        # A merge that would run through an empty cell: under no cell of its columns.
+        (
+            (0, [(0, 1, "restart"), (1, 1, None)], 0),
+            (1, [(1, 1, None)], 0),
+            (0, [(0, 1, "continue"), (1, 1, None)], 0),
+        ),
+        (
+            (0, [(0, 1, None), (1, 1, "restart")], 0),
+            (0, [(0, 1, None)], 1),
+            (0, [(0, 1, None), (1, 1, "continue")], 0),
+        ),
+        # A merge under an empty cell.
+        ((1, [(1, 1, None)], 0), (0, [(0, 1, "continue"), (1, 1, None)], 0)),
+        ((0, [(0, 1, None)], 1), (0, [(0, 1, None), (1, 1, "continue")], 0)),
+        # A row of no cells of its own.
+        ((0, [(0, 1, None), (1, 1, None)], 0), (2, [], 0)),
+        ((0, [(0, 1, None), (1, 1, None)], 0), (1, [], 1)),
+    ],
+)
+def test_an_empty_cell_that_would_meet_a_merge_is_refused(rows: Any) -> None:
+    table = _rows_grid(2, *rows)
+    paragraphs = [
+        _p("x" if merge != "continue" else "", table=(0, r, c))
+        for r, (_, cells, _) in enumerate(rows)
+        for c, (_, _, merge) in enumerate(cells)
+    ]
+    with pytest.raises(RefusedError) as refused:
+        _build(*paragraphs, tables=(table,))
+    assert refused.value.code == "table-shape"
+
+
+@pytest.mark.skipif(browser.find_chrome() is None, reason="Chrome is not installed")
+def test_chrome_draws_word_epi_1_5_0s_tables_tabs_and_unpainted_marks_as_word_does() -> None:
+    """The drawing check reads each as Chrome draws it: an empty cell and a dropped column draw
+    no line, a tab and a space collapse alike, and a mark over trailing spaces marks no character
+    that is not whitespace; held to the same drawing, a read that differs differs."""
+    # Column 3 starts no cell; rows 0 and 2 leave columns out.
+    table = _rows_grid(
+        4,
+        (1, [(1, 1, None), (2, 2, None)], 0),
+        (0, [(0, 2, None), (2, 2, None)], 0),
+        (0, [(0, 1, None)], 3),
+    )
+    paragraphs = (
+        _p("\tIndented", table=(0, 0, 0)),
+        _p("Dose", table=(0, 0, 1)),
+        _p("Adults\t10 mg", table=(0, 1, 0)),
+        _p("x   ", (1, 4, "highlight-yellow"), table=(0, 1, 1)),
+        _p("\t\u2022\tOnce", table=(0, 2, 0)),
+        _p("n\t= 50"),
+        _p("Alpha beta   ", (10, 13, "strike")),
+        _p("   ", (0, 3, "shading-000000")),
+    )
+    body = Body(paragraphs, (table,))
+    div, _ = _section(range(len(paragraphs)), body)
+    section = {"key": "s", "refusal": None, "narrative": div, "paragraphs": [0, len(paragraphs)]}
+    assert drawing.check(body, {"sections": [section]})["sections"] == [
+        {"key": "s", "agrees": True, "where": None}
+    ]
+    for at, change in ((2, {"text": "Adults\t10 mgx"}), (5, {"marks": (Mark(0, 1, "bold"),)})):
+        moved = _tampered(body, at, **change)
+        assert not drawing.check(moved, {"sections": [section]})["sections"][0]["agrees"]
 
 
 def test_whitespace_alone_is_drawn_as_nothing_and_left_out() -> None:
@@ -545,6 +1158,121 @@ def test_chrome_draws_every_grey_as_the_silver_span_word_shades() -> None:
     assert not drawing.check(plain, {"sections": [section]})["sections"][0]["agrees"]
 
 
+UNPAINTED = ("strike", "highlight-yellow", "highlight-darkBlue", "shading-000000", "shading-FF00AA")
+ORACLE = Path(__file__).parent / "fixtures" / "word-oracle"
+
+
+@pytest.mark.parametrize("kind", UNPAINTED)
+def test_a_mark_word_paints_over_nothing_is_left_out(kind: str) -> None:
+    """Word paints no strike, highlight or shading over U+0020 that end a paragraph's text (its
+    own print, 2026-10-08): the narrative and the page leave the mark out, in a cell as outside,
+    a paragraph or a cell of such spaces included."""
+    div, page = _build(
+        _p("Alpha beta   ", (10, 13, kind)),
+        _p("Alpha beta   ", (11, 12, kind)),
+        _p("   ", (0, 3, kind)),
+        _p("x   ", (2, 3, kind), table=(0, 0, 0)),
+        _p("   ", (0, 3, kind), table=(0, 0, 1)),
+        tables=(_grid(2, [(0, 1, None), (1, 1, None)]),),
+    )
+    assert _inner(div) == (
+        "<p>Alpha beta   </p><p>Alpha beta   </p>"
+        "<table><tr><td><p>x   </p></td><td></td></tr></table>"
+    )
+    assert (
+        page == "\nAlpha beta   \nAlpha beta   \n\ufdd0\n\ufdd2\t\ufdd3\tx   \t\ufdd3\t\n\ufdd1\n"
+    )
+    assert _same(div, page)
+
+
+@pytest.mark.parametrize("kind", [*UNPAINTED, "dstrike"])
+@pytest.mark.parametrize(
+    ("text", "start", "end"),
+    [
+        ("Alpha   beta", 5, 8),  # between words: Word paints it
+        ("Alpha beta\u00a0\u00a0", 10, 12),  # over U+00A0: Word paints it
+        ("Alpha beta \u00a0", 10, 11),  # U+00A0 after it
+        ("Alpha  \nbeta", 5, 7),  # a line break and text after it
+        ("Alpha beta  ", 6, 12),  # over a visible code point
+        ("Alpha beta \t", 10, 11),  # a tab after it
+        ("\u00a0\u00a0", 0, 2),  # a paragraph of U+00A0 alone
+    ],
+)
+def test_a_mark_over_spaces_word_paints_is_refused(
+    kind: str, text: str, start: int, end: int
+) -> None:
+    for tables, where in (((), None), (CELL, (0, 0, 0))):
+        with pytest.raises(RefusedError) as refused:
+            _build(_p(text, (start, end, kind), table=where), tables=tables)
+        assert refused.value.code == "formatting", (kind, text, where)
+    if kind != "dstrike":
+        assert not word_epi.unpainted(_p(text), Mark(start, end, kind))
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "dstrike",
+        # A pattern's or a theme's shading: not yet probed in Word.
+        *("shading-pct15-AUTO-AUTO", "shading-solid-000000-AUTO", "shading-pct50-FF0000-FFFF00"),
+        *("shading-THEME-background1", "shading-THEME-accent1"),
+        # Not a solid fill of six hex digits, or not one of Word's highlight colours.
+        *("shading-00000", "shading-0000000", "shading-00000g", "highlight-orange", "highlight-"),
+    ],
+)
+def test_a_mark_word_was_not_shown_painting_over_trailing_spaces_is_refused(kind: str) -> None:
+    """Only a strike, a highlight of Word's own colours and a solid shading were printed."""
+    for tables, where in (((), None), (CELL, (0, 0, 0))):
+        with pytest.raises(RefusedError) as refused:
+            _build(_p("Alpha   ", (5, 8, kind), table=where), tables=tables)
+        assert refused.value.code == "formatting", (kind, where)
+        assert not word_epi.unpainted(_p("Alpha   "), Mark(5, 8, kind))
+
+
+def test_the_highlights_are_words_sixteen_colours() -> None:
+    assert {kind.removeprefix("highlight-") for kind in word_epi.HIGHLIGHTS} == {
+        *("black", "blue", "cyan", "green", "magenta", "red", "yellow", "white", "darkBlue"),
+        *("darkCyan", "darkGreen", "darkMagenta", "darkRed", "darkYellow", "darkGray", "lightGray"),
+    }
+
+
+def test_the_marks_word_painted_over_nothing_in_its_own_print() -> None:
+    """Word's own print of the two synthetic probes (2026-10-08), read by the label reader: each
+    mark over trailing spaces drew nothing, and is left out; over spaces between words, or over
+    trailing U+00A0, it drew, and is refused."""
+    strike = read_body((ORACLE / "claude-strike-probe.docx").read_bytes())
+    painted = read_body((ORACLE / "claude-hl-probe.docx").read_bytes())
+    for body, cases in (
+        (strike, {0: "carried", 2: "formatting", 4: "carried", 6: "formatting"}),
+        (painted, {0: "carried", 2: "formatting", 4: "carried", 6: "carried", 8: "carried"}),
+        (painted, {10: "carried"}),
+    ):
+        for at, outcome in cases.items():
+            assert (at, _outcome(body, at)) == (at, outcome)
+
+
+def _outcome(body: Body, at: int) -> str:
+    """Paragraph ``at`` built as a section on its own: its refusal's code, or "carried"."""
+    try:
+        div, page = _section(range(at, at + 1), body)
+    except RefusedError as refused:
+        return refused.code
+    # A paragraph or a cell of the spaces alone draws nothing; no mark is written.
+    assert (div, page) == (None, "") if blank(body.paragraphs[at]) else _same(div or "", page)
+    assert "span" not in (div or "")
+    return "carried"
+
+
+def test_a_heading_may_end_in_spaces_word_paints_over_nothing() -> None:
+    for kind in UNPAINTED:
+        body = Body((_p("4.1 Y   ", (5, 8, kind)), _p("text"), _p("4.2 Z")), ())
+        built = sections(body, _structured({"smpc.4.1": 0, "smpc.4.2": 2}), REGISTRY)
+        assert built["refused"] == 0, kind
+        body = Body((_p("4.1   Y", (3, 6, kind)), _p("text"), _p("4.2 Z")), ())
+        built = sections(body, _structured({"smpc.4.1": 0, "smpc.4.2": 2}), REGISTRY)
+        assert built["sections"][0]["refusal"]["code"] == "heading-formatting", kind
+
+
 @pytest.mark.parametrize(
     ("paragraph", "code"),
     [
@@ -558,7 +1286,7 @@ def test_chrome_draws_every_grey_as_the_silver_span_word_shades() -> None:
         (_p("a<b", (1, 2, "superscript")), "script"),
         (_p("x\u00bd", (1, 2, "superscript")), "script"),
         (_p("word\u00adbreak"), "soft-hyphen"),
-        (_p("a\tb"), "tab"),
+        (_p("a\tb\tc"), "tab"),
         (_p("a\ufffcb"), "picture"),
         (_p("x\n\u2022 y"), "bullet-after-break"),
         (_p(" ", label="1."), "empty-numbered"),
@@ -591,7 +1319,6 @@ def test_a_list_that_changes_level_or_misses_a_number_is_refused() -> None:
             [_p("x", table=(0, 0, 0))],
             "table-grid",
         ),
-        (_grid(2, [(1, 1, None)], before=1), [_p("x", table=(0, 0, 0))], "table-shape"),
         (
             _grid(1, [(0, 1, None)], [(0, 1, "continue")]),
             [_p("x", table=(0, 0, 0)), _p("", table=(0, 1, 0))],
@@ -683,9 +1410,11 @@ def test_the_qrd_template_carries_what_its_markup_allows() -> None:
     structured = structure(body.paragraphs, REGISTRY, MAPPING, {"smpc.6.5": 192, "smpc.6.6": 196})
     built = sections(body, structured, REGISTRY)
     codes = Counter((s["refusal"] or {}).get("code", "carried") for s in built["sections"])
-    # The template's guidance in angle brackets and its tabs; its black triangle, drawn 0.9% out
-    # of its own proportions, and its grey (a silver span, from word-epi 1.3.0) are carried.
-    assert codes == {"carried": 27, "underline": 3, "tab": 2}
+    # The template's guidance in angle brackets; its black triangle, drawn 0.9% out of its own
+    # proportions, its grey (a silver span, from word-epi 1.3.0) and, from word-epi 1.5.0, the
+    # lone tab of "<2.1<tab>General description>" and "<11.<tab>DOSIMETRY>" (owner decision 11)
+    # are carried.
+    assert codes == {"carried": 29, "underline": 3}
 
 
 # ---- the two outputs, held to each other ---------------------------------------------------------
@@ -718,11 +1447,21 @@ def _random_paragraph(rng: random.Random, table: tuple[int, int, int] | None) ->
     text = " ".join(rng.choice(_WORDS) for _ in range(rng.randint(0, 6)))
     if rng.random() < 0.1:
         text += "\n" + rng.choice(_WORDS)
+    # Tabs (an indent, a lone one, several) and trailing spaces under a mark Word paints over
+    # nothing (word-epi 1.5.0).
+    if rng.random() < 0.2:
+        at = rng.randint(0, len(text))
+        text = text[:at] + "\t" + text[at:]
+    if rng.random() < 0.1:
+        text = "\t" + text
     marks = []
     for _ in range(rng.randint(0, 3)):
         if text:
             start = rng.randrange(len(text))
             marks.append((start, rng.randint(start + 1, len(text)), rng.choice(_KINDS)))
+    if rng.random() < 0.1:
+        marks.append((len(text), len(text) + 2, rng.choice(["strike", "highlight-yellow"])))
+        text += "  "
     label = rng.choice(_LABELS) if rng.random() < 0.4 else None
     return _p(text, *marks, label=label, num=rng.randint(1, 2), table=table)
 
@@ -735,10 +1474,15 @@ def _random_body(rng: random.Random) -> tuple[tuple[Paragraph, ...], tuple[dict[
             t = len(tables)
             columns = rng.randint(1, 3)
             rows = []
+            edges = []
             for r in range(rng.randint(1, 3)):
-                cells, column = [], 0
-                while column < columns:
-                    span = rng.randint(1, columns - column)
+                # The grid columns a row leaves out at its start and end (decision 10).
+                before = rng.choice([0, 0, 0, 1]) if columns > 1 else 0
+                after = rng.choice([0, 0, 0, 1]) if columns - before > 1 else 0
+                edges.append((before, after))
+                cells, column = [], before
+                while column < columns - after:
+                    span = rng.randint(1, columns - after - column)
                     merge = (
                         rng.choice([None, None, "restart", "continue"])
                         if r
@@ -750,7 +1494,9 @@ def _random_body(rng: random.Random) -> tuple[tuple[Paragraph, ...], tuple[dict[
                 for c in range(len(cells)):
                     for _ in range(rng.randint(1, 2)):
                         paragraphs.append(_random_paragraph(rng, (t, r, c)))
-            tables.append(_grid(columns, *rows))
+            tables.append(
+                _rows_grid(columns, *((b, row, a) for (b, a), row in zip(edges, rows, strict=True)))
+            )
         else:
             paragraphs.append(_random_paragraph(rng, None))
     return tuple(paragraphs), tuple(tables)
@@ -759,6 +1505,7 @@ def _random_body(rng: random.Random) -> tuple[tuple[Paragraph, ...], tuple[dict[
 def test_whatever_is_not_refused_the_scanner_reads_as_the_page() -> None:
     rng = random.Random(20261005)
     outcomes: Counter[str] = Counter()
+    reached: Counter[str] = Counter()
     for _ in range(3000):
         paragraphs, tables = _random_body(rng)
         try:
@@ -773,9 +1520,14 @@ def test_whatever_is_not_refused_the_scanner_reads_as_the_page() -> None:
             outcomes[f"scanner:{getattr(error, 'code', '?')}"] += 1
             continue
         assert scanned == normalize_text(text)
-    # The run must reach both outcomes often enough to mean something.
+        rows = [row for table in tables for row in table["grid"]["rows"]]
+        reached["an empty cell"] += any(row["before"] or row["after"] for row in rows)
+        reached["a tab"] += any("\t" in p.text and not blank(p) for p in paragraphs)
+        reached["unpainted"] += any(m.kind == "strike" for p in paragraphs for m in p.marks)
+    # The run must reach both outcomes, and word-epi 1.5.0's rules, often enough to mean something.
     assert outcomes["carried"] > 250
     assert sum(outcomes.values()) - outcomes["carried"] > 500
+    assert min(reached["an empty cell"], reached["a tab"], reached["unpainted"]) > 20
 
 
 # ---- real Word SmPCs, and what Chrome draws for them -------------------------------------------
@@ -1121,13 +1873,201 @@ def test_the_page_reads_the_grid_apart_from_the_builder(monkeypatch: pytest.Monk
     real = word_epi._grid
 
     def misread(table: int, members: Any, body: Body) -> Any:
-        columns, rows = real(table, members, body)
-        return columns, [[dataclasses.replace(cell, rows=1) for cell in row] for row in rows]
+        return [
+            [dataclasses.replace(cell, rows=1) for cell in row]
+            for row in real(table, members, body)
+        ]
 
     monkeypatch.setattr(word_epi, "_grid", misread)
     with pytest.raises(RefusedError) as refused:
         _build(*paragraphs, tables=tables)
     assert refused.value.code in ("narrative", "page-differs")
+
+
+def _random_grid(rng: random.Random) -> dict[str, Any]:
+    """A grid as the reader lays one: each row's cells side by side over the columns exactly."""
+    columns = rng.randint(1, 6)
+    rows = []
+    for _ in range(rng.randint(1, 5)):
+        before = rng.choice([0, 0, rng.randint(0, columns - 1)])
+        after = rng.choice([0, 0, rng.randint(0, columns - before - 1)])
+        cells, column = [], before
+        while column < columns - after:
+            span = rng.randint(1, columns - after - column)
+            cells.append(
+                {"column": column, "span": span, "merge": rng.choice([None, "restart", "continue"])}
+            )
+            column += span
+        rows.append({"before": before, "after": after, "cells": cells})
+    return {"columns": columns, "rows": rows}
+
+
+def test_the_page_and_the_builder_lay_the_grid_alike_by_separate_code() -> None:
+    """``_slots`` (the page) and ``_rows`` (the builder) are written apart; on random grids they
+    write the same slots: each cell's first column U+FDD3, the rest U+FDD4, a merge's U+FDD5."""
+    rng = random.Random(20261008)
+    dropped = 0
+    for _ in range(3000):
+        grid = _random_grid(rng)
+        laid = [
+            [
+                ("\ufdd5" if merge == "continue" else "\ufdd3" if k == 0 else "\ufdd4", n)
+                for column, span, merge, n in row
+                for k in range(span)
+            ]
+            for row in word_epi._rows(grid)
+        ]
+        assert word_epi._slots(grid) == laid, grid
+        dropped += len(laid[0]) < grid["columns"]
+    assert dropped > 300
+
+
+def _html_table_model(div: str) -> list[list[str]]:
+    """The narrative's table as the HTML table model places it: each slot the text of its cell,
+    a cell named by where it starts, so that two cells of one text are told apart."""
+    table = ET.fromstring(div).find("{http://www.w3.org/1999/xhtml}table")
+    assert table is not None
+    slots: dict[tuple[int, int], str] = {}
+    for r, tr in enumerate(table):
+        k = 0
+        for td in tr:
+            while (r, k) in slots:
+                k += 1
+            name = f"{r},{k}:" + "".join(td.itertext())
+            for dr in range(int(td.get("rowspan", "1"))):
+                for dk in range(int(td.get("colspan", "1"))):
+                    slots[r + dr, k + dk] = name
+            k += int(td.get("colspan", "1"))
+    rows = 1 + max(r for r, _ in slots)
+    return [[slots[r, k] for k in range(1 + max(k for _, k in slots))] for r in range(rows)]
+
+
+def _word_grid_model(
+    grid: dict[str, Any], texts: dict[tuple[int, int], str]
+) -> list[list[tuple[int, int, str]]]:
+    """The same from Word's grid, by its own rules: each grid column's owner, row by row (a
+    continued merge the owner above it, a column left out an empty cell of its own), then each
+    column whose owners are those of the column before it, in every row, left out."""
+    owners: list[list[tuple[int, int, str]]] = []
+    for r, row in enumerate(grid["rows"]):
+        owner = [(r, -1, "")] * row["before"]
+        for c, cell in enumerate(row["cells"]):
+            for k in range(cell["column"], cell["column"] + cell["span"]):
+                owner.append(owners[-1][k] if cell["merge"] == "continue" else (r, c, texts[r, c]))
+        owners.append(owner + [(r, -2, "")] * row["after"])
+    kept = [k for k in range(grid["columns"]) if k == 0 or any(o[k] != o[k - 1] for o in owners)]
+    return [[o[k] for k in kept] for o in owners]
+
+
+def _same_partition(html: list[list[str]], word: list[list[tuple[int, int, str]]]) -> bool:
+    """Whether the two grids group their slots into the same cells, each with the same text."""
+    if [len(row) for row in html] != [len(row) for row in word]:
+        return False
+    pairs = {(h, w) for hs, ws in zip(html, word, strict=True) for h, w in zip(hs, ws, strict=True)}
+    return len(pairs) == len({h for h, _ in pairs}) == len({w for _, w in pairs}) and all(
+        h.split(":", 1)[1] == w[2] for h, w in pairs
+    )
+
+
+def _random_merged_grid(rng: random.Random) -> dict[str, Any]:
+    """A random grid whose vertical merges are mostly ones Word writes: a cell continues the
+    merge of the cell above it where that cell spans the same columns (and now and then where it
+    does not, which the builder refuses)."""
+    grid = _random_grid(rng)
+    above: dict[tuple[int, int], str | None] = {}
+    for row in grid["rows"]:
+        here: dict[tuple[int, int], str | None] = {}
+        for cell in row["cells"]:
+            key = (cell["column"], cell["span"])
+            if key in above and above[key] is not None and rng.random() < 0.7:
+                cell["merge"] = "continue"
+            elif rng.random() < 0.95:
+                cell["merge"] = rng.choice([None, "restart", "restart"])
+            here[key] = cell["merge"]
+        above = here
+    return grid
+
+
+def test_each_carried_table_is_the_html_table_model_of_words_grid() -> None:
+    """On random grids, the narrative's table, placed by the HTML table model, groups the slots
+    into the cells Word's grid does (each owner of a column, merged down, the columns that only
+    repeat the one before them left out), each cell with its own text."""
+    rng = random.Random(20261009)
+    carried = merged = 0
+    for _ in range(3000):
+        grid = _random_merged_grid(rng)
+        texts = {
+            (r, c): "" if cell["merge"] == "continue" else f"r{r}c{c}"
+            for r, row in enumerate(grid["rows"])
+            for c, cell in enumerate(row["cells"])
+        }
+        paragraphs = [_p(text, table=(0, r, c)) for (r, c), text in texts.items()]
+        try:
+            div, _ = _build(*paragraphs, tables=({"grid": grid, "parent": None, "reason": None},))
+        except RefusedError:
+            continue
+        if not div:  # every cell blank: no table drawn
+            continue
+        carried += 1
+        merged += "rowspan" in div
+        assert _same_partition(_html_table_model(div), _word_grid_model(grid, texts)), grid
+    assert carried > 1000
+    assert merged >= 200
+
+
+@pytest.mark.parametrize("bug", ["no column dropped", "the empty cell moved"])
+def test_a_builder_that_lays_the_grid_otherwise_is_seen(
+    bug: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The page lays the grid by its own code, so a fault in ``_rows`` refuses the section."""
+    # Row 0 leaves column 0 out; no cell starts at column 2.
+    table = _rows_grid(3, (1, [(1, 2, None)], 0), (0, [(0, 3, None)], 0))
+    paragraphs = _in_cells(["x"], ["y"])
+    div, _ = _build(*paragraphs, tables=(table,))
+    assert _inner(div) == (
+        '<table><tr><td></td><td><p>x</p></td></tr><tr><td colspan="2"><p>y</p></td></tr></table>'
+    )
+    misread = {
+        "no column dropped": [[(0, 1, None, None), (1, 2, None, 0)], [(0, 3, None, 0)]],
+        "the empty cell moved": [[(0, 1, None, 0), (1, 1, None, None)], [(0, 2, None, 0)]],
+    }[bug]
+    monkeypatch.setattr(word_epi, "_rows", lambda _grid: misread)
+    with pytest.raises(RefusedError) as refused:
+        _build(*paragraphs, tables=(table,))
+    assert refused.value.code in ("narrative", "page-differs")
+
+
+VECTORS = json.loads((REPOSITORY / "test/fixtures/fidelity/vectors.json").read_text("utf-8"))
+
+
+def test_the_verify_vectors_of_3_5_0_are_what_the_builder_writes() -> None:
+    """The page and the narrative of fidelity-norm/3.5.0's two certified Word vectors
+    (``test/fixtures/fidelity/cases.ts``) are what ``zone_a.word_epi`` writes for their read."""
+    table = _rows_grid(
+        3,
+        (0, [(0, 2, None), (2, 1, None)], 0),
+        (0, [(0, 2, None), (2, 1, None)], 0),
+        (0, [(0, 2, None)], 1),
+        (2, [(2, 1, None)], 0),
+    )
+    div, page = _build(
+        _p("\tTable 2:\tDose by weight"),
+        *_in_cells(
+            ["Weight", "Dose"],
+            ["Under 40 kg", "5 mg\t(one tablet)"],
+            ["40 kg or more"],
+            ["See 4.4"],
+        ),
+        _p("Take with food.  ", (15, 17, "strike")),
+        tables=(table,),
+    )
+    by_name = {vector["name"]: vector for vector in VECTORS["verify"]}
+    passed = by_name["certified-word-dropped-column-and-empty-cells"]["input"]
+    failed = by_name["certified-word-empty-cell-on-the-wrong-side"]["input"]
+    for vector in (passed, failed):
+        assert [p["text"] for p in vector["source"]["pages"]] == [page]
+    inner = passed["sections"][0]["div"].removeprefix('<div xmlns="http://www.w3.org/1999/xhtml">')
+    assert _inner(div) == inner.removesuffix("</div>")
 
 
 # ---- pictures -----------------------------------------------------------------------------------

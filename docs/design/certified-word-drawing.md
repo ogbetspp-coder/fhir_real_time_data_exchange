@@ -1042,6 +1042,12 @@ request (key `48c680712be78fa7…`) was published once to `ema-flow-dev-word-dra
 `src/render/word-drawing/keys/dev/1.pem`, dev, key version 1, image `sha256:eff4827a…`, `word-drawing/1.2.1` and that
 request (exit 0, commit 1fa5212).
 
+**`word-epi/1.5.0` (`fidelity-norm/3.5.0`, 2026-10-08).** The builder's version moves the
+request's path again, and the drawing's version (`word-drawing/1.2.2`) its drawing id, so this
+build finds the record for `word-epi/1.4.0` nowhere; the tests keep the test key, as above, and
+dev's image is unchanged (the code is mounted from the checkout). The synthetic SmPC's request is
+to be published again after the deploy, as for 1.4.0.
+
 ## Build order, each change reviewed on its own
 
 1. **Measure first** (partly done 2026-10-07, above, in "Step 1": the corpus with the pinned
