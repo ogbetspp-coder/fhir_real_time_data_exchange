@@ -1878,7 +1878,8 @@ def word6(
     """The suffix the reader gives a Word 6 level's label: ``rpr`` (closed here), ``extra``..."""
     fmt, start = ("bullet", 1) if "%" not in text else ("decimal", int(parts.get("start", "10")))
     rpr = parts.get("rpr", TIMES_11) + parts.get("run", "") + "</w:rPr>"
-    level = lvl(0, fmt, text, f'<w:legacy w:legacy="1" {gap}/>{parts.get("extra", "")}{rpr}', start)
+    extra = parts.get("extra", '<w:lvlJc w:val="left"/>')
+    level = lvl(0, fmt, text, f'<w:legacy w:legacy="1" {gap}/>{extra}{rpr}', start)
     body = li(1, props=parts.get("props", "")) + parts.get("after", "")
     found = read_docx(docx(body, numbering=abstract(1, level) + num(1, 1)))[0].numbering
     assert found is not None

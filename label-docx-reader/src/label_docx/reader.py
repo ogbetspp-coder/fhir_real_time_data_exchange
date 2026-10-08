@@ -266,8 +266,9 @@ advance + legacySpace) after the label starts, or further where the paragraph ha
 can be no gap at all ("10.5 mg"). Its suffix is ``tab`` only where that gap is at least the space
 Word draws after a label and everything else about it is as Word was recorded drawing it
 (``_word6_unrecorded`` and ``_word6_page``, from Word's drawing of the legacy-drawn cases: its font,
-characters, size, gap, run properties, alignment, its paragraph's tab stops and indents, the compat
-options, outside tables, its paragraph's other properties), else ``legacy``: a Word 6 label Word's
+characters, size, gap, run properties and where they are set, alignment, its paragraph's and its
+level's tab stops and indents, the compat options, default tab stop, character spacing and line
+pitch, outside tables, its paragraph's other properties), else ``legacy``: a Word 6 label Word's
 drawing of which is not on record. A Word 6 level with ``w:suff`` is refused, and so is a numbering
 part out of the schema's order (picture bullets, definitions, lists, then at most one
 ``numIdMacAtCleanup``): with a ``num`` before an ``abstractNum``, Word numbered every list of the
@@ -446,7 +447,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 import zlib
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Collection, Iterator
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from typing import Any
@@ -3594,6 +3595,22 @@ _WORD6_PARAGRAPH: dict[str, frozenset[str | None] | None] = {
 _WORD6_SHADING = frozenset({"FFFFFF", "E6E6E6"})
 _WORD6_LINES = {"auto": (240, 480), "exact": (200, 1200), "atLeast": (200, 1200)}
 _WORD6_INDENT = frozenset(_w(n) for n in ("left", "hanging", "firstLine", "right"))
+# The longest labels sampled, by font; the run and paragraph properties of the defaults Word drew
+# them under; a level's own paragraph properties, and the shapes of its indent.
+_WORD6_LONGEST = {"Times New Roman": 4, "Symbol": 2}
+_WORD6_DEFAULTS = frozenset(_w(n) for n in ("rFonts", "sz", "szCs", "lang"))
+_WORD6_DEFAULT_PARAGRAPH = frozenset(
+    _w(n) for n in ("widowControl", "autoSpaceDE", "autoSpaceDN", "spacing")
+)
+_WORD6_LEVEL = frozenset(_w(n) for n in ("tabs", "ind"))
+_WORD6_LEVEL_INDENTS = frozenset(
+    frozenset(_w(n) for n in shape)
+    for shape in (("left", "hanging"), ("left", "hanging", "right"), ("left", "firstLine"))
+)
+# The default tab stops and docGrid line pitches (and no other docGrid attribute) of the
+# documents Word drew them in, and their character spacing control.
+_WORD6_TAB_STOPS = frozenset({"561", "562", "567", "708", "720", "850"})
+_WORD6_PITCHES = frozenset({"233", "299", "326", "360"})
 _WORD_URI = "http://schemas.microsoft.com/office/word"
 _WORD6_COMPAT = frozenset(
     {
@@ -3712,8 +3729,9 @@ def _level(element: ET.Element) -> _Level:
 def _word6_page(document: ET.Element, settings: ET.Element | None) -> bool:
     """Whether Word drew Word 6 labels in this document's layout (legacy-drawn*).
 
-    No settings part, or one whose compat options are one of ``_WORD6_COMPAT``'s; no character
-    grid; every text direction left to right.
+    No settings part, or one whose compat options are one of ``_WORD6_COMPAT``'s, with a default
+    tab stop of ``_WORD6_TAB_STOPS`` and its character spacing doNotCompress; each docGrid only a
+    linePitch of ``_WORD6_PITCHES``; every text direction left to right.
     """
     compat = None if settings is None else settings.find(_w("compat"))
     options = frozenset(
@@ -3724,17 +3742,37 @@ def _word6_page(document: ET.Element, settings: ET.Element | None) -> bool:
     )
     # No settings part at all is drawn (legacy-drawn); a part without compat options is not.
     return (
-        (settings is None or options in _WORD6_COMPAT)
+        (
+            settings is None
+            or (
+                options in _WORD6_COMPAT
+                and _word6_setting(settings, "defaultTabStop", _WORD6_TAB_STOPS)
+                and _word6_setting(settings, "characterSpacingControl", {"doNotCompress"})
+            )
+        )
         and all(
-            g.get(_w("type")) not in ("linesAndChars", "snapToChars")
+            set(g.attrib) == {_w("linePitch")} and g.get(_w("linePitch")) in _WORD6_PITCHES
             for g in document.iter(_w("docGrid"))
         )
         and all(t.get(_w("val")) == "lrTb" for t in document.iter(_w("textDirection")))
     )
 
 
-def _word6_spacing(spacing: ET.Element) -> bool:
-    """Whether Word drew Word 6 labels with this line spacing (``_WORD6_LINES``)."""
+def _word6_setting(settings: ET.Element, name: str, values: Collection[str]) -> bool:
+    """Whether the settings set ``name`` once, to one of ``values``, and nothing else in it."""
+    found = settings.findall(_w(name))
+    return (
+        len(found) == 1
+        and set(found[0].attrib) == {_w("val")}
+        and found[0].get(_w("val")) in values
+    )
+
+
+def _word6_spacing(spacing: ET.Element, size: int) -> bool:
+    """Whether Word drew Word 6 labels with this line spacing (``_WORD6_LINES``).
+
+    An exact or at-least line no lower than the label (``size``, half-points), as drawn.
+    """
     rule = spacing.get(_w("lineRule"), "auto")
     if set(spacing.attrib) - {_w(n) for n in ("before", "after", "line", "lineRule")}:
         return False
@@ -3745,6 +3783,8 @@ def _word6_spacing(spacing: ET.Element) -> bool:
         if value is None:
             continue
         low, high = _WORD6_LINES[rule] if name == "line" else (0, 240)
+        if name == "line" and rule != "auto":
+            low = max(low, size * 10)
         if not re.fullmatch("[0-9]{1,4}", value) or not low <= int(value) <= high:
             return False
     return True
@@ -3755,13 +3795,18 @@ def _word6_unrecorded(
 ) -> str | None:
     """What of a Word 6 label Word's drawing is not on record for, or None (legacy-drawn*).
 
-    On record: a label outside a table, of characters ``LEGACY_ADVANCES`` lists, in that font in
-    both Latin slots, at 8 to 28 pt, legacySpace 0 to 340 and legacyIndent 0 to 1500, aligned
-    left, its run properties ``_WORD6_RUN``'s; its paragraph's properties (its own, its style's,
-    the defaults' and its level's) only ``_WORD6_PARAGRAPH``'s, with the values Word drew: aligned
-    left or justified, its tab stops ``_WORD6_TABS``' from -1985 to 1440, indented by left and
-    hanging 0 to 1500, right -29 to 720 and a firstLine of 0, hanging at most 360 past its left,
-    its spacing ``_WORD6_LINES``', its shading clear, of ``_WORD6_SHADING``.
+    On record: a label outside a table, of characters ``LEGACY_ADVANCES`` lists and no longer
+    than ``_WORD6_LONGEST``, in that font in both Latin slots (Symbol named in its level or its
+    paragraph's mark), at 8 to 28 pt, legacySpace 0 to 340 and legacyIndent 0 to 1500, its level
+    aligned left by its own ``lvlJc``, its run properties ``_WORD6_RUN``'s (the defaults'
+    ``_WORD6_DEFAULTS``'); its paragraph's properties (its own, its style's, the defaults' and its
+    level's) only ``_WORD6_PARAGRAPH``'s (its level's ``_WORD6_LEVEL``'s, the defaults'
+    ``_WORD6_DEFAULT_PARAGRAPH``'s), with the values Word
+    drew: aligned left or justified, its tab stops ``_WORD6_TABS``' from -1985 to 1440, indented
+    by left and hanging 0 to 1500, right -29 to 720 and a firstLine of 0 (its level in
+    ``_WORD6_LEVEL_INDENTS``' shapes), hanging at most 360 past its left, its spacing
+    ``_WORD6_LINES``' (exact and at-least lines no lower than the label), its shading clear, of
+    ``_WORD6_SHADING``.
     """
     space, indent = definition.legacy or (None, None)
     name = properties.font("ascii")
@@ -3774,22 +3819,42 @@ def _word6_unrecorded(
         return "table"
     if name not in LEGACY_ADVANCES or properties.font("hAnsi") != name:
         return "font"
+    if name == "Symbol" and not any(
+        x is not None
+        and (fonts := x.find(_w("rFonts"))) is not None
+        and fonts.get(_w("ascii")) == name
+        for x in (definition.rpr, context.mark)
+    ):
+        # From the paragraph's style, Word names Symbol on none of the label's runs when it
+        # writes the label in: its label is not on record (legacy-drawn-sample).
+        return "font"
     if properties.value("rFonts", "hint") not in (None, "default"):
         return "hint"
-    if any(c not in LEGACY_ADVANCES[name] for c in label):
+    if len(label) > _WORD6_LONGEST[name] or any(c not in LEGACY_ADVANCES[name] for c in label):
         return "character"
     if size is None or not re.fullmatch("[0-9]{2}", size) or not 16 <= int(size) <= 56:
         return "size"
     if space is None or indent is None or not (0 <= space <= 340 and 0 <= indent <= 1500):
         return "gap"
-    if runs - _WORD6_RUN or (name == "Symbol" and _w("b") in runs):
+    defaults = properties.styles.default_rpr
+    if (
+        runs - _WORD6_RUN
+        or (name == "Symbol" and _w("b") in runs)
+        or (defaults is not None and any(c.tag not in _WORD6_DEFAULTS for c in defaults))
+    ):
         return "run properties"
-    if definition.justified not in (None, "left") or any(
+    if definition.justified != "left" or any(
         j.get(_w("val")) not in ("left", "both")
         for level in paragraph
         for j in level.findall(_w("jc"))
     ):
         return "alignment"
+    if definition.ppr is not None and any(c.tag not in _WORD6_LEVEL for c in definition.ppr):
+        return "paragraph"
+    if (default := properties.styles.default_ppr) is not None and any(
+        c.tag not in _WORD6_DEFAULT_PARAGRAPH for c in default
+    ):
+        return "paragraph"
     for level in paragraph:
         for child in level:
             name = _local(child.tag) if child.tag.startswith(f"{{{W}}}") else ""
@@ -3806,7 +3871,7 @@ def _word6_unrecorded(
                 or child.get(_w("fill")) not in _WORD6_SHADING
             ):
                 return "paragraph"
-            if name == "spacing" and not _word6_spacing(child):
+            if name == "spacing" and not _word6_spacing(child, int(size)):
                 return "spacing"
     for stop in stops:
         position = stop.get(_w("pos"), "")
@@ -3826,6 +3891,10 @@ def _word6_unrecorded(
                 return "indent"
             if not low <= int(value) <= high:
                 return "indent"
+    if definition.ppr is not None and any(
+        frozenset(x.attrib) not in _WORD6_LEVEL_INDENTS for x in definition.ppr.findall(_w("ind"))
+    ):
+        return "indent"
     lefts = [int(x.get(_w("left"), "0")) for x in indents if _w("left") in x.attrib]
     hangings = [int(x.get(_w("hanging"), "0")) for x in indents]
     if max(hangings, default=0) - min(lefts, default=0) > 360:

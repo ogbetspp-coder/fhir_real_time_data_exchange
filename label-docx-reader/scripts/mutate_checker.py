@@ -481,6 +481,17 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
     ("_unread_kind", 'if node.tag == _w("sdt"):', "compare:0", 0): _HELD_CONTROLS,
     ("_unread_kind", 'if node.tag == _w("sdt"):', "str:'sdt'", 0): _HELD_CONTROLS,
     ("_unread_kind", "_control(node)", "call", 0): _HELD_CONTROLS,
+    (
+        "_Numbering._word6_spaced",
+        "return max(after, space * _WORD6_EM) >= needed",
+        "compare:0",
+        0,
+    ): (
+        "no label the checks before it take (at most four characters, two in Symbol, of the "
+        "widths table; 16 to 56 half-points; legacySpace to 340, legacyIndent to 1500) is ever "
+        "exactly a space and the margin from its text: neither (advance + 569) x size x 10 + 8192 "
+        "nor 5690 x size + 8192 is then a multiple of 2048, so >= and > agree"
+    ),
 }
 
 _COMPARE = {

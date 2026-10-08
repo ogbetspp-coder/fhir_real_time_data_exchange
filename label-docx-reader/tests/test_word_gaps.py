@@ -135,8 +135,9 @@ def test_a_word_6_label_is_followed_by_a_tab_only_where_word_draws_a_space_or_mo
         assert spaced or suffix == "legacy", row
         named[(str(suffix), spaced)] = named.get((str(suffix), spaced), 0) + 1
     # Word draws no space after some (as "10.5 mg"): a bare tab for every Word 6 label, the
-    # reader before this rule, is wrong there.
-    assert named == {("tab", True): 2799, ("legacy", False): 924, ("legacy", True): 155}
+    # reader before this rule, is wrong there. "2345." and "6789.", longer than any label drawn
+    # at random, are not taken.
+    assert named == {("tab", True): 2785, ("legacy", False): 924, ("legacy", True): 169}
 
 
 def _sample(name: str) -> Iterator[tuple[DrawnRow, float, float, Paragraph]]:
@@ -149,11 +150,14 @@ def _sample(name: str) -> Iterator[tuple[DrawnRow, float, float, Paragraph]]:
 
 
 def test_a_sample_of_all_the_whitelist_takes_draws_every_tab_a_space_wide() -> None:
-    # Seeded (numbering_cases.SAMPLE_SEED): label characters, size, faces, gaps, the level's and
-    # the paragraph's indents, tab stops, alignment, style, spacing, the paragraph's other
-    # properties, and each compat set (none, and each combination), drawn jointly.
+    # Seeded (numbering_cases.SAMPLE_SEED), jointly: label characters, size, faces, gaps, the
+    # level's and the paragraph's indents, tab stops, alignment, style, spacing and other
+    # properties; from INHERITED, where the label's run properties and the paragraph's are set,
+    # and the mark's and the text's sizes. Each case is its own document (DRAWN_SAMPLE_PAGES):
+    # no settings part, each compat combination, and the corpus's default tab stops, line
+    # pitches and defaults.
     assert numbering_cases.SAMPLE_SEED == 20261008
-    assert len(SAMPLES) == len(numbering_cases.DRAWN_SAMPLE_COMPAT) == 9
+    assert len(SAMPLES) == len(numbering_cases.DRAWN_SAMPLE_PAGES) == 18
     named: dict[str, int] = {}
     for name in SAMPLES:
         for row, gap, space, paragraph in _sample(name):
@@ -170,4 +174,26 @@ def test_a_sample_of_all_the_whitelist_takes_draws_every_tab_a_space_wide() -> N
             space_twips, indent = row.legacy
             floor = max(indent * LEGACY_EM - units * row.size * 10, space_twips * LEGACY_EM)
             assert floor < LEGACY_SPACE * row.size * 10 + LEGACY_MARGIN * LEGACY_EM
-    assert named == {"tab": 359, "legacy": 46}
+    assert named == {"tab": 711, "legacy": 99}
+
+
+def test_word_draws_the_rule_to_a_pixel_within_half_a_point_of_a_space() -> None:
+    # Each sample from INHERITED ends with NEAR rows whose legacyIndent puts the text, by the
+    # rule, 0.2 to 0.5 pt past a space or short of one; Word draws each where the rule says, to a
+    # pixel, beside its own space, and every tab among them at least a space wide.
+    named: dict[str, int] = {}
+    for case in range(numbering_cases.INHERITED, len(numbering_cases.DRAWN_SAMPLE_PAGES)):
+        rows = list(_sample(f"legacy-drawn-sample-{case}"))[-numbering_cases.NEAR :]
+        for row, gap, space, paragraph in rows:
+            assert paragraph.numbering is not None
+            assert row.legacy is not None
+            font = dict(row.extra)["font"]
+            units = sum(LEGACY_ADVANCES[font][c] for c in str(paragraph.numbering.text))
+            past = (row.legacy[1] / 20) - (units + LEGACY_SPACE) / LEGACY_EM * row.size / 2
+            assert 0.17 <= abs(past) <= 0.53
+            assert abs(gap - space - past) <= PIXEL + 1e-9
+            suffix = str(paragraph.numbering.suffix)
+            assert suffix == ("tab" if past >= LEGACY_MARGIN / 20 else "legacy")
+            assert gap >= space or suffix == "legacy"
+            named[suffix] = named.get(suffix, 0) + 1
+    assert named == {"tab": 24, "legacy": 21}
