@@ -6,12 +6,12 @@ real deploy on 2026-09-22 (below). The agent is live as
 3.14. Its post-check has not yet run in a live Gemini turn. Documentation dates are the dates
 the pages were read, 2026-09-18 to 2026-09-20.
 
-**Which build is live.** Redeployed in place 2026-10-08 02:39 UTC from `main` 1fa5212
-(`agent/0.1.0+1fa521201a5c49c936effc08de328b10c9aab759`), whose post-check accepts
-`fidelity-norm/3.4.0` (#208; the query service's deploy of the same commit finished 02:51 UTC), with the configuration read back from the live engine (same
+**Which build is live.** Redeployed in place 2026-10-08 07:57 UTC from `main` 35feaa0
+(`agent/0.1.0+35feaa01058bf2f05e07b5826e291b94b5cfe517`), whose post-check accepts
+`fidelity-norm/3.5.0` (#211; the query service's deploy of the same commit finished 08:14 UTC), with the configuration read back from the live engine (same
 model, query service URL and staging bucket; no secret, service account or timeout set); the
-resource name, and so its registration, is unchanged. Before it: 2026-10-06 22:39 UTC from
-`main` 73e338e for `fidelity-norm/3.3.0` (#186); 17:20 UTC from `main` fe6b8f9 for
+resource name, and so its registration, is unchanged. Before it: 2026-10-08 02:39 UTC from `main` 1fa5212 for `fidelity-norm/3.4.0` (#208);
+2026-10-06 22:39 UTC from `main` 73e338e for `fidelity-norm/3.3.0` (#186); 17:20 UTC from `main` fe6b8f9 for
 `fidelity-norm/3.2.0` (#183); 2026-09-29 00:05 UTC from `main` d2d2d1f, registered, with the 2026-09-27
 audit fixes (the earlier `caa5d9a` build failed every Gemini Enterprise turn). The deployed build
 is named by the `serviceVersion` of its own audit records, `agent/<version>+<commit>`, which the
