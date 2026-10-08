@@ -2242,10 +2242,10 @@ class _ListLevel:
     picture: bool
     # A Word 6 level's legacySpace and legacyIndent (None where unset), else None; whether it
     # has a suffix; lvlJc (None where there is none, "" where it has no value); its pPr.
-    word6: tuple[int | None, int | None] | None = None
-    suffixed: bool = False
-    jc: str | None = None
-    ppr: ET.Element | None = None
+    word6: tuple[int | None, int | None] | None
+    suffixed: bool
+    jc: str | None
+    ppr: ET.Element | None
 
 
 def _list_level(element: ET.Element) -> _ListLevel:
