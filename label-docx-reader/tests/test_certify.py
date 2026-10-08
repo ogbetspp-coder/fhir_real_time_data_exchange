@@ -1200,6 +1200,24 @@ def test_each_page_number_field_is_set_aside_and_placed(code: str) -> None:
         DocxSource(data).certify(_value("p12"))
 
 
+def test_a_page_number_in_another_fields_result_is_set_aside_and_placed() -> None:
+    # As a table of contents holds each entry's PAGEREF in its own field's result (Word's own,
+    # corpus/word-authored, refused since docx-reader 1.34.0 for its dot leaders).
+    outer = (
+        '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+        '<w:r><w:instrText xml:space="preserve"> DOCPROPERTY Title </w:instrText></w:r>'
+        '<w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+        "<w:r><w:t>p</w:t></w:r>"
+        + _field("PAGE", "12")
+        + '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
+    )
+    data = docx(_p(outer))
+    certificate = DocxSource(data).certify(_value({"text": "p", "pages": [1]}))
+    assert certificate["setAside"]["pageNumbers"] == 2
+    with pytest.raises(CertificationError):
+        DocxSource(data).certify(_value("p12"))
+
+
 @pytest.mark.parametrize(
     ("code", "placed"),
     [
