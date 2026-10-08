@@ -314,7 +314,10 @@ export const CanonicalSubmissionSchema = CanonicalSubmissionBase.superRefine(
 export type SubmissionRefusal =
   | "certified-word-not-recomputed"
   | "certified-word-recompute-refused"
-  | "certified-word-drawing-missing";
+  | "certified-word-drawing-missing"
+  | "certified-word-drawing-invalid"
+  | "certified-word-drawing-mismatch"
+  | "certified-word-document-unbound";
 
 export class SubmissionRejectedError extends Error {
   public constructor(

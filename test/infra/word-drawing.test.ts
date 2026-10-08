@@ -108,6 +108,18 @@ describe("the drawing identity", () => {
       ["roles/storage.objectViewer", "worker"],
     ]);
   });
+
+  // PR 4: the gate's step 5 reads the records there and verifies them against its environment's
+  // pins (src/certified-word/recompute.ts, certifiedWordSources).
+  it("is named to the worker, with the environment whose pins verify a record", () => {
+    const worker = block("google_cloud_run_v2_service", "worker");
+    const env = (name: string) =>
+      new RegExp(`env \\{\\s*name\\s*=\\s*"${name}"\\s*value\\s*=\\s*([^\\n]+)\\n`).exec(
+        worker,
+      )?.[1];
+    expect(env("WORD_DRAWING_BUCKET")).toBe("google_storage_bucket.word_drawings.name");
+    expect(env("WORD_DRAWING_ENVIRONMENT")).toBe("var.environment");
+  });
 });
 
 describe("the drawing key", () => {
@@ -557,7 +569,7 @@ describe("the build's signing step", () => {
     expect(result.out).toContain(`is not this build's record (this build ran ${COMMIT})`);
   });
 
-  it("writes nothing signed by another key, for a commit off main, or on a refused write", () => {
+  it("writes nothing signed by another key, for a commit off main, on a refused write, or over 64 KiB", () => {
     const other = signing();
     writeFileSync(
       path.join(other.dir, "other.pem"),
@@ -574,7 +586,24 @@ describe("the build's signing step", () => {
     expect(run(refused.dir, refused.bin, "sign", { STUB_WRITE: "500" }).out).toContain(
       "writing the record answered HTTP 500",
     );
-    for (const { dir } of [other, off]) {
+    // A record whose stored object is over the worker's 64 KiB cap; a little shorter, written.
+    const sections = (count: number) =>
+      record({
+        sections: Array.from({ length: count }, (_, index) => ({
+          key: `smpc.${String(index)}`,
+          narrativeDivSha256: "0".repeat(64),
+        })),
+      });
+    const long = signing();
+    writeFileSync(path.join(long.dir, "run", "record.json"), sections(700));
+    const refusedLong = run(long.dir, long.bin, "sign");
+    expect(refusedLong.status).toBe(1);
+    expect(refusedLong.out).toContain("the signed record is over 64 KiB, which the worker refuses");
+    const short = signing();
+    writeFileSync(path.join(short.dir, "run", "record.json"), sections(600));
+    expect(run(short.dir, short.bin, "sign")).toMatchObject({ status: 0 });
+    expect(readFileSync(path.join(short.dir, "written")).length).toBeLessThanOrEqual(64 * 1024);
+    for (const { dir } of [other, off, long]) {
       expect(() => readFileSync(path.join(dir, "written"))).toThrow();
     }
   });

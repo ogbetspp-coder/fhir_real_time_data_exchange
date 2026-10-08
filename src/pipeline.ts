@@ -274,8 +274,8 @@ async function documentGate(
 // What a run may be given instead of its production default; tests use it.
 export type PipelineDependencies = {
   authorityFetcher?: AuthorityFetcher;
-  // Where the certified Word gate reads an upload and runs the recompute; from the configuration
-  // by default (src/certified-word/recompute.ts).
+  // Where the certified Word gate reads an upload, runs the recompute and reads the drawing record;
+  // from the configuration by default (src/certified-word/recompute.ts).
   certifiedWord?: CertifiedWordSources;
   // Where a document run reads its head statement and the approval key's public keys; Cloud
   // Storage and Cloud KMS from the configuration by default.

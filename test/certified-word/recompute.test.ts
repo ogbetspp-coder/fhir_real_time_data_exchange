@@ -13,7 +13,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { loadConfig } from "../../src/config.js";
 import { sha256Bytes } from "../../src/authority/import.js";
+import { drawingPins, type DrawingSource } from "../../src/certified-word/drawing.js";
 import {
+  CERTIFIED_WORD_DOCUMENT_UNBOUND,
+  CERTIFIED_WORD_DRAWING_INVALID,
+  CERTIFIED_WORD_DRAWING_MISMATCH,
   CERTIFIED_WORD_DRAWING_MISSING,
   verifyCertifiedWordImport,
 } from "../../src/certified-word/gate.js";
@@ -257,6 +261,27 @@ describe("the upload (D4)", () => {
         undefined,
       ]);
     }
+    // The drawing records (D3), only with the record bucket and the environment, by its pins.
+    expect(own.drawing).toBeUndefined();
+    const drawing = { WORD_DRAWING_BUCKET: "records", WORD_DRAWING_ENVIRONMENT: "dev" } as const;
+    const asked: [string, string, number][] = [];
+    const records = certifiedWordSources({ ...config, ...drawing }, (at, object, maxBytes) => {
+      asked.push([at, object, maxBytes]);
+      return Promise.resolve(undefined);
+    })?.drawing;
+    expect([
+      records?.pins.environment,
+      records?.pins.imageDigest,
+      records?.pins.keys.map(([version]) => version),
+    ]).toEqual(["dev", drawingPins("dev").imageDigest, [1]]);
+    // A record is read from the record bucket, at most 64 KiB and one byte more.
+    expect(await records?.read("word/x.json")).toBeUndefined();
+    expect(asked).toEqual([["records", "word/x.json", 64 * 1024]]);
+    for (const key of Object.keys(drawing) as (keyof typeof drawing)[]) {
+      const without = certifiedWordSources({ ...config, ...drawing, [key]: undefined });
+      expect([key, without?.drawing]).toEqual([key, undefined]);
+    }
+    expect(() => loadConfig({ WORD_DRAWING_ENVIRONMENT: "staging" })).toThrow();
     // Each an absolute path: the subprocess has no PATH, and its working directory is the root.
     for (const relative of [
       { RECOMPUTE_PYTHON: "python3" },
@@ -704,6 +729,105 @@ describe(`the gate, recomputing (${PYTHON === undefined ? "the committed results
     expect(result.evidence.manifest.validation.profiles).toContain(
       "http://ema.europa.eu/fhir/StructureDefinition/EUQRD-CAP-template-new-Package-Leaflet-en",
     );
+  });
+});
+
+// Step 5 (D3; docs/design/certified-word-drawing.md, section 3): the record bucket holds the real
+// record dev's drawing build signed for the committed synthetic SmPC, at its path in dev
+// (test/certified-word/drawing.test.ts verifies it field by field, and every way it is refused).
+describe(`the gate's step 5, the drawing record (${PYTHON === undefined ? "the committed results" : "Python"})`, () => {
+  const PATH =
+    "word/7e4c389fdb72bf3b804e1240e043eba02352fd3a70ebe25283b06a53fcd92809/03d058be759c88620d0748c07ea6c747c468b7ad9b0e95f23476e07db67d4000/1.json";
+  const REAL = readFileSync("test/fixtures/certified-word/drawing/smpc.record.json");
+
+  function records(
+    objects: Record<string, Uint8Array> = { [PATH]: REAL },
+    read: DrawingSource["read"] = (object) => Promise.resolve(objects[object]),
+  ): CertifiedWordSources {
+    return sources({ drawing: { pins: drawingPins("dev"), read } });
+  }
+
+  it("passes a dry run of the synthetic SmPC as drawn, by the real signed record", async () => {
+    const input = uploaded();
+    const passed = await gate(input, OPTIONS, records());
+    expect(passed.gate.submission).toEqual(input.submission);
+    expect(passed.check).toBe("drawn");
+  });
+
+  it("refuses a run that is not dry: unbound once the record verifies, missing without one", async () => {
+    const notDry = { ...OPTIONS, dryRun: false };
+    const unbound = await rejection(gate(uploaded(), notDry, records()));
+    expect([unbound.reason, unbound.issues]).toEqual([
+      "certified-word-document-unbound",
+      [CERTIFIED_WORD_DOCUMENT_UNBOUND],
+    ]);
+    const missing = await rejection(gate(uploaded(), notDry, records({})));
+    expect([missing.reason, missing.issues]).toEqual([
+      "certified-word-drawing-missing",
+      [CERTIFIED_WORD_DRAWING_MISSING],
+    ]);
+    // Dry, with no record, the run answers as before the drawing was built.
+    expect((await gate(uploaded(), OPTIONS, records({}))).check).toBe("recomputed");
+  });
+
+  it("refuses an invalid or mismatched record, dry or not, by its closed code", async () => {
+    for (const dryRun of [true, false]) {
+      const invalid = await rejection(
+        gate(uploaded(), { ...OPTIONS, dryRun }, records({ [PATH]: Buffer.from("{}") })),
+      );
+      expect([invalid.reason, invalid.issues]).toEqual([
+        "certified-word-drawing-invalid",
+        [CERTIFIED_WORD_DRAWING_INVALID],
+      ]);
+      // The recompute writes the same value in other bytes, which the importer makes the same
+      // submission of: the record names the bytes, so it is not this run's.
+      const spaced = sources({
+        ...records(),
+        recompute: (docx, request) =>
+          recompute(docx, request).then((outcome) =>
+            "made" in outcome
+              ? { made: Buffer.concat([Buffer.from(" "), Buffer.from(outcome.made)]) }
+              : outcome,
+          ),
+      });
+      const mismatch = await rejection(gate(uploaded(), { ...OPTIONS, dryRun }, spaced));
+      expect([mismatch.reason, mismatch.issues]).toEqual([
+        "certified-word-drawing-mismatch",
+        [CERTIFIED_WORD_DRAWING_MISMATCH],
+      ]);
+    }
+  });
+
+  it("fails the run on a Storage error reading the record, never taking it for missing", async () => {
+    const outage = records({}, () => Promise.reject(new Error("Storage is down")));
+    for (const dryRun of [true, false]) {
+      await expect(gate(uploaded(), { ...OPTIONS, dryRun }, outage)).rejects.toThrow(
+        "Storage is down",
+      );
+    }
+  });
+
+  it("runs through the worker's pipeline dry as drawn, and is refused there otherwise", async () => {
+    const config = loadConfig({
+      ALLOW_SYNTHETIC_SOURCES: "true",
+      NODE_ENV: "test",
+      DRY_RUN: "true",
+    });
+    const run = (dryRun: boolean) =>
+      runPipeline(
+        {
+          runId: "00000000-0000-4000-8000-00000000c0d3",
+          sourceKind: "document",
+          sourceResource: "document:certified-word",
+          ...uploaded(),
+        },
+        mapping,
+        { ...config, DRY_RUN: dryRun },
+        { certifiedWord: records() },
+      );
+    const dry = await run(true);
+    expect([dry.status, dry.certifiedWordCheck]).toEqual(["validated", "drawn"]);
+    expect((await rejection(run(false))).reason).toBe("certified-word-document-unbound");
   });
 });
 

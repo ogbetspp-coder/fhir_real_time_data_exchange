@@ -79,6 +79,12 @@ const ConfigSchema = z
     // the gate cannot recompute, and refuses a certified Word submission that is not a dry run.
     RECOMPUTE_PYTHON: AbsolutePath,
     ZONE_A_ROOT: AbsolutePath,
+    // Where the certified Word gate's step 5 reads a drawing record, and the environment whose
+    // pinned image and keys (src/render/word-drawing/) it verifies one against
+    // (docs/design/certified-word-drawing.md, section 3). infra/run.tf sets both; unset, the gate
+    // finds no record, and refuses a certified Word submission that is not a dry run.
+    WORD_DRAWING_BUCKET: optionalNonEmpty,
+    WORD_DRAWING_ENVIRONMENT: ApprovalEnvironment.optional(),
     FHIR_ANALYTICS_DATASET: optionalNonEmpty,
     TRANSFORMATION_LEDGER_DATASET: optionalNonEmpty,
     TRANSFORMATION_LEDGER_TABLE: z.string().trim().min(1).default("transformation_runs"),

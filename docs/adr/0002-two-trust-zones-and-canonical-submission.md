@@ -418,17 +418,26 @@ importer's version, the number of tracked changes the view settled, one page per
   and a document id in the reserved block (`00000000-5979-4e74-8000-`), and every narrative that
   carries text carries the marker; a non-synthetic one carries none of these.
 - **Invariant 11.** A certified Word source is admitted only once Zone B has made its sections
-  again from its bytes (D2) and the renderer gate has drawn them (D3). Since 2026-10-07 the worker
+  again from its bytes (D2), has verified the signed record that Chrome draws them as the .docx was
+  read (D3), and the ePI's document id is bound to its product (P5). Since 2026-10-07 the worker
   makes them again: `src/certified-word/gate.ts` reads the uploaded .docx itself from its content
   address in the submissions bucket and requires its SHA-256 and length (D4), runs
   `python -m zone_a.recompute` on it with the source's request, runs its own importer on the result
-  and requires the very submission, page text and fidelity report it was sent. The drawing is not
-  built, so the gate accepts one only as a dry run: when `DRY_RUN` is false it refuses one that
-  passed all of that with the closed code `certified-word-drawing-missing`, one the recompute
-  refused with `certified-word-recompute-refused`, and, in a worker that cannot recompute (no
-  bucket or no Python configured), any with `certified-word-not-recomputed`; the HTTP caller learns
-  each code. The ordinary gate accepts one only with `GateOptions.certifiedWordDryRun` bound to its
-  hash, set only there. Nothing it makes is persisted.
+  and requires the very submission, page text and fidelity report it was sent. Then (step 5,
+  `docs/design/certified-word-drawing.md`, section 3) it reads the drawing record of the .docx and
+  request under its own identity, verifies its signature against a public key pinned in the worker
+  image, and requires its environment, .docx, recompute output, drawing version and image and
+  sections to be this submission's and this run's: an object at the record's path that is not a
+  record it verifies refuses the run with `certified-word-drawing-invalid`, and a signed record
+  that is not this submission's with `certified-word-drawing-mismatch`, dry or not. P5 is not
+  built, so the gate accepts one only as a dry run, whose answer says `drawn` where the record
+  verified and `recomputed` where there was none: when `DRY_RUN` is false it refuses one whose
+  record verified with `certified-word-document-unbound`, one with no record with
+  `certified-word-drawing-missing`, one the recompute refused with
+  `certified-word-recompute-refused`, and, in a worker that cannot recompute (no bucket or no
+  Python configured), any with `certified-word-not-recomputed`; the HTTP caller learns each code.
+  The ordinary gate accepts one only with `GateOptions.certifiedWordDryRun` bound to its hash, set
+  only there. Nothing it makes is persisted.
 - **Invariant 12.** Its page text has one page per section, each wholly body, and every page no
   narrative covers is blank, as an authority import's; page i is the record's i-th section in
   pre-order, keyed as `sectionPages` says, and each narrative's span is on its own section's page.

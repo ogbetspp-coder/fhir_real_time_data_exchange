@@ -4,7 +4,8 @@
   recommendations the owner said to go ahead on. Build order step 1 partly measured and PR 1
   built the same day ("Step 1: measured, and PR 1 as built", below); PR 2 built and step 1's
   remainder measured the same day ("Step 2: PR 2 as built, and measured", below); PR 3 built the
-  same day, pinning dev's image and key ("Step 3: PR 3 as built", below); PR 4 is not built
+  same day, pinning dev's image and key ("Step 3: PR 3 as built", below); PR 4, the gate's step 5,
+  built the same day ("Step 4: PR 4 as built", below); step 6 waits for P5
 - Implements: `docs/design/certified-word-import.md` D3 (a), the owner's choice of 2026-10-06
   ("extend the renderer gate's attested records"), and that note's "The gate", steps 5 and 6
 - Fits: `docs/design/authority-import-renderer.md` R1 (attested records), frozen, its architecture
@@ -928,6 +929,98 @@ and prod are still refused. `scripts/word-drawing/build.sh` is unchanged.
   committed `smpc.json`'s and 32 sections. That build is the first run of what "Uncertain until the
   first build after PR 3" lists. PR 4's dry run then finds the record.
 
+## Step 4: PR 4 as built (2026-10-07)
+
+**What PR 4 adds.** Step 5 of section 5, as section 3's "How Zone B verifies it" has it, and
+nothing of step 6.
+
+- `src/certified-word/drawing.ts`, in the importer's locked directory (certified Word importer
+  1.3.0):
+  - **the pins**, read as `scripts/word-drawing/build.sh` reads them: the lock's version and the
+    environment's image digest, and each `keys/<environment>/<n>.pem` that `revoked.json` does not
+    list, highest first, each refused unless it is a 3072-bit RSA key;
+  - **the read**, `word/<key>/<drawing id>/<n>.json` for each pinned version in turn, under the
+    worker's own identity: not-found goes on to the next version; any other Storage error fails the
+    run; the first object found decides, and is never stepped over;
+  - **the bytes**: over 64 KiB refused before anything is parsed; strict UTF-8 and JSON with no
+    repeated key (the importer's own reader); the canonical JSON of exactly
+    `{ record, signatureBase64 }` with the record's fields of section 3; `keyVersion` the path's;
+    the SHA-256 of `request` the path's key;
+  - **the signature**, by `verifyPss`, factored out of `src/approval/statement.ts` so an approval
+    statement and a drawing record are verified by one function (the one base64 spelling, RSA-PSS,
+    SHA-256, a 32-byte salt, over the canonical bytes);
+  - **the fields**: the environment the worker's; the document's hash and length the source's;
+    `outputSha256` that of the bytes the worker's recompute wrote; the drawing's version and image
+    the pins'; `sections` the provenance's, in order.
+- `src/certified-word/gate.ts`: step 5 after step 4 in every run that recomputes, dry or not.
+  `certified-word-drawing-invalid` and `-mismatch` refuse; a dry run answers `drawn` where the
+  record verified and `recomputed` where none was found; a run that is not dry is refused with
+  `certified-word-document-unbound` once a record verified and `certified-word-drawing-missing`
+  where none was found (none at any pinned key version's path, or, with no image, key or record
+  bucket, none looked for). `SubmissionRefusal` gains the three new codes, which the HTTP caller
+  learns as it learns the others.
+- **The worker**: its image copies `src/render/word-drawing/` (root's, read-only to the service)
+  to its working directory, where the gate reads it; and Terraform names it the record bucket
+  (`WORD_DRAWING_BUCKET`) and its environment (`WORD_DRAWING_ENVIRONMENT`, `var.environment`),
+  which select the pins. Its read of the bucket was granted in PR 2. The image's recompute smoke
+  (`scripts/ci/worker-recompute-smoke.mjs`, in CI's Images job and in Cloud Build before the push)
+  reads the pins there as the gate does, so an image without them fails before it is pushed.
+- **The build** (`scripts/word-drawing/build.sh`, `sign`, after the review of #207): a stored
+  object over the worker's 64 KiB cap, signature and all, is refused before it is written, since
+  written create-if-absent it would hold its path for good and be refused at every run.
+
+**Choices where this note left them open:**
+
+1. **A worker that recomputes but is not given the record bucket** finds no record: a dry run
+   answers `recomputed`, and any other run is refused `certified-word-drawing-missing`. It is
+   never taken for drawn.
+2. **A record whose request is not the submission's is `invalid`, never `mismatch`:** the path's
+   key is made from the submission's source, and the record's request must hash to it, so such a
+   record is at another path or fails there. The record's `document` is compared with the source
+   as well.
+3. **Not compared:** `drawing.chrome` (the pinned image fixes the Chrome) and `commitSha` (the
+   build checked it is on main's first-parent line), as section 3's list has it.
+4. **Section 3's item 6, keeping the record's bytes with the run's evidence,** waits with step 6
+   for P5: until then no certified Word run persists anything, so there is no evidence to keep it
+   with.
+
+**Tests.** Against the first real record: what dev's build signed with key version 1 for the
+committed synthetic SmPC, copied byte for byte into `test/fixtures/certified-word/drawing/`.
+
+- `test/certified-word/drawing.test.ts`:
+  - its path is the one made from the submission's .docx and request and dev's pins; it verifies
+    against the pinned key, and its 32 sections are the provenance's, in order;
+  - `invalid`: another signature, one in another base64 spelling (`==` more), one with no salt
+    instead of 32 bytes, one by another key, a section's hash or the commit changed, its
+    bytes spelled otherwise, a repeated key, not JSON, empty, a byte-order mark, another field, a
+    `keyVersion` or a request not its path's, and a record over 64 KiB (which, 500 sections long
+    instead of 700, is a `mismatch`: the cap acts first);
+  - `mismatch` (records signed by a key made for the test): the environment, the document's hash
+    or length, the output, the drawing's version or image, the sections reordered or one fewer;
+  - `missing` with nothing at the path, and no read at all where no image or key is pinned; the
+    highest version read first, and an object there that fails refusing though version 1 holds a
+    good record; a Storage error thrown;
+  - the pins: versions highest first, revoked ones left out, a malformed `revoked.json` or a key
+    that is not RSA 3072 refused.
+- `test/certified-word/recompute.test.ts`, the gate on the committed label (and in CI's Zone A
+  job, with the real recompute): the dry run of the synthetic SmPC `drawn`, alone and through the
+  worker's pipeline; not dry, `certified-word-document-unbound`, and without a record
+  `certified-word-drawing-missing`; `invalid` and `mismatch` (the recompute's output in other bytes
+  that make the same submission) dry or not; a Storage error failing the run.
+- `test/infra/word-drawing.test.ts`: the worker named the record bucket and `var.environment`.
+  `test/ci/images.test.ts`: the worker image, and only it, copies the pins.
+- Each rule of step 5 removed in turn from `drawing.ts` (the cap, `keyVersion`, the request's
+  key, the first object deciding, the environment, the output, the sections) fails a test.
+
+**In dev.** The deployed worker runs with `DRY_RUN=false`, and the run request has no dry-run
+field, so no dry run can be made through it. Before the merge, read only: dev's upload of the
+synthetic SmPC and its record, read with `gcloud storage cat`, through this gate on this machine
+with the real recompute: the dry run `drawn`, through the pipeline `validated` and `drawn`, and not
+dry `certified-word-document-unbound`. After the deploy, a run of that submission through the
+deployed worker is expected to be refused `certified-word-document-unbound`, which only a record
+the worker found under its own identity and verified with the key its image carries gives
+(the pull request's post-deploy steps).
+
 ## Build order, each change reviewed on its own
 
 1. **Measure first** (partly done 2026-10-07, above, in "Step 1": the corpus with the pinned
@@ -956,7 +1049,7 @@ and prod are still refused. `scripts/word-drawing/build.sh` is unchanged.
    - each environment's image digest in `src/render/word-drawing/lock.json`;
    - the key's first public key in `src/render/word-drawing/keys/<environment>/`;
    - after its merge, the first record of a synthetic label in dev.
-5. **PR 4, the gate:**
+5. **PR 4, the gate** (built 2026-10-07, "Step 4"):
    - step 5 with its codes and the dry run's `"drawn"`;
    - `certified-word-document-unbound` for the runs that are not dry;
    - the shared PSS check, and the pinned keys in the worker image;

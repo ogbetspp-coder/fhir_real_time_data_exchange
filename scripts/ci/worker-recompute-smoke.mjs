@@ -33,3 +33,16 @@ for (const { name, request } of cases) {
 console.log(
   `worker image: zone_a.recompute made ${cases.length} committed labels again, byte for byte`,
 );
+
+// The Word drawing's pins, read from the image's working directory as the gate's step 5 reads them
+// (src/certified-word/drawing.ts): each environment's lock entry and keys parse, and some key is
+// there, so an image without them fails here rather than at a run.
+const { drawingPins } = await import("/app/dist/certified-word/drawing.js");
+const pins = ["dev", "validation", "prod"].map((environment) => drawingPins(environment));
+if (pins.every(({ keys }) => keys.length === 0)) {
+  console.error("the worker image carries no Word drawing key");
+  process.exit(1);
+}
+console.log(
+  `worker image: the Word drawing pins parse (${pins.map(({ environment, keys }) => `${environment} ${keys.length}`).join(", ")} keys)`,
+);

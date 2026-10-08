@@ -212,6 +212,11 @@ sys.stdout.buffer.write(base64.b64decode(signed["signature"], validate=True))' \
   # record that did not verify would hold its path for good.
   printf '{"record":%s,"signatureBase64":"%s"}' "$(<"$RUN/record.json")" \
     "$(base64 -w0 <"$RUN/signature")" >"$RUN/stored.json"
+  # The worker refuses a stored object over 64 KiB before reading it, so one would hold its path for
+  # good and be refused at every run: never written. The cap is on the object as stored, signature
+  # and all, so it is checked here, where that object is first whole.
+  (($(wc -c <"$RUN/stored.json") <= MAX_RECORD)) ||
+    fail "the signed record is over 64 KiB, which the worker refuses"
   accepted "$RUN/stored.json" "$RUN/record.json" >/dev/null ||
     fail "the signed record is not one this build accepts, against the pinned key ${version}"
   stored="$(<"$RUN/object")"

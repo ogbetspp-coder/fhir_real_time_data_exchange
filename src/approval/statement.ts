@@ -80,8 +80,9 @@ export function signedStatementBytes(signed: SignedApprovalStatement): string {
   return canonicalJson(signed);
 }
 
-// The public key of an approval key version, from its PEM. Anything but a 3072-bit RSA key is
-// refused: a statement verified against another kind of key proves nothing about this one.
+// The public key of an approval key version, from its PEM (and of a Word drawing key version,
+// whose algorithm is the same). Anything but a 3072-bit RSA key is refused: a statement verified
+// against another kind of key proves nothing about this one.
 export function approvalPublicKey(pem: string): KeyObject {
   const key = createPublicKey(pem);
   if (
@@ -117,17 +118,23 @@ export function parseSignedStatement(bytes: string): SignedApprovalStatement | A
   return parsed.data;
 }
 
-// Whether `key` signed the statement: RSA-PSS (SHA-256, salt 32) over the canonical JSON of the
-// statement, which is how Cloud KMS signs its SHA-256 digest.
-export function verifySignature(signed: SignedApprovalStatement, key: KeyObject): boolean {
-  const signature = Buffer.from(signed.signatureBase64, "base64");
-  if (signature.toString("base64") !== signed.signatureBase64) return false;
+// Whether `key` signed `bytes`: RSA-PSS (SHA-256, salt 32) over them, which is how Cloud KMS signs
+// their SHA-256 digest, the signature in its one base64 spelling. A signed approval statement and a
+// Word drawing record (src/certified-word/drawing.ts) are both verified here.
+export function verifyPss(bytes: string, signatureBase64: string, key: KeyObject): boolean {
+  const signature = Buffer.from(signatureBase64, "base64");
+  if (signature.toString("base64") !== signatureBase64) return false;
   return verify(
     "sha256",
-    Buffer.from(canonicalJson(signed.statement), "utf8"),
+    Buffer.from(bytes, "utf8"),
     { key, padding: constants.RSA_PKCS1_PSS_PADDING, saltLength: PSS_SALT_LENGTH },
     signature,
   );
+}
+
+// Whether `key` signed the statement: over the canonical JSON of the statement.
+export function verifySignature(signed: SignedApprovalStatement, key: KeyObject): boolean {
+  return verifyPss(canonicalJson(signed.statement), signed.signatureBase64, key);
 }
 
 // Parses and verifies a signed statement against the key its own `signer.keyVersion` names, as the

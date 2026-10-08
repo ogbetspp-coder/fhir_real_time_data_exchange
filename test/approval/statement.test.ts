@@ -101,6 +101,14 @@ describe("a signed statement", () => {
     expect(verifySignedStatement(signedStatementBytes(untrusted), trusted)).toBe("untrusted-key");
   });
 
+  it("is refused when its signature is written in another base64 spelling of the same bytes", () => {
+    const signed = signStatement(statementFor(first.facts));
+    // 384 bytes are 512 base64 characters and no padding: with "==" more, the same bytes.
+    expect(signed.signatureBase64).toHaveLength(512);
+    const padded = { ...signed, signatureBase64: `${signed.signatureBase64}==` };
+    expect(verifySignedStatement(signedStatementBytes(padded), trusted)).toBe("bad-signature");
+  });
+
   it("is refused for other content: a changed hash breaks the signature, and a signed one is not this record's", () => {
     const signed = signStatement(statementFor(first.facts));
     const tampered = {
