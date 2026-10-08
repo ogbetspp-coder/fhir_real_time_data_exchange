@@ -359,14 +359,43 @@ def _defaults(ppr: str) -> str:
     return f"<w:docDefaults><w:pPrDefault><w:pPr>{ppr}</w:pPr></w:pPrDefault></w:docDefaults>"
 
 
+# The QRD template's compatibility options (Word 2013 and later, ``compatibilityMode`` 15), which
+# EMA's labels carry: each ``-compat`` case is its case again under them.
+_OPTIONS = (
+    ("compatibilityMode", "15"),
+    ("overrideTableStyleFontSizeAndJustification", "1"),
+    ("enableOpenTypeFeatures", "1"),
+    ("doNotFlipMirrorIndents", "1"),
+    ("differentiateMultirowTableHeaders", "1"),
+    ("useWord2013TrackBottomHyphenation", "0"),
+)
+COMPAT = (
+    "<w:compat>"
+    + "".join(
+        f'<w:compatSetting w:name="{name}" w:uri="http://schemas.microsoft.com/office/word" '
+        f'w:val="{value}"/>'
+        for name, value in _OPTIONS
+    )
+    + "</w:compat>"
+)
+
+
 def _cases() -> dict[str, Case]:
-    cases = {
-        f"picture-{name}": Case(f"An in-line picture: {name}.", picture(*shape), picture=True)
-        for name, shape in PICTURES.items()
-    }
+    cases: dict[str, Case] = {}
+    for name, shape in PICTURES.items():
+        cases[f"picture-{name}"] = Case(
+            f"An in-line picture: {name}.", picture(*shape), picture=True
+        )
+        cases[f"picture-{name}-compat"] = Case(
+            f"An in-line picture: {name}, in the QRD template's compatibility mode.",
+            picture(*shape),
+            settings=COMPAT,
+            picture=True,
+        )
     window = '<a:sysClr val="window" lastClr="FFFFFF"/>'
     for name, lt1, settings, entries in (
         ("shading", window, MAPPING, SHADINGS),
+        ("shading-compat", window, COMPAT + MAPPING, SHADINGS),
         ("shading-srgb-white", '<a:srgbClr val="FFFFFF"/>', MAPPING, SHADINGS),
         ("shading-red", '<a:srgbClr val="FF0000"/>', MAPPING, SHADINGS),
         ("shading-unmapped", window, "", SHADINGS),
@@ -389,6 +418,14 @@ def _cases() -> dict[str, Case]:
         rows([(content, props) for _, content, props in TABS]),
         styles=TAB_STYLES,
         numbering=TAB_NUMBERING,
+        rows=len(TABS),
+    )
+    cases["tabs-compat"] = Case(
+        "The tab rows in the QRD template's compatibility mode.",
+        rows([(content, props) for _, content, props in TABS]),
+        styles=TAB_STYLES,
+        numbering=TAB_NUMBERING,
+        settings=COMPAT,
         rows=len(TABS),
     )
     cases["tabs-defaults"] = Case(

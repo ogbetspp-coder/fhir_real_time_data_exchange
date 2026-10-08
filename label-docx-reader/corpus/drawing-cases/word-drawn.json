@@ -15,6 +15,20 @@
    ],
    "sha256": "9caaa5cd63cf76dace900473cf2fd93100ab25bfc43d391c1dfb800bfe8903e9"
   },
+  "picture-plain-compat": {
+   "drawn": [
+    [
+     144,
+     144,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "3703a4f93602c1df2969b92de12dc77c5d20b86a38a2b26226818254518ef364"
+  },
   "picture-extent-even": {
    "drawn": [
     [
@@ -28,6 +42,20 @@
     ]
    ],
    "sha256": "d39cb87cb19181cc35a4b02bfa13d46a0581f53a422f1e9c800e1b5414da8cb8"
+  },
+  "picture-extent-even-compat": {
+   "drawn": [
+    [
+     150,
+     150,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "5342961d68ec798d1eae9e15e63b7043a9de4d282130ccfff49c8d41e81e3629"
   },
   "picture-extent-left": {
    "drawn": [
@@ -43,6 +71,20 @@
    ],
    "sha256": "405d8383d1fc7ebc8ba26747af4c225ef46195b6a3a231ad0eea14f9a45e1f02"
   },
+  "picture-extent-left-compat": {
+   "drawn": [
+    [
+     174,
+     144,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "1f3dc00fe79a5bc2f03908a0da6adc33e9f1cf0db99e8521581dec5502d8c258"
+  },
   "picture-extent-right-bottom": {
    "drawn": [
     [
@@ -56,6 +98,20 @@
     ]
    ],
    "sha256": "2a53ec96017a718cee82d5ef9d2c5707cc1a432fd31b62917d931b20f1b31689"
+  },
+  "picture-extent-right-bottom-compat": {
+   "drawn": [
+    [
+     144,
+     144,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "b11d7cd3c636de028bbbe5e5aed712295964f0c0bfa38bc0085b0b4568eb7a75"
   },
   "picture-extent-big": {
    "drawn": [
@@ -71,6 +127,20 @@
    ],
    "sha256": "06625398f7978f48b80eeba3957f82252cf2e55924552ad68712da8781544541"
   },
+  "picture-extent-big-compat": {
+   "drawn": [
+    [
+     444,
+     444,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "d0448157a7588b15f2f0375dfcc799173496971efec9c4329d96368b3b7dff7f"
+  },
   "picture-extent-negative": {
    "drawn": [
     [
@@ -84,6 +154,20 @@
     ]
    ],
    "sha256": "b0803b6175e9dfe2247e033f90de124f72b9d556737204ab488742c184d4d73b"
+  },
+  "picture-extent-negative-compat": {
+   "drawn": [
+    [
+     141,
+     144,
+     120,
+     59,
+     "02876f3cfc7ee34a",
+     0,
+     0
+    ]
+   ],
+   "sha256": "8c0d230e2c13cb5b982dd0a606ba6997c29e02b6647d158409635939f59932f4"
   },
   "picture-extent-negative-bottom": {
    "drawn": [
@@ -99,6 +183,20 @@
    ],
    "sha256": "b80e43af82fa2beebfd67e8fe6aca4d0302ee0d7e0fd863755076590b06523ac"
   },
+  "picture-extent-negative-bottom-compat": {
+   "drawn": [
+    [
+     144,
+     149,
+     120,
+     60,
+     "9fc5603b072d7c49",
+     0,
+     0
+    ]
+   ],
+   "sha256": "da655684c4ccb608e03127e8801dbb8b4122147d28b72065518b6d12fdeb3046"
+  },
   "picture-rot-with-shape-1": {
    "drawn": [
     [
@@ -112,6 +210,20 @@
     ]
    ],
    "sha256": "8ae117144318900ed05ae13fba55e9c3ba6a6cccc7a9a2e61a94965b483824ba"
+  },
+  "picture-rot-with-shape-1-compat": {
+   "drawn": [
+    [
+     144,
+     144,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "87dd58025c5925f08df718ed342989528b35c59b8a6c683c46b3bef575124200"
   },
   "picture-rot-with-shape-0": {
    "drawn": [
@@ -127,6 +239,20 @@
    ],
    "sha256": "115a6f86bf068dbb4c999aab49ac06245b31a8128e857c69aa9ac0117e8298ea"
   },
+  "picture-rot-with-shape-0-compat": {
+   "drawn": [
+    [
+     144,
+     144,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "7d1633db7b33bc8764fa55fbde4852acbe5c155554186bf2109e6ef5c120efb8"
+  },
   "picture-rot-with-shape-true": {
    "drawn": [
     [
@@ -140,6 +266,20 @@
     ]
    ],
    "sha256": "baf6d8c0a8453d486e047f9dbc5e116eab4f0afebb21a5614879bfcf3c6e30ac"
+  },
+  "picture-rot-with-shape-true-compat": {
+   "drawn": [
+    [
+     144,
+     144,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "a830594aa930d246f8f1cea80961ced475081278d105118a30aa56a6ad44a6a6"
   },
   "picture-rot-with-shape-false": {
    "drawn": [
@@ -155,6 +295,20 @@
    ],
    "sha256": "f55d4baba986af2865f4fa44e67b22c8266a7f3678cdc04b3bd42df87f544b02"
   },
+  "picture-rot-with-shape-false-compat": {
+   "drawn": [
+    [
+     144,
+     144,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "d5e979f6dd80865e5966fc5f78e310eb1d2c96147123ea25ac20b42ecd28dc69"
+  },
   "picture-shadow-obscured": {
    "drawn": [
     [
@@ -168,6 +322,20 @@
     ]
    ],
    "sha256": "9a4cca195e3fec2d657db22c75e43d5fc53c9ebe509f8c00319a9dc57175730d"
+  },
+  "picture-shadow-obscured-compat": {
+   "drawn": [
+    [
+     144,
+     144,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "0f41296e09a3297705f11ef37274882ba1a6edac779e948aece5e57e660b0b49"
   },
   "picture-shadow-drawn": {
    "drawn": [
@@ -183,6 +351,20 @@
    ],
    "sha256": "a87c3093701cfe2e6c5c4ea2160f7f40102faa70152359ebffabe262faab1fe1"
   },
+  "picture-shadow-drawn-compat": {
+   "drawn": [
+    [
+     144,
+     145,
+     120,
+     59,
+     "b8a564a893896750",
+     1610,
+     2595
+    ]
+   ],
+   "sha256": "b769a9b38dc568c86be9bdde9fe546c8e021e8d62dcf60f5569a3d88c2bf56ed"
+  },
   "picture-line-miter": {
    "drawn": [
     [
@@ -196,6 +378,20 @@
     ]
    ],
    "sha256": "7b16b18e9bd6947b34d1789be0a7702976cfa9cf8fb252d28639af2f57acca47"
+  },
+  "picture-line-miter-compat": {
+   "drawn": [
+    [
+     144,
+     144,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "9415e7ea4c1bc1027961b18e46500703c72b65da4dd006a934a84954e56cc002"
   },
   "picture-line-miter-width": {
    "drawn": [
@@ -211,6 +407,20 @@
    ],
    "sha256": "8608ad3f36a198ea5ab1b5391259734e6b0e3186c62e7154c50179b54f2cf951"
   },
+  "picture-line-miter-width-compat": {
+   "drawn": [
+    [
+     144,
+     144,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "56e51e3c9ae710b6874cc3d7e238cbef391308f8748f5bbc1d6187173eccdbd8"
+  },
   "picture-line-miter-bare": {
    "drawn": [
     [
@@ -224,6 +434,20 @@
     ]
    ],
    "sha256": "bf2f8384a94362b4aa73de3937c58b65e635af3e68e601929d514a35984b76dc"
+  },
+  "picture-line-miter-bare-compat": {
+   "drawn": [
+    [
+     144,
+     144,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "77196e811628cc100b2e65c6f8f94acc545ce0e0f4e45ab30f5afab84dc2ed15"
   },
   "picture-line-miter-zero": {
    "drawn": [
@@ -239,6 +463,20 @@
    ],
    "sha256": "f3e5b0f8c534e99315b773a310accc8093fb1a1ba65663e55b633b4e40bb14f3"
   },
+  "picture-line-miter-zero-compat": {
+   "drawn": [
+    [
+     144,
+     144,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "776ae69331aefe2e5106eb6e2917e42091e153e9caafe9f357fa1fd160432858"
+  },
   "picture-line-round": {
    "drawn": [
     [
@@ -252,6 +490,20 @@
     ]
    ],
    "sha256": "594193c93e949fdc32a4c1b3d237a5446aa4149fa474bf59a40e166cf6eca526"
+  },
+  "picture-line-round-compat": {
+   "drawn": [
+    [
+     144,
+     144,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "1125df27f2a75fda1c8f8a9b55c8a7b9901db04c35fe5ce55604402a212fd708"
   },
   "picture-line-bevel": {
    "drawn": [
@@ -267,6 +519,20 @@
    ],
    "sha256": "f2a9ff4ff55cb3368eca50a4de5d4bfac0e74266d20d7fcd24b40e8b152847a3"
   },
+  "picture-line-bevel-compat": {
+   "drawn": [
+    [
+     144,
+     144,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "58a4683906f435fff5d931dea4343fff92d2255fea47583b36996bb3c2106102"
+  },
   "picture-line-head": {
    "drawn": [
     [
@@ -280,6 +546,20 @@
     ]
    ],
    "sha256": "1b816e306b401fc6ec3762466530c86037308650501b3718f4497c17661a40d6"
+  },
+  "picture-line-head-compat": {
+   "drawn": [
+    [
+     144,
+     144,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "2718134e2793375e74d8b8b25a58b876a45e939bc0c8728a343f1703d5d5e617"
   },
   "picture-line-tail": {
    "drawn": [
@@ -295,6 +575,20 @@
    ],
    "sha256": "86fdad678880e019f88d08d9ee6ec8b769fc903b76cccf6134fc5ce8ab2b0749"
   },
+  "picture-line-tail-compat": {
+   "drawn": [
+    [
+     144,
+     144,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "96e093a1ba175716c819f5a7da9322278f4c542352c31ce50c7f4dfa3720f960"
+  },
   "picture-line-wide": {
    "drawn": [
     [
@@ -308,6 +602,20 @@
     ]
    ],
    "sha256": "1453aefeb3b3542fac6844bc1c29a2fb7b0ba11bbba71005f47e71783ef2f756"
+  },
+  "picture-line-wide-compat": {
+   "drawn": [
+    [
+     144,
+     144,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "8f3554591100823ae08635f0310a2a28cefc84dfdeea0ee17a1292493ba55af0"
   },
   "picture-line-drawn": {
    "drawn": [
@@ -323,6 +631,20 @@
    ],
    "sha256": "b560c2efcb60cf9a5e54476083e208dd9588ddda999941b79c66d0ec1b284aa4"
   },
+  "picture-line-drawn-compat": {
+   "drawn": [
+    [
+     144,
+     145,
+     120,
+     59,
+     "b8a564a893896750",
+     2680,
+     2824
+    ]
+   ],
+   "sha256": "3f830bcdff1c48cbabf62c83cbf59f9caacbcf49196a220e089e9879d6f4deee"
+  },
   "picture-combo": {
    "drawn": [
     [
@@ -336,6 +658,20 @@
     ]
    ],
    "sha256": "0e4836317e7cddd6736f8c1ae2a820646329121d68e138214030ddca8386c5b0"
+  },
+  "picture-combo-compat": {
+   "drawn": [
+    [
+     150,
+     147,
+     120,
+     60,
+     "fbb038d2ea496cf8",
+     0,
+     0
+    ]
+   ],
+   "sha256": "933cdcda3aed9574dee7fe7f88570f4ab6e4d251ff83665cb804adcba2223c88"
   },
   "shading": {
    "drawn": [
@@ -517,6 +853,187 @@
     ]
    ],
    "sha256": "928249ca733c567fed5511ba5ace4c5f5eae3ba6fdf63e1250f0e050d084dcd9"
+  },
+  "shading-compat": {
+   "drawn": [
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     "D9D9D9:30550 EEEEEE:94"
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     "D9D9D9:30550 EEEEEE:94"
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     "BFBFBF:30550 E2E2E2:94"
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     "D9D9D9:30550 EEEEEE:94"
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     "D9D9D9:30550 EEEEEE:94"
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     "D9D9D9:30550 EEEEEE:94"
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     "4F81BD:30550 B1C7E2:94"
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     "000000:30550 8F8F8F:94"
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     "D9D9D9:197682 E2E2E2:94 E9E9E9:94"
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     "D9D9D9:30550 EEEEEE:94"
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     "F6E5E4:30550 FBF3F3:94"
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     "EFE1E1:30550 F7F1F1:94"
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     "D9D9D9:30550 EEEEEE:94"
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     "D9D9D9:30550 EEEEEE:94"
+    ]
+   ],
+   "sha256": "d101321d2f98ec5b61c6208f560c6967f5587a5fd9958a0e6ff3b620897ddf13"
   },
   "shading-srgb-white": {
    "drawn": [
@@ -3238,6 +3755,131 @@
     ]
    ],
    "sha256": "985f2547d494ce39fee65dbc4ce1221c651b21ab3dde1d0468065d3b7428bd05"
+  },
+  "tabs-compat": {
+   "drawn": [
+    [
+     36.0,
+     43.25,
+     73.0,
+     78.75,
+     32,
+     "0000FF:345 FF0000:261 D8D8FF:32"
+    ],
+    [
+     36.0,
+     43.25,
+     253.0,
+     258.75,
+     3032,
+     "000000:1440 0000FF:345 FF0000:261"
+    ],
+    [
+     36.0,
+     43.25,
+     253.0,
+     258.75,
+     32,
+     "0000FF:345 FF0000:261 D8D8FF:32"
+    ],
+    [
+     36.0,
+     43.25,
+     253.0,
+     258.75,
+     32,
+     "0000FF:345 FF0000:261 D8D8FF:32"
+    ],
+    [
+     36.0,
+     43.25,
+     253.0,
+     258.75,
+     3308,
+     "000000:1628 787878:748 BFBFBF:748"
+    ],
+    [
+     36.0,
+     43.25,
+     253.0,
+     258.75,
+     3282,
+     "000000:1650 0F0F0F:600 E9E9E9:550"
+    ],
+    [
+     36.0,
+     43.25,
+     253.0,
+     258.75,
+     2972,
+     "000000:1440 0000FF:345 FF0000:261"
+    ],
+    [
+     36.0,
+     43.25,
+     253.0,
+     258.75,
+     3308,
+     "000000:1628 787878:748 BFBFBF:748"
+    ],
+    [
+     36.0,
+     43.25,
+     253.0,
+     258.75,
+     3032,
+     "000000:1440 0000FF:345 FF0000:261"
+    ],
+    [
+     36.0,
+     43.25,
+     253.0,
+     258.75,
+     3032,
+     "000000:1440 0000FF:345 FF0000:261"
+    ],
+    [
+     37.0,
+     53.0,
+     253.0,
+     258.75,
+     2882,
+     "000000:1368 FF0000:438 0000FF:345"
+    ],
+    [
+     37.0,
+     249.0,
+     253.0,
+     258.75,
+     32,
+     "FF0000:1397 0000FF:345 FF0F0F:244"
+    ],
+    [
+     36.5,
+     44.75,
+     73.0,
+     78.75,
+     35,
+     "0000FF:345 FF0000:263 D8D8FF:32"
+    ],
+    [
+     36.0,
+     43.25,
+     553.0,
+     558.75,
+     7432,
+     "000000:3552 0000FF:345 9D9D9D:296"
+    ],
+    [
+     36.0,
+     43.25,
+     553.0,
+     558.75,
+     32,
+     "0000FF:345 FF0000:261 D8D8FF:32"
+    ]
+   ],
+   "sha256": "14349ec1eaceed07a1f89f87c0b8990bead7433588e5c48e1e0467d35cc5eb84"
   },
   "tabs-defaults": {
    "drawn": [

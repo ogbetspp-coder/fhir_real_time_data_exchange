@@ -203,7 +203,7 @@ each document reads to, `word.json` and `browser.json` hold Word's and Chrome's 
 | `ema-qrd`         |         4 | EMA QRD files the rules were first written from                   |
 | `ema-templates`   |        18 | EMA product-information templates                                 |
 | `numbering-cases` |       155 | one Word rule each, synthetic                                     |
-| `drawing-cases`   |        32 | what Word draws for pictures, theme shading and tab leaders, synthetic |
+| `drawing-cases`   |        58 | what Word draws for pictures, theme shading and tab leaders, synthetic |
 | `fda-templates`   |         3 | FDA prescribing information, medication guide and patient insert templates |
 | `word-authored`   |         2 | written by Word itself (a table of contents)                      |
 | `tracked-cases`   |        39 | tracked changes, with Word's Accept All and Reject All files      |

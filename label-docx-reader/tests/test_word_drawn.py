@@ -40,15 +40,18 @@ def test_words_drawing_is_on_record_for_the_cases_as_they_are() -> None:
         assert len(_drawn(name)) == (case.rows or 1), name
 
 
-def test_a_picture_is_carried_only_where_word_draws_its_pixels_and_nothing_else() -> None:
-    # The box's size, its pixels' digest and no ink round it or elsewhere: as the plain one's.
-    plain = _drawn("picture-plain")[0][2:]
+@pytest.mark.parametrize("mode", ["", "-compat"])
+def test_a_picture_is_carried_only_where_word_draws_its_pixels_and_nothing_else(mode: str) -> None:
+    # The box's size, its pixels' digest and no ink round it or elsewhere: as the plain one's,
+    # in Word's own mode and in the QRD template's (compatibilityMode 15) alike.
+    plain = _drawn(f"picture-plain{mode}")[0][2:]
     assert plain[3:] == [0, 0]
+    assert plain == _drawn("picture-plain")[0][2:]
     alone, carried = set(), set()
     for name in drawing_cases.PICTURES:
-        if _drawn(f"picture-{name}")[0][2:] == plain:
+        if _drawn(f"picture-{name}{mode}")[0][2:] == plain:
             alone.add(name)
-        (paragraph,) = read_docx((FOLDER / f"picture-{name}.docx").read_bytes())
+        (paragraph,) = read_docx((FOLDER / f"picture-{name}{mode}.docx").read_bytes())
         reason = paragraph.pictures[0].reason
         assert reason in (None, "effects"), name
         if reason is None:
@@ -73,7 +76,15 @@ def _rows(name: str) -> list[tuple[str, list[str]]]:
 
 
 @pytest.mark.parametrize(
-    "name", ["shading", "shading-srgb-white", "shading-red", "shading-unmapped", "shading-shades"]
+    "name",
+    [
+        "shading",
+        "shading-compat",
+        "shading-srgb-white",
+        "shading-red",
+        "shading-unmapped",
+        "shading-shades",
+    ],
 )
 def test_a_shading_the_reader_names_by_its_colour_is_the_colour_word_paints(name: str) -> None:
     for painted, kinds in _rows(name):
@@ -111,6 +122,8 @@ def test_a_theme_shading_is_resolved_only_where_word_paints_what_it_is_resolved_
             if row in themed:
                 assert kinds, (name, row)
                 assert all("THEME" in kind for kind in kinds), (name, row)
+    # In the QRD template's compatibility mode, Word paints and the reader reads every row alike.
+    assert _rows("shading-compat") == list(rows.values())
     red = dict(zip(names, _rows("shading-red"), strict=True))
     assert red["bg1"][0] == "FF0000"
     assert red["bg1-shade-D9"][0] == "D90000"
@@ -142,15 +155,21 @@ def _leader(row: list[object]) -> bool:
     return between > 1000 or label_end > 100
 
 
-def test_a_tab_is_refused_exactly_where_word_draws_a_leader_across_it() -> None:
-    drawn = [_leader(row) for row in _drawn("tabs")]
+@pytest.mark.parametrize(
+    ("name", "settings"), [("tabs", None), ("tabs-compat", drawing_cases.COMPAT)]
+)
+def test_a_tab_is_refused_exactly_where_word_draws_a_leader_across_it(
+    name: str, settings: str | None
+) -> None:
+    drawn = [_leader(row) for row in _drawn(name)]
     refused = []
-    for name, content, props in drawing_cases.TABS:
+    for row, content, props in drawing_cases.TABS:
         alone = drawing_cases.Case(
-            name,
+            row,
             drawing_cases.rows([(content, props)]),
             styles=drawing_cases.TAB_STYLES,
             numbering=drawing_cases.TAB_NUMBERING,
+            settings=settings,
             rows=1,
         )
         refused.append(_refused(drawing_cases.package(alone)))

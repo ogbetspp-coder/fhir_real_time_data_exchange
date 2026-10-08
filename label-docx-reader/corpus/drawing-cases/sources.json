@@ -9,10 +9,22 @@
       "bytes": 3696
     },
     {
+      "name": "An in-line picture: plain, in the QRD template's compatibility mode.",
+      "file": "picture-plain-compat.docx",
+      "sha256": "3703a4f93602c1df2969b92de12dc77c5d20b86a38a2b26226818254518ef364",
+      "bytes": 4932
+    },
+    {
       "name": "An in-line picture: extent-even.",
       "file": "picture-extent-even.docx",
       "sha256": "d39cb87cb19181cc35a4b02bfa13d46a0581f53a422f1e9c800e1b5414da8cb8",
       "bytes": 3712
+    },
+    {
+      "name": "An in-line picture: extent-even, in the QRD template's compatibility mode.",
+      "file": "picture-extent-even-compat.docx",
+      "sha256": "5342961d68ec798d1eae9e15e63b7043a9de4d282130ccfff49c8d41e81e3629",
+      "bytes": 4948
     },
     {
       "name": "An in-line picture: extent-left.",
@@ -21,10 +33,22 @@
       "bytes": 3700
     },
     {
+      "name": "An in-line picture: extent-left, in the QRD template's compatibility mode.",
+      "file": "picture-extent-left-compat.docx",
+      "sha256": "1f3dc00fe79a5bc2f03908a0da6adc33e9f1cf0db99e8521581dec5502d8c258",
+      "bytes": 4936
+    },
+    {
       "name": "An in-line picture: extent-right-bottom.",
       "file": "picture-extent-right-bottom.docx",
       "sha256": "2a53ec96017a718cee82d5ef9d2c5707cc1a432fd31b62917d931b20f1b31689",
       "bytes": 3705
+    },
+    {
+      "name": "An in-line picture: extent-right-bottom, in the QRD template's compatibility mode.",
+      "file": "picture-extent-right-bottom-compat.docx",
+      "sha256": "b11d7cd3c636de028bbbe5e5aed712295964f0c0bfa38bc0085b0b4568eb7a75",
+      "bytes": 4941
     },
     {
       "name": "An in-line picture: extent-big.",
@@ -33,10 +57,22 @@
       "bytes": 3716
     },
     {
+      "name": "An in-line picture: extent-big, in the QRD template's compatibility mode.",
+      "file": "picture-extent-big-compat.docx",
+      "sha256": "d0448157a7588b15f2f0375dfcc799173496971efec9c4329d96368b3b7dff7f",
+      "bytes": 4952
+    },
+    {
       "name": "An in-line picture: extent-negative.",
       "file": "picture-extent-negative.docx",
       "sha256": "b0803b6175e9dfe2247e033f90de124f72b9d556737204ab488742c184d4d73b",
       "bytes": 3704
+    },
+    {
+      "name": "An in-line picture: extent-negative, in the QRD template's compatibility mode.",
+      "file": "picture-extent-negative-compat.docx",
+      "sha256": "8c0d230e2c13cb5b982dd0a606ba6997c29e02b6647d158409635939f59932f4",
+      "bytes": 4940
     },
     {
       "name": "An in-line picture: extent-negative-bottom.",
@@ -45,10 +81,22 @@
       "bytes": 3701
     },
     {
+      "name": "An in-line picture: extent-negative-bottom, in the QRD template's compatibility mode.",
+      "file": "picture-extent-negative-bottom-compat.docx",
+      "sha256": "da655684c4ccb608e03127e8801dbb8b4122147d28b72065518b6d12fdeb3046",
+      "bytes": 4937
+    },
+    {
       "name": "An in-line picture: rot-with-shape-1.",
       "file": "picture-rot-with-shape-1.docx",
       "sha256": "8ae117144318900ed05ae13fba55e9c3ba6a6cccc7a9a2e61a94965b483824ba",
       "bytes": 3713
+    },
+    {
+      "name": "An in-line picture: rot-with-shape-1, in the QRD template's compatibility mode.",
+      "file": "picture-rot-with-shape-1-compat.docx",
+      "sha256": "87dd58025c5925f08df718ed342989528b35c59b8a6c683c46b3bef575124200",
+      "bytes": 4949
     },
     {
       "name": "An in-line picture: rot-with-shape-0.",
@@ -57,10 +105,22 @@
       "bytes": 3713
     },
     {
+      "name": "An in-line picture: rot-with-shape-0, in the QRD template's compatibility mode.",
+      "file": "picture-rot-with-shape-0-compat.docx",
+      "sha256": "7d1633db7b33bc8764fa55fbde4852acbe5c155554186bf2109e6ef5c120efb8",
+      "bytes": 4949
+    },
+    {
       "name": "An in-line picture: rot-with-shape-true.",
       "file": "picture-rot-with-shape-true.docx",
       "sha256": "baf6d8c0a8453d486e047f9dbc5e116eab4f0afebb21a5614879bfcf3c6e30ac",
       "bytes": 3716
+    },
+    {
+      "name": "An in-line picture: rot-with-shape-true, in the QRD template's compatibility mode.",
+      "file": "picture-rot-with-shape-true-compat.docx",
+      "sha256": "a830594aa930d246f8f1cea80961ced475081278d105118a30aa56a6ad44a6a6",
+      "bytes": 4952
     },
     {
       "name": "An in-line picture: rot-with-shape-false.",
@@ -69,10 +129,22 @@
       "bytes": 3717
     },
     {
+      "name": "An in-line picture: rot-with-shape-false, in the QRD template's compatibility mode.",
+      "file": "picture-rot-with-shape-false-compat.docx",
+      "sha256": "d5e979f6dd80865e5966fc5f78e310eb1d2c96147123ea25ac20b42ecd28dc69",
+      "bytes": 4953
+    },
+    {
       "name": "An in-line picture: shadow-obscured.",
       "file": "picture-shadow-obscured.docx",
       "sha256": "9a4cca195e3fec2d657db22c75e43d5fc53c9ebe509f8c00319a9dc57175730d",
       "bytes": 3798
+    },
+    {
+      "name": "An in-line picture: shadow-obscured, in the QRD template's compatibility mode.",
+      "file": "picture-shadow-obscured-compat.docx",
+      "sha256": "0f41296e09a3297705f11ef37274882ba1a6edac779e948aece5e57e660b0b49",
+      "bytes": 5034
     },
     {
       "name": "An in-line picture: shadow-drawn.",
@@ -81,10 +153,22 @@
       "bytes": 3931
     },
     {
+      "name": "An in-line picture: shadow-drawn, in the QRD template's compatibility mode.",
+      "file": "picture-shadow-drawn-compat.docx",
+      "sha256": "b769a9b38dc568c86be9bdde9fe546c8e021e8d62dcf60f5569a3d88c2bf56ed",
+      "bytes": 5167
+    },
+    {
       "name": "An in-line picture: line-miter.",
       "file": "picture-line-miter.docx",
       "sha256": "7b16b18e9bd6947b34d1789be0a7702976cfa9cf8fb252d28639af2f57acca47",
       "bytes": 3743
+    },
+    {
+      "name": "An in-line picture: line-miter, in the QRD template's compatibility mode.",
+      "file": "picture-line-miter-compat.docx",
+      "sha256": "9415e7ea4c1bc1027961b18e46500703c72b65da4dd006a934a84954e56cc002",
+      "bytes": 4979
     },
     {
       "name": "An in-line picture: line-miter-width.",
@@ -93,10 +177,22 @@
       "bytes": 3752
     },
     {
+      "name": "An in-line picture: line-miter-width, in the QRD template's compatibility mode.",
+      "file": "picture-line-miter-width-compat.docx",
+      "sha256": "56e51e3c9ae710b6874cc3d7e238cbef391308f8748f5bbc1d6187173eccdbd8",
+      "bytes": 4988
+    },
+    {
       "name": "An in-line picture: line-miter-bare.",
       "file": "picture-line-miter-bare.docx",
       "sha256": "bf2f8384a94362b4aa73de3937c58b65e635af3e68e601929d514a35984b76dc",
       "bytes": 3730
+    },
+    {
+      "name": "An in-line picture: line-miter-bare, in the QRD template's compatibility mode.",
+      "file": "picture-line-miter-bare-compat.docx",
+      "sha256": "77196e811628cc100b2e65c6f8f94acc545ce0e0f4e45ab30f5afab84dc2ed15",
+      "bytes": 4966
     },
     {
       "name": "An in-line picture: line-miter-zero.",
@@ -105,10 +201,22 @@
       "bytes": 3738
     },
     {
+      "name": "An in-line picture: line-miter-zero, in the QRD template's compatibility mode.",
+      "file": "picture-line-miter-zero-compat.docx",
+      "sha256": "776ae69331aefe2e5106eb6e2917e42091e153e9caafe9f357fa1fd160432858",
+      "bytes": 4974
+    },
+    {
       "name": "An in-line picture: line-round.",
       "file": "picture-line-round.docx",
       "sha256": "594193c93e949fdc32a4c1b3d237a5446aa4149fa474bf59a40e166cf6eca526",
       "bytes": 3730
+    },
+    {
+      "name": "An in-line picture: line-round, in the QRD template's compatibility mode.",
+      "file": "picture-line-round-compat.docx",
+      "sha256": "1125df27f2a75fda1c8f8a9b55c8a7b9901db04c35fe5ce55604402a212fd708",
+      "bytes": 4966
     },
     {
       "name": "An in-line picture: line-bevel.",
@@ -117,10 +225,22 @@
       "bytes": 3730
     },
     {
+      "name": "An in-line picture: line-bevel, in the QRD template's compatibility mode.",
+      "file": "picture-line-bevel-compat.docx",
+      "sha256": "58a4683906f435fff5d931dea4343fff92d2255fea47583b36996bb3c2106102",
+      "bytes": 4966
+    },
+    {
       "name": "An in-line picture: line-head.",
       "file": "picture-line-head.docx",
       "sha256": "1b816e306b401fc6ec3762466530c86037308650501b3718f4497c17661a40d6",
       "bytes": 3708
+    },
+    {
+      "name": "An in-line picture: line-head, in the QRD template's compatibility mode.",
+      "file": "picture-line-head-compat.docx",
+      "sha256": "2718134e2793375e74d8b8b25a58b876a45e939bc0c8728a343f1703d5d5e617",
+      "bytes": 4944
     },
     {
       "name": "An in-line picture: line-tail.",
@@ -129,10 +249,22 @@
       "bytes": 3708
     },
     {
+      "name": "An in-line picture: line-tail, in the QRD template's compatibility mode.",
+      "file": "picture-line-tail-compat.docx",
+      "sha256": "96e093a1ba175716c819f5a7da9322278f4c542352c31ce50c7f4dfa3720f960",
+      "bytes": 4944
+    },
+    {
       "name": "An in-line picture: line-wide.",
       "file": "picture-line-wide.docx",
       "sha256": "1453aefeb3b3542fac6844bc1c29a2fb7b0ba11bbba71005f47e71783ef2f756",
       "bytes": 3707
+    },
+    {
+      "name": "An in-line picture: line-wide, in the QRD template's compatibility mode.",
+      "file": "picture-line-wide-compat.docx",
+      "sha256": "8f3554591100823ae08635f0310a2a28cefc84dfdeea0ee17a1292493ba55af0",
+      "bytes": 4943
     },
     {
       "name": "An in-line picture: line-drawn.",
@@ -141,16 +273,34 @@
       "bytes": 3794
     },
     {
+      "name": "An in-line picture: line-drawn, in the QRD template's compatibility mode.",
+      "file": "picture-line-drawn-compat.docx",
+      "sha256": "3f830bcdff1c48cbabf62c83cbf59f9caacbcf49196a220e089e9879d6f4deee",
+      "bytes": 5030
+    },
+    {
       "name": "An in-line picture: combo.",
       "file": "picture-combo.docx",
       "sha256": "0e4836317e7cddd6736f8c1ae2a820646329121d68e138214030ddca8386c5b0",
       "bytes": 3882
     },
     {
+      "name": "An in-line picture: combo, in the QRD template's compatibility mode.",
+      "file": "picture-combo-compat.docx",
+      "sha256": "933cdcda3aed9574dee7fe7f88570f4ab6e4d251ff83665cb804adcba2223c88",
+      "bytes": 5118
+    },
+    {
       "name": "Theme and pattern shadings, the theme's lt1 <a:sysClr val=\"window\" lastClr=\"FFFFFF\"/>.",
       "file": "shading.docx",
       "sha256": "928249ca733c567fed5511ba5ace4c5f5eae3ba6fdf63e1250f0e050d084dcd9",
       "bytes": 17217
+    },
+    {
+      "name": "Theme and pattern shadings, the theme's lt1 <a:sysClr val=\"window\" lastClr=\"FFFFFF\"/>.",
+      "file": "shading-compat.docx",
+      "sha256": "d101321d2f98ec5b61c6208f560c6967f5587a5fd9958a0e6ff3b620897ddf13",
+      "bytes": 17930
     },
     {
       "name": "Theme and pattern shadings, the theme's lt1 <a:srgbClr val=\"FFFFFF\"/>.",
@@ -181,6 +331,12 @@
       "file": "tabs.docx",
       "sha256": "985f2547d494ce39fee65dbc4ce1221c651b21ab3dde1d0468065d3b7428bd05",
       "bytes": 8902
+    },
+    {
+      "name": "The tab rows in the QRD template's compatibility mode.",
+      "file": "tabs-compat.docx",
+      "sha256": "14349ec1eaceed07a1f89f87c0b8990bead7433588e5c48e1e0467d35cc5eb84",
+      "bytes": 10138
     },
     {
       "name": "A tab under a leader the document defaults' tab stop gives.",
