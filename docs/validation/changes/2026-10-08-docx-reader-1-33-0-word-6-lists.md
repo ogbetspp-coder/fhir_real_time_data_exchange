@@ -16,25 +16,25 @@ draws it, and refuses what Word's drawing does not cover:
   else is as Word was recorded drawing it (a whitelist; any other input is `legacy`, which Zone A's
   builder refuses, `list-label`, as before):
   - the label: of characters the table lists, at most four (two in Symbol), in Times New Roman,
-    or Symbol but not in bold (Word draws its made-up bold wider), in both Latin slots with no
-    other font hint; 16 to 56 half-points; legacySpace 0 to 340 and legacyIndent 0 to 1500
-    twips; its level aligned left or not at all; run properties only fonts, size, colour,
-    language, `noProof`, bold, italic and their complex-script forms (no character style,
-    border, outline, spacing...), set in its level, the paragraph mark or the paragraph's style
-    chain, and in the defaults only fonts, sizes and language;
-  - its paragraph: outside a table; its properties (its own, its style's and the defaults') only
-    those Word drew, each with a value it drew: style, numbering, the mark's run properties;
-    aligned left or justified; tab stops only left, clear, `num` or right, from -1985 to 1440
-    twips; indents only left and hanging (0 to 1500), right (-29 to 720) and a firstLine of 0,
-    hanging at most 360 past the least left; line spacing auto (240 to 480), exact or at least
-    (200 to 1200, and no lower than the label), before and after up to 240; keep with next, keep
-    lines, contextual
-    spacing, page break before (on); widow control (on or off); overflow punctuation, East Asian
-    spacing and right-indent adjustment (off); text alignment auto, baseline or centre; outline
-    level 0 to 8; clear shading in white or light grey. Its level's own properties only tab
-    stops and an indent by left and hanging (and right), or by left and a firstLine of 0.
-    Anything else (no `bidi`, no frame, no border, no mirrored indents, no alignment or spacing
-    in the level...) is `legacy`;
+    or Symbol but not in bold (Word draws its made-up bold wider) and named in its level or the
+    paragraph's mark, in both Latin slots with no other font hint; 16 to 56 half-points;
+    legacySpace 0 to 340 and legacyIndent 0 to 1500 twips; its level aligned left by its own
+    `lvlJc`; run properties only fonts, size, colour, language, `noProof`, bold, italic and their
+    complex-script forms (no character style, border, outline, spacing...), set in its level, the
+    paragraph's mark or its style chain, and in the defaults only fonts, sizes and language;
+  - its paragraph: outside a table; its properties (its own, its style chain's and the
+    defaults') only those Word drew, each with a value it drew: style, numbering, the mark's run
+    properties; aligned left or justified; tab stops only left, clear, `num` or right, from -1985
+    to 1440 twips; indents only left and hanging (0 to 1500), right (-29 to 720) and a firstLine
+    of 0, hanging at most 360 past the least left; line spacing auto (240 to 480), exact or at
+    least (200 to 1200, and no lower than the label), before and after up to 240; keep with next,
+    keep lines, contextual spacing, page break before (on); widow control (on or off); overflow
+    punctuation, East Asian spacing and right-indent adjustment (off); text alignment auto,
+    baseline or centre; outline level 0 to 8; clear shading in white or light grey. The
+    defaults' only spacing, widow control and East Asian spacing; its level's own only tab stops
+    and an indent by left and hanging (and right), or by left and a firstLine of 0. Anything else
+    (no `bidi`, no frame, no border, no mirrored indents, no alignment or spacing in the
+    level...) is `legacy`;
   - the document: each `docGrid` only a line pitch of 233, 299, 326 or 360 twips (or none),
     every text direction left to right, and either no settings part or one whose compat options
     are one of the eight combinations recorded (the QRD template's, `compatibilityMode` 15 with
@@ -114,29 +114,35 @@ so the reader now carries only what Word's drawing proves.
     draws each within a pixel of the rule against its own space (0.93 px at most): the reader
     says `tab` for the 24 at least 0.2 pt past one, `legacy` for the 21 others. Word's labels
     for cases 9 to 17 (`word.json`) are the reader's, Symbol's mapped where Word names it.
-  - Fixed in every drawn row, and so gated: a label's level setting anything but tab stops and
-    an indent, or an indent of another shape (`legacy`); a label longer than four characters, or
-    two in Symbol (`legacy`: "2345." and "6789." of `legacy-drawn` are no longer taken); Symbol
-    from the paragraph's style (`legacy`: Word drew it as from the mark, but names no font on the
-    label it writes in, so its label is not on record); the defaults setting a run property
-    other than fonts, size and language (`legacy`); an exact or at-least line lower than the
-    label (`legacy`); a `docGrid` other than the line pitches above, a default tab stop not
-    among those above, or characters other than `doNotCompress` (`legacy`). Fixed and not read:
-    the text's font and characters (Times New Roman, "5 mg"), measured against a control with the
-    same text, so its glyphs' sides cancel; the label's colour; the page (A4, 0.5 in top and
-    bottom, 2 cm left and right) and a single column.
+  - Fixed in every drawn row, and so gated (each `legacy` otherwise, in both copies):
+    - a level setting only tab stops and an indent of a drawn shape, and aligned left by its own
+      `lvlJc` (none was drawn without one);
+    - labels of at most four characters, two in Symbol ("2345." and "6789." of `legacy-drawn`
+      are no longer taken);
+    - Symbol named in the level or the mark: from the paragraph's style Word drew it as from the
+      mark, but names no font on the label it writes in, so its label is not on record;
+    - the defaults setting only fonts, sizes and language, and only spacing, widow control and
+      East Asian spacing;
+    - exact and at-least lines no lower than the label;
+    - a `docGrid` only of a line pitch above, a default tab stop above, `doNotCompress`.
+  - Fixed and not read: the text's font and characters (Times New Roman, "5 mg"), measured
+    against a control with the same text, so its glyphs' sides cancel; the label's colour (red);
+    the page (A4, 0.5 in top and bottom, 2 cm left and right) and a single column.
 - Every row of every case keeps its ink at least half a point from its band's edges, so no row's
   ink is another's (a two-line justified paragraph with spacing is drawn above its own top: the
   samples stand a page each).
 - `corpus/numbering-cases/numbering-num-before-abstract`: the interleaved numbering part.
 - Word's answers for the whole numbering-cases set were recorded again under 16.113.4; the 153
-  earlier cases answered as under 16.113.3.
+  earlier cases answered as under 16.113.3. Word's drawing of every case before
+  `legacy-drawn-sample-9` was recorded again with the new cases, unchanged to the last value.
 
 **Proof.** `tests/test_word_gaps.py` holds the rule, the space and the reader's suffixes to Word's
 drawing; `tests/test_word_oracle.py` the labels and written suffixes; `tests/test_certify.py`, read
 through both the reader and the check, each condition of the whitelist on both sides of each bound
-and either side of the gap's threshold (no label the whitelist takes is ever exactly on it). The check's mutation record: 4,188 of 4,294 faults killed, 106 recorded as unable to change a result,
-none unexplained.
+and either side of the gap's threshold (no label the whitelist takes is ever exactly on it). The
+check's mutation record: 4,253 of 4,361 faults killed, 108 recorded as unable to change a
+result (two new: `>=` at the threshold, which no label it takes reaches, and a final `return
+False` read only under `not`), none unexplained.
 
 **Impact assessment.**
 

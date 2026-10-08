@@ -481,6 +481,10 @@ EQUIVALENT: dict[tuple[str, str, str, int], str] = {
     ("_unread_kind", 'if node.tag == _w("sdt"):', "compare:0", 0): _HELD_CONTROLS,
     ("_unread_kind", 'if node.tag == _w("sdt"):', "str:'sdt'", 0): _HELD_CONTROLS,
     ("_unread_kind", "_control(node)", "call", 0): _HELD_CONTROLS,
+    ("_symbol_named", "return False", "statement", 0): (
+        "without it the function returns None, and its one caller reads it only under not, "
+        "where None is False"
+    ),
     (
         "_Numbering._word6_spaced",
         "return max(after, space * _WORD6_EM) >= needed",
