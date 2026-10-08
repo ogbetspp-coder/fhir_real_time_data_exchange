@@ -15,12 +15,18 @@ import {
   type DrawingPins,
 } from "../../src/certified-word/drawing.js";
 import { importCertifiedWord } from "../../src/certified-word/import.js";
-import { RUN, caseRequest, recomputed, recomputedCases } from "../../src/certified-word/vectors.js";
+import {
+  RUN,
+  caseRequest,
+  recomputed,
+  recomputedCases,
+  type RecomputedCase,
+} from "../../src/certified-word/vectors.js";
 import type {
   CanonicalSubmission,
   CertifiedWordSourceDocument,
 } from "../../src/contracts/index.js";
-import { loadEmaMapping } from "../../src/fhir/mapping.js";
+import { loadEmaMapping, type EmaMapping } from "../../src/fhir/mapping.js";
 import { canonicalJson } from "../../src/lib/hash.js";
 
 // The gate's step 5 (docs/design/certified-word-drawing.md, section 3, "How Zone B verifies it"),
@@ -28,32 +34,53 @@ import { canonicalJson } from "../../src/lib/hash.js";
 // for the committed synthetic SmPC (test/fixtures/certified-word/recompute/smpc.docx), copied byte
 // for byte from gs://sage-ship-509104-b8-ema-flow-dev-word-drawings/<PATH> on 2026-10-07. Records
 // that are not real are signed here with a key made for the test.
+//
+// It is a record of the build it was drawn by (word-epi/1.3.2, word-drawing/1.2.0), so it is held
+// to what that build made: the recompute's bytes it names, frozen beside it (smpc.recompute.json),
+// its own request, and dev's pins with the drawing's version of then. A later build's request
+// has another path, so it finds this record nowhere ("a later build", below).
 
 const REAL_RECORD = readFileSync("test/fixtures/certified-word/drawing/smpc.record.json");
+const SIGNED_FOR = readFileSync("test/fixtures/certified-word/drawing/smpc.recompute.json");
 const PATH =
   "word/7e4c389fdb72bf3b804e1240e043eba02352fd3a70ebe25283b06a53fcd92809/03d058be759c88620d0748c07ea6c747c468b7ad9b0e95f23476e07db67d4000/1.json";
 const real = JSON.parse(REAL_RECORD.toString("utf8")) as {
-  record: Record<string, unknown> & { sections: unknown[] };
+  record: Record<string, unknown> & {
+    sections: unknown[];
+    request: { recompute: RecomputedCase["request"] };
+    drawing: { version: string };
+  };
   signatureBase64: string;
 };
 
+let mapping: EmaMapping;
 let submission: CanonicalSubmission;
 let source: CertifiedWordSourceDocument;
 let output: string;
 let dev: DrawingPins;
 let own: { publicKey: KeyObject; privateKey: KeyObject };
 
-beforeAll(async () => {
-  const mapping = await loadEmaMapping();
+function certifiedSource(made: CanonicalSubmission): CertifiedWordSourceDocument {
+  const named = made.provenance.sourceDocument;
+  if (named.kind !== "certified-word") throw new Error("not a certified Word source");
+  return named;
+}
+
+function smpcCase(): RecomputedCase {
   const found = recomputedCases().find(({ name }) => name === "smpc");
   if (found === undefined) throw new Error("no smpc case");
-  ({ submission } = importCertifiedWord(recomputed("smpc"), caseRequest(found), mapping, RUN));
-  const named = submission.provenance.sourceDocument;
-  if (named.kind !== "certified-word") throw new Error("not a certified Word source");
-  source = named;
-  // What the recompute writes for the committed label: the committed result, byte for byte.
-  output = sha256Bytes(recomputed("smpc"));
-  dev = drawingPins("dev");
+  return found;
+}
+
+beforeAll(async () => {
+  mapping = await loadEmaMapping();
+  const signed = { ...caseRequest(smpcCase()), recompute: real.record.request.recompute };
+  ({ submission } = importCertifiedWord(SIGNED_FOR, signed, mapping, RUN));
+  source = certifiedSource(submission);
+  // What the recompute wrote for the committed label at that build, byte for byte.
+  output = sha256Bytes(SIGNED_FOR);
+  // Dev's pins as they stood when the record was signed: the image and key are the same.
+  dev = { ...drawingPins("dev"), version: real.record.drawing.version };
   own = generateKeyPairSync("rsa", { modulusLength: 3072 });
 });
 
@@ -108,6 +135,22 @@ describe("the real record", () => {
       })),
     );
     expect(real.record.sections).toHaveLength(32);
+  });
+
+  it("is found by no later build: its request and drawing's version have other paths", async () => {
+    // This build (word-epi/1.4.0, word-drawing/1.2.1) on the same label, with dev's pins now.
+    expect(real.record.drawing.version).toBe("word-drawing/1.2.0");
+    const later = importCertifiedWord(recomputed("smpc"), caseRequest(smpcCase()), mapping, RUN);
+    const asked: string[] = [];
+    const now = drawingVerdict(
+      { pins: drawingPins("dev"), read: bucket({ [PATH]: REAL_RECORD }, asked) },
+      later.submission,
+      certifiedSource(later.submission),
+      sha256Bytes(recomputed("smpc")),
+    );
+    expect(await now).toBe("missing");
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).not.toBe(PATH);
   });
 });
 
@@ -277,7 +320,7 @@ describe("the pins", () => {
     expect(pins.keys.map(([version]) => version)).toEqual([10, 2, 1]);
     expect([pins.environment, pins.version, pins.imageDigest]).toEqual([
       "dev",
-      "word-drawing/1.2.0",
+      "word-drawing/1.2.1",
       dev.imageDigest,
     ]);
     // Nothing pinned for validation.

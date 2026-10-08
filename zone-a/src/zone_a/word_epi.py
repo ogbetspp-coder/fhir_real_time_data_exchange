@@ -39,7 +39,8 @@ What is carried, a closed list. A section is refused on the first paragraph that
 else, with the code in parentheses:
 
 - marks: bold, italic, superscript and subscript (not both at once: ``script``), and the QRD
-  template's grey, a light grey highlight or D9D9D9 shading (``GREY``; owner decision 2026-10-06).
+  template's grey, a light grey highlight or D9D9D9 shading, or C0C0C0 shading, which Word draws
+  as the highlight (``GREY``; owner decisions of 2026-10-06 and 2026-10-07).
   An underline is left out where it cannot change what the text says (``zone_a.underline``, a
   hyphen inside an underlined word included), else (``underline``); so are capitals and small
   capitals over text that capitals draw the same ("4."). Any other mark, capitals elsewhere,
@@ -66,10 +67,11 @@ else, with the code in parentheses:
   2%; a picture is an ``img`` of the ``data:`` URI of its exact bytes, and on the page U+FFFC, the
   SHA-256 of that URI, and U+FFFC (``picture``);
 - text: no soft hyphen (``soft-hyphen``), tab (``tab``: Word draws it as a jump to a tab stop),
-  but the one after a label typed at the start of a paragraph's text outside a table and after
-  no list label (a bullet glyph or dash, a footnote mark, or "1.", "a)", "(iv)"), which the
-  narrative and the page write as a space (``typed_tab``; owner decisions of 2026-10-06), line
-  or paragraph separator (``line-separator``), or
+  but the one after a label typed at the start of a paragraph's text (a bullet glyph or dash, a
+  footnote mark, "1.", "a)", "(iv)", a caption's "Table 1:" or "Figure 3.", or a raised footnote
+  key of one to three code points) in a paragraph that draws no list label, in a table cell or
+  outside one, which the narrative and the page write as a space (``typed_tab``; owner decisions
+  of 2026-10-06 and 2026-10-07), line or paragraph separator (``line-separator``), or
   line that starts with a bullet glyph after a line break (``bullet-after-break``: section 3 step
   4 would read it as a list bullet);
 - no comment (``comment``) and no hidden paragraph mark (``hidden-mark``, the paragraph runs on
@@ -115,7 +117,7 @@ from zone_a.structure import line
 from zone_a.underline import underline_changes
 
 # The narrative builder's and the page serialiser's version: one, as they are one closed list.
-WORD_EPI_VERSION: Final = "word-epi/1.3.2"
+WORD_EPI_VERSION: Final = "word-epi/1.4.0"
 
 CARRIED: Final = {"bold": "strong", "italic": "em", "superscript": "sup", "subscript": "sub"}
 # Section 3 step 4's bullet glyphs: a list bullet in page text, removed at a line start.
@@ -126,8 +128,11 @@ DISC: Final = "\u2022"
 WHITESPACE: Final = frozenset(
     "\t\n\r \u00a0\u2000\u2001\u2002\u2003\u2004\u2005\u2007\u2008\u2028\u2029\u3000"
 )
-# The template's grey, as the registry keeps it (``zone_a.qrd.registry``): highlight or shading.
-GREY: Final = frozenset({"highlight-lightGray", "shading-D9D9D9"})
+# The template's grey, as the registry keeps it (``zone_a.qrd.registry``): highlight or shading;
+# and C0C0C0 shading, which Word draws in the highlight's colour (owner decision 2026-10-07, ADR
+# 0006 decision 9, by Word's own print). A solid fill is opaque, and a theme fill is another kind
+# (``shading-THEME-...``). A pattern's grey waits for the reader to spell a theme pattern colour.
+GREY: Final = frozenset({"highlight-lightGray", "shading-D9D9D9", "shading-C0C0C0"})
 # How the narrative draws it: the EMA ePI style guide's form for QRD "not printed" text.
 GREY_SPAN: Final = '<span style="background-color: silver;">'
 
@@ -161,34 +166,48 @@ _SUFFIXES: Final = frozenset({"tab", "space"})
 
 
 # A label typed at the start of a paragraph, before a tab (section 7; owner decisions of
-# 2026-10-06): a bullet glyph or a dash; one to three of the same footnote mark; or an
-# enumerator with its punctuation ("1.", "a)", "(iv)"); then any spaces. A bare letter or number
-# is not one: "n" before a tab reads as a column ("n<tab>= 50"), not as a label.
+# 2026-10-06 and 2026-10-07): a bullet glyph or a dash (a non-breaking hyphen included); one to
+# three of the same footnote mark; an enumerator with its punctuation ("1.", "a)", "(iv)"); or a
+# caption's number ("Table 1:", "Figure 3."); then any spaces. A bare letter or number is not
+# one: "n" before a tab reads as a column ("n<tab>= 50"), not as a label. A raised footnote key
+# is one as well (``typed_tab``).
 _ENUMERATOR: Final = r"(?:[0-9]{1,3}|[A-Za-z]|[ivx]{1,4}|[IVX]{1,4})"
 TYPED_LABEL: Final = re.compile(
     "(?:["
     + "".join(sorted(BULLETS))
-    + "\\-\u2013\u2014]"
+    + "\\-\u2011\u2013\u2014]"
     + "|([*\u2217\u2020\u2021\u00a7\u00b6#])\\1{0,2}"
     + rf"|\({_ENUMERATOR}\)|{_ENUMERATOR}[.)]"
+    + "|(?:Table|Figure)[ \u00a0][0-9]{1,3}[a-z]?[.:]?"
     + ") *"
 )
+# A raised footnote key's most code points, each inside a superscript mark, and the bidi classes
+# each may have: a tab separates bidi segments and a space does not, so a key that is or may
+# join right-to-left text (R, AL, AN, a control, NSM, BN) keeps its tab, refused.
+RAISED_KEY: Final = 3
+RAISED_KEY_BIDI: Final = frozenset({"L", "EN", "ES", "ET", "CS", "ON"})
 
 
 def typed_tab(paragraph: Paragraph) -> int | None:
     """Where the tab after a label typed at the start of the paragraph's text stands, else None.
 
-    Only outside a table and after no list label: the narrative and the page write that tab as a
-    space (owner decisions of 2026-10-06, ADR 0006); the EMA's own ePIs carry no tab.
+    A label is ``TYPED_LABEL``, or a raised footnote key: one to three code points, each inside a
+    superscript mark and of a bidi class in ``RAISED_KEY_BIDI``, then any spaces. In a table cell
+    or outside one, in a paragraph that draws no list label: the narrative and the page write that
+    tab as a space (owner decisions of 2026-10-06 and 2026-10-07, ADR 0006); the EMA's own ePIs
+    carry no tab.
     """
     text = paragraph.text
     start = len(text) - len(text.lstrip(_INLINE_WHITESPACE))
     tab = text.find("\t", start)
-    if (
-        paragraph.table is None
-        and not _label(paragraph)
-        and tab >= 0
-        and TYPED_LABEL.fullmatch(text[start:tab])
+    if _label(paragraph) or tab < 0:
+        return None
+    key = text[start:tab].rstrip(" ")
+    raised = {i for m in paragraph.marks if m.kind == "superscript" for i in range(m.start, m.end)}
+    if TYPED_LABEL.fullmatch(text[start:tab]) or (
+        0 < len(key) <= RAISED_KEY
+        and all(i in raised for i in range(start, start + len(key)))
+        and all(unicodedata.bidirectional(c) in RAISED_KEY_BIDI for c in key)
     ):
         return tab
     return None
@@ -592,12 +611,17 @@ def _line(
 
     Each picture is U+FFFC, the SHA-256 of the ``data:`` URI of its bytes, and U+FFFC.
     """
-    text = list(paragraph.text)
+    # The tab after a label typed at the start of the text is a space (section 7), on the page as
+    # in the narrative, raised or lowered with its mark as a space is.
+    source = paragraph.text
+    if (tab := typed_tab(paragraph)) is not None:
+        source = source[:tab] + " " + source[tab + 1 :]
+    text = list(source)
     for mark in marks:
         table = _RAISED if mark.kind == "superscript" else _LOWERED
         if mark.kind in ("superscript", "subscript"):
             for at in range(mark.start, mark.end):
-                text[at] = _script(index, paragraph.text[at], table)
+                text[at] = _script(index, source[at], table)
     for picture in paragraph.pictures:
         uri = _MEDIA[picture.type or ""] + binascii.b2a_base64(
             images[picture.sha256 or ""], newline=False
@@ -605,12 +629,6 @@ def _line(
         text[picture.offset] = "\ufffc" + hashlib.sha256(uri.encode("utf-8")).hexdigest() + "\ufffc"
     label = _label(paragraph)
     head = "" if not label or (in_cell and label in BULLETS) else label + " "
-    # The tab after a label typed at the start of the text, outside a table and after no list
-    # label, is a space (section 7), on the page as in the narrative.
-    lead = paragraph.text.lstrip(_INLINE_WHITESPACE)
-    tab = lead.find("\t")
-    if not in_cell and not label and tab >= 0 and TYPED_LABEL.fullmatch(lead[:tab]):
-        text[len(paragraph.text) - len(lead) + tab] = " "
     lines = "".join(text).split("\n")
     if in_cell:
         return head + " ".join(lines)

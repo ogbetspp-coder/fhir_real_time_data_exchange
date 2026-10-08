@@ -225,30 +225,164 @@ def test_a_tab_after_a_typed_label_is_a_space(label: str) -> None:
     assert _same(div, page)
 
 
+CELL = (_grid(1, [(0, 1, None)]),)
+
+# The labels of owner decision 9 (2026-10-07): a non-breaking hyphen, a caption's number.
+CAPTIONS = (
+    "\u2011",
+    "Table 1",
+    "Table 1:",
+    "Table\u00a01.",
+    "Table 12a:",
+    "Figure 3.",
+    "Figure 100",
+)
+
+
+@pytest.mark.parametrize("label", CAPTIONS)
+def test_a_tab_after_a_non_breaking_hyphen_or_a_captions_number_is_a_space(label: str) -> None:
+    """Owner decision 9 (2026-10-07): U+2011, the hyphen it draws (decision 8), and "Table 1:" or
+    "Figure 3." typed before a tab are labels; the EMA's own ePIs write "Table 1: ..." with a
+    space."""
+    div, page = _build(_p(f"{label}\tTake once daily."), _p(f"{label}  \tor twice."))
+    assert _inner(div) == f"<p>{label} Take once daily.</p><p>{label}   or twice.</p>"
+    assert page == f"\n{label} Take once daily.\n{label}   or twice.\n"
+    assert _same(div, page)
+
+
+@pytest.mark.parametrize(
+    "label", [*("\u2022", "-", "\u2013", "*", "\u2020\u2020", "1.", "a)", "(iv)", "- "), *CAPTIONS]
+)
+def test_a_tab_after_a_typed_label_in_a_table_cell_is_a_space(label: str) -> None:
+    """Owner decision 9 (2026-10-07): in a table cell as outside one. The cell's line keeps the
+    label as typed, a step 4 bullet glyph included: the page leaves out only a list's label."""
+    div, page = _build(
+        _p(f"{label}\tTake once daily.", table=(0, 0, 0)),
+        _p(f"  {label}\tor twice.", table=(0, 0, 0)),
+        tables=CELL,
+    )
+    assert _inner(div) == (
+        f"<table><tr><td><p>{label} Take once daily.</p><p>  {label} or twice.</p></td></tr>"
+        "</table>"
+    )
+    assert (
+        page == f"\n\ufdd0\n\ufdd2\t\ufdd3\t{label} Take once daily.   {label} or twice.\n\ufdd1\n"
+    )
+    assert _same(div, page)
+
+
+@pytest.mark.parametrize(
+    ("text", "raised", "drawn", "paged"),
+    [
+        ("a\tx", 1, "<sup>a</sup> x", "a x"),
+        ("1\tx", 1, "<sup>1</sup> x", "\u00b9 x"),
+        ("*\tx", 1, "<sup>*</sup> x", "* x"),
+        ("\u2020\tx", 1, "<sup>\u2020</sup> x", "\u2020 x"),
+        ("12\tx", 2, "<sup>12</sup> x", "\u00b9\u00b2 x"),
+        ("a,b\tx", 3, "<sup>a,b</sup> x", "a,b x"),
+        # Then spaces, raised or not, then the tab.
+        ("a  \tx", 1, "<sup>a</sup>   x", "a   x"),
+        ("a  \tx", 3, "<sup>a  </sup> x", "a   x"),
+        # The tab raised with its key is a raised space, as the narrative writes it.
+        ("a\tx", 2, "<sup>a </sup>x", "a x"),
+        ("1\tx", 2, "<sup>1 </sup>x", "\u00b9 x"),
+    ],
+)
+def test_a_tab_after_a_raised_footnote_key_is_a_space(
+    text: str, raised: int, drawn: str, paged: str
+) -> None:
+    """Owner decision 9 (2026-10-07): one to three code points, each inside a superscript mark,
+    typed before a tab are a footnote key, in a table cell as outside one."""
+    div, page = _build(_p(text, (0, raised, "superscript")))
+    assert _inner(div) == f"<p>{drawn}</p>"
+    assert page == f"\n{paged}\n"
+    assert _same(div, page)
+    div, page = _build(
+        _p(text, (0, raised, "superscript"), table=(0, 0, 0)), _p("y", table=(0, 0, 0)), tables=CELL
+    )
+    assert _inner(div) == f"<table><tr><td><p>{drawn}</p><p>y</p></td></tr></table>"
+    assert page == f"\n\ufdd0\n\ufdd2\t\ufdd3\t{paged} y\n\ufdd1\n"
+    assert _same(div, page)
+
+
 def test_every_other_tab_is_refused() -> None:
     # A tab is still Word's jump to a tab stop: a second one, one before the label, one in the
-    # text, after a bare letter or number (a column: "n<tab>= 50"), after a decimal, after a list
-    # label, or in a table cell.
-    cell = (_grid(1, [(0, 1, None)]),)
-    for paragraph, tables in (
-        (_p("\u2022\t\tdouble"), ()),
-        (_p("\t\u2022\tled"), ()),
-        (_p("\t- led"), ()),
-        (_p("a \u2022\tb"), ()),
-        (_p("\u2022\ta\tb"), ()),
-        (_p("-\ta\tb"), ()),
-        (_p("n\t= 50"), ()),
-        (_p("1\tTake"), ()),
-        (_p("2.5\tmg"), ()),
-        (_p("Adults\t10 mg"), ()),
-        (_p("e.g.\tx"), ()),
-        (_p("\u2022\tx", label="1."), ()),
-        (_p("\u2022\tx", table=(0, 0, 0)), cell),
-        (_p("-\tx", table=(0, 0, 0)), cell),
+    # text, after a bare letter or number that is not raised (a column: "n<tab>= 50"), after a
+    # decimal, after a list label, after four raised code points or a lead that mixes raised and
+    # level ones, after a caption's word with no number or another number, in a table cell as
+    # outside one.
+    raised = "superscript"
+    for paragraph in (
+        _p("\u2022\t\tdouble"),
+        _p("\t\u2022\tled"),
+        _p("\t- led"),
+        _p("a \u2022\tb"),
+        _p("\u2022\ta\tb"),
+        _p("-\ta\tb"),
+        _p("n\t= 50"),
+        _p("1\tTake"),
+        _p("2.5\tmg"),
+        _p("Adults\t10 mg"),
+        _p("e.g.\tx"),
+        _p("\u2022\tx", label="1."),
+        _p("\u2011\u2011\tx"),
+        _p("abcd\tx", (0, 4, raised)),
+        _p("ab\tx", (0, 1, raised)),
+        _p("ab\tx", (1, 2, raised)),
+        _p("a b\tx", (0, 1, raised), (2, 3, raised)),
+        _p("a\tx", (0, 1, "subscript")),
+        # A raised key that is or may join right-to-left text: a tab separates bidi segments.
+        _p("\u0627\t\u0646\u0635", (0, 1, raised)),
+        _p("\u200f\tx", (0, 1, raised)),
+        _p("a\u200f\tx", (0, 2, raised)),
+        _p("\u0661\tx", (0, 1, raised)),
+        _p("a\u0301\tx", (0, 2, raised)),
+        _p("a\tx\ty", (0, 1, raised)),
+        _p("a\tx", (0, 1, raised), label="1."),
+        _p("Tables 1\tx"),
+        _p("Table\tx"),
+        _p("Table \tx"),
+        _p("table 1\tx"),
+        _p("TABLE 1\tx"),
+        _p("Table  1\tx"),
+        _p("Table\u20091\tx"),
+        _p("Table 1234\tx"),
+        _p("Table 1A\tx"),
+        _p("Table 1ab\tx"),
+        _p("Table 1.2\tx"),
+        _p("Table 1)\tx"),
+        _p("Table 1:.\tx"),
+        _p("Table \u0661\tx"),
+        _p("Fig. 1\tx"),
+        _p("Table 1:\tx\ty"),
+        _p("Table 1:\tx", label="1."),
     ):
-        with pytest.raises(RefusedError) as refused:
-            _build(paragraph, tables=tables)
-        assert refused.value.code == "tab", paragraph.text
+        for tables, where in (((), None), (CELL, (0, 0, 0))):
+            with pytest.raises(RefusedError) as refused:
+                _build(dataclasses.replace(paragraph, table=where), tables=tables)
+            assert refused.value.code == "tab", (paragraph.text, where)
+
+
+@pytest.mark.skipif(browser.find_chrome() is None, reason="Chrome is not installed")
+def test_chrome_draws_a_typed_labels_tab_as_word_does_in_a_cell_and_outside() -> None:
+    """The drawing check reads the tab as Chrome draws the space (both collapse to one space),
+    and a raised key as raised, in a table cell as outside one."""
+    paragraphs = (
+        _p("Table 1:\tDose", table=(0, 0, 0)),
+        _p("a\tx", (0, 1, "superscript"), table=(0, 0, 0)),
+        _p("•\tOnce", table=(0, 0, 0)),
+        _p("Figure 3.\tLevels"),
+        _p("1\tSee", (0, 2, "superscript")),
+    )
+    body = Body(paragraphs, CELL)
+    div, _ = _section(range(len(paragraphs)), body)
+    section = {"key": "s", "refusal": None, "narrative": div, "paragraphs": [0, len(paragraphs)]}
+    verdict = drawing.check(body, {"sections": [section]})
+    assert verdict["sections"] == [{"key": "s", "agrees": True, "where": None}]
+    # Held to the same drawing, a read whose key is not raised differs.
+    level = dataclasses.replace(paragraphs[1], marks=())
+    moved = Body((paragraphs[0], level, *paragraphs[2:]), CELL)
+    assert not drawing.check(moved, {"sections": [section]})["sections"][0]["agrees"]
 
 
 def test_a_table_carries_its_grid() -> None:
@@ -320,12 +454,95 @@ def test_the_grey_span_holds_the_other_marks() -> None:
 
 
 @pytest.mark.parametrize(
-    "kind", ["highlight-darkGray", "shading-BFBFBF", "shading-D9D9D8", "highlight-yellow"]
+    "kind",
+    [
+        *("highlight-darkGray", "shading-D9D9D8", "highlight-yellow"),
+        # Word draws these in other colours than the template's two (its own print, 2026-10-07).
+        *("shading-BFBFBF", "shading-E6E6E6"),
+        # Word prints 15% auto on auto or white as D9D9D9, but the reader spells no theme pattern
+        # colour (a themed accent reads the same) and an auto fill may let a cell's paint through.
+        *("shading-pct15-AUTO-AUTO", "shading-pct15-AUTO-FFFFFF", "shading-pct15-AUTO-E6E6E6"),
+        # Nothing on record says how Word draws these.
+        *("shading-pct10-AUTO-AUTO", "shading-pct20-AUTO-AUTO", "shading-pct15-AUTO-D9D9D9"),
+        *("shading-pct15-000000-AUTO", "shading-pct15-AUTO-C0C0C0", "shading-C0C0C1"),
+        *("shading-THEME-background1", "shading-clear-AUTO-C0C0C0"),
+    ],
 )
 def test_another_grey_or_colour_is_refused(kind: str) -> None:
     with pytest.raises(RefusedError) as refused:
         _build(_p("x", (0, 1, kind)))
     assert refused.value.code == "formatting"
+
+
+def test_the_greys_are_the_templates_two_and_the_shading_word_draws_as_its_highlight() -> None:
+    """Decision 5's two marks, and C0C0C0 shading (decision 9, by Word's own print)."""
+    assert frozenset({"highlight-lightGray", "shading-D9D9D9", "shading-C0C0C0"}) == word_epi.GREY
+
+
+def _shaded_docx(shading: str) -> bytes:
+    """A minimal .docx of one paragraph whose second word's run carries ``shading``."""
+    run = '<w:r><w:t xml:space="preserve">{}</w:t></w:r>'
+    body = (
+        "<w:p>"
+        + run.format("Report ")
+        + f'<w:r><w:rPr>{shading}</w:rPr><w:t xml:space="preserve">it here</w:t></w:r>'
+        + "</w:p>"
+    )
+    rels = "http://schemas.openxmlformats.org/package/2006/relationships"
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as package:
+        package.writestr(
+            "[Content_Types].xml",
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="xml" ContentType="application/xml"/></Types>',
+        )
+        package.writestr(
+            "_rels/.rels",
+            f'<Relationships xmlns="{rels}"><Relationship Id="r1" Type="http://schemas.'
+            'openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+            'Target="word/document.xml"/></Relationships>',
+        )
+        package.writestr("word/_rels/document.xml.rels", f'<Relationships xmlns="{rels}"/>')
+        package.writestr(
+            "word/document.xml", f'<w:document xmlns:w="{W}"><w:body>{body}</w:body></w:document>'
+        )
+    return out.getvalue()
+
+
+def test_a_solid_c0c0c0_run_read_by_the_reader_is_the_silver_span_and_a_themed_one_is_not() -> None:
+    """Through the label reader's certified read: a solid fill is opaque, and a theme fill is
+    another kind (``shading-THEME-...``), refused."""
+    solid = '<w:shd w:val="clear" w:color="auto" w:fill="C0C0C0"/>'
+    body = read_body(_shaded_docx(solid))
+    assert [(m.start, m.end, m.kind) for m in body.paragraphs[0].marks] == [
+        (7, 14, "shading-C0C0C0")
+    ]
+    div, text = _section(range(len(body.paragraphs)), body)
+    assert _inner(div or "") == f"<p>Report {GREY_SPAN}it here</span></p>"
+    assert text == "\nReport it here\n"
+    themed = solid.replace("/>", ' w:themeFill="background1"/>')
+    body = read_body(_shaded_docx(themed))
+    with pytest.raises(RefusedError) as refused:
+        _section(range(len(body.paragraphs)), body)
+    assert refused.value.code == "formatting"
+
+
+@pytest.mark.skipif(browser.find_chrome() is None, reason="Chrome is not installed")
+def test_chrome_draws_every_grey_as_the_silver_span_word_shades() -> None:
+    """Owner decision 9 (2026-10-07): C0C0C0 shading is drawn by Word as the light grey highlight;
+    each grey is the silver span, and the drawing check reads it so, in a table cell as outside
+    one."""
+    paragraphs = tuple(
+        _p(f"Report {n} here", (7, 8, kind), table=where)
+        for where in (None, (0, 0, 0))
+        for n, kind in enumerate(sorted(word_epi.GREY))
+    )
+    body = Body(paragraphs, (_grid(1, [(0, 1, None)]),))
+    div, _ = _section(range(len(paragraphs)), body)
+    section = {"key": "s", "refusal": None, "narrative": div, "paragraphs": [0, len(paragraphs)]}
+    assert drawing.check(body, {"sections": [section]})["sections"][0]["agrees"]
+    plain = Body(tuple(dataclasses.replace(p, marks=()) for p in paragraphs), body.tables)
+    assert not drawing.check(plain, {"sections": [section]})["sections"][0]["agrees"]
 
 
 @pytest.mark.parametrize(

@@ -25,6 +25,8 @@ const RELEASED_TABLES: Readonly<Record<string, string>> = {
   "fidelity-norm/3.2.0": "61927ab9e2345524a694ed2770de1fa29c25b7bfe0ac54d56ed258a1b1b5d8ae",
   // 3.3.0 allows one attribute value (section 5) and changes no list.
   "fidelity-norm/3.3.0": "61927ab9e2345524a694ed2770de1fa29c25b7bfe0ac54d56ed258a1b1b5d8ae",
+  // 3.4.0 widens section 7's certified Word rule (a typed label's tab) and changes no list.
+  "fidelity-norm/3.4.0": "61927ab9e2345524a694ed2770de1fa29c25b7bfe0ac54d56ed258a1b1b5d8ae",
 };
 
 describe("the code point vectors", () => {

@@ -1,5 +1,5 @@
 {
-  "normalizationVersion": "fidelity-norm/3.3.0",
+  "normalizationVersion": "fidelity-norm/3.4.0",
   "normalization": [
     {
       "name": "invisible-blocks-nfc",
@@ -2971,7 +2971,7 @@
     {
       "name": "body-boundary-mid-line",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3008,7 +3008,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b6f93229a6401898a14067fb7e11d4e23b1479ee1de12090ddac6809e1836c79",
         "narrativeBindingSha256": "97a3da6e2d1deb0272b5df67c5931790f2fd84b5167b2e88db14abf04c138438",
         "status": "failed",
@@ -3033,13 +3033,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "7bbf6fac9526c03e846227b1eeff8cc9ab945e6d2b24a9653c98fb49dd31b4ce"
+        "reportHash": "ccfadb608653fd5b4e2db43c56a99bf97ec65b3f6ad0c89a91a7c8def4757158"
       }
     },
     {
       "name": "excluded-text-budget",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3088,7 +3088,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "ea8ed2318b4b39803331949a11806097d85a7d683dfe2c4757fb02f4402dd32e",
         "narrativeBindingSha256": "b8c7f41230ed825bd6620dae99dd19fd3373a26ac7cd9108d62a5641d7f6fdb8",
         "status": "failed",
@@ -3113,13 +3113,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "fd5f45a126c0c427e897c8061e07f748a89b1bafc7d44266ebe6944c01fbe9de"
+        "reportHash": "50a70cd149f678afcb5fc25ae98c379dc134757ee9cc14a9285cd389a1e9c92e"
       }
     },
     {
       "name": "body-boundary-after-soft-hyphen-break",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3156,7 +3156,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b4c501f7e3066e69e2a5196939f85ca43d2add751091ac25d22c09266b750d08",
         "narrativeBindingSha256": "891eb342d58545a091a099871883362c21f19a6dd9a1ba965fcd11a5e113833d",
         "status": "failed",
@@ -3181,13 +3181,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "d48a475aff8ef00290a64b569b41c55dabdf77a5990159fca12c85add8f72134"
+        "reportHash": "83f9adff4d288c354e7bf421dbfbf79cab5a0ac69119eb4c02f33c9dae2b50d2"
       }
     },
     {
       "name": "span-starts-mid-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3236,7 +3236,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "27de94c82023c168e1eb2ab2f8b396a341df3309f295f03cbf8c4fa9532fc21a",
         "status": "failed",
@@ -3261,13 +3261,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "4eda20bc66bf70975ba6d777066f690b82362cec89ed8b063b85036b9cba3620"
+        "reportHash": "6834a76fc77191d0dc26fe193d000c33988cf35ae530ecf57c13023395a84f75"
       }
     },
     {
       "name": "span-ends-mid-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3316,7 +3316,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "54a28d7aa5dfd0efec8cd062c8f58a439f0dfc7de5a53526f99631ebeacf37c4",
         "status": "failed",
@@ -3341,13 +3341,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "35f47c010e7a66b297c1b53d026fae56653b59ee8941748a0ce8ca33fd120f33"
+        "reportHash": "983de4be73c702790f3c948d87da0f350be2f2922c1d435b4217eb52e141ec19"
       }
     },
     {
       "name": "span-ends-before-soft-hyphen",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3396,7 +3396,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "da830d0971a7e42c9fa2c72abf01bb44dca09a4e32939dd0fa143a9bb9b4de0d",
         "status": "failed",
@@ -3421,13 +3421,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "c1532b67e1384bb26151fd72afca3be44a84871aea57f0dc27d56061285e1097"
+        "reportHash": "d5773ffee4e3c03f72d41ac3db21668bb54f400d622ac3fd93e1edb30b27a359"
       }
     },
     {
       "name": "span-ends-before-punctuation-is-word-cut",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3476,7 +3476,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "90a7e96c471d8bbe39372408789152b924508f5879cd793df0b073b2c1f663f8",
         "status": "failed",
@@ -3501,13 +3501,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "c6290de7585c5814c121b609a7991de033e4628f047258b360b92efd2e87fc1b"
+        "reportHash": "05a14f56a8988a68a031fd3c7b710581b15fd7cfc17688e621207816d75a0ed9"
       }
     },
     {
       "name": "section-ends-at-hyphenated-page-end",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3550,7 +3550,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "79f31879194134300d14e49deb17d2c35c72c82dd56ae149aeba2eb7adcfc679",
         "narrativeBindingSha256": "90ddc3f99452858145cda13aa47ffd2b77b58cb79a9e86e6c061772c3ce8e419",
         "status": "failed",
@@ -3575,13 +3575,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 2
         },
-        "reportHash": "5825ae603149a4bdb7a4e397d27c9f25516215aaeafeb1e0f80c7b049304178a"
+        "reportHash": "bfdd36ab03de04c00920867b55fc871c8372dd52debde23de8e6d48150d35486"
       }
     },
     {
       "name": "soft-hyphen-across-pages-joins-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3630,7 +3630,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "79f31879194134300d14e49deb17d2c35c72c82dd56ae149aeba2eb7adcfc679",
         "narrativeBindingSha256": "795acadbb4ad3e00052a3d5f0a73bd3c5607982f674b11083b5f3f2041b4deaa",
         "status": "passed",
@@ -3654,13 +3654,13 @@
           "coveredCodePoints": 59,
           "uncoveredGaps": 0
         },
-        "reportHash": "06a78fa36796e685fb53c2cdd3e0aa833c83d42a9e1d4139b8c146853ba2bcb9"
+        "reportHash": "b5330d90edd3466c08ce52b640b579b895a0d97a53fbb287a610615ec823ae29"
       }
     },
     {
       "name": "soft-hyphen-across-pages-cannot-split-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3709,7 +3709,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "79f31879194134300d14e49deb17d2c35c72c82dd56ae149aeba2eb7adcfc679",
         "narrativeBindingSha256": "65393833d1542029d72fc37acd7526ccc113e76f14c653a5ce19e0b3c2b604e2",
         "status": "failed",
@@ -3743,13 +3743,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 2
         },
-        "reportHash": "7d2f5215e13b80007b7ec8f7db73a9e359228633be70128be67cbc9a11b5c865"
+        "reportHash": "c70c12be4d3c10fc9b4231a28e2f74d70f2dd1f950806e89aa79800e1516c010"
       }
     },
     {
       "name": "line-break-across-pages-separates-words",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3798,7 +3798,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "563f9215659f7154a80b8518a7bb62a9e91dca32265af7bd7ea35f41a3fda98e",
         "narrativeBindingSha256": "e577aeca8ca8568c6a316add2ed2a1bdb47e7e24b638f4ac25128f7e20810a9b",
         "status": "passed",
@@ -3822,13 +3822,13 @@
           "coveredCodePoints": 29,
           "uncoveredGaps": 0
         },
-        "reportHash": "9be0738e7b46955553f633ee266d220cc6e9b286d8f714f5a3e578602f9371ef"
+        "reportHash": "ff2f69b787a3e167ebce9a49698e0726106f5ce71b927987578444555df3e79b"
       }
     },
     {
       "name": "invisible-page-gap-cannot-join-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3877,7 +3877,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "563f9215659f7154a80b8518a7bb62a9e91dca32265af7bd7ea35f41a3fda98e",
         "narrativeBindingSha256": "28b618958c1c8dc5e8735d90cb4c1f6bcf229f0e6c6c2c71ab4d1b570cb52273",
         "status": "failed",
@@ -3911,13 +3911,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 2
         },
-        "reportHash": "07e0806bdc5b7e329d6560d19e12da79d5b8543b0c694d1c6bc69083e66b771b"
+        "reportHash": "aa05d72558c3d5f84301fbebd55fdb50799a7c669fbc4353bf3cbcf1e1df8589"
       }
     },
     {
       "name": "adjacent-spans-cannot-split-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3972,7 +3972,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "0b23f68c62326d47d255c499d96ce4f565d1848ab712cae26e0a5049c42210a2",
         "status": "failed",
@@ -4006,13 +4006,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "948fbd447e7409077e6b455680645c8337ea21b854d896df0ab0e96c864aa9a7"
+        "reportHash": "8a65627b66341737949f5a38dc9c3c12711c8da137dc3e165cc90aa93cf80037"
       }
     },
     {
       "name": "adjacent-spans-same-word-verifies",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -4067,7 +4067,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "f2c425160545f67b3a17fc65484e4a1eca04233ef00fb788a50264cde49b24d9",
         "status": "passed",
@@ -4091,13 +4091,13 @@
           "coveredCodePoints": 63,
           "uncoveredGaps": 3
         },
-        "reportHash": "cf9a265bad97db814283878173ee84c1146ce58e38858db1db7dcb2b2ef226f9"
+        "reportHash": "cd9a947f804b4ff1bf966ad988e69d92d0c48a69d1cc1a23d5ca001fb40d998d"
       }
     },
     {
       "name": "soft-hyphen-gap-cannot-split-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -4152,7 +4152,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "630ae5dbade7f56bc5b61801c5b086d00543edb059a7b1ee01b4702858f06d21",
         "status": "failed",
@@ -4186,13 +4186,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "d04069a02d18b315457831fe992690d8ee1d8ed90804c2c834858b10aee3bc8b"
+        "reportHash": "75cb1934355f01b515de1236ab1d98487fc89c23598ce62900c8965416079181"
       }
     },
     {
       "name": "soft-hyphen-gap-joins-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -4247,7 +4247,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "3d2db72e06e36105c4e4a3d5207e9d961c1de62e2765973cf871a0876229e42a",
         "status": "passed",
@@ -4271,13 +4271,13 @@
           "coveredCodePoints": 63,
           "uncoveredGaps": 4
         },
-        "reportHash": "81e555119c8644706d323c43014a095ad9316b43cb20d1f216b7aa5fa0bbb8cf"
+        "reportHash": "1fae8c6e1bc23900d85adfd774a09c0832794094ea57ae8af353353e3b7d4593"
       }
     },
     {
       "name": "empty-sections-fail",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -4306,7 +4306,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "status": "failed",
@@ -4322,13 +4322,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "2fb2ab046a120b79337a1c86543b5c1dc655d26f0d54745f695f1de931096335"
+        "reportHash": "af64886e35a356e06770f1a138d8bb2801a9a8fc0cfc865de34df777d147d908"
       }
     },
     {
       "name": "exact-pass",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -4455,7 +4455,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "f5c4493e9e415d4c6d876b4c7ea0f8876129f3cfc0ebc0a579fa0c22cfb9a939",
         "status": "passed",
@@ -4507,13 +4507,13 @@
           "coveredCodePoints": 341,
           "uncoveredGaps": 5
         },
-        "reportHash": "591928a97717c3662a3b244c83261fdb3e2d781fe5a6a20270a9d9cb32519601"
+        "reportHash": "d342ba745ed97a3de0f2f1cc3ae8cc8450ea5555d02dbf16f1d2e3e4ad250c3c"
       }
     },
     {
       "name": "whitespace-only-differences",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -4562,7 +4562,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "b8c7f41230ed825bd6620dae99dd19fd3373a26ac7cd9108d62a5641d7f6fdb8",
         "status": "passed",
@@ -4586,13 +4586,13 @@
           "coveredCodePoints": 70,
           "uncoveredGaps": 4
         },
-        "reportHash": "caae1ddefcb9e5ee9c0a6db962ac0ab9074b6d8a212b09c2c871386c488f0efb"
+        "reportHash": "48261078eeadf6f617fb7374b992b7cad7cae27bb73ea3a7b69676b9b2930e70"
       }
     },
     {
       "name": "ligature-and-soft-hyphen",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -4641,7 +4641,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "3d2db72e06e36105c4e4a3d5207e9d961c1de62e2765973cf871a0876229e42a",
         "status": "passed",
@@ -4665,13 +4665,13 @@
           "coveredCodePoints": 64,
           "uncoveredGaps": 4
         },
-        "reportHash": "5b35666afda360ba2b3cbcdd0e2a162da840fa06da20ab2ca25fb6798015b551"
+        "reportHash": "189ea91d0a354eec112f895c3f4f2d5c2649c35d66e9f973bfeb55fe161c7c2f"
       }
     },
     {
       "name": "soft-hyphen-entity-in-narrative",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -4720,7 +4720,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -4744,13 +4744,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "46c2ba2935508d856e1e3f78da0b740ea786955f8c2bacfe3dad45fb4e9cc62d"
+        "reportHash": "feb3a4cc50684c7740fcbf71e3bd01e3db6264cea2e31e8184366d83b56d73ab"
       }
     },
     {
       "name": "superscript-markup-over-plain-digit",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -4799,7 +4799,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "23703513b4a58f2add7dc7e5c54f6852ac68b91ed5958d42518c60b14bf318c4",
         "status": "failed",
@@ -4833,13 +4833,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "0435bc4dd1159b681173be5cf94e328028529081094f9a90269bf0dfde9c7892"
+        "reportHash": "254cce49d1b4208a0d965cee7566449ace79b50c0bf465963f07186877842e47"
       }
     },
     {
       "name": "page-break-two-contiguous-spans",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -4894,7 +4894,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "f5f093bf218e98d32bf56febe102999ecd208e83ad974efe160c81841a9c0a47",
         "status": "passed",
@@ -4918,13 +4918,13 @@
           "coveredCodePoints": 95,
           "uncoveredGaps": 3
         },
-        "reportHash": "c0506378d8fcf95cb677bc10f5f35e2b06df533ccd62297dbbf5e3eacf7381d8"
+        "reportHash": "61690c40cf90dcd6db903342ade0f6246232c01e148ab58c5f816f66b98aefe1"
       }
     },
     {
       "name": "word-changed",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -4973,7 +4973,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "e8bc58e66c57e33026a3c8dd51758fd3973b1800abfd296eeba7f36c9a150550",
         "status": "failed",
@@ -5007,13 +5007,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "36c30554f9f4629f7db43a93381b5d554779339995c3ef1f6ce86a0582abe61c"
+        "reportHash": "3465f810a4f14d5ea858b0c169b50295cdbfebbea6d2e70d2acaa46019fdb7eb"
       }
     },
     {
       "name": "word-deleted",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -5062,7 +5062,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "ced3dc1cf5a1d5479373830d7e72b18f4446d5b92530114f0479014aefa17ef7",
         "status": "failed",
@@ -5096,13 +5096,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "e94ba36cda11f0ca71c39a2aa94e9c49343ff55f85365146f0493bd36e7f8036"
+        "reportHash": "61f04c96c31277765feef65e435cf75945f43931e8521dddb72e5cd61cddbc37"
       }
     },
     {
       "name": "sentence-appended",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -5151,7 +5151,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "168dc859c053241697e32eb494a39c80c8cdca28069b56c2736239a32437019c",
         "status": "failed",
@@ -5185,13 +5185,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "db3da7305355c9585d07d8a30107de0d24c081f84c8a8e579a6d8ae27a850f5d"
+        "reportHash": "68c0ed1328978ef9be62af901a9f4d7dc1e01d11223bb8adf449db91f2957c04"
       }
     },
     {
       "name": "sentences-reordered",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -5246,7 +5246,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "d96225ddec9d87b47d1f0a8f08e979890e8a2ebe567e6d4f5ee724ad6af69b43",
         "status": "failed",
@@ -5280,13 +5280,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "891973a55a73c2bc2eeafc7a7627997b8c4debc0d840863c8a37c978f8c05069"
+        "reportHash": "def2502c7dea4726c5f56f06c3d29ae077db27569ba694f9f0891e6a1badb9ae"
       }
     },
     {
       "name": "number-changed",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -5335,7 +5335,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "3b64b4311fb31b25fb783570be9768de63a29bf0d2dd37bb9d584008749d7665",
         "status": "failed",
@@ -5369,13 +5369,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "384c6d29d763101ff9e56deee57ba7f1cceda9e3d9e4b5ebd70e0a6cba282cd0"
+        "reportHash": "195d6f9dc51a8d021fa7377fa7f45b4de44778aa1603f107900360439cb86628"
       }
     },
     {
       "name": "unit-changed",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -5424,7 +5424,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "8068ccd9dd454c2a71ba191642a89af4f447820245bd349228231b99b43c1b3b",
         "status": "failed",
@@ -5458,13 +5458,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "8cc140cdd14a8af720e97cc4209f27c6138a99723bf89e3dcc118cf07a45e94a"
+        "reportHash": "880f50432b5830f8c083c7e90cd71bb0ea603b5564ef87aee6fd3d87f977b880"
       }
     },
     {
       "name": "negation-added",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -5513,7 +5513,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "cf1e24bb2f2332489e97192a576470aecd2e883871eb80f85f5b804df733190b",
         "status": "failed",
@@ -5547,13 +5547,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "15e1190b74302e8b3200aac4652f920a44d9f01b98b855cd68127302165bd439"
+        "reportHash": "7896fe1fe06ae1d2dd5c44875bba71cda946db44b84631d784f1bb321c20cef7"
       }
     },
     {
       "name": "hard-hyphen-dehyphenated",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -5602,7 +5602,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "c31f36dd8aacfe74f94755264527c4fed491cece76a02525c589aa1f2cdc32fe",
         "status": "failed",
@@ -5636,13 +5636,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "028b9104767231e6bccd9a84df4bb3a34c333c27375100a6e3dd970dd67aab8c"
+        "reportHash": "6e9337691b65a308e23b10e3df86c0fbe42e302535597eac33cd23a87cee9c10"
       }
     },
     {
       "name": "straight-vs-typographic-quotes",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -5691,7 +5691,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "c66798b96de897ca417d9e08ef7991ea219e8711229b9ee0ffbafe6bb9fb693a",
         "status": "failed",
@@ -5725,13 +5725,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "03a056660ef68e325699283e9382a04570474e4b2c9c1eccec37bb19d03abd2e"
+        "reportHash": "78326d3c73688dfa7972b26fcc10a564652e870e16ef2a179788da1a6d05f5d9"
       }
     },
     {
       "name": "superscript-code-point-vs-digit",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -5780,7 +5780,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "23703513b4a58f2add7dc7e5c54f6852ac68b91ed5958d42518c60b14bf318c4",
         "status": "failed",
@@ -5814,13 +5814,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "0435bc4dd1159b681173be5cf94e328028529081094f9a90269bf0dfde9c7892"
+        "reportHash": "254cce49d1b4208a0d965cee7566449ace79b50c0bf465963f07186877842e47"
       }
     },
     {
       "name": "text-not-in-source",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -5869,7 +5869,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "2ce363e53b9ce9b49ef613362c394ce9ed3888ddb0a65a240b25f184b8175d18",
         "status": "failed",
@@ -5903,13 +5903,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "ee02974ef4de54bc91c2509832dc234c8ff123f8fcd07da0bc51e103bacc7f93"
+        "reportHash": "ae4990f91c68161274060a9f7b884179702dfe33c87c19a28de9859040815c28"
       }
     },
     {
       "name": "hidden-extra-element",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -5958,7 +5958,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -5982,13 +5982,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "bfad91e67552ce985f6ffb0f69256083d009ea8cecf0a8aac8801ff6794b99e9"
+        "reportHash": "c0364d7662a5948d4a9e16c8dba9cf8c9db48ae81fba884b7195ba7f8d5782c5"
       }
     },
     {
       "name": "wrong-page-span",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -6037,7 +6037,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "b8c7f41230ed825bd6620dae99dd19fd3373a26ac7cd9108d62a5641d7f6fdb8",
         "status": "failed",
@@ -6062,13 +6062,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "64c9b5204b11e8bd977ab01bfb25be320257b9e5dae1fd0cad307b63a70ec00a"
+        "reportHash": "1e34921b5ba29eed3ead65e2587d8135edde470b84acdea3157af0030f44853a"
       }
     },
     {
       "name": "span-hash-tampered",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -6117,7 +6117,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "b8c7f41230ed825bd6620dae99dd19fd3373a26ac7cd9108d62a5641d7f6fdb8",
         "status": "failed",
@@ -6142,13 +6142,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "64c9b5204b11e8bd977ab01bfb25be320257b9e5dae1fd0cad307b63a70ec00a"
+        "reportHash": "1e34921b5ba29eed3ead65e2587d8135edde470b84acdea3157af0030f44853a"
       }
     },
     {
       "name": "span-outside-body",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -6197,7 +6197,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "a33e789caf5da9fa6130787efe09642e4d6cd6e00420deab8da2b023770ab3fa",
         "status": "failed",
@@ -6222,13 +6222,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "0dfd7bd5ebea2ff61be441a966efe8535776277840ae8278ca94a5440dca2411"
+        "reportHash": "6c89683b6151570ec5a96feaa8b2a0e3f56c9febe0f36561c701f279ad9b2b1c"
       }
     },
     {
       "name": "stitched-non-adjacent-spans",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -6283,7 +6283,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "b31228e6632c3255b6a636d27aec5c7afa88622279e3562b69326822cc54dee7",
         "status": "failed",
@@ -6308,13 +6308,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "4657bb1526c41417c67baaa13f6d1e7e53ccbf52e501e09c011f0b909792768a"
+        "reportHash": "0a00da0601ee5f1edc90d40b40fe854f871110a3d091357b8a0338473154722c"
       }
     },
     {
       "name": "overlapping-sections",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -6381,7 +6381,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "f02ad3bcca9f667a99ab13b3d233732f3a7b4236585b864fdeaabccda5bb6337",
         "status": "failed",
@@ -6414,13 +6414,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "6c472d36a170e5b9e3e632c2806bde21af8594e1a489874517ae9d78c7a9a39c"
+        "reportHash": "0a296624d30050ec7c26c1bd8947333380ccd673a6975e01802f3f9f1d50c5a2"
       }
     },
     {
       "name": "missing-provenance",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -6455,7 +6455,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "b8c7f41230ed825bd6620dae99dd19fd3373a26ac7cd9108d62a5641d7f6fdb8",
         "status": "failed",
@@ -6479,13 +6479,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "6ef0e5cad3ce19ef911e8e460c9ec6bce27aa23d5d5df8119c2ad750f77c818e"
+        "reportHash": "89712ac1a2d83518065396f070bde0049b5d714e371f762fafef2660263586d8"
       }
     },
     {
       "name": "orphan-provenance",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -6553,7 +6553,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "b8c7f41230ed825bd6620dae99dd19fd3373a26ac7cd9108d62a5641d7f6fdb8",
         "status": "failed",
@@ -6577,13 +6577,13 @@
           "coveredCodePoints": 70,
           "uncoveredGaps": 4
         },
-        "reportHash": "3e79329f435cf875d21d91305bb724b092683c7e4462ff73e11df9d6eb617789"
+        "reportHash": "5165527af0ba81a48fa881341f587d1db16b04696c131f0a80c8b827ca9fa06d"
       }
     },
     {
       "name": "empty-div",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -6632,7 +6632,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -6656,13 +6656,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "f69825e405e7df26cce7d253d3ee7d2b519be7b8c88c45cc6aae41cd3e3e64e8"
+        "reportHash": "97803314900471509d732fc8fb4e58a0ae1830aa06401fe766adeac5621089eb"
       }
     },
     {
       "name": "whitespace-only-div",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -6711,7 +6711,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -6735,13 +6735,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "f69825e405e7df26cce7d253d3ee7d2b519be7b8c88c45cc6aae41cd3e3e64e8"
+        "reportHash": "97803314900471509d732fc8fb4e58a0ae1830aa06401fe766adeac5621089eb"
       }
     },
     {
       "name": "empty-table-div",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -6790,7 +6790,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -6814,13 +6814,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "f69825e405e7df26cce7d253d3ee7d2b519be7b8c88c45cc6aae41cd3e3e64e8"
+        "reportHash": "97803314900471509d732fc8fb4e58a0ae1830aa06401fe766adeac5621089eb"
       }
     },
     {
       "name": "style-attribute",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -6869,7 +6869,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -6893,13 +6893,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "bfad91e67552ce985f6ffb0f69256083d009ea8cecf0a8aac8801ff6794b99e9"
+        "reportHash": "c0364d7662a5948d4a9e16c8dba9cf8c9db48ae81fba884b7195ba7f8d5782c5"
       }
     },
     {
       "name": "script-element",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -6948,7 +6948,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -6972,13 +6972,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "3de5ef89b19301c04540cba9018c415019e35f539c9ca8f8017e26d01543ee7f"
+        "reportHash": "8c7d252eddb0201edc2e9b109c1826bae94af0ebb19206d4e9c425c4798518c7"
       }
     },
     {
       "name": "comment-in-narrative",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -7027,7 +7027,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -7051,13 +7051,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "3155e5ead60afe517a0108d5f8f1d517e1f11ba287bfc970ff2d598a460dc153"
+        "reportHash": "71f2c77f410bf4194e5baa6b9da6485dfa90c7442c0b250857e0fedcdbe82fa3"
       }
     },
     {
       "name": "nbsp-named-entity",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -7106,7 +7106,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -7130,13 +7130,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "1482b8f6998aae3c70ae22fc2746d812bc2a2e69e958e974ea3ea4160198efc4"
+        "reportHash": "38bf343f9737e34caabe7ca3d48e567731af404e80161b513fc387c44563a843"
       }
     },
     {
       "name": "uppercase-tag",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -7185,7 +7185,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -7209,13 +7209,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "5c010537589fd17d80c7164852a5e9a9c29e782564c5db740ca9d56fa56cbffe"
+        "reportHash": "95656e15d60f657d18a10dcb9f056d79ba82d4dbf08eaf4ed9e043dcf55d75ce"
       }
     },
     {
       "name": "unbalanced-tag",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -7264,7 +7264,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -7288,13 +7288,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "c9607c1379c817d72003532cbe1386addd23d2a744edf887273c6d43c0cc45f9"
+        "reportHash": "b3abb47d5bd5c06902cb2f0977b3c187a67d70559b9562329cdcef460bc15ba4"
       }
     },
     {
       "name": "replacement-character",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -7343,7 +7343,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -7367,13 +7367,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "32f99c95ccd3160ddca4b63630e050d207981fbafdc97d047017358809cf618e"
+        "reportHash": "e866dcb397de32d058791773788235360f6a8b0dd6060ee18309a47c3fdd3d07"
       }
     },
     {
       "name": "lone-surrogate-page",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -7410,7 +7410,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "41eb401e91c447dcacd5bc361378cc8e53137df2e3633ecccc0862c28c165dd5",
         "narrativeBindingSha256": "35ff71e4dbde1765946ea27de42df0bf30c846fbcf315cad7812b8014b4caf58",
         "status": "failed",
@@ -7435,13 +7435,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "d783831b37fcc2e84d0956439996becb46c554aa777edce024e07c01891822a8"
+        "reportHash": "f34e3aad0bf03b642675b418dc6016a262c219860953e1814f169d16468db2fb"
       }
     },
     {
       "name": "page-body-without-final-lf",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -7484,7 +7484,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "65b93dbeaa8938c7e470dc5c3f7c8f766167ffc04c28d8d74ea5686357c9707f",
         "narrativeBindingSha256": "9c0d31b067763feeb9ce24ece41ad78fadbc3ee4fbaf9eedb1f72078630e7213",
         "status": "failed",
@@ -7509,13 +7509,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 2
         },
-        "reportHash": "41a6d60722d48db287c227d736e6146e1e1300970a80c811d6c1e0afb0d09f4e"
+        "reportHash": "a921a43650a7a930e27fa516efa450aab45b1887c677b56882ddb75b4cf97c22"
       }
     },
     {
       "name": "section-after-body-without-final-lf",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -7558,7 +7558,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "65b93dbeaa8938c7e470dc5c3f7c8f766167ffc04c28d8d74ea5686357c9707f",
         "narrativeBindingSha256": "97cd3691ec1b143adfbc34666d0be96bf608d795c2f53c9fd49b1ee90dd904f4",
         "status": "failed",
@@ -7583,13 +7583,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 2
         },
-        "reportHash": "7832c9fd0835794ea068b13ab648e48a13a6732f3ff61e385384d3c1681d92b4"
+        "reportHash": "54dd13c4020052d0297ce7ac93fe2ae647467b058d2b2042e4ad982f1a98501b"
       }
     },
     {
       "name": "body-ends-with-lf-at-page-end",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -7626,7 +7626,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "4cfcc9095a1f3c7f5780c9f7acc19483e1c65b69f2f88df364631497d2000c16",
         "narrativeBindingSha256": "273f3e1bfc9db6be6eaad0f336800e12ab2f361fbe9e0d788273efdc42e2fb90",
         "status": "passed",
@@ -7650,13 +7650,13 @@
           "coveredCodePoints": 25,
           "uncoveredGaps": 0
         },
-        "reportHash": "bad8adf7b4027cad9bb603f085fa2910d3b73fc55bad6b0d977bbc676cbbb1bc"
+        "reportHash": "149493e450e44b79ffdd5ef73e962e610d613f645c3fb693cd06fdbfb5308d4c"
       }
     },
     {
       "name": "empty-body-page-before-section",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -7699,7 +7699,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "d4fcbc56e34ec94d0b387c0da4d24fce4c5e91f6c8a8ca9773f411ef848bce2a",
         "narrativeBindingSha256": "273f3e1bfc9db6be6eaad0f336800e12ab2f361fbe9e0d788273efdc42e2fb90",
         "status": "passed",
@@ -7723,13 +7723,13 @@
           "coveredCodePoints": 25,
           "uncoveredGaps": 0
         },
-        "reportHash": "31a21407b42fb0ea1a0b671b9be44dfb557586df07fbc7189a88f931edb85670"
+        "reportHash": "270d71c55156a23b9a23306e664c0d89f4e96432f8fb93ae22ef0eea5d0261d0"
       }
     },
     {
       "name": "section-starts-at-first-body-start",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -7778,7 +7778,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "21076897a9183220bc6c0d7e475277c0248d7315afbd22df0327ddaebce6330a",
         "status": "passed",
@@ -7802,13 +7802,13 @@
           "coveredCodePoints": 27,
           "uncoveredGaps": 3
         },
-        "reportHash": "53554776c094daa77dddeba4a5d44f350a95dc15a7dc5bcfee70f77148f69cb4"
+        "reportHash": "03679126cde548cd169569960c359fdd94e61fe0c6529be1da9daf0287302a05"
       }
     },
     {
       "name": "section-starts-after-hyphenated-page-end",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -7851,7 +7851,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "3eaf537fe7ccb8b6bc04cafd6be097bbbe4334f95bd6a62f3af36aaad86aab72",
         "narrativeBindingSha256": "6cef71c4f71a76cad0b1d1c2dfb4785b10b71423489a529cf786ec0da0ac1f0d",
         "status": "failed",
@@ -7876,13 +7876,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 2
         },
-        "reportHash": "370d88278fd85a3ae1897329f3b420861be755af48e5a738d1ec13a276a6c9e6"
+        "reportHash": "e0bde2e9a662bd54e7d61ad17d4cd9649d85281ba3a9c0533e1257a16eb4b86d"
       }
     },
     {
       "name": "section-starts-after-full-stop-page-end",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -7925,7 +7925,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "718a826e5f7353b6ca4da1508dde4779e3be0c72683ec5d8658198af9866e3fc",
         "narrativeBindingSha256": "273f3e1bfc9db6be6eaad0f336800e12ab2f361fbe9e0d788273efdc42e2fb90",
         "status": "passed",
@@ -7949,13 +7949,13 @@
           "coveredCodePoints": 25,
           "uncoveredGaps": 1
         },
-        "reportHash": "8d3bd0fdc35d9eac6b3e93b924100f7eb74503831bcb3f88cc4801d43d004972"
+        "reportHash": "b258e43dfe157341f987e86deffa0b8c9212c297cb8307cb4fd470740aa8a3ab"
       }
     },
     {
       "name": "section-starts-after-blank-line-after-soft-hyphen",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -7992,7 +7992,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "4255ffe20e7f3faf3b9e03496da9f232c655738e66096ddddb283ca6d6d56d02",
         "narrativeBindingSha256": "6cef71c4f71a76cad0b1d1c2dfb4785b10b71423489a529cf786ec0da0ac1f0d",
         "status": "failed",
@@ -8017,13 +8017,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "61804f4b850a6b948b6e84a6d8c2da012ebcada892735d81aa2d9c51f1cffce8"
+        "reportHash": "0d12af634b70621c9b6bd4c955cd16fef8d10b4f5f14cc3a2613c50f2ebb0edc"
       }
     },
     {
       "name": "section-starts-after-blank-line-after-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -8060,7 +8060,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "041a32abfe5a1d7473eee11b8f8f73e754cb4aee963a49b14fa7df3ed9fc2975",
         "narrativeBindingSha256": "273f3e1bfc9db6be6eaad0f336800e12ab2f361fbe9e0d788273efdc42e2fb90",
         "status": "passed",
@@ -8084,13 +8084,13 @@
           "coveredCodePoints": 25,
           "uncoveredGaps": 1
         },
-        "reportHash": "eb9d2f2a40f5e5f69ec616852e7ff98c05b82af233ed82bad6df69b4e42864b2"
+        "reportHash": "e8f24d43638434cee563c4d95d5dfee0398d8599e9d6906bcc3bdb1f0a1c93b2"
       }
     },
     {
       "name": "section-starts-after-blank-page-head-after-soft-hyphen",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -8133,7 +8133,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "e8e844ae0e800f4c5010aa49cfd786a8d726bd933e4b1a8932bb11a48df411d1",
         "narrativeBindingSha256": "6cef71c4f71a76cad0b1d1c2dfb4785b10b71423489a529cf786ec0da0ac1f0d",
         "status": "failed",
@@ -8158,13 +8158,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 2
         },
-        "reportHash": "d8ed109d1707c713a6e79bbbbac5e37f6b9a4a9619f2c6753bd4f5f0862c01b9"
+        "reportHash": "f7b3e67130aa117071f9ce0bde24561545cf3ade866f7f78203f19a9f2bd1200"
       }
     },
     {
       "name": "section-starts-after-blank-page-head-after-full-stop",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -8207,7 +8207,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "c04d8e26d2de727ac84dcc2efcfe8c433effed45af4892f03d5cac00a9ae9191",
         "narrativeBindingSha256": "273f3e1bfc9db6be6eaad0f336800e12ab2f361fbe9e0d788273efdc42e2fb90",
         "status": "passed",
@@ -8231,13 +8231,13 @@
           "coveredCodePoints": 25,
           "uncoveredGaps": 1
         },
-        "reportHash": "14898c93c5202fe45211a62bd76ec8503938d31e2406636d38efd21d4e329eab"
+        "reportHash": "fad9050fbe522bc61c75a00614d96e176ee484930c4c76380649b5af5197fe8c"
       }
     },
     {
       "name": "section-starts-after-malformed-page-ending-in-soft-hyphen",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -8280,7 +8280,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "aaf780394230b35faa1f131ec29a3915b83ddb81f5675378c8a53c5c00fe56ed",
         "narrativeBindingSha256": "6cef71c4f71a76cad0b1d1c2dfb4785b10b71423489a529cf786ec0da0ac1f0d",
         "status": "failed",
@@ -8305,13 +8305,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 2
         },
-        "reportHash": "d58278f2193ca0459cb62b4648beed8b3438b348dda930376c101ae075e1262f"
+        "reportHash": "44911c1c7768914978185210df8b096562a1e7ff2314595c9997841d5a108dbd"
       }
     },
     {
       "name": "section-starts-after-malformed-page-ending-in-full-stop",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -8354,7 +8354,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "28b28863f414a98b2edcdae4ba16464064c36e559b3b9dd51ae226a034d73116",
         "narrativeBindingSha256": "273f3e1bfc9db6be6eaad0f336800e12ab2f361fbe9e0d788273efdc42e2fb90",
         "status": "passed",
@@ -8378,13 +8378,13 @@
           "coveredCodePoints": 25,
           "uncoveredGaps": 1
         },
-        "reportHash": "22c5c582905779876b554a85f24331fe2043f50b29fd53390a8077b386897777"
+        "reportHash": "3a889c29087491f0e1d699515fb2e0f0aed22efc56522e31a615e8f0c7442f5e"
       }
     },
     {
       "name": "span-ends-soft-hyphen-before-space",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -8421,7 +8421,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "56da5da538feee118d3a56d9b76463e9632056823b5591caf9e664bdec8cdbf4",
         "narrativeBindingSha256": "90ddc3f99452858145cda13aa47ffd2b77b58cb79a9e86e6c061772c3ce8e419",
         "status": "failed",
@@ -8446,13 +8446,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "6c5e1e6471672d2988dcf7a28996cfb4859d3593eb8c5027ed6b65442e35d562"
+        "reportHash": "d4668a6d11c207ea81a1d75e37d5c053fc90cdea15a4a929418a3034142799f4"
       }
     },
     {
       "name": "span-ends-at-body-end-before-footer",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -8501,7 +8501,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "5c831c470aff216daf5ed7dff79eac18a08115a22f0cc5ce092d0239c17c14a4",
         "status": "passed",
@@ -8525,13 +8525,13 @@
           "coveredCodePoints": 72,
           "uncoveredGaps": 3
         },
-        "reportHash": "1030757ff426ef4d9061e3982e8538b82a619aec5803baf39f5d53bb0b57533d"
+        "reportHash": "01d8391c529170d384b4f5c0ec873244d2edc60f050926a7bd4c2fcb6364a7bd"
       }
     },
     {
       "name": "superscript-markup-over-script-code-point",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -8568,7 +8568,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "162ec1520e656df61d5da2ee31d3b4e1786a1ac969a896430f9118dc70a9f189",
         "narrativeBindingSha256": "23703513b4a58f2add7dc7e5c54f6852ac68b91ed5958d42518c60b14bf318c4",
         "status": "passed",
@@ -8592,13 +8592,13 @@
           "coveredCodePoints": 59,
           "uncoveredGaps": 0
         },
-        "reportHash": "c1ede295fb89e1c7d6114b2d9379c7af4b569e13f195bd92fc39c0b6090de3a7"
+        "reportHash": "3fdb2e71a5a80c57718a4e073e944cab00d315fc65f0a04297ecf3998d460546"
       }
     },
     {
       "name": "superscript-markup-changes-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -8635,7 +8635,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "9aa16effaf58530120c33610865dfe06da004de9fcf09dc7bf72269139bf016a",
         "narrativeBindingSha256": "04e5100b8181c3b0ae214ff7f2b540aa79ae5ce4d2d10437df93e1518e0576ff",
         "status": "failed",
@@ -8669,13 +8669,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "6481bcec2cd95ce3425cc7e9cacd422ff809f023a723a2599e3d58c0675694d3"
+        "reportHash": "9ec0fb354e7671b6d852b7782917afe250f2a12dbda6b0e229a9fdc0c4989cd5"
       }
     },
     {
       "name": "self-closing-superscript-rejected",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -8712,7 +8712,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "9aa16effaf58530120c33610865dfe06da004de9fcf09dc7bf72269139bf016a",
         "narrativeBindingSha256": "349904246e80dc5c526e0efeba6c1fa8ea56c88da9fbdc71ef0201801344d12a",
         "status": "failed",
@@ -8736,13 +8736,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "5f59044aa3fcadd395cedc5ea59d2dd08f4cc61a2f24b92665e1d8766f1e76d9"
+        "reportHash": "bf2e81b70abe78639c99bcba5807830a1c9f4353fc756d480086686634dfcd92"
       }
     },
     {
       "name": "superscript-dash-folds-to-minus",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -8779,7 +8779,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "dd35cd59c3728a4620e7974d1ca4dbf19293276a47f1210f640495e896587e05",
         "narrativeBindingSha256": "9a81bb01452087a00db85d2784eedefc55144813d490fa582fb89d2eb69d8316",
         "status": "passed",
@@ -8803,13 +8803,13 @@
           "coveredCodePoints": 28,
           "uncoveredGaps": 0
         },
-        "reportHash": "5e59e6573a5f349354620c2762b83fba61d9a7792cf2bcdfa9223fe6f0d95a16"
+        "reportHash": "d75864ad037940704e0208f7a2e396e7fdad089a6456e5997add948372abbf0f"
       }
     },
     {
       "name": "superscript-plus-minus-rejected",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -8846,7 +8846,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "dd35cd59c3728a4620e7974d1ca4dbf19293276a47f1210f640495e896587e05",
         "narrativeBindingSha256": "349904246e80dc5c526e0efeba6c1fa8ea56c88da9fbdc71ef0201801344d12a",
         "status": "failed",
@@ -8870,13 +8870,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "26d016432070eb1e48744220dfde4da7a5ebb183b5e59be20d651d21c73ac842"
+        "reportHash": "b6058f0c229cf4c31a3939312b5085fdcb1a0477f983f4f34079a29140101870"
       }
     },
     {
       "name": "soft-hyphen-before-cr-and-br",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -8913,7 +8913,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "efece94cba1bfb50e7370bedfb066d3151e0d1b20215a53d20d0b717d08c30a9",
         "narrativeBindingSha256": "8503b01e08b1d87de0cc2f67e44d4bd7ac0433e7d9e89851676497d66456e056",
         "status": "failed",
@@ -8937,13 +8937,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "b90ebf82c7d0713809a3cbb1bef584511055c2243619c0050681af9b20ea05f0"
+        "reportHash": "ccfcf96685a68e851b41d4f70bfa0df7f83c4417afb35735276f7d0a429ab393"
       }
     },
     {
       "name": "soft-hyphen-before-raw-line-feed",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -8980,7 +8980,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "efece94cba1bfb50e7370bedfb066d3151e0d1b20215a53d20d0b717d08c30a9",
         "narrativeBindingSha256": "8503b01e08b1d87de0cc2f67e44d4bd7ac0433e7d9e89851676497d66456e056",
         "status": "failed",
@@ -9004,13 +9004,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "b90ebf82c7d0713809a3cbb1bef584511055c2243619c0050681af9b20ea05f0"
+        "reportHash": "ccfcf96685a68e851b41d4f70bfa0df7f83c4417afb35735276f7d0a429ab393"
       }
     },
     {
       "name": "soft-hyphen-before-raw-line-feed-against-split-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -9047,7 +9047,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "bb96fcc31d5f0231cef42d2ed9556ae82af0652378fa39830c14ce39970afef5",
         "narrativeBindingSha256": "8503b01e08b1d87de0cc2f67e44d4bd7ac0433e7d9e89851676497d66456e056",
         "status": "failed",
@@ -9071,13 +9071,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "ca0b80a1ce478ec830b865355fcb22d8a70c17dc8c4d431f48b35da589e74cc9"
+        "reportHash": "d29561006f81d3d60a2a7aa19685b68700d906ada820b3930d3e2f15f50121f7"
       }
     },
     {
       "name": "soft-hyphen-before-raw-line-feed-against-joined-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -9114,7 +9114,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "6f938f4c76c2e5d9740737c29eb9f977b0fee02fd2a4f46b5b3c94e3d90ee8db",
         "narrativeBindingSha256": "8503b01e08b1d87de0cc2f67e44d4bd7ac0433e7d9e89851676497d66456e056",
         "status": "failed",
@@ -9138,13 +9138,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "8fd1a225e9c2f2d89145de1721bbc1ff1305e3739199c7eb6771a4dbc5f4c163"
+        "reportHash": "65d703b748d1ade9074e5d101e95b74d5ad8b17318168c7d5ef8f73e7b90317a"
       }
     },
     {
       "name": "surrogate-pair-by-references-rejected",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -9181,7 +9181,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "c5608b7ba5ed77f4dded830beb845f6e25caa5bc3e63133998ad928bdf14ccc4",
         "narrativeBindingSha256": "8503b01e08b1d87de0cc2f67e44d4bd7ac0433e7d9e89851676497d66456e056",
         "status": "failed",
@@ -9205,13 +9205,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "ad90f8616233243a97729009f18e1c67896fcc5727fe8da93ecfca25df3f7df8"
+        "reportHash": "3e69aec5cc19e759bab82aee7c6f54a17076ffe48cdd63596e4e29c7f964c79b"
       }
     },
     {
       "name": "surrogates-split-by-markup-rejected",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -9248,7 +9248,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "c5608b7ba5ed77f4dded830beb845f6e25caa5bc3e63133998ad928bdf14ccc4",
         "narrativeBindingSha256": "8503b01e08b1d87de0cc2f67e44d4bd7ac0433e7d9e89851676497d66456e056",
         "status": "failed",
@@ -9272,13 +9272,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "ad90f8616233243a97729009f18e1c67896fcc5727fe8da93ecfca25df3f7df8"
+        "reportHash": "3e69aec5cc19e759bab82aee7c6f54a17076ffe48cdd63596e4e29c7f964c79b"
       }
     },
     {
       "name": "supplementary-reference-verifies",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -9315,7 +9315,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "c5608b7ba5ed77f4dded830beb845f6e25caa5bc3e63133998ad928bdf14ccc4",
         "narrativeBindingSha256": "e1bef54cff82550d10852a40606ba0c5c8da39974e8f2d41a854be05d0fff962",
         "status": "passed",
@@ -9339,13 +9339,13 @@
           "coveredCodePoints": 28,
           "uncoveredGaps": 0
         },
-        "reportHash": "40348b982a9fee29328d9a9b3c12449a4fcc36a98224a7bac022d48cf5a2251f"
+        "reportHash": "2d4c4633b3534f83f820e33f9a1eba910a3a5f5b23f6856940029723f629119b"
       }
     },
     {
       "name": "class-attribute-rejected",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -9382,7 +9382,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "a5c257af1c27e363486746bd2a7a97466647143d44508311c13c9d543313cdeb",
         "narrativeBindingSha256": "8503b01e08b1d87de0cc2f67e44d4bd7ac0433e7d9e89851676497d66456e056",
         "status": "failed",
@@ -9406,13 +9406,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "c167fe5f18872229f0fd83779dd004ff0ed8417870645e5e4ffe1b7f9802fb7e"
+        "reportHash": "fead3c7fed6b22f76e7915068c5f3ea8958437d2b9876d8c11c8a318793117bc"
       }
     },
     {
       "name": "text-directly-inside-table-rejected",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -9461,7 +9461,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "283b5a00d68924a85b939107395f37435c0e05017b287d93c683d69e2561b9fe",
         "status": "failed",
@@ -9485,13 +9485,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "8b7b3abe878fec9ae4107e087d9c0beebb8e20e8716f3b260d8e4c2ad28bbef9"
+        "reportHash": "7548529ad7b57e65090be9d950b3385328a9f59e9ed7cbebb23796fb9aaee68c"
       }
     },
     {
       "name": "spanned-cell-against-separate-cells",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -9540,7 +9540,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "53037168a82f89a7b2e701afc73a621556fddcfe3ec7509c817222a28c3188ba",
         "status": "failed",
@@ -9574,13 +9574,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "d8e7a168cd801fb000ebe63529ad44854f7c0310149a62e562f0f898f7c695c0"
+        "reportHash": "9ecc464bf2454f23a6d21934fc26c9d403d5289e59e97eb1a2a3772be7f0cbf5"
       }
     },
     {
       "name": "merged-cells-uneven-rows-rejected",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -9629,7 +9629,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "283b5a00d68924a85b939107395f37435c0e05017b287d93c683d69e2561b9fe",
         "status": "failed",
@@ -9653,13 +9653,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "8f6193c4ba7360d7b2e7f48558e9a62a15812fb90cf8186886c19befebdfa8f0"
+        "reportHash": "734524fd668f2930432ad4c079d3556206e979b16b887af6e3c12c88cc208e7d"
       }
     },
     {
       "name": "c1-reference-rejected",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -9696,7 +9696,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "eeedf54597d033495edd88144fd455864dcba9b0176bccdf55309c15fdfa5d4f",
         "narrativeBindingSha256": "349904246e80dc5c526e0efeba6c1fa8ea56c88da9fbdc71ef0201801344d12a",
         "status": "failed",
@@ -9720,13 +9720,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "66530a91c27f216e9cf8e3b980ba0aa6b7b0eb40a960db4dddd7d1f52f39c5ee"
+        "reportHash": "06425794722abefc074b439e19647a3d132cc5d3cbace263caf548118f4515ec"
       }
     },
     {
       "name": "vertical-tab-reference-rejected",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -9763,7 +9763,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "eeedf54597d033495edd88144fd455864dcba9b0176bccdf55309c15fdfa5d4f",
         "narrativeBindingSha256": "349904246e80dc5c526e0efeba6c1fa8ea56c88da9fbdc71ef0201801344d12a",
         "status": "failed",
@@ -9787,13 +9787,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "66530a91c27f216e9cf8e3b980ba0aa6b7b0eb40a960db4dddd7d1f52f39c5ee"
+        "reportHash": "06425794722abefc074b439e19647a3d132cc5d3cbace263caf548118f4515ec"
       }
     },
     {
       "name": "br-start-tag-rejected",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -9830,7 +9830,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "a5c257af1c27e363486746bd2a7a97466647143d44508311c13c9d543313cdeb",
         "narrativeBindingSha256": "8503b01e08b1d87de0cc2f67e44d4bd7ac0433e7d9e89851676497d66456e056",
         "status": "failed",
@@ -9854,13 +9854,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "f095b5abf34501c60f6296de804bb3a30f6e74479dac0d89db079729a3184f0f"
+        "reportHash": "fe870a69e7118d70799bb40d44325986f32d1260cf64384a03c7975e52b6590d"
       }
     },
     {
       "name": "c1-control-in-page-text",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -9897,7 +9897,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "274adea0ba758b1e00c580960fb77cacf9e91d20c31fd6835361621f0bce3a80",
         "narrativeBindingSha256": "120152067232871ecc903a46e1682d29abf5b28b7f3ffaee508eea7555b16b84",
         "status": "failed",
@@ -9922,13 +9922,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "0b25e723b9ddea5ecdfa0e8de37738edfa0b7093e84b351863a980cb980c08a2"
+        "reportHash": "5b32c0d7dc7af093c3aa4187a8c3f7e46fcaabcff51af94b75e885cc4e481bd0"
       }
     },
     {
       "name": "form-feed-in-page-text",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -9965,7 +9965,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "13b977e9ddfea76bc0885391593bb395bdee152b406e2f870ae73458436acc3b",
         "narrativeBindingSha256": "120152067232871ecc903a46e1682d29abf5b28b7f3ffaee508eea7555b16b84",
         "status": "failed",
@@ -9990,13 +9990,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "a855eb12461bc43e3cc9f9d052495af3e10db237ba57f4f3d9354282332a1f58"
+        "reportHash": "f890538f368c14b979b40641ffd8c68cf51ede28130227994ef826d2c60d4114"
       }
     },
     {
       "name": "bidi-control-in-page-text",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -10033,7 +10033,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "8867b1604d0f500ad8592a7daedb1d50e6c50fc893e66036fe4a6672f9ac4ff0",
         "narrativeBindingSha256": "120152067232871ecc903a46e1682d29abf5b28b7f3ffaee508eea7555b16b84",
         "status": "failed",
@@ -10058,13 +10058,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "0cf6456a278d84eeff5622c7711c2a3fd6679a8873e6f038cb30aba989d8bfc4"
+        "reportHash": "ed6332a45ec9c7076684bae8d21cd3d37a06e45bbdc934d44d485f834661d90d"
       }
     },
     {
       "name": "span-ends-inside-decimal",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -10101,7 +10101,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "c1e2ed220ad392948e4aca175e6a0768cf7ce2554ae543a6eff3c720eb33df23",
         "narrativeBindingSha256": "bbde19fe3aefcb2d75fe7e59cbbfd45deaf8e93982208d8d7dcd50b6234d1687",
         "status": "failed",
@@ -10126,13 +10126,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "f72ca4e56b94587ffbac45b19ede68353de84b31aac6853a11abfb9445b63d5a"
+        "reportHash": "5d05e9a0175bd76f65314eba2fcc446699eb5352a0a6be1739fad64c040671f4"
       }
     },
     {
       "name": "span-ends-after-decimal-before-space",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -10169,7 +10169,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "c1e2ed220ad392948e4aca175e6a0768cf7ce2554ae543a6eff3c720eb33df23",
         "narrativeBindingSha256": "3f486a9a02f2b1d16d197c1199946937198ee63f7b7a7b8db74827e2bc1bc378",
         "status": "passed",
@@ -10193,13 +10193,13 @@
           "coveredCodePoints": 19,
           "uncoveredGaps": 1
         },
-        "reportHash": "e5e247240a72f1e881ef163de4385677ab97ead5fadaf06b1082ea0d4b64e383"
+        "reportHash": "27df6a0c2e343becc0c1b3bee936ddf29fc20c36f10b6edeeace84effc2098f1"
       }
     },
     {
       "name": "span-ends-before-thousands-separator",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -10236,7 +10236,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b1bfaa1297319c7f9f9adeff3e6057b53f2fe56ebb8f97b51f499163ccf40884",
         "narrativeBindingSha256": "a34f5fa6b564853b19992003e5a061642914a71463a9e52936fc81995fbe33c2",
         "status": "failed",
@@ -10261,13 +10261,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "89a17e886fc560943569ae5df447024155a92a99413cf5d9c1bae89945a95a89"
+        "reportHash": "46bbec1b2a7edb446c0bd56f35aafb2da1579519653745374d5763785e98a059"
       }
     },
     {
       "name": "span-starts-after-minus-sign",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -10304,7 +10304,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "ca2791e8f142ff417a44d41270c346d99a5363ff9c6f0203dbb65dfdc4eb4080",
         "narrativeBindingSha256": "85d6b6fc8d935b20cd219607e486ce38f4c633413072dd6b5e4922847048fbb5",
         "status": "failed",
@@ -10329,13 +10329,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "e350db5339ab8a5a0ef94e3d65473405d65ce854cf343fb4308b34aa1699cdd9"
+        "reportHash": "1ca014d5a7c7f38836228c5d5b357e923f9c7b3df7813e45677bf25e014974b1"
       }
     },
     {
       "name": "span-starts-at-minus-sign-after-space",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -10372,7 +10372,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "ca2791e8f142ff417a44d41270c346d99a5363ff9c6f0203dbb65dfdc4eb4080",
         "narrativeBindingSha256": "228ee74143d6f96f95d261226bfc2991459f486ddb520c64313c63df8eb58157",
         "status": "passed",
@@ -10396,13 +10396,13 @@
           "coveredCodePoints": 7,
           "uncoveredGaps": 1
         },
-        "reportHash": "6ad93d9527a060e8fa7fc387e1d471f42967167ad5035d6d396850bd6547d043"
+        "reportHash": "e0afa2780d66d1c8aa24ad78251a946d3d5bc772f1a64e28485c21a69d0efea6"
       }
     },
     {
       "name": "span-starts-after-decimal-point",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -10439,7 +10439,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "5762f2226f08b32f4c31c64492765725d7937206780f13df485e9f3c2c3e1c24",
         "narrativeBindingSha256": "cecc11b7764237eba9e2f8892a31b5dc2ddf1b2fdd883385c5d1eb9f21fd10f8",
         "status": "failed",
@@ -10464,13 +10464,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "b57b44055b27bad469ea99b3d443b4bbc121e742921d9508327aed3758e4d55c"
+        "reportHash": "17a0d8b9261e27964bb8e3f9b165da9d50c22bc7c6ee9d7f8d8c3b495608161c"
       }
     },
     {
       "name": "span-starts-after-hyphen-in-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -10507,7 +10507,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "88d7d8febb666f02674ad7ba5cbaa8b22e3b54e662380c2ef6be5be0643aba20",
         "narrativeBindingSha256": "4a9d2b289a90566995515b473107ccb7a7e7e7b6c6fb65314fef4736c97dde8b",
         "status": "failed",
@@ -10532,13 +10532,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "9516839a9f2e9c9c19903fe01ed4fa34ab70217f0f5b7a3a519f97af98fd22b6"
+        "reportHash": "17562e8d8901b1066ec785da0b756e255665523d0a9683525702fad977a5c9a3"
       }
     },
     {
       "name": "span-starting-with-space-after-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -10575,7 +10575,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "88d7d8febb666f02674ad7ba5cbaa8b22e3b54e662380c2ef6be5be0643aba20",
         "narrativeBindingSha256": "76033bd9df8dbf0bbb8439a68a4f15d05e0727f52299c3e6cadd86146a83aeec",
         "status": "failed",
@@ -10600,13 +10600,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "de9735ccd25a4db94bd391dc07a56c5a970fe62d959ad7b2680b540e0137925c"
+        "reportHash": "015809dc5ffc7dffe18ccb7768c01010ac48b3b9c6c24dc1b78d256100fb75a5"
       }
     },
     {
       "name": "bullet-operator-between-numbers",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -10643,7 +10643,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "df3c7ecd947151bb277858636d737a72ce7f583e490c3d6b51834fbc99c80618",
         "narrativeBindingSha256": "4629c1a9657b22b992f9928032d6af9b8b37bb0d789b88a395315b383681c6f0",
         "status": "failed",
@@ -10677,13 +10677,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "23ed3ab1761175345891692acfea91646ae1e58dd4fc02df24f93c1fe055e150"
+        "reportHash": "9c7383b64086f71685d7394710b46265a7bd79ab6dacc64d85336e48d0d0201f"
       }
     },
     {
       "name": "bullet-between-numbers-mid-line",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -10720,7 +10720,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "df3c7ecd947151bb277858636d737a72ce7f583e490c3d6b51834fbc99c80618",
         "narrativeBindingSha256": "9b85a20587ffd0a8cfaebac39940cb43bb64b91a5bd1c667f17dfbbf831e9b1d",
         "status": "failed",
@@ -10754,13 +10754,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "5e680c72607fc52fd7386458d2d2354b2f7a280a7ef51e910e78b292142b8051"
+        "reportHash": "0ffea714a50479594592d8cf2f0f7e5efcb1b5c319cb3f1c9e0c5033c87bad1b"
       }
     },
     {
       "name": "no-break-space-in-sup-tag",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -10797,7 +10797,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "9db197a0424ca142481f3f097f8a8065931d27d43b964602c8fd259fedd4da77",
         "narrativeBindingSha256": "349904246e80dc5c526e0efeba6c1fa8ea56c88da9fbdc71ef0201801344d12a",
         "status": "failed",
@@ -10821,13 +10821,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "414298cf9ae1cc40142579f5c9a83b93194526371bfcde6ca6aad37988b7b19c"
+        "reportHash": "bc1c01e7b3ee3cdd072c4ed7bc3d0d6128cd152060d2c78c21f60c7291dd8926"
       }
     },
     {
       "name": "ascii-space-in-sup-tag-verifies",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -10864,7 +10864,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "9db197a0424ca142481f3f097f8a8065931d27d43b964602c8fd259fedd4da77",
         "narrativeBindingSha256": "c64ad99cf126aa5c6de68dfd128fffcdcb2f665a1640969b910ecc65957c7805",
         "status": "passed",
@@ -10888,13 +10888,13 @@
           "coveredCodePoints": 11,
           "uncoveredGaps": 0
         },
-        "reportHash": "1079d53365ff9be5f1c8141ac011c5a210f3201b471808314bfe24052f1a85dd"
+        "reportHash": "f2bf728a00f5f4c7b8ca01aa35296389f2bd459e42ff3fc0cca79256a39ca16e"
       }
     },
     {
       "name": "bullet-after-raw-line-feed-in-paragraph",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -10931,7 +10931,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "ed028b6e650231eb67d13264e1dae229a2fda313781059688dd16b47d945d1dd",
         "narrativeBindingSha256": "f54835ddbe2d3b0b22f90d00604a7028ccfa4012e29d202abdc0202d84cdb428",
         "status": "failed",
@@ -10965,13 +10965,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "9c6fa4136fbdb416bbbca0db12a1ac6bc34fec93f1610f06a126f78c594f1509"
+        "reportHash": "80b3f4cba4a072a6aa240af34354573d5527c4ac508703613b51030b94f6fe13"
       }
     },
     {
       "name": "bullet-after-line-feed-reference-in-paragraph",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -11008,7 +11008,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "ed028b6e650231eb67d13264e1dae229a2fda313781059688dd16b47d945d1dd",
         "narrativeBindingSha256": "f54835ddbe2d3b0b22f90d00604a7028ccfa4012e29d202abdc0202d84cdb428",
         "status": "failed",
@@ -11042,13 +11042,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "9c6fa4136fbdb416bbbca0db12a1ac6bc34fec93f1610f06a126f78c594f1509"
+        "reportHash": "80b3f4cba4a072a6aa240af34354573d5527c4ac508703613b51030b94f6fe13"
       }
     },
     {
       "name": "bullet-after-raw-line-feed-against-plain-text",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -11085,7 +11085,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "cba16cf8bbe0c51c0c85f26ab480f9298240caab3a1689c9f1d1edca23cba3ee",
         "narrativeBindingSha256": "f54835ddbe2d3b0b22f90d00604a7028ccfa4012e29d202abdc0202d84cdb428",
         "status": "failed",
@@ -11119,13 +11119,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "e9472ced4db9f49632528ec7582b1cc45e1df44ea7875ba5b491e454fc7c1043"
+        "reportHash": "e1bbf6197e6d702caced1cf0af049c5fe3ec658f9e636aeac2ff10db1a8197f5"
       }
     },
     {
       "name": "white-bullet-after-raw-line-feed",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -11162,7 +11162,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "349a3a693a03e2e605dd30b41ebf5fedac5dc11c840e3a051cfd49ae1a3888ac",
         "narrativeBindingSha256": "db96273ae8e836c3ea38b1346636b65560b8f193c34ddfd38a69d7714a4bc876",
         "status": "failed",
@@ -11196,13 +11196,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "8a9a15524f2d0d2b1359f9a034a76a65fe6ef418d213a2d77d3ca6d3e42e1fa0"
+        "reportHash": "39057bd3d47cdb9060d2552e20380e511947a3540f925b68941260a7270b8551"
       }
     },
     {
       "name": "bullet-after-br-is-a-list-item",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -11239,7 +11239,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "ed028b6e650231eb67d13264e1dae229a2fda313781059688dd16b47d945d1dd",
         "narrativeBindingSha256": "14e85d5d06fc9ae63d2554a75fcddd02ed35e946874e7cc75b0c7c9737386a59",
         "status": "passed",
@@ -11263,13 +11263,13 @@
           "coveredCodePoints": 14,
           "uncoveredGaps": 0
         },
-        "reportHash": "14b60efdfebb37cfb7ecf1df1e932b90294bfcc36aa4e8734a9ec4cb24f16fe4"
+        "reportHash": "fd5cc196908a1206c84b7a9857ce91f9471a2f729bbae8ecd7b5ccb925545f9d"
       }
     },
     {
       "name": "span-ends-inside-space-grouped-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -11306,7 +11306,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "569ce78c1a31a2e44baf62582bfeb0e649568fe9351146cfdff6be75df093391",
         "narrativeBindingSha256": "ceff77f23ecdc1aa2962875c9a5496b7b83dc7711573eddbef46fa76b97db39f",
         "status": "failed",
@@ -11331,13 +11331,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "6d6928355500075a9ca9434a8d1f1722f589de1a9714e433fb2264a4332ccd82"
+        "reportHash": "e1619c7dc6bfa8538ed161d654a5af188ebae08afce00fc3c52e8277b7557f73"
       }
     },
     {
       "name": "span-ends-inside-no-break-space-grouped-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -11374,7 +11374,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "06cb8d1aa35b78060c0939ae173edc06d8648c0e665725ce866f8e3223b7fef6",
         "narrativeBindingSha256": "ceff77f23ecdc1aa2962875c9a5496b7b83dc7711573eddbef46fa76b97db39f",
         "status": "failed",
@@ -11399,13 +11399,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "578e3a40a9b802e1d13cee5986a23f8d47c877f6832aabb209318ee94234709a"
+        "reportHash": "8ec8b033e57a516ffa4b9f3cdecac9c973bb67bb282b235b68f5289e7a955320"
       }
     },
     {
       "name": "span-ends-inside-narrow-no-break-space-grouped-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -11442,7 +11442,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "49dc88631dbc73e55912803d0ab63e83758f0f03d1e1523dcfaec4721279d0c0",
         "narrativeBindingSha256": "ceff77f23ecdc1aa2962875c9a5496b7b83dc7711573eddbef46fa76b97db39f",
         "status": "failed",
@@ -11467,13 +11467,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "f14fba51b98f99964b751abb52c102785f45bfb62e9786e35712c87907585830"
+        "reportHash": "dca499d4b30c1208ef95a4f39d5e63de363e8611f5ffaf77519bcd952aafd07a"
       }
     },
     {
       "name": "span-ends-inside-thin-space-grouped-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -11510,7 +11510,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "829371911c8332aaea33a61b9f2c96dbd55079c9da9c3e270b32a2643236fefb",
         "narrativeBindingSha256": "ceff77f23ecdc1aa2962875c9a5496b7b83dc7711573eddbef46fa76b97db39f",
         "status": "failed",
@@ -11535,13 +11535,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "a5f59c08337110aeec8bba112a4fb7cfa6d3a36c25f7ac6aba2b95b2f815a57e"
+        "reportHash": "d3db624badc3b8b5b8f1ca4dbfaf6e9f1f356fffa5e733b8b2f797a829bc8e62"
       }
     },
     {
       "name": "span-ends-inside-figure-space-grouped-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -11578,7 +11578,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "9255c479705bc40f27a4a38e29a3c542d0e275331376b86b160d2a2facbd16c2",
         "narrativeBindingSha256": "ceff77f23ecdc1aa2962875c9a5496b7b83dc7711573eddbef46fa76b97db39f",
         "status": "failed",
@@ -11603,13 +11603,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "31dd804e16ce0fc2cd31eddf7d1ba86e839b3a9dd9c1fcbd78d945f518bfeaf0"
+        "reportHash": "5864052bb13af35dd2ffe17643092c2f8164eed76bd0d5632539fb2de2a85f90"
       }
     },
     {
       "name": "span-starts-inside-space-grouped-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -11646,7 +11646,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "569ce78c1a31a2e44baf62582bfeb0e649568fe9351146cfdff6be75df093391",
         "narrativeBindingSha256": "3b689e709653a8fe593bcf14cd73c95a9ba9e4790f9cafa564bbc7c986d8537c",
         "status": "failed",
@@ -11671,13 +11671,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "7435d15a601c1e13b8afcb0c6a8743521bca6f958a9b1216e730d0c170113af6"
+        "reportHash": "c0c3eb946b99d26d8e3b89689f89a0f16e81e00f05e1124c10a4e2a5769da8b9"
       }
     },
     {
       "name": "span-starts-inside-no-break-space-grouped-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -11714,7 +11714,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "06cb8d1aa35b78060c0939ae173edc06d8648c0e665725ce866f8e3223b7fef6",
         "narrativeBindingSha256": "3b689e709653a8fe593bcf14cd73c95a9ba9e4790f9cafa564bbc7c986d8537c",
         "status": "failed",
@@ -11739,13 +11739,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "b1b3ee7f7d8ed18fe86c8f6251d90ee1c55132c6316e908240817db9af429b05"
+        "reportHash": "69e8cbe83dd76bee997250b568b53343f04e641b3b2404a53cfa44d761d20fbc"
       }
     },
     {
       "name": "span-ends-after-grouped-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -11782,7 +11782,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "569ce78c1a31a2e44baf62582bfeb0e649568fe9351146cfdff6be75df093391",
         "narrativeBindingSha256": "970996104d2ec7028805b4c5974c4c01a5f8a42647780bd699c2af9a80093f2b",
         "status": "passed",
@@ -11806,13 +11806,13 @@
           "coveredCodePoints": 29,
           "uncoveredGaps": 1
         },
-        "reportHash": "479409ca35639c88d4baf84b3f9de31b554653ac9fcbfd26a4547fd44d540a6d"
+        "reportHash": "634a9d19242697ca85c5b3b7d48a7280a1d55c2789d7c26f6dc8dd6a13b0d9fd"
       }
     },
     {
       "name": "span-ends-at-number-before-line-feed-and-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -11849,7 +11849,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "3a05b517c416e21090307db89148e5d9ac904a7662a87341af3f0a2b4d8f70a9",
         "narrativeBindingSha256": "8d9afa855953e92a65ca78a2685a8eeea1c0e5c270c29d318adf2af97074f4ce",
         "status": "passed",
@@ -11873,13 +11873,13 @@
           "coveredCodePoints": 6,
           "uncoveredGaps": 1
         },
-        "reportHash": "3a0f8de230b4a2dab3a1550a286861d0e8c4402aec5959dc70e6c9d454ff76a8"
+        "reportHash": "c53deeb2b93546fa802fdaa415ef9ed5c72aaa0feb09ef37802668e25f07e754"
       }
     },
     {
       "name": "span-starts-at-number-after-line-feed-and-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -11916,7 +11916,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "3a05b517c416e21090307db89148e5d9ac904a7662a87341af3f0a2b4d8f70a9",
         "narrativeBindingSha256": "6c3acb8a9a9f50789cce0eeae9c03f69eb04b629f32492bb82a3b6aff63975b8",
         "status": "passed",
@@ -11940,13 +11940,13 @@
           "coveredCodePoints": 24,
           "uncoveredGaps": 1
         },
-        "reportHash": "9c56e692856cb4b774c3a9f643daac99b9d4dea7fe7780ae7433e744a9dddf88"
+        "reportHash": "6196afcd821bb762e722eef6f1de8c3f68429d7a624db28ac5aad9fc4c4a7a00"
       }
     },
     {
       "name": "bullet-in-later-cell-against-row",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -11983,7 +11983,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "6f0046de342271a55f7c6fb1970b1032c39ed2af0981dfb6d197803cb917db82",
         "narrativeBindingSha256": "2082bc1701dcc398749d915b228cc8585ecacbd94b944069982403e732a29d0f",
         "status": "failed",
@@ -12017,13 +12017,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "cbf4b525356404b517534b8de8d29fe54c0edb8ee9488fdc5412db87e51abb72"
+        "reportHash": "089595656e3563fbf021d62350f63324d0fce055edd870bc0263943d59b78140"
       }
     },
     {
       "name": "bullet-in-later-cell-against-bullet-row",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -12060,7 +12060,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "fb9a0851621bedc99e5a37e084ea8cca2cebbe027eb8e4b186d814497bfa136f",
         "narrativeBindingSha256": "2082bc1701dcc398749d915b228cc8585ecacbd94b944069982403e732a29d0f",
         "status": "passed",
@@ -12084,13 +12084,13 @@
           "coveredCodePoints": 16,
           "uncoveredGaps": 0
         },
-        "reportHash": "ec76d92daf4d9daeaf465bcc95ad95ac65f589c832289d14ad9605ee2e3dfe78"
+        "reportHash": "30c4f78949e9c078ae091c5a1bc10317b90205bcbdf4c949a879eecf77048a7a"
       }
     },
     {
       "name": "bullet-in-first-cell-against-row",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -12127,7 +12127,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "27c2259106cc516c772e8c74074df5655732112d487a4c7d7142dae273bd3c19",
         "narrativeBindingSha256": "4a321fe019c78d6b6c3b5485008553ca19f2d78202a00972b25a04ac4bb76117",
         "status": "failed",
@@ -12161,13 +12161,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "e03c9102af4afc034345836446edebb8a6cba9a84e11429ef5b14d31866b25ae"
+        "reportHash": "00735261528a349f5754d0e906f7298d049e281efd2b4f2ed2063cb994d0a9ab"
       }
     },
     {
       "name": "bullet-in-first-cell-against-bullet-row",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -12204,7 +12204,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "ff353933ee24dc7f65b24cd940de9929a0d15fc9b5426136479defc847aadd08",
         "narrativeBindingSha256": "4a321fe019c78d6b6c3b5485008553ca19f2d78202a00972b25a04ac4bb76117",
         "status": "passed",
@@ -12228,13 +12228,13 @@
           "coveredCodePoints": 16,
           "uncoveredGaps": 0
         },
-        "reportHash": "50ee256521e8ffe1222e14b7460c2ce402442d7ca5d2d6a2da80a6eea52df5e5"
+        "reportHash": "dc99bde7876ab821a80b5a66e0d2c7dc432e0a6378fd0a503a35c1a122e681f7"
       }
     },
     {
       "name": "bullet-row-against-cells-without-bullet",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -12271,7 +12271,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "ff353933ee24dc7f65b24cd940de9929a0d15fc9b5426136479defc847aadd08",
         "narrativeBindingSha256": "888102114d66afbbe262f6fc075c9f5e398e39dbca52c802edcc4be521b8b1dc",
         "status": "failed",
@@ -12305,13 +12305,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "e65deb9598fdd38a48f3e86698c380c42de39ab5754c057a29f60e789fdc04ee"
+        "reportHash": "c5a6e4425c465b7ef537ca8105449ea5d1e79f0a850184c50b0fffbc49ceadc0"
       }
     },
     {
       "name": "bullet-in-cell-paragraph-against-row",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -12348,7 +12348,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "6f0046de342271a55f7c6fb1970b1032c39ed2af0981dfb6d197803cb917db82",
         "narrativeBindingSha256": "2082bc1701dcc398749d915b228cc8585ecacbd94b944069982403e732a29d0f",
         "status": "failed",
@@ -12382,13 +12382,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "cbf4b525356404b517534b8de8d29fe54c0edb8ee9488fdc5412db87e51abb72"
+        "reportHash": "089595656e3563fbf021d62350f63324d0fce055edd870bc0263943d59b78140"
       }
     },
     {
       "name": "list-item-at-body-start-verifies",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -12425,7 +12425,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "1c672eaf6b30cf3b655ba5c3c104d493d0ba6b55a688c875eb8fa45fc1e175ee",
         "narrativeBindingSha256": "273f3e1bfc9db6be6eaad0f336800e12ab2f361fbe9e0d788273efdc42e2fb90",
         "status": "passed",
@@ -12449,13 +12449,13 @@
           "coveredCodePoints": 27,
           "uncoveredGaps": 0
         },
-        "reportHash": "aa6243917747b4a3c7cd36f73c1512b2a6fb99130cb316794a9ff0bcc400f47f"
+        "reportHash": "03402fefc89d6d1ad5f73c57bec8f98c50cc72e5520b188045a203672e085f50"
       }
     },
     {
       "name": "list-item-at-page-start-without-header",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -12492,7 +12492,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "08940332fc991d6a254c942901df3c885b120f929f8d8232e83b0d2d1d732e0d",
         "narrativeBindingSha256": "273f3e1bfc9db6be6eaad0f336800e12ab2f361fbe9e0d788273efdc42e2fb90",
         "status": "failed",
@@ -12526,13 +12526,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "dbe7506f9c2c9b4808b0c38b7ab205fdba358ded7bff38a0f9c071294c7e703a"
+        "reportHash": "a8d64a17d12b2cca76755a0079f5c7c5fd5ff68cf7e5af9e20bd66752dc8dd51"
       }
     },
     {
       "name": "span-starting-at-mid-line-bullet",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -12569,7 +12569,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "f5a80ed6c732b66c40a7d99c7577bd8cc164e45e0237c89237a3062408ac3a46",
         "narrativeBindingSha256": "833bf5e0ec7cfd80f61a33b41956502b9bd5dd3e4c20bfe3067621f0836c5e5e",
         "status": "failed",
@@ -12603,13 +12603,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "6ac88443e51c915254f9c0d134a3341cd73f7e3a437f8946f029c21696cf2fc9"
+        "reportHash": "c567d84c615eab58b06a36f2dce062d528cdc4d78b4a3b63bb13da07644b6c50"
       }
     },
     {
       "name": "section-continues-over-bullet-at-page-head",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -12658,7 +12658,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "95bb272088914c9b028d15d23b396c41f9623dbe9c89bd2641f21dc0657f5201",
         "narrativeBindingSha256": "a23781a9baaed80ad5e374c533f3d3567b708f56696becf3bf1e4367edd031dc",
         "status": "passed",
@@ -12682,13 +12682,13 @@
           "coveredCodePoints": 35,
           "uncoveredGaps": 0
         },
-        "reportHash": "297c050398e7931ad0ca56dfeee8ea256471011a39506b138fe6171b3cf85f54"
+        "reportHash": "f43e2ce60852eefa7efb9dc2ac2f954e1b1de52811dc22cb291b76e7e6e5496b"
       }
     },
     {
       "name": "span-ends-with-space-inside-double-spaced-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -12725,7 +12725,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "46e241a6cf394bf3b59e766674e93356c7de6736aace5fce80c611b2c27c449d",
         "narrativeBindingSha256": "ceff77f23ecdc1aa2962875c9a5496b7b83dc7711573eddbef46fa76b97db39f",
         "status": "failed",
@@ -12750,13 +12750,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "8abf550aa8b30621d221d7cce4bf0c61f5fa214b8ecc7a2733768d373612dd31"
+        "reportHash": "236eb74f2c20bd5ea6f7b85bc03b0220fd4572b4e98d7302974374fb3c43e96f"
       }
     },
     {
       "name": "span-ends-with-thin-space-inside-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -12793,7 +12793,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "3d155c71cb72d0899ef16355a42d9c0cef926f99f989c4be84685b3a282b49fa",
         "narrativeBindingSha256": "ba5d946ca37646ee997c641ec76c5f116f2130e2d12ed29d1730c17a32f07688",
         "status": "failed",
@@ -12818,13 +12818,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "64b94220e987ce9ebc9be0593194900e86594cf54ef11ba0e26d23a470fe9767"
+        "reportHash": "40b7899a79a812bfe85d1ab6ffb16f9c8df4bdd2030021eb3c47b1d1acf53371"
       }
     },
     {
       "name": "span-ends-with-narrow-no-break-space-inside-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -12861,7 +12861,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "a9fa80fe6b14a97f287482777fed2afe913a813cacdaf3f47b12733e7261f3fc",
         "narrativeBindingSha256": "8280bedc3930bb7e4cc58d620ff9f3cb08e040097ccd24c0a704f1f53ebd0cc5",
         "status": "failed",
@@ -12886,13 +12886,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "53c6280c664717b53262cbac723e5970307a871566bae1a49df5182457935b4d"
+        "reportHash": "dcd5b8331b3e1bba23dd43c338bfa8787abfdc03257c53520458c008f9e1e1b4"
       }
     },
     {
       "name": "span-starts-with-space-inside-double-spaced-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -12929,7 +12929,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "46e241a6cf394bf3b59e766674e93356c7de6736aace5fce80c611b2c27c449d",
         "narrativeBindingSha256": "3b689e709653a8fe593bcf14cd73c95a9ba9e4790f9cafa564bbc7c986d8537c",
         "status": "failed",
@@ -12954,13 +12954,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "4676d92f1accd69960a53f652e8194adefb4ef24e214b08f520ec28680e84e19"
+        "reportHash": "6eff5e4b0a49a6fa8126b13d2a0ae08cced0c71e242549b139ed967a98a6d436"
       }
     },
     {
       "name": "row-cut-before-tab-bullet-kept",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -12997,7 +12997,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "201173c60d41e4bc3ff708a1de9c7e4ad5ad45af462d36b5a003763463860f70",
         "narrativeBindingSha256": "c19252f51f69bc86b5251326ba3da83ca2c4a12ea55d8d87365484ad9426e7a4",
         "status": "failed",
@@ -13031,13 +13031,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "b64a953e3c599b27217bef1b0884f81dda62fd6e9dcc5f96db35198dd95b7bac"
+        "reportHash": "b5cc328a9b10b98c8c88fdca911ef3a1d839ffcdea8faa594026c9e3dee35873"
       }
     },
     {
       "name": "row-cell-cut-before-tab-bullet-kept",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -13074,7 +13074,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "201173c60d41e4bc3ff708a1de9c7e4ad5ad45af462d36b5a003763463860f70",
         "narrativeBindingSha256": "a70adf87aa9b1cd5271150cded486822fd24e559da03ce447891e5c9a8982535",
         "status": "failed",
@@ -13108,13 +13108,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "3f7ef4ceba239146e318f1dc5bae5f396be9e83ccd76d1869cbb53963eed449a"
+        "reportHash": "1b530d5f8f79c43295a07b947fd75f9df1b03b9cead1e869bd707694382560b1"
       }
     },
     {
       "name": "row-cell-cut-before-tab-against-cell",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -13151,7 +13151,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "201173c60d41e4bc3ff708a1de9c7e4ad5ad45af462d36b5a003763463860f70",
         "narrativeBindingSha256": "18c97399ea58d36db2f647ba61eea82a4cb15796f9393dab173877b1ff827efa",
         "status": "failed",
@@ -13185,13 +13185,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "ebef75ec323335d60188422d505a02aedfe190311702bf39f3f1f4836d8f6a9f"
+        "reportHash": "f9ffb569b2ac841c6686471b23b2ee49d2b042f9f2bcc8209abf7b7d439af246"
       }
     },
     {
       "name": "list-bullet-then-tab-against-list",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -13228,7 +13228,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "366a6407a9ed9c9c1a622d556199e39a95ec09a6f82ef149f372293f7cdac3da",
         "narrativeBindingSha256": "f933c3c3eab7b2ee263b495cf177630c8a0b74db68262102645dea7c1b087381",
         "status": "failed",
@@ -13262,13 +13262,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "57bc4701fb8f18368b4f96d47cca8b8d5365a4d6df9b6725f491eaa2d4efb9b5"
+        "reportHash": "1881295df8d2a0ae34f1734b10664588c30cf1fc48fb56ccfc1e1ae7986bb5cf"
       }
     },
     {
       "name": "list-bullet-then-space-against-list",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -13305,7 +13305,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "3a53239e86a63ffd6974386c645c8140761af29fa99263d1dc323656577c22df",
         "narrativeBindingSha256": "f933c3c3eab7b2ee263b495cf177630c8a0b74db68262102645dea7c1b087381",
         "status": "passed",
@@ -13329,13 +13329,13 @@
           "coveredCodePoints": 15,
           "uncoveredGaps": 0
         },
-        "reportHash": "4da055a7d6f6cb2ffad3d06e4d72a00f49ec96433031f5bdd1ba7f1c2945fb1a"
+        "reportHash": "c137872a7ce4c08903de3cf636836e16d978f3ce3f2a478f4e50f99c3059bb7e"
       }
     },
     {
       "name": "ordered-list-number-verifies",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -13372,7 +13372,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "e8ab3feea637764a1eb94cee7955655d94905e8cb50e5a1f29d027f477042c21",
         "narrativeBindingSha256": "312a68a59fc7bf85df72ef939abaaa81f2f1fa04cf58cf2481757fb82aa01ed3",
         "status": "passed",
@@ -13396,13 +13396,13 @@
           "coveredCodePoints": 19,
           "uncoveredGaps": 0
         },
-        "reportHash": "5a7d3660842b8854758479ba018f22f7e7fbf915eb9a738487a2b5cb3bdf4434"
+        "reportHash": "078ee724c4c7f7c3c6d5c7cfc38f846d4ece03bd54033b4fef5650e7f906b55d"
       }
     },
     {
       "name": "ordered-list-other-number-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -13439,7 +13439,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "e8ab3feea637764a1eb94cee7955655d94905e8cb50e5a1f29d027f477042c21",
         "narrativeBindingSha256": "dba7c10947a637f7a886f7ac99714804142fbb438d6a0bf38d05be7683ba8e11",
         "status": "failed",
@@ -13473,13 +13473,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "2dafeb90b08b08b21b32cc9bcff246dfecf66260dd539fb9d3840b41873c84c4"
+        "reportHash": "a5617bbf87d73be8707ed56a06f6abed093350d7a1a107860beabb6cf1cd8e13"
       }
     },
     {
       "name": "ordered-list-other-style-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -13516,7 +13516,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "e8ab3feea637764a1eb94cee7955655d94905e8cb50e5a1f29d027f477042c21",
         "narrativeBindingSha256": "c7208d070e3aee1d002fc2ad11dfe4eaa86b74e74f1e4acf680b09e24c290c0a",
         "status": "failed",
@@ -13550,13 +13550,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "c4e669d9a73bd809600fdb2a6c44ecda258d54f6a785d48bc3d989a138557c86"
+        "reportHash": "9acb6029739e2010892dcb0e30fefabbaf169f97598275a34eb1e16d0b0a1505"
       }
     },
     {
       "name": "row-span-against-row-span-verifies",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -13593,7 +13593,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "7dd980f05b43062f37d6ea0074292c60945757ccf07dbd6712b4a883b87a450c",
         "narrativeBindingSha256": "515eb62562b969e4ae0424f665f9e096ff96391f6dc1c86fadafac64be9e9bcc",
         "status": "passed",
@@ -13617,13 +13617,13 @@
           "coveredCodePoints": 53,
           "uncoveredGaps": 0
         },
-        "reportHash": "db22263784910ae4f2b70142bdb3bd925725dfc269df90eb30c28bdb1f2f1b5c"
+        "reportHash": "e9d048c686ae99eba98586a96d2ad2f66c02e25ac98e92ddeaf5e799bec86c34"
       }
     },
     {
       "name": "row-span-against-empty-cells-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -13660,7 +13660,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "d34b8695d851154d571cb9224bf12cf4c18ba96f2afd2c831f759a072e1b2ce0",
         "narrativeBindingSha256": "515eb62562b969e4ae0424f665f9e096ff96391f6dc1c86fadafac64be9e9bcc",
         "status": "failed",
@@ -13694,13 +13694,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "e5a05237b57f013a81e21a5d722335522955a198eb6442b7f427ed5cbfd46b25"
+        "reportHash": "705c19fca8493af47c1d649f43843d83f5907c83ec37e5a1a0099ef18d35a501"
       }
     },
     {
       "name": "empty-cells-against-row-span-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -13737,7 +13737,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "7dd980f05b43062f37d6ea0074292c60945757ccf07dbd6712b4a883b87a450c",
         "narrativeBindingSha256": "1512d92d7632bfab739493e9626b46678cadee3ec9b664b257b49a95dd7123f8",
         "status": "failed",
@@ -13771,13 +13771,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "d21131eb1c18feb3d1e13d0f6223371856ac1f11f6fea2b72020ca0e906b9335"
+        "reportHash": "665b15c626477dd72ea755dbabb5940313c397ea8a1fd156c666cf92899a4515"
       }
     },
     {
       "name": "value-in-another-column-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -13814,7 +13814,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "28bd4be71f4177feda0c46279f9c56a88e7b4c594f506ba990a9438d2318e30a",
         "narrativeBindingSha256": "48d30613fd0e4a16b20162bb9e0b52fc0064b0c6af4843a1aa79c5b49b3b03a4",
         "status": "failed",
@@ -13848,13 +13848,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "f0aa04e5f86d0a33bcee4b19b33c45b05540df2870df28f9b257e492090d7ef5"
+        "reportHash": "38182d82214eeee1540c1e3d4c1aa6a30f128f7179cb435c18de344c39766cbe"
       }
     },
     {
       "name": "picture-with-source-bytes-verifies",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -13891,7 +13891,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "dc7dee0ccf736255f86b3b33512562d330df716b4bf2047dc2b4b05e78d772c7",
         "narrativeBindingSha256": "27ebe6a0acb737addc8ca723455cdc3bae04268e5a308e498ecf241de90aa4f7",
         "status": "passed",
@@ -13915,13 +13915,13 @@
           "coveredCodePoints": 77,
           "uncoveredGaps": 0
         },
-        "reportHash": "7a561c03c5a11ffdda74f97e8c3741e50c6aaabb5c3db1f9c497b1036775f516"
+        "reportHash": "df2e143a0cb74b54840ab09dc831889a86690c534ab0dcc56891ec222ad07d5c"
       }
     },
     {
       "name": "picture-with-other-bytes-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -13958,7 +13958,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "dc7dee0ccf736255f86b3b33512562d330df716b4bf2047dc2b4b05e78d772c7",
         "narrativeBindingSha256": "bd26e50e17c140e3dea8bc9ae0c8e7e1e001ec4bafb65d7f5420a5e446fb0be5",
         "status": "failed",
@@ -13992,13 +13992,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "07acc07a99b9f09b7d6ec186b0a2223864a7648e7ed1231dbed3e80250ae39a0"
+        "reportHash": "8ec5a919d821125bdb85b490b3e52d9ebd51940362fd9236fe2c6ee416e3d5af"
       }
     },
     {
       "name": "picture-missing-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -14035,7 +14035,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "dc7dee0ccf736255f86b3b33512562d330df716b4bf2047dc2b4b05e78d772c7",
         "narrativeBindingSha256": "0801db7e57b6630f3c52fc763f303d7a0d192a2810f5d778397f6cd9728de6df",
         "status": "failed",
@@ -14069,13 +14069,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "76ee508a9c9f57aad5e168c733ddd9a5af25c80ed23f4753c6e2c41337e9a81c"
+        "reportHash": "82f296ba150b009e246c1601e1767a8a7059f36d36cc602f640112d7bf2236a6"
       }
     },
     {
       "name": "cell-across-page-break-keeps-its-bullet",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -14124,7 +14124,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "c65d2fdb39a50a381b72570409ef43462d9db1f5ca42080b7bcb7ba9aa6faebf",
         "narrativeBindingSha256": "42adb7df2285ebd6822d4a777d5af096946b557d7a96275bd4be4f8a2e764a2a",
         "status": "passed",
@@ -14148,13 +14148,13 @@
           "coveredCodePoints": 21,
           "uncoveredGaps": 0
         },
-        "reportHash": "398da3e138f39ea9160e8fd42fd1248ce0274313ff3f364baec3989537a8afe9"
+        "reportHash": "eecba71f145e69897b50eb73951b6d303eda15777fcfe7019b762e0af7a1d601"
       }
     },
     {
       "name": "cell-across-page-break-without-its-bullet-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -14203,7 +14203,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "c65d2fdb39a50a381b72570409ef43462d9db1f5ca42080b7bcb7ba9aa6faebf",
         "narrativeBindingSha256": "e46bc6fee26e9bc4e34a0826ed45be97eedd62a17b4416da89b3b60ca3e23100",
         "status": "failed",
@@ -14237,13 +14237,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 2
         },
-        "reportHash": "ee3499788ee0fa6529bd312c14b2733ecaae8b8081c170d5713fc7d703185887"
+        "reportHash": "efa4c69a6c0e3e68ebe98336feb8a67b072355d2c2072cc66f7e2d17dea328de"
       }
     },
     {
       "name": "cell-word-hyphenated-across-page-break-joins",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -14292,7 +14292,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "5e6b7fae27afa12241754a7a945b8ba6f7ec969f8a6bbf5ddafd28b021cf64c0",
         "narrativeBindingSha256": "f9345ff14cec6aaae3ba6122d2956d8001aa74dfc860eb6362754df8b5041800",
         "status": "passed",
@@ -14316,13 +14316,13 @@
           "coveredCodePoints": 52,
           "uncoveredGaps": 0
         },
-        "reportHash": "0043b4062278e7f3a1ef42578f125ef8eebdebecee496871a43c4fc543b47d9f"
+        "reportHash": "9a8bc943d9a006b17f7555c9b6dd7e11dde4e8d2d90905487440c2a85ad75a41"
       }
     },
     {
       "name": "cell-word-hyphenated-across-page-break-split-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -14371,7 +14371,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "5e6b7fae27afa12241754a7a945b8ba6f7ec969f8a6bbf5ddafd28b021cf64c0",
         "narrativeBindingSha256": "d79f60c6f48fd4fdfddab13eecd30491c3ff4a2b70e78c79bba64b743dfec146",
         "status": "failed",
@@ -14405,13 +14405,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 2
         },
-        "reportHash": "eeb388faea8a936a37480721d98fd15297e267c7224936338291c80f22028646"
+        "reportHash": "ca07e4c355772a2e58a6fa42a515cf4654db74154e533b85fbc63e7fdec27075"
       }
     },
     {
       "name": "row-broken-across-page-keeps-its-cells",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -14460,7 +14460,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "ef079b0d0732b98ac9309facbd2377257a16cf454a296256f40eae492c867ae7",
         "narrativeBindingSha256": "39ec9e0f7cb23d7f86924e67bc1bd1f4b25934628e21af97306cfcd109b247ed",
         "status": "passed",
@@ -14484,13 +14484,13 @@
           "coveredCodePoints": 69,
           "uncoveredGaps": 0
         },
-        "reportHash": "f3d2047a104f101169f6e31e6d9546772e0aadedf2c7feb932016fe70a170919"
+        "reportHash": "29113be5b42c669e55f3cf40d62a959c0bc52fed5720a3d50c206b1a827b8997"
       }
     },
     {
       "name": "row-broken-across-page-with-a-word-in-the-next-cell-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -14539,7 +14539,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "ef079b0d0732b98ac9309facbd2377257a16cf454a296256f40eae492c867ae7",
         "narrativeBindingSha256": "7baf827fccf02e65489ba59ddb1b5fc7086240bb3d3d5993ead8961065d067eb",
         "status": "failed",
@@ -14573,13 +14573,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 2
         },
-        "reportHash": "bae2551f00aa8d0c2287152555094d5c41b10a0a640fbb743ccf727e8e882707"
+        "reportHash": "e83a07350d6ea67574f949ede5ce1c1ebdc311e95ae8512a2f50d537ce8c070e"
       }
     },
     {
       "name": "page-footnote-between-table-parts-after-the-table",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -14628,7 +14628,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "30e306b07babd1601af671ae66433287584842a74b5d91f5707dd808285145d9",
         "narrativeBindingSha256": "6231bc19b095687e972ef08c9dcc0a8d9cc6b9746a25dc5c60c9cd9da30847f8",
         "status": "passed",
@@ -14652,13 +14652,13 @@
           "coveredCodePoints": 79,
           "uncoveredGaps": 0
         },
-        "reportHash": "c05590e58803ad2b40962e7085b0412c5b351f097400ee4bd928bcf745a6e014"
+        "reportHash": "d0201d5d75d447d1f2d2ffdc8f6330704e43a7bf4dacf2527fdb1db8f5b98091"
       }
     },
     {
       "name": "page-footnote-moved-into-a-cell-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -14707,7 +14707,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "30e306b07babd1601af671ae66433287584842a74b5d91f5707dd808285145d9",
         "narrativeBindingSha256": "f4d725262dd85afc3ef28f3ecd718561755dc6046a6c5912aeeff174b32b605c",
         "status": "failed",
@@ -14741,13 +14741,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 2
         },
-        "reportHash": "ab6492d605673a3edc974cfa9c86a0a94eb8be0e6767cca873e50311d99d6c7c"
+        "reportHash": "6ef7872b91355ebc5092ecbabbd5c9aba46c351375a2b660f46838392eed86cf"
       }
     },
     {
       "name": "row-span-broken-across-page-keeps-its-slot",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -14796,7 +14796,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "50d55580538b6cbccb6b24a5a6d09c17761a8ecc5158dfebf5d87790e2d50cbf",
         "narrativeBindingSha256": "1bac93b2511d25cb0c676e4f1dc20fa20e1d0b733dcaef1475b36da5e9056da8",
         "status": "passed",
@@ -14820,13 +14820,13 @@
           "coveredCodePoints": 56,
           "uncoveredGaps": 0
         },
-        "reportHash": "5f3bd13f60fd04cf194ca9cb9313fa333366ff464cdb08f5acc20f788e62e5b8"
+        "reportHash": "b7f44ef6a7669ec35dc99f4585ccd02ac36602b03ef254163595c5885007a32b"
       }
     },
     {
       "name": "row-span-word-moved-to-the-next-row-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -14875,7 +14875,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "50d55580538b6cbccb6b24a5a6d09c17761a8ecc5158dfebf5d87790e2d50cbf",
         "narrativeBindingSha256": "c0d623a20641f8be785b9b5cd7cf9a342d614871162bd8ad207c5dfd228a3efa",
         "status": "failed",
@@ -14909,13 +14909,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 2
         },
-        "reportHash": "7197571cae8ee9d6d6a2bacf48d9eb97ec078ce5720677cb1ba82af5d83b6ea1"
+        "reportHash": "6d910ba6bf4684b82359ca42ea80fd83a5df5607a62f79d589b47605c5c72889"
       }
     },
     {
       "name": "repeated-footer-row-where-the-table-last-has-it",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -14964,7 +14964,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "7c443cbe6bb1fd4f39194434bde53a974cf4f36e8fb498e2a90753d1c3b02b50",
         "narrativeBindingSha256": "04a9dfe6f4834ab6f93e985f13dc4f17145f226682f9e1c23b8c0078d0b7e18d",
         "status": "passed",
@@ -14988,13 +14988,13 @@
           "coveredCodePoints": 36,
           "uncoveredGaps": 0
         },
-        "reportHash": "3a7cd163ed3c549b070cddd364073c9e093602bf82e4ae8d662927b8bf616006"
+        "reportHash": "9ed110903aaa3d86755e803ef04c974d9b63c09864a8110bbaaf8792a507340d"
       }
     },
     {
       "name": "repeated-footer-row-mid-table-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -15043,7 +15043,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "7c443cbe6bb1fd4f39194434bde53a974cf4f36e8fb498e2a90753d1c3b02b50",
         "narrativeBindingSha256": "751e83c9347fe6e7965a41980522984fcf14a9c3f4f459e829e7f51e0bd7de0b",
         "status": "failed",
@@ -15077,13 +15077,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 2
         },
-        "reportHash": "1f4f51471fa01aacb1bbc86ba1376554c4472369358b672a6b84c77089160881"
+        "reportHash": "f14fc6108031d902eb3053273d929c68ee4c4d706d64f2a04d367838f5a27418"
       }
     },
     {
       "name": "caption-across-page-break-keeps-its-bullet",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -15132,7 +15132,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "e133d2cb1737e41dfc062c04b86d901e1d3e2bd25da1f7c79baeabbae24a1a3d",
         "narrativeBindingSha256": "ec922daee86695d3252e6f8c2fe3cca3ee726aef3d45f4e5544c0a2bb82d9128",
         "status": "passed",
@@ -15156,13 +15156,13 @@
           "coveredCodePoints": 24,
           "uncoveredGaps": 0
         },
-        "reportHash": "ea0351c5d6a20e13ddaa1ebc893ef82d6741f5c91d708dcdbe90ca09d1df396a"
+        "reportHash": "0e209dc7abf373d98eecd861ebf5a19e01f1d0d8b141b6ef55fd3b04437c3ee6"
       }
     },
     {
       "name": "caption-across-page-break-without-its-bullet-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -15211,7 +15211,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "e133d2cb1737e41dfc062c04b86d901e1d3e2bd25da1f7c79baeabbae24a1a3d",
         "narrativeBindingSha256": "eeebf6aab40fcba0c3815b97d37201cbf474cc8c757c7a0c714aa3ccbb041992",
         "status": "failed",
@@ -15245,13 +15245,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 2
         },
-        "reportHash": "5096fd2a5a82c9278c10a76a32c5cdab4c3e3e69b19af12655075af0a818dec2"
+        "reportHash": "4b90271284e2f98dd0dcda06b5d0cce74f4c8d295dfdb2c355e0439c2f728992"
       }
     },
     {
       "name": "wrap-before-mid-line-bullet-keeps-it",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -15288,7 +15288,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "3050775a002b0cf2b1480f15d649aede6d1cb91b2ac2efb75030a653e055785d",
         "narrativeBindingSha256": "d2ea69a72d43a51cfc8f9da056d83ae2e966134f373670fb0d5eed7564f3aec3",
         "status": "passed",
@@ -15312,13 +15312,13 @@
           "coveredCodePoints": 22,
           "uncoveredGaps": 0
         },
-        "reportHash": "e3b5d6c7fd11278cc240bee7c7648a988b9993d7102b03b0f243c4cd0148b437"
+        "reportHash": "b19a85c29f5cd7c86fb664a185edfdf9f269889eaa0cf99148019daae6a942f9"
       }
     },
     {
       "name": "wrap-before-mid-line-bullet-dropped-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -15355,7 +15355,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "3050775a002b0cf2b1480f15d649aede6d1cb91b2ac2efb75030a653e055785d",
         "narrativeBindingSha256": "1baa7b94d8e409b96d87a570f2c3b88ee0d003707fa749af10400d1d05eed850",
         "status": "failed",
@@ -15389,13 +15389,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "55edcb52668f18ee4488a888c0d7a5ec97b7d1b2bd25d6befac799f4f18db723"
+        "reportHash": "14539a3b8b09046363e85d9509af6ae64345f5682ea8c372d22058d173ceb53d"
       }
     },
     {
       "name": "wrap-before-mid-line-bullet-as-a-list-item-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -15432,7 +15432,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "3050775a002b0cf2b1480f15d649aede6d1cb91b2ac2efb75030a653e055785d",
         "narrativeBindingSha256": "1baa7b94d8e409b96d87a570f2c3b88ee0d003707fa749af10400d1d05eed850",
         "status": "failed",
@@ -15466,13 +15466,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "55edcb52668f18ee4488a888c0d7a5ec97b7d1b2bd25d6befac799f4f18db723"
+        "reportHash": "14539a3b8b09046363e85d9509af6ae64345f5682ea8c372d22058d173ceb53d"
       }
     },
     {
       "name": "repeated-header-row-excluded-verifies-once",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -15521,7 +15521,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b5f3d02887ba8fa79b8f5c9dccb21e6b745e3e876770594f06fa2e262f7a2487",
         "narrativeBindingSha256": "187cdc9fbddfdd79bc5db647ee9a9d74a9b9d3c7fad18704c49e96a615fe0315",
         "status": "passed",
@@ -15545,13 +15545,13 @@
           "coveredCodePoints": 63,
           "uncoveredGaps": 0
         },
-        "reportHash": "37653dcae961eb87b6dcdfd2f292cb7f3cbdc54662b0394d2114c06535242224"
+        "reportHash": "d912f225cec2ae48a97ccc7d84fbed9a6f9b7f09eba3eee5772e2f81dbc59fd7"
       }
     },
     {
       "name": "repeated-header-row-written-twice-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -15600,7 +15600,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b5f3d02887ba8fa79b8f5c9dccb21e6b745e3e876770594f06fa2e262f7a2487",
         "narrativeBindingSha256": "a1ada288a0fc8efa92c8277b383daed59e4d9267a099cd8bfd93ea90f0d48ab9",
         "status": "failed",
@@ -15634,13 +15634,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 2
         },
-        "reportHash": "7227d4b3d5f8dee6ad2ff1a09db5f97abeb83c5c69507011cd4489ca1694c5e2"
+        "reportHash": "d6c2063e191a8d064c73d32a652dab7dc6657f56223156c1c5f3adf68b8fd078"
       }
     },
     {
       "name": "ogham-space-mark-against-a-space-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -15677,7 +15677,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "16750775b8a2a6de718cb073b2b60678a87bd0d8b47c13dfec1d508b55d6de62",
         "narrativeBindingSha256": "1baa7b94d8e409b96d87a570f2c3b88ee0d003707fa749af10400d1d05eed850",
         "status": "failed",
@@ -15711,13 +15711,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "6bafa367388d165035767ec656d51986acdffbe0e7ff75a5574d1a8b6c78a95c"
+        "reportHash": "8c1368abb11382558cd18466270d23154468d8780eee8ec2585e29e8e1f5749a"
       }
     },
     {
       "name": "space-against-an-ogham-space-mark-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -15754,7 +15754,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "9cb7eac35d5a0dd732951e26ef30b2134bbfb33b9c3d1441d28b8264d43764dc",
         "narrativeBindingSha256": "7f62bee7d7e15c787f516d0a8bc368e0950505011c0ff0a3c877e8687ee3f0f5",
         "status": "failed",
@@ -15788,13 +15788,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "d6efa528afb8e1468f0e2df6cd86c174c2bdeab97e3b4ba6b87d23e1f864362c"
+        "reportHash": "a38584a85684db4b944d51519142448860b0ce8ab9f2a6bd9bc633a187a6ab36"
       }
     },
     {
       "name": "hair-space-against-a-space-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -15831,7 +15831,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "e6167a5dc6d5e15f2ee50fbf8056317729c2101694007bb76854cfd1fb995a1a",
         "narrativeBindingSha256": "4e02374d7a57d2afe0ccec907b66fcefe1615121e08dfb02461dcd83b059d182",
         "status": "failed",
@@ -15865,13 +15865,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "6846a402094c3c6ae3095b75b5cd086e4f224113fb2df0f9811ceb030e65291e"
+        "reportHash": "3b4d89563608d0f54f45e8b3b716cdcd4f1761f0519a5cd70299f8367e6df4ad"
       }
     },
     {
       "name": "span-starts-after-thin-space-inside-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -15908,7 +15908,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "3d155c71cb72d0899ef16355a42d9c0cef926f99f989c4be84685b3a282b49fa",
         "narrativeBindingSha256": "3b689e709653a8fe593bcf14cd73c95a9ba9e4790f9cafa564bbc7c986d8537c",
         "status": "failed",
@@ -15933,13 +15933,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "d07e151e3eb701659ec1da6506ac551f7871f20409141eae63dfe4e8cb1dc8af"
+        "reportHash": "2f78e4d718e7896735cf92e9f432bed7bef9cff0eb7f61be763568ffed407731"
       }
     },
     {
       "name": "span-ends-with-invisible-separator-inside-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -15976,7 +15976,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "643fcffd26e6186b2c20f508aadaa5237514b79bc4a859c8a937dd30c3c5df44",
         "narrativeBindingSha256": "a8f94ef27ef9753709da67bc58d04e880faafde9ea1788a6889552af4312c560",
         "status": "failed",
@@ -16001,13 +16001,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "51856a63689af23da0b7815402fe6d1b035f913d2f1324c45f2b718d364b8a41"
+        "reportHash": "011ddd1a36d72e53a74685191329d5a9a4f44e602a872bf7216eddcee9f1ad5d"
       }
     },
     {
       "name": "span-starts-after-invisible-separator-inside-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -16044,7 +16044,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "643fcffd26e6186b2c20f508aadaa5237514b79bc4a859c8a937dd30c3c5df44",
         "narrativeBindingSha256": "3b689e709653a8fe593bcf14cd73c95a9ba9e4790f9cafa564bbc7c986d8537c",
         "status": "failed",
@@ -16069,13 +16069,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "f2f8b0c19715339f1d1680b24c76c81dc1c6133b9b9568e220c95de113c51dfa"
+        "reportHash": "4f68385a058881b5e5c9c4f98f1cdb89de593ce9c1a18baef8746803a5a81ecb"
       }
     },
     {
       "name": "span-ends-with-braille-blank-inside-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -16112,7 +16112,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "a12a7799c721aac5f5d82af11a07d29e75e877abbbe6f2cb42b77897205c2c44",
         "narrativeBindingSha256": "61bd545c3a13e1a36290b7a107b7c7d7ca6f316740ef486709edacad4504f3ad",
         "status": "failed",
@@ -16137,13 +16137,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "c36391dfcfd12e63c22c27a853997711fd2b6caba32c883d84b1857369aa23d3"
+        "reportHash": "43844c11a6e46cfaf1a534e24cbde65819db4662865c801484886037a4b031de"
       }
     },
     {
       "name": "span-ends-with-tag-space-inside-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -16180,7 +16180,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "77069075fc16716dd5d495446c9704a3b1cec6f5141a69a2ed4d4c839742b4ee",
         "narrativeBindingSha256": "2963e9c458b5ba453c28294020a2a0f285d82316c38cce5e820df1dd1258ebe2",
         "status": "failed",
@@ -16205,13 +16205,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "e6bac595ac32f0770f1b8cc2df06de80c97ef7e4c4187ca0dda2c389c79d9758"
+        "reportHash": "bdc05e197122307639aa9526e4eaeff325ba8af418e67f58c0dae90a57fe9958"
       }
     },
     {
       "name": "thin-space-alone-is-empty",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -16260,7 +16260,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -16284,13 +16284,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "f69825e405e7df26cce7d253d3ee7d2b519be7b8c88c45cc6aae41cd3e3e64e8"
+        "reportHash": "97803314900471509d732fc8fb4e58a0ae1830aa06401fe766adeac5621089eb"
       }
     },
     {
       "name": "invisible-separator-and-braille-blank-alone-are-empty",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -16339,7 +16339,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -16363,13 +16363,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "f69825e405e7df26cce7d253d3ee7d2b519be7b8c88c45cc6aae41cd3e3e64e8"
+        "reportHash": "97803314900471509d732fc8fb4e58a0ae1830aa06401fe766adeac5621089eb"
       }
     },
     {
       "name": "ogham-space-mark-alone-is-drawn",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -16406,7 +16406,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "23b214a42ed5206e94ee272305f0aeeef2cb0151ba58e51feb448f82fe652063",
         "narrativeBindingSha256": "15b6f89d2e9a53b4cc4e5756533a3eb4f25209fe9f9a869ff65f45d473048fdb",
         "status": "passed",
@@ -16430,13 +16430,13 @@
           "coveredCodePoints": 1,
           "uncoveredGaps": 0
         },
-        "reportHash": "ea1592160cae2d1d640e5105bc0c4fc61ba6c1e9f379479aa26ca4178327faae"
+        "reportHash": "46dd784293e1484dcc11a4c9e6a62bd710306115e2007a33c7012cdf4519418c"
       }
     },
     {
       "name": "span-ends-with-yi-blank-inside-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -16473,7 +16473,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "81eea7022d027cd471867cd95e0f78c77a57f5d395a76ac4c00833f9b30f4527",
         "narrativeBindingSha256": "5bbe34adecf858f6c309a35d696caf1ebc49dd693041efc1af861200206a9442",
         "status": "failed",
@@ -16498,13 +16498,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "27123861f82a7e03bebb66f8eaea25566d473fb526554c436e224fc2f5b68748"
+        "reportHash": "fbce8d764256e9820c532832caf0b4c61fc5834a8bec0458ff71a54e0f59284b"
       }
     },
     {
       "name": "page-with-interlinear-annotation",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -16541,7 +16541,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "2dc53f56aa34d5822ed5bfb8e2ae9d37bcd95ef805c698bbb4447408977ec99a",
         "narrativeBindingSha256": "35ff71e4dbde1765946ea27de42df0bf30c846fbcf315cad7812b8014b4caf58",
         "status": "failed",
@@ -16566,13 +16566,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "7880f861a59df8228c9049b6224d7c1349e05bd126df5993082d5ef9bd16cebb"
+        "reportHash": "00aba1dc63815f182fa3d8437f8f79f83a9f2e580b352f2aaac028eca610e04f"
       }
     },
     {
       "name": "blank-letters-alone-are-empty",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -16621,7 +16621,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -16645,13 +16645,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "f69825e405e7df26cce7d253d3ee7d2b519be7b8c88c45cc6aae41cd3e3e64e8"
+        "reportHash": "97803314900471509d732fc8fb4e58a0ae1830aa06401fe766adeac5621089eb"
       }
     },
     {
       "name": "medium-mathematical-space-against-a-space-mismatches",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -16688,7 +16688,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "9cb7eac35d5a0dd732951e26ef30b2134bbfb33b9c3d1441d28b8264d43764dc",
         "narrativeBindingSha256": "a90ffe3c8145e89f2de21affe61526a3f0fdb63e7c1092b1b9c4cb39978b5859",
         "status": "failed",
@@ -16722,13 +16722,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "ce7b1c8a0f3edc9757ef08792e1773ea0ce59b3f0daf9705ffce0c6b7879c607"
+        "reportHash": "c39a98401cf6f5500e62ffe5ebec478ea0cabdabd37b339ac93e7c17e9d1edba"
       }
     },
     {
       "name": "certified-word-section",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "word-epi/1.0.0",
           "pages": [
@@ -16765,7 +16765,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "97ef8c022000774c75c4a71ea2806ee4ff08199bbda6efd2461009955b160b05",
         "narrativeBindingSha256": "73c54a2ba7cbc60949b3c3a09ae5f467992b01250a9ae9dd09e9428f7d163206",
         "status": "passed",
@@ -16789,13 +16789,13 @@
           "coveredCodePoints": 283,
           "uncoveredGaps": 0
         },
-        "reportHash": "7b2f6aa2035c2c255f569cc18846a62999184dc3e55150df1a93b898afd56fdb"
+        "reportHash": "373810a64f108660fcc4f6047a0d1341f0e5caff03d01d6f5e16bf343bbf5556"
       }
     },
     {
       "name": "certified-word-rowspan-dropped",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "word-epi/1.0.0",
           "pages": [
@@ -16832,7 +16832,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "97ef8c022000774c75c4a71ea2806ee4ff08199bbda6efd2461009955b160b05",
         "narrativeBindingSha256": "0098de5085fe53fdb5dc9b2b567fd09c1cea04e0915411ae422335e2b56ceb83",
         "status": "failed",
@@ -16866,13 +16866,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "8d9bd9a47e2804a32c149d1a6d9b6a7676ad38162937288648d4933a7d4bc036"
+        "reportHash": "27bca809fb211635c34262f3b78437eb9c52b2224fc688b3caea4de570a2d26d"
       }
     },
     {
       "name": "certified-word-list-number",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "word-epi/1.0.0",
           "pages": [
@@ -16909,7 +16909,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "97ef8c022000774c75c4a71ea2806ee4ff08199bbda6efd2461009955b160b05",
         "narrativeBindingSha256": "af46b453381aa3cf3821471de3cebe3036babb72f38a96005b0c5a3446f30353",
         "status": "failed",
@@ -16943,13 +16943,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "7a3a54fcff2ce77122e41d3ba99c3b81bf34187118213c58f5884ba40ed4c4e0"
+        "reportHash": "5f8baaf334af5bdc1c8af47d95a9946c8183265b8519ba489ee5ab8e1863b6e4"
       }
     },
     {
       "name": "certified-word-bullet-after-break",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "word-epi/1.0.0",
           "pages": [
@@ -16986,7 +16986,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "230f52f1bb7f640819a0d756e9289492dd3fe442d5de68747b4b1124d1670239",
         "narrativeBindingSha256": "14e85d5d06fc9ae63d2554a75fcddd02ed35e946874e7cc75b0c7c9737386a59",
         "status": "failed",
@@ -17020,13 +17020,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "09bcc0fcdbb4575153251e58b3a72b3b69786840cd35a388dd7e9bd8961d0d9b"
+        "reportHash": "d449905b01c0c07c10e8933a4081140c0b0cdb22a8688a7c2f6081db08a84c1e"
       }
     },
     {
       "name": "certified-word-grey-and-labels-as-text",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "word-epi/1.0.0",
           "pages": [
@@ -17063,7 +17063,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "115ad3b8a31048d1f27d1fb0edea0d683f8588435850236bdc6abab0cd8ba5cf",
         "narrativeBindingSha256": "ca4766e858e3236eca0f87e453fad9e3e99c67926baf09f0fc13dc538289194b",
         "status": "passed",
@@ -17087,13 +17087,13 @@
           "coveredCodePoints": 94,
           "uncoveredGaps": 0
         },
-        "reportHash": "2b7dea38276a5515e622f561039ae63eea02e4ca22e13bf5c3789005799f3b7a"
+        "reportHash": "3c1f8d71ba4a7d40866658cc88928f8805a41a92bd2162807e7b031389b64432"
       }
     },
     {
       "name": "certified-word-dashes-as-discs",
       "input": {
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "source": {
           "extractorVersion": "word-epi/1.0.0",
           "pages": [
@@ -17130,7 +17130,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/3.3.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
         "extractedTextSha256": "de0acb831cbc0559b5283a0fe40fa77d9207a685f4c4baa18872e47ea87f5af2",
         "narrativeBindingSha256": "1c5d386e5c894d4dd21d6c374ff7646765b0d07c26cce5eb680166a930b6f619",
         "status": "failed",
@@ -17164,7 +17164,74 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "fa09f70f98b9bdf61e3479f115c919da6760b87fb91130555929e94c489e47af"
+        "reportHash": "942ada2a57a82e62c959690a63ef4b4f1f07a6c9f7856913249ade6d58daff1e"
+      }
+    },
+    {
+      "name": "certified-word-typed-labels-in-a-cell",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.4.0",
+        "source": {
+          "extractorVersion": "word-epi/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "\nTable 1: Dose by age\n﷐\n﷒\t﷓\tAge\t﷓\tDose\n﷒\t﷓\ta Over 18 years\t﷓\t‑ 10 mg\n﷑\na See section 5.2.\n",
+              "bodyStart": 0,
+              "bodyEnd": 90
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Table 1: Dose by age</p><table><tr><td><p>Age</p></td><td><p>Dose</p></td></tr><tr><td><p><sup>a</sup> Over 18 years</p></td><td><p>‑ 10 mg</p></td></tr></table><p><sup>a</sup> See section 5.2.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 0,
+                "endOffset": 90,
+                "textSha256": "26f1ee15f484c7f1b264def218d841ad87f1aa7b3c292b8a312ca8a4d1002715"
+              }
+            ],
+            "narrativeDivSha256": "83ac5e94ba33258c0fc991b16ebbc28114f563ceacbcaa0caabaf714396bd178",
+            "normalizedTextSha256": "ef11972cd0e4a854d7d68f74d9f86fb6578be8d8a8498b20aeb4763ee60c690f"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.4.0",
+        "extractedTextSha256": "dbd201eeaf0f25780e87eb0622ddc19a13854c2ffebceca33da1e0cc844d1323",
+        "narrativeBindingSha256": "9688dedc9970be1f0c1deba8c83a3e0613aa1659c7203a923389cb03008648d6",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "ef11972cd0e4a854d7d68f74d9f86fb6578be8d8a8498b20aeb4763ee60c690f"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 90,
+          "bodyCodePoints": 90,
+          "coveredCodePoints": 90,
+          "uncoveredGaps": 0
+        },
+        "reportHash": "4b3487e8be09f5492c6e0f7f97e05645316bb29a8a706983b99ef2ca2be83bd4"
       }
     }
   ],

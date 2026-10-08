@@ -26,7 +26,7 @@ from zone_a.certified import read_docx
 from zone_a.qrd.pattern import Token, UnbalancedTemplateError, children, is_balanced, parse
 from zone_a.underline import underline_changes
 
-REGISTRY_VERSION = "1.3.0"
+REGISTRY_VERSION = "1.3.1"
 
 TEMPLATE_FILE = "qrd-product-information-template-version-104_en.docx"
 APPENDIX_I_FILE = (

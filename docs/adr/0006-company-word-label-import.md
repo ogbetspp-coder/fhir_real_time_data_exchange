@@ -61,8 +61,8 @@ The record does not admit this today, for reasons this ADR has to answer rather 
 
    Adding a qualified source invalidates no existing output, so it is a **minor** version:
    `fidelity-norm/3.2.0` (amended 2026-10-05: the withheld design, which had reserved 3.2.0 and is
-   not built, takes 3.4.0, after 3.3.0's grey, so versions are released in order; §8 now names
-   this case). Its new
+   not built, takes 3.5.0, after 3.3.0's grey and 3.4.0's typed labels, so versions are released
+   in order; §8 now names this case). Its new
    vectors are reviewed by hand and the differential run covers them.
 
 2. **The page text is defined exactly**, by a stated serialiser in §7's form:
@@ -85,8 +85,9 @@ The record does not admit this today, for reasons this ADR has to answer rather 
    - **The template's own formatting:** the QRD template's grey (a light grey highlight or D9D9D9
      shading) is a `span` styled `background-color: silver;`, the EMA ePI style guide's form for
      "not printed" text (amended 2026-10-06, owner decision 5 below; until then it was dropped
-     where the registry named it, the 4.8 reporting statement only). Any other strike, faint
-     text, highlight, shading or right-to-left text refuses the section.
+     where the registry named it, the 4.8 reporting statement only), and so is C0C0C0 shading,
+     which Word draws as the light grey highlight (amended 2026-10-07, owner decision 9 below).
+     Any other strike, faint text, highlight, shading or right-to-left text refuses the section.
    - **Lists:** `ul` for "•", and `ol` only for "1.", "2.", ... from one (amended 2026-10-05:
      FHIR's narrative rule txt-1 allows no `start` or `type` on `ol`, and the official validator
      with the EMA profiles refuses both). Any other list, "a)", "–" or "3." included, is written as
@@ -210,7 +211,7 @@ silver;">`, the one style `fidelity-norm/3.3.0` allows (§5, exactly that value,
    only: a background under text in its own colour hides nothing). Silver is the colour of Word's
    light grey highlight. The drawing check holds it to Chrome drawing that background under
    exactly the grey characters (`zone_a.drawing`), where it was left out before. Any other
-   highlight or shading is still refused.
+   highlight or shading is still refused (amended by decision 9: C0C0C0 shading too).
 6. **Lists an HTML list cannot draw:** EMA's stylesheet draws every `ul` with discs, and FHIR
    allows no `start` or `type` on `ol`, so a dash bullet, "a)" or "(i)" numbering, or numbering
    that does not start at one would be refused or drawn with another marker. Each such item is
@@ -221,7 +222,8 @@ silver;">`, the one style `fidelity-norm/3.3.0` allows (§5, exactly that value,
 7. **A tab after a typed label:** decision 1 above, widened. The tab after a label typed at the
    start of a paragraph is written as a space: a bullet glyph or a dash, one to three of the same
    footnote mark (`*`, `†`, `§`, ...), or an enumerator with its punctuation ("1.", "a)", "(iv)"),
-   outside a table and after no list label (§7, `fidelity-norm/3.3.0`). A bare letter or number
+   outside a table (amended by decision 9: in a table cell too) and after no list label (§7,
+   `fidelity-norm/3.3.0`). A bare letter or number
    before a tab is no label ("n" then a tab then "= 50" is a column) and is still refused, as is
    every other tab. On the EMA SmPC cuts it carries 228 of the 845 body paragraphs still refused
    for a tab.
@@ -250,6 +252,63 @@ recommendations ... the rest you are authorized to do as well"); each reading is
    at the product information's next annex ("ANNEX IV") or the document's end, and numbered lines
    standing together are a list (the leaflet's list of its sections when it starts with section
    1's heading; else numbered steps, among which a section's heading stays a heading).
+
+## Owner decision (2026-10-07)
+
+Taken as recommended, under the owner's authorisation of 2026-10-06 (decision 8's).
+
+9. **A tab after a typed label, in a table cell too; a grey Word draws as the template's:**
+   decision 7, widened. The tab after a label typed at the start of a paragraph's text (past §3
+   step 5 whitespace, after no list label) is written as a space in a table cell as well as
+   outside one, and a typed label is also:
+   - U+2011 NON-BREAKING HYPHEN, beside "-", U+2013 and U+2014 (decision 8 already reads it as
+     the hyphen it draws);
+   - a caption's number: `Table` or `Figure`, then U+0020 or U+00A0, then one to three ASCII
+     digits, optionally one ASCII lower-case letter, optionally "." or ":" ("Table 1:",
+     "Table 12a:", "Figure 3.");
+   - a raised footnote key: one to three code points, every one inside a superscript mark and of
+     bidi class L, EN, ES, ET, CS or ON (a raised "a", "1", "*", "†"): a tab separates bidi
+     segments and a space does not, so a key that is or may join right-to-left text (R, AL, AN,
+     a bidi control, NSM, BN) keeps its tab, refused.
+
+   Then any number of spaces, as before (§7, `fidelity-norm/3.4.0`). Everything else is still
+   refused: a bare letter or number that is not raised ("n" then a tab then "= 50" is a column),
+   more than three raised code points, a lead mixing raised and level code points, a raised
+   right-to-left key, "Tables 1",
+   "Table" with no number, a second tab, a tab after a list label. The tab is written as a space
+   where it is raised or lowered with its label too, as the narrative already wrote it.
+
+   Evidence (EMA's published English Word PI cuts, 296 SmPC and 286 leaflet files; internal, counts
+   only): among the SmPCs whose structure is ready but a section is refused, the refused tabs in
+   built sections were 490 in a table cell (193 after one raised letter, 112 after one level symbol
+   such as a bullet or "*", 33 after a raised symbol, 23 after a raised digit), 313 after a
+   "Table N:" caption outside a cell and 91 inside one, and 177 mid-text (61 after a raised digit,
+   49 after a raised letter). EMA's own 37 English ePI Bundles (`label-docx-reader/corpus/ema-epi`)
+   carry no tab anywhere and write "Table 1: ..." with a space. With this rule, the SmPC files
+   still blocked by some tab fall from 54 to about 32 (measured by the coordinator's scan).
+
+   The template's grey of decision 5 is also C0C0C0 shading, which Word draws in exactly the
+   light grey highlight's colour. No new reading: Word's own print of a synthetic probe, one
+   paragraph per mark, counted by colour at 144 dpi (2026-10-07):
+
+   | reader mark                 | Word draws | as                    |
+   | --------------------------- | ---------- | --------------------- |
+   | `shading-D9D9D9`            | #D9D9D9    | (decision 5)          |
+   | `shading-pct15-AUTO-AUTO`   | #D9D9D9    | refused, for now      |
+   | `shading-pct15-AUTO-FFFFFF` | #D9D9D9    | refused, for now      |
+   | `highlight-lightGray`       | #C0C0C0    | (decision 5)          |
+   | `shading-C0C0C0`            | #C0C0C0    | `highlight-lightGray` |
+   | `shading-BFBFBF`            | #BFBFBF    | refused               |
+   | `shading-E6E6E6`            | #E6E6E6    | refused               |
+
+   A solid fill is opaque, and a theme fill is another reader mark (`shading-THEME-...`), so
+   C0C0C0 is that colour wherever it stands. It is the same silver span, which the drawing check
+   holds to Chrome drawing it under exactly the shaded characters. The 15% patterns wait: the
+   reader spells a pattern's colour from `w:color` alone (a themed accent at 15% reads as
+   `shading-pct15-AUTO-AUTO` too), and what Word draws for an automatic fill over a painted cell or
+   paragraph is not on record; both are the reader's to say, planned for `docx-reader/1.34.0`.
+   Any other shading is still refused. In the built but blocked files of the same cuts, C0C0C0
+   stands in 3 leaflet files.
 
 ## Progress
 
