@@ -1,6 +1,6 @@
 {
-  "killed": 4090,
-  "mutants": 4196,
+  "killed": 4188,
+  "mutants": 4294,
   "survivors": [
     {
       "code": "return False",
@@ -23,7 +23,7 @@
       "equivalent": "a function that ends without a return gives None, which is as false as False here",
       "function": "_refused",
       "kind": "statement",
-      "line": 3360,
+      "line": 3428,
       "occurrence": 0
     },
     {
@@ -71,7 +71,7 @@
       "equivalent": "a row group is always met beside a table or a row, which end the paragraph; text directly in one is refused by the reader",
       "function": "<module>",
       "kind": "str:'thead'",
-      "line": 3781,
+      "line": 3849,
       "occurrence": 0
     },
     {
@@ -79,7 +79,7 @@
       "equivalent": "a row group is always met beside a table or a row, which end the paragraph; text directly in one is refused by the reader",
       "function": "<module>",
       "kind": "str:'tbody'",
-      "line": 3782,
+      "line": 3850,
       "occurrence": 0
     },
     {
@@ -151,7 +151,7 @@
       "equivalent": "the depth is set whenever a capture begins, before it is read",
       "function": "_raw_texts",
       "kind": "int:1",
-      "line": 2792,
+      "line": 2860,
       "occurrence": 0
     },
     {
@@ -159,7 +159,7 @@
       "equivalent": "the counts follow from the sequences, which are equal by then: the ledger is a second statement of the same fact, stated in the certificate",
       "function": "DocxSource.certify",
       "kind": "statement",
-      "line": 3290,
+      "line": 3358,
       "occurrence": 0
     },
     {
@@ -167,7 +167,7 @@
       "equivalent": "a bookmark's end that opens its parent opens it in the view too, nothing being joined before it: left out of both alike, the two still agree",
       "function": "_canon.add",
       "kind": "bool",
-      "line": 3472,
+      "line": 3540,
       "occurrence": 0
     },
     {
@@ -175,7 +175,7 @@
       "equivalent": "the parser starts at the div, a block, which ends the (empty) paragraph and clears it",
       "function": "_Div.__init__",
       "kind": "bool",
-      "line": 3805,
+      "line": 3873,
       "occurrence": 0
     },
     {
@@ -183,7 +183,7 @@
       "equivalent": "the div ends with its own end tag, so nothing is left buffered",
       "function": "EpiSource._section",
       "kind": "call",
-      "line": 3900,
+      "line": 3968,
       "occurrence": 0
     },
     {
@@ -191,7 +191,7 @@
       "equivalent": "the div's end tag, a block's, has ended the last paragraph",
       "function": "EpiSource._section",
       "kind": "call",
-      "line": 3901,
+      "line": 3969,
       "occurrence": 0
     },
     {
@@ -199,7 +199,7 @@
       "equivalent": "the counts follow from the sequences, which are equal by then: the ledger is a second statement of the same fact, stated in the certificate",
       "function": "EpiSource.certify",
       "kind": "statement",
-      "line": 3971,
+      "line": 4039,
       "occurrence": 0
     },
     {
@@ -295,7 +295,7 @@
       "equivalent": "the xml prefix can never name Word's namespace, the only one the tokenizer looks for",
       "function": "_raw_texts",
       "kind": "str:'xml'",
-      "line": 2789,
+      "line": 2857,
       "occurrence": 0
     },
     {
@@ -303,7 +303,7 @@
       "equivalent": "a '<' at the very start finds no capture open, so the chunk is never used there",
       "function": "_raw_texts",
       "kind": "compare:0",
-      "line": 2796,
+      "line": 2864,
       "occurrence": 0
     },
     {
@@ -311,7 +311,7 @@
       "equivalent": "the word only names the place in a refusal's detail",
       "function": "DocxSource.certify",
       "kind": "str:'paragraph'",
-      "line": 3229,
+      "line": 3297,
       "occurrence": 0
     },
     {
@@ -319,7 +319,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "_refused",
       "kind": "str:' paragraph'",
-      "line": 3359,
+      "line": 3427,
       "occurrence": 0
     },
     {
@@ -327,7 +327,7 @@
       "equivalent": "a change (ins, del, moveFrom, moveTo) is a revision outside _SAME_AS and no cell change: the test after it passes over it too",
       "function": "_canon.add",
       "kind": "statement",
-      "line": 3489,
+      "line": 3557,
       "occurrence": 3
     },
     {
@@ -335,7 +335,7 @@
       "equivalent": "the table count is compared only between two walks that both make it: any step but zero numbers the same tables apart, so a table added or lost shows either way",
       "function": "_run_tokens.table",
       "kind": "binop",
-      "line": 3542,
+      "line": 3610,
       "occurrence": 0
     },
     {
@@ -343,7 +343,7 @@
       "equivalent": "a paragraph holds no paragraph and run content no run the walk reads: walking either again only adds to a list outside any paragraph, which is never read",
       "function": "_run_tokens.walk",
       "kind": "statement",
-      "line": 3575,
+      "line": 3643,
       "occurrence": 0
     },
     {
@@ -351,7 +351,7 @@
       "equivalent": "a bookmark's end has no children: walking it once carried reads nothing",
       "function": "_run_tokens.walk",
       "kind": "statement",
-      "line": 3582,
+      "line": 3650,
       "occurrence": 2
     },
     {
@@ -359,7 +359,7 @@
       "equivalent": "the element has no children: walking it reads nothing",
       "function": "_run_tokens.walk",
       "kind": "statement",
-      "line": 3603,
+      "line": 3671,
       "occurrence": 4
     },
     {
@@ -439,7 +439,7 @@
       "equivalent": "a reference to character 0 is refused by the XML parser first (_parse); any other keeps a digit",
       "function": "_unescape.one",
       "kind": "str:'0'",
-      "line": 2766,
+      "line": 2834,
       "occurrence": 1
     },
     {
@@ -447,7 +447,7 @@
       "equivalent": "a '<' at the very start finds no capture open, so the chunk is never used there",
       "function": "_raw_texts",
       "kind": "int:0",
-      "line": 2796,
+      "line": 2864,
       "occurrence": 0
     },
     {
@@ -455,7 +455,7 @@
       "equivalent": "the comments' metadata lists are compared just before, so the lengths are equal",
       "function": "DocxSource.certify",
       "kind": "bool",
-      "line": 3278,
+      "line": 3346,
       "occurrence": 0
     },
     {
@@ -463,7 +463,7 @@
       "equivalent": "called only after certify has compared the lengths",
       "function": "DocxSource._pairs",
       "kind": "bool",
-      "line": 3327,
+      "line": 3395,
       "occurrence": 0
     },
     {
@@ -471,7 +471,7 @@
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "_paragraphs",
       "kind": "bool",
-      "line": 3347,
+      "line": 3415,
       "occurrence": 0
     },
     {
@@ -479,7 +479,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "_paragraphs",
       "kind": "str:' '",
-      "line": 3348,
+      "line": 3416,
       "occurrence": 0
     },
     {
@@ -487,7 +487,7 @@
       "equivalent": "the table count is compared only between two walks that both make it: any step but zero numbers the same tables apart, so a table added or lost shows either way",
       "function": "_run_tokens.table",
       "kind": "int:1",
-      "line": 3542,
+      "line": 3610,
       "occurrence": 0
     },
     {
@@ -495,7 +495,7 @@
       "equivalent": "what stands before a begin in found is the run holding it, which the view drops with it",
       "function": "_field_runs",
       "kind": "binop",
-      "line": 3653,
+      "line": 3721,
       "occurrence": 0
     },
     {
@@ -559,7 +559,7 @@
       "equivalent": "a paragraph's section is at most the number of sections closed before the last, len(sections) - 1, so the bound never takes",
       "function": "_note_marks",
       "kind": "binop",
-      "line": 2720,
+      "line": 2788,
       "occurrence": 0
     },
     {
@@ -567,7 +567,7 @@
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "DocxSource.certify",
       "kind": "bool",
-      "line": 3235,
+      "line": 3303,
       "occurrence": 0
     },
     {
@@ -575,7 +575,7 @@
       "equivalent": "the parts and their uses are compared just before, so the lengths are equal",
       "function": "DocxSource.certify",
       "kind": "bool",
-      "line": 3261,
+      "line": 3329,
       "occurrence": 0
     },
     {
@@ -583,7 +583,7 @@
       "equivalent": "called only after certify has compared the lengths",
       "function": "DocxSource._pairs",
       "kind": "bool",
-      "line": 3324,
+      "line": 3392,
       "occurrence": 0
     },
     {
@@ -591,7 +591,7 @@
       "equivalent": "a refused comment is served with no paragraphs (certify holds it to that): counting it adds nothing to the output",
       "function": "DocxSource._pairs",
       "kind": "str:'#'",
-      "line": 3328,
+      "line": 3396,
       "occurrence": 0
     },
     {
@@ -599,7 +599,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "_paragraphs",
       "kind": "binop",
-      "line": 3348,
+      "line": 3416,
       "occurrence": 0
     },
     {
@@ -607,7 +607,7 @@
       "equivalent": "places in found are distinct: no other field ends where this one begins",
       "function": "_field_runs",
       "kind": "compare:1",
-      "line": 3662,
+      "line": 3730,
       "occurrence": 0
     },
     {
@@ -615,7 +615,7 @@
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "EpiSource.certify",
       "kind": "bool",
-      "line": 3962,
+      "line": 4030,
       "occurrence": 0
     },
     {
@@ -623,7 +623,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "EpiSource.certify",
       "kind": "str:'section '",
-      "line": 3963,
+      "line": 4031,
       "occurrence": 0
     },
     {
@@ -655,7 +655,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "DocxSource.certify",
       "kind": "str:' '",
-      "line": 3254,
+      "line": 3322,
       "occurrence": 0
     },
     {
@@ -663,7 +663,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "DocxSource.certify",
       "kind": "str:' paragraph'",
-      "line": 3254,
+      "line": 3322,
       "occurrence": 0
     },
     {
@@ -671,7 +671,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "_paragraphs",
       "kind": "int:1",
-      "line": 3348,
+      "line": 3416,
       "occurrence": 0
     },
     {
@@ -679,7 +679,7 @@
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "EpiSource.certify.section",
       "kind": "bool",
-      "line": 3947,
+      "line": 4015,
       "occurrence": 0
     },
     {
@@ -687,7 +687,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "EpiSource.certify.section",
       "kind": "str:'.'",
-      "line": 3949,
+      "line": 4017,
       "occurrence": 0
     },
     {
@@ -695,7 +695,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "EpiSource.certify",
       "kind": "binop",
-      "line": 3963,
+      "line": 4031,
       "occurrence": 0
     },
     {
@@ -719,7 +719,7 @@
       "equivalent": "the default is only compared with 'eachSect', which 'Xontinuous' is not either",
       "function": "_note_marks",
       "kind": "str:'continuous'",
-      "line": 2743,
+      "line": 2811,
       "occurrence": 0
     },
     {
@@ -727,7 +727,7 @@
       "equivalent": "the default only has to be outside the layout types, as 'Xormal' is",
       "function": "DocxSource.__init__",
       "kind": "str:'normal'",
-      "line": 2960,
+      "line": 3028,
       "occurrence": 0
     },
     {
@@ -735,7 +735,7 @@
       "equivalent": "a paragraph mark's change markers are empty: dropping one drops no content",
       "function": "_run_tokens.walk",
       "kind": "str:'rPr'",
-      "line": 3606,
+      "line": 3674,
       "occurrence": 0
     },
     {
@@ -743,7 +743,7 @@
       "equivalent": "a paragraph mark's change markers are empty: dropping one drops no content",
       "function": "_field_runs.collect",
       "kind": "str:'rPr'",
-      "line": 3630,
+      "line": 3698,
       "occurrence": 0
     },
     {
@@ -751,7 +751,7 @@
       "equivalent": "the cell count starts again at each row; only the row count's start matters, and its mutant is caught",
       "function": "_Div.handle_starttag",
       "kind": "int:1",
-      "line": 3832,
+      "line": 3900,
       "occurrence": 1
     },
     {
@@ -759,7 +759,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "EpiSource.certify.section",
       "kind": "binop",
-      "line": 3949,
+      "line": 4017,
       "occurrence": 0
     },
     {
@@ -767,7 +767,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "EpiSource.certify",
       "kind": "int:1",
-      "line": 3963,
+      "line": 4031,
       "occurrence": 0
     },
     {
@@ -783,7 +783,7 @@
       "equivalent": "a tag's first character is its name's, never '>' or a quote, so matching from one character later finds the same end",
       "function": "_raw_texts",
       "kind": "int:1",
-      "line": 2813,
+      "line": 2881,
       "occurrence": 0
     },
     {
@@ -791,7 +791,7 @@
       "equivalent": "outside a namespace declaration an attribute is read only for its references, which the XML parser has checked first (_parse)",
       "function": "_raw_texts",
       "kind": "compare:0",
-      "line": 2832,
+      "line": 2900,
       "occurrence": 1
     },
     {
@@ -799,7 +799,7 @@
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "_agree",
       "kind": "bool",
-      "line": 3444,
+      "line": 3512,
       "occurrence": 0
     },
     {
@@ -807,7 +807,7 @@
       "equivalent": "where a difference is found only words the refusal",
       "function": "EpiSource.certify.section",
       "kind": "compare:0",
-      "line": 3929,
+      "line": 3997,
       "occurrence": 0
     },
     {
@@ -815,7 +815,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "EpiSource.certify.section",
       "kind": "int:1",
-      "line": 3949,
+      "line": 4017,
       "occurrence": 0
     },
     {
@@ -831,7 +831,7 @@
       "equivalent": "splitting once more leaves the first word, the name, the same",
       "function": "_raw_texts",
       "kind": "int:1",
-      "line": 2827,
+      "line": 2895,
       "occurrence": 0
     },
     {
@@ -839,7 +839,7 @@
       "equivalent": "outside a namespace declaration an attribute is read only for its references, which the XML parser has checked first (_parse)",
       "function": "_raw_texts",
       "kind": "str:'&'",
-      "line": 2832,
+      "line": 2900,
       "occurrence": 0
     },
     {
@@ -852,7 +852,7 @@
     }
   ],
   "target": "src/label_docx/certify.py",
-  "targetSha256": "2818582654fae695f20e31b036e58b26f52ae5ebcb55a4307dcc8d54dbe0b3bc",
+  "targetSha256": "3b2ed920cecce22b5eb3a571bda351df799f56a90a33ef6d66718a872d99f49c",
   "tests": [
     "tests/test_certify.py",
     "tests/test_headers_comments.py",
@@ -861,5 +861,5 @@
     "tests/test_robustness.py",
     "tests/test_output.py"
   ],
-  "testsSha256": "2984359e25a94b2681352c8eb0453df4ffec202168159c9efd67f668173b4f73"
+  "testsSha256": "b1e1324be36a7d1ea697a470d87727a8561469783a6860f982cc71f932edd532"
 }
