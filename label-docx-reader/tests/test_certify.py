@@ -2645,6 +2645,8 @@ _WORD6: dict[str, tuple[dict[str, Any], str]] = {
             ("spacing-auto-most", '<w:spacing w:line="480"/>'),
             ("spacing-exact-most", '<w:spacing w:line="1200" w:lineRule="exact"/>'),
             ("spacing-at-least", '<w:spacing w:line="200" w:lineRule="atLeast"/>'),
+            ("spacing-at-least-most", '<w:spacing w:line="1200" w:lineRule="atLeast"/>'),
+            ("spacing-exact-least", '<w:spacing w:line="200" w:lineRule="exact"/>'),
             ("spacing-around", '<w:spacing w:before="240" w:after="240"/>'),
         ]
     },
@@ -2671,6 +2673,7 @@ _WORD6: dict[str, tuple[dict[str, Any], str]] = {
             ("spacing-auto-over", '<w:spacing w:line="481"/>'),
             ("spacing-exact-over", '<w:spacing w:line="1201" w:lineRule="exact"/>'),
             ("spacing-at-least-under", '<w:spacing w:line="199" w:lineRule="atLeast"/>'),
+            ("spacing-at-least-over", '<w:spacing w:line="1201" w:lineRule="atLeast"/>'),
             ("spacing-before-over", '<w:spacing w:before="241"/>'),
             ("spacing-after-over", '<w:spacing w:after="241"/>'),
             ("spacing-lines", '<w:spacing w:beforeLines="100"/>'),
@@ -2754,6 +2757,9 @@ def test_a_word_6_label_is_followed_by_a_tab_only_as_far_as_words_drawing_goes(n
         {"rpr": _TIMES_11 + '<x:numSpacing xmlns:x="urn:x" x:val="tabular"/>'},
         {"props": '<x:kinsoku xmlns:x="urn:x"/>'},
         {"props": '<w:shd w:fill="FFFFFF"/>'},
+        {"props": '<x:keepNext xmlns:x="urn:x"/>'},
+        # An exact line under 10 pt clips the paragraph's 10 pt text, which the reader refuses.
+        {"props": '<w:spacing w:line="199" w:lineRule="exact"/>'},
         # A tracked paragraph mark: the reader refuses the document (tracked-change), as it
         # refuses every change; the check, on its own, takes the mark's w:ins for a run property
         # Word's drawing is not on record for, and says legacy.
