@@ -2502,6 +2502,15 @@ _WORD6: dict[str, tuple[dict[str, Any], str]] = {
     "indent-enough": ({"gap": (0, 347), "rpr": _TIMES_28}, "tab"),
     "indent-short": ({"gap": (0, 346), "rpr": _TIMES_28}, "legacy"),
     "space-enough": ({"gap": (160, 0), "rpr": _TIMES_28}, "tab"),
+    # At 8 pt, "-iiiii" from legacyIndent 324 is a space and the margin exactly: a gap.
+    "indent-exactly": (
+        {"text": "-iiiii", "gap": (0, 324), "rpr": _TIMES_FONT + '<w:sz w:val="16"/>'},
+        "tab",
+    ),
+    "indent-just-short": (
+        {"text": "-iiiii", "gap": (0, 323), "rpr": _TIMES_FONT + '<w:sz w:val="16"/>'},
+        "legacy",
+    ),
     "space-short": ({"gap": (159, 0), "rpr": _TIMES_28}, "legacy"),
     # The gaps and sizes drawn: legacySpace 0 to 340, legacyIndent 0 to 1500, 16 to 56 half-points.
     "space-most": ({"gap": (340, 0)}, "tab"),
@@ -2604,6 +2613,8 @@ _WORD6: dict[str, tuple[dict[str, Any], str]] = {
     "ind-start": ({"props": '<w:ind w:start="360"/>'}, "legacy"),
     "ind-hangs-360-past": ({"level": '<w:ind w:left="0" w:hanging="360"/>'}, "tab"),
     "ind-hangs-361-past": ({"level": '<w:ind w:left="0" w:hanging="361"/>'}, "legacy"),
+    "ind-hangs-360-no-left": ({"level": '<w:ind w:hanging="360"/>'}, "tab"),
+    "ind-hangs-361-no-left": ({"level": '<w:ind w:hanging="361"/>'}, "legacy"),
     "ind-style-hangs-past": (
         {"styles": _DEFAULT.format("paragraph", '<w:ind w:left="0" w:hanging="400"/>')},
         "legacy",
@@ -2691,6 +2702,13 @@ def test_the_check_on_its_own_does_not_take_what_the_reader_refuses_for_drawn(
     numbering = DocxSource(_word6_docx(parts)).body.paragraphs[0].numbering
     assert numbering is not None
     assert numbering["suffix"] == "legacy"
+
+
+@pytest.mark.parametrize("measure", ["\u0663\u0666\u0660", "36O", ""])
+def test_the_check_reads_a_word_6_gap_only_in_ascii_digits(measure: str) -> None:
+    # The reader refuses these first (invalid-package); the check on its own refuses them too.
+    with pytest.raises(CertificationError, match="a measure"):
+        DocxSource(_word6_docx({"gap": (0, measure)}))
 
 
 def test_the_check_holds_its_own_copy_of_words_widths_and_space() -> None:

@@ -2559,7 +2559,7 @@ class _Numbering:
             or indent is None
             or not 0 <= space <= 340
             or not 0 <= indent <= 1500
-            or not tags <= _WORD6_RUN
+            or tags - _WORD6_RUN
             or (name == "Symbol" and _w("b") in tags)
             or look.jc not in (None, "left")
             or any(
@@ -2577,7 +2577,7 @@ class _Numbering:
         # Both sides in twips times the em.
         needed = _WORD6_SPACE * int(size) * 10 + _WORD6_MARGIN * _WORD6_EM
         after = indent * _WORD6_EM - sum(widths[c] for c in label) * int(size) * 10
-        return after >= needed or space * _WORD6_EM >= needed
+        return max(after, space * _WORD6_EM) >= needed
 
 
 # Word's drawing of Word 6 labels (legacy-drawn*), written here on its own, equal to the reader's
@@ -2621,7 +2621,7 @@ def _indents_drawn(indents: list[ET.Element]) -> bool:
     By left, hanging, right and a zero firstLine, hanging at most 360 twips past the least left.
     """
     lefts: list[int] = []
-    hangings = [0]
+    hangings: list[int] = []
     for x in indents:
         for key, value in x.attrib.items():
             if not re.fullmatch("-?[0-9]{1,4}", value):
@@ -2637,8 +2637,9 @@ def _indents_drawn(indents: list[ET.Element]) -> bool:
                 return False
         if _w("left") in x.attrib:
             lefts.append(int(x.attrib[_w("left")]))
-        hangings.append(int(x.get(_w("hanging"), "0")))
-    return max(hangings) - min(lefts, default=0) <= 360
+        if _w("hanging") in x.attrib:
+            hangings.append(int(x.attrib[_w("hanging")]))
+    return not hangings or max(hangings) - min(lefts, default=0) <= 360
 
 
 def _page_drawn(document: ET.Element, settings: ET.Element | None) -> bool:
