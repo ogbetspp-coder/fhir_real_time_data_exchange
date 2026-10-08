@@ -99,7 +99,7 @@ so the reader now carries only what Word's drawing proves.
 **Proof.** `tests/test_word_gaps.py` holds the rule, the space and the reader's suffixes to Word's
 drawing; `tests/test_word_oracle.py` the labels and written suffixes; `tests/test_certify.py`, read
 through both the reader and the check, each condition of the whitelist on both sides of each bound
-and at the gap's exact threshold. The check's mutation record: 4,090 of 4,196 faults killed, 106 recorded as unable to change a result,
+and at the gap's exact threshold. The check's mutation record: 4,188 of 4,294 faults killed, 106 recorded as unable to change a result,
 none unexplained.
 
 **Impact assessment.**
@@ -126,9 +126,9 @@ In 26 leaflets more sections are carried; no file's outcome changed and none los
 Every SmPC entry is unchanged. Reader refusals are unchanged: the new ones (a Word 6 level with a
 suffix, a numbering part out of order) stand in none of these files.
 
-Of the Word 6 labels in the documents read whole (90 files), 1,330 of 1,511 are carried (`tab`) and
-181 are not (`legacy`); by level, 104 of 134 are carried in every paragraph, 26 in none. Of those
+Of the Word 6 labels in the documents read whole (90 files), 1,324 of 1,511 are carried (`tab`) and
+187 are not (`legacy`); by level, 103 of 134 are carried in every paragraph, 26 in none. Of those
 not carried, 117 stand in documents whose compat options are not among those recorded (older
-compatibility modes and their options); the other 64 stand in a table, have a character style,
-kerning or ligatures on the label, a tab stop or indent outside the recorded ones, no font named, or
-a gap Word draws under a space.
+compatibility modes and their options); the other 70 stand in a table, have a character style,
+kerning or ligatures on the label, a tab stop, indent or other paragraph property outside those
+drawn, no font named, or a gap Word draws under a space.
