@@ -195,6 +195,18 @@
       "bytes": 3200
     },
     {
+      "name": "Word 6 (legacy) levels: what Word writes after the label, by gap, size and w:suff.",
+      "file": "legacy-levels.docx",
+      "sha256": "a7146dfe924d28e64138480defcc1a9b3656df0fa7ee2cc1d30fdcb9c3e275e8",
+      "bytes": 47743
+    },
+    {
+      "name": "Each abstractNum followed by its num, out of the schema's order.",
+      "file": "numbering-num-before-abstract.docx",
+      "sha256": "5dd0d103fbf59c446da8f3ed23379b1a5ee9a84d982c56f6164cb11c76602eed",
+      "bytes": 47743
+    },
+    {
       "name": "Bullets in Symbol, in Courier New, and in the paragraph mark's font.",
       "file": "bullets.docx",
       "sha256": "62a355d1e912cb232cc60eacbd917ff31642219a2e0e428a88cb0cec3071b14b",

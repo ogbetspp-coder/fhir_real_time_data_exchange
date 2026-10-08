@@ -1583,7 +1583,8 @@ def test_lvl_restart_zero_never_restarts_and_n_restarts_after_level_n_minus_1() 
         ("", "tab"),
         ('<w:suff w:val="space"/>', "space"),
         ('<w:suff w:val="nothing"/>', "nothing"),
-        ('<w:legacy w:legacy="1" w:legacySpace="0" w:legacyIndent="360"/>', "legacy"),
+        # A Word 6 level: Word writes a tab after it (corpus/numbering-cases legacy-levels).
+        ('<w:legacy w:legacy="1" w:legacySpace="0" w:legacyIndent="360"/>', "tab"),
     ],
 )
 def test_the_suffix_is_reported(extra: str, suffix: str) -> None:
@@ -1643,16 +1644,16 @@ def test_a_level_override_replaces_the_level_whole() -> None:
         '<w:legacy w:legacy="1" w:legacySpace="0" w:legacyIndent="360"/></w:lvl>',
     )
     paragraph = read_docx(docx(li(6), numbering=NUMBERING + num(6, 0, legacy)))[0]
-    assert paragraph.numbering == Numbering(6, 0, "-", "legacy")
+    assert paragraph.numbering == Numbering(6, 0, "-", "tab")
 
 
-SHARED = (
-    abstract(7, lvl(0))
-    + num(10, 7)
+SHARED_LISTS = (
+    num(10, 7)
     + num(11, 7)
     + num(12, 7, RESTART)
     + num(13, 7, override(0, '<w:startOverride w:val="5"/>'))
 )
+SHARED = abstract(7, lvl(0)) + SHARED_LISTS
 
 
 def test_lists_that_share_a_definition_continue_and_a_start_override_restarts() -> None:
@@ -1677,7 +1678,8 @@ def test_lists_that_share_a_definition_continue_and_a_start_override_restarts() 
 def test_counts_across_lists_and_levels_follow_word(body: str, drawn: list[str]) -> None:
     # Word's answers for corpus/numbering-cases return-after-restart, override-return,
     # plain-after-restart and ancestor-never-counted.
-    assert labels(body, SHARED + SECTIONS) == drawn
+    # Each abstractNum before every num, as the schema orders them.
+    assert labels(body, abstract(7, lvl(0)) + SECTIONS + SHARED_LISTS) == drawn
 
 
 def test_a_bullet_shows_no_count_and_is_never_ambiguous() -> None:
@@ -1813,9 +1815,10 @@ def test_the_template_draws_its_bullets_and_dashes() -> None:
         for x in read_docx(data)
         if x.numbering is not None and x.numbering.num_id
     ]
-    # Symbol U+F0B7 bullets, and Word 6 dash bullets from the lists that override a level.
-    assert sorted(set(drawn)) == [("-", "legacy"), ("•", "tab")]
-    assert (drawn.count(("•", "tab")), drawn.count(("-", "legacy"))) == (7, 9)
+    # Symbol U+F0B7 bullets, and Word 6 dash bullets from the lists that override a level, each
+    # followed by the tab Word writes.
+    assert sorted(set(drawn)) == [("-", "tab"), ("•", "tab")]
+    assert (drawn.count(("•", "tab")), drawn.count(("-", "tab"))) == (7, 9)
 
 
 @pytest.mark.parametrize(
@@ -1831,6 +1834,16 @@ def test_the_template_draws_its_bullets_and_dashes() -> None:
 def test_a_numbering_part_that_defines_something_twice_is_refused(numbering: str) -> None:
     # Refused even when no paragraph is in the list, as a style defined twice is.
     assert refusal(p(r("<w:t>x</w:t>")), numbering=numbering) == "invalid-package"
+
+
+def test_a_num_before_an_abstract_num_is_refused() -> None:
+    # Word then draws every list as one (corpus/numbering-cases numbering-num-before-abstract).
+    dash = abstract(1, lvl(0, "bullet", "-"))
+    assert refusal(li(1), numbering=dash + num(1, 1) + abstract(2, lvl(0))) == (
+        "unsupported-numbering"
+    )
+    assert refusal(li(1), numbering=num(1, 1) + dash) == "unsupported-numbering"
+    assert labels(li(1), dash + abstract(2, lvl(0)) + num(1, 1)) == ["-"]
 
 
 def test_a_link_to_a_list_that_overrides_a_level_is_refused() -> None:

@@ -258,9 +258,11 @@ roman (1 to 3999), upper and lower letter (a to z, then aa, bb...), or none; a b
 is its bullet. The label is drawn in the level's run properties over the paragraph mark's (with the
 mark's character style), so its fonts are placed as a run's are: a Symbol bullet (U+F0B7) is mapped
 to "•", a Wingdings bullet through ``WINGDINGS_BULLETS`` (U+F0A7 to "▪"), and a bullet in any other
-dingbat font is refused. ``suffix`` is ``tab``, ``space`` or
-``nothing`` (``w:suff``), or ``legacy`` for a Word 6 level, where the gap is layout and not a
-character.
+dingbat font is refused. ``suffix`` is what Word writes after the label, as ``w:suff`` says:
+``tab`` (also when it says nothing), ``space`` or ``nothing``. A Word 6 level (``w:legacy``) is
+no exception: whatever its ``legacySpace`` and ``legacyIndent``, Word writes what ``w:suff`` says.
+A ``num`` before an ``abstractNum`` is refused: Word then numbers the lists otherwise than they
+say, in the case on record all as one [numbering-num-before-abstract].
 
 Notes. ``read_document`` returns the footnotes and endnotes with the body, each note's paragraphs
 read by every rule above, in the order the body refers to them; ``read_docx`` returns the body
@@ -376,20 +378,21 @@ What it refuses (``DocxRefusedError.code``):
 - ``unread-content``: a run the reader did not reach (inside section, paragraph or cell
   properties, say), run content standing outside a run, a note nothing refers to, or a comment
   nothing anchors (Word does not show them; their text is in the file all the same).
-- ``unsupported-numbering``: a list label the reader cannot draw exactly: a ``numId`` or level
-  with no definition (or no numbering part), a paragraph's level outside 0 to 8, a format or
-  suffix other than those above (ordinal and text formats depend on the language), a custom
-  format, a level with no ``lvlText`` or one over ``MAX_LEVEL_TEXT`` characters, a picture
+- ``unsupported-numbering``: a list label the reader cannot draw exactly: a ``numId`` or level with
+  no definition (or no numbering part), a ``num`` before an ``abstractNum`` in the numbering part,
+  numbered paragraphs or not (Word then numbers every list as one), a paragraph's level outside 0 to
+  8, a format or suffix other than those above (ordinal and text formats depend on the language), a
+  custom format, a level with no ``lvlText`` or one over ``MAX_LEVEL_TEXT`` characters, a picture
   bullet, a level holding anything else the reader does not know (alternate content, say), a
   negative ``lvlRestart``, an ``lvlRestart`` at the paragraph's level or above that restarts it
   after the level directly above (written out), itself or a deeper one (Word draws such a level
   empty), a ``%`` in ``lvlText`` that names no level or a deeper or undefined one, a bullet level
-  that shows a counter or is shown in another's, ``isLgl`` showing a level of format none, a
-  number past a format's range, a label in capitals or small capitals with letters in it, a
-  numbering-style link the reader cannot follow (no ``styleLink`` back, or to a list with
-  overrides), a list (or its level) set by a table style, a list in a note, header, footer or
-  comment, a custom note number format or one other than those above, a note symbol past ††,
-  or a note ``numRestart`` other than ``continuous``, ``eachSect`` or ``eachPage``.
+  that shows a counter or is shown in another's, ``isLgl`` showing a level of format none, a number
+  past a format's range, a label in capitals or small capitals with letters in it, a numbering-style
+  link the reader cannot follow (no ``styleLink`` back, or to a list with overrides), a list (or its
+  level) set by a table style, a list in a note, header, footer or comment, a custom note number
+  format or one other than those above, a note symbol past ††, or a note ``numRestart`` other than
+  ``continuous``, ``eachSect`` or ``eachPage``.
 - ``ambiguous-numbering``: a label drawn hidden (the paragraph mark is hidden at any level, its
   character style included, whatever the list level says, or the level is hidden) or a
   numbered paragraph run on after a hidden paragraph mark, for which Word's list API reports a
@@ -439,7 +442,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 # The version of the rules above; versions.lock.json ties it to this file (tests/test_locks.py).
-READER_VERSION = "docx-reader/1.32.0"
+READER_VERSION = "docx-reader/1.33.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -674,8 +677,8 @@ class Numbering:
     """The list a paragraph belongs to. ``num_id`` 0 means "not in a list".
 
     ``text`` is the label Word draws before the paragraph ("4.8.", "b)", "•", or "" for a level
-    that shows nothing) and ``suffix`` what follows it: ``tab``, ``space``, ``nothing`` or
-    ``legacy``. Both are None when ``num_id`` is 0.
+    that shows nothing) and ``suffix`` what follows it: ``tab``, ``space`` or ``nothing``. Both
+    are None when ``num_id`` is 0.
     """
 
     num_id: int
@@ -3586,12 +3589,10 @@ def _level(element: ET.Element) -> _Level:
         text = "" if null else text_element.get(_w("val"), "")
         if len(text) > MAX_LEVEL_TEXT:
             unsupported = unsupported or f"a list level text over {MAX_LEVEL_TEXT} characters"
-    legacy = element.find(_w("legacy"))
+    # A Word 6 level's too (w:legacy, whatever its gap): Word writes what w:suff says, a tab
+    # when it says nothing [legacy-levels].
     suffix = value("suff") or "tab"
-    if legacy is not None and legacy.get(_w("legacy")) not in ("0", "false", "off"):
-        # A Word 6 level: the gap after the label is set by legacySpace and legacyIndent.
-        suffix = "legacy"
-    elif suffix not in ("tab", "space", "nothing"):
+    if suffix not in ("tab", "space", "nothing"):
         unsupported = unsupported or f"the suffix {suffix}"
     start = value("start")
     restart = value("lvlRestart")
@@ -3667,6 +3668,11 @@ class _Lists:
         self.counters: dict[int, _Counters] = {}
         if root is None:
             return
+        # Each abstractNum before every num, in the schema's order: else Word draws every list as
+        # one, not as each names [numbering-num-before-abstract].
+        order = [c.tag == _w("num") for c in root if c.tag in (_w("abstractNum"), _w("num"))]
+        if order != sorted(order):
+            raise _refuse_numbering("a num before an abstractNum")
         for element in root.findall(_w("abstractNum")):
             key = _int(element.get(_w("abstractNumId"), ""), "abstractNumId")
             if key in self.abstracts:

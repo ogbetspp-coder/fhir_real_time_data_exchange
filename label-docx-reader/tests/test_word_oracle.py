@@ -21,7 +21,7 @@ import pytest
 
 import word_oracle
 from label_docx import word as word_module
-from label_docx.reader import DocxRefusedError, read_document
+from label_docx.reader import DocxRefusedError, read_document, read_docx
 from label_docx.word import (
     _has_computed_fields,
     _has_stories,
@@ -85,6 +85,8 @@ REFUSED = {
     "numbering-cases/fields-noteref-stale.docx": "stale-field",
     # A SEQ with no stored result: Word shows nothing on screen and prints 1.
     "numbering-cases/fields-seq-shown-no-result.docx": "field-without-result",
+    # A num before an abstractNum: Word numbers every list as one, not as each names.
+    "numbering-cases/numbering-num-before-abstract.docx": "unsupported-numbering",
     # EMA's stray U+F02D in Times New Roman, a code no font draws as the template means it.
     "ema-templates/qrd-product-information-template-version-104_es.docx": "private-use-character",
 }
@@ -147,6 +149,22 @@ def test_the_reader_draws_words_labels_or_refuses_as_listed(
         assert result == f"reader refuses: {REFUSED[key]}"
     else:
         assert result == "agrees"
+
+
+def test_each_suffix_is_named_for_what_word_writes_after_the_label() -> None:
+    """A Word 6 level's suffix is ``tab`` where Word writes a tab: held by name, not by character.
+
+    The reader before docx-reader/1.33.0 named it ``legacy``, which the verifier took for a tab.
+    """
+    path = CORPUS / "numbering-cases" / "legacy-levels.docx"
+    record = _record(path.parent / "word.json")
+    word, at = record["drawn"][path.name], record["at"][path.name]
+    paragraphs = read_docx(path.read_bytes())
+    named = [n.suffix if (n := paragraphs[i].numbering) else None for i in at]
+    written = {"\t": "tab", " ": "space"}
+    assert named == [written.get(label[-1:], "nothing") for label in word]
+    # Word 6 levels followed by each of the three, and levels that are not.
+    assert sorted(set(named), key=str) == ["nothing", "space", "tab"]
 
 
 @pytest.mark.parametrize(

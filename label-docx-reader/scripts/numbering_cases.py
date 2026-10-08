@@ -435,6 +435,88 @@ LEGACY = (
     '<w:lvlText w:val="-"/><w:legacy w:legacy="1" w:legacySpace="0" w:legacyIndent="360"/>'
     "</w:lvl></w:lvlOverride>"
 )
+
+
+def _legacy_variants() -> list[tuple[str, str, str, int, str, str, int]]:
+    """Each paragraph of legacy-levels: numFmt, lvlText, font, start, suff, legacy, size.
+
+    The labels, gaps and sizes of the probe put to Word on 2026-10-07 and its two controls, then
+    each way a level says it is Word 6's or not, with and without w:suff.
+    """
+    labels = [
+        ("bullet", "", '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/>', 1),
+        ("bullet", "-", "", 1),
+        ("decimal", "%1.", "", 1),
+        ("decimal", "%1.", "", 10),
+        ("lowerRoman", "%1.", "", 3),
+    ]
+    out = []
+    for fmt, text, font, start in labels:
+        for space, indent in [(0, 283), (0, 360), (0, 0), (144, 0), (0, 120), (144, 360)]:
+            legacy = f'w:legacy="1" w:legacySpace="{space}" w:legacyIndent="{indent}"'
+            out += [(fmt, text, font, start, "", legacy, size) for size in (22, 56)]
+        out += [(fmt, text, font, start, suffix, "", 22) for suffix in ("tab", "nothing")]
+    gap = 'w:legacySpace="0" w:legacyIndent="360"'
+    for suffix, on in [
+        ("tab", 'w:legacy="1"'),
+        ("space", 'w:legacy="1"'),
+        ("nothing", 'w:legacy="1"'),
+        ("", 'w:legacy="true"'),
+        ("", 'w:legacy="on"'),
+        ("nothing", 'w:legacy="true"'),
+        ("nothing", 'w:legacy="on"'),
+        ("", ""),
+        ("nothing", ""),
+        ("space", ""),
+        ("nothing", 'w:legacy="0"'),
+        ("nothing", 'w:legacy="false"'),
+        ("nothing", 'w:legacy="off"'),
+        ("space", None),
+    ]:
+        legacy = "" if on is None else f"{on} {gap}".strip()
+        out.append(("bullet", "-", "", 1, suffix, legacy, 22))
+    return out
+
+
+def _legacy_levels(interleaved: bool = False) -> Case:
+    """One list per paragraph, each level in the schema's order; then a Word 6 deeper level.
+
+    Interleaved, each abstractNum is followed by its num, out of the schema's order.
+    """
+    abstracts, nums, body = [], [], []
+    for key, (fmt, text, font, start, suffix, legacy, size) in enumerate(_legacy_variants(), 1):
+        suff = f'<w:suff w:val="{suffix}"/>' if suffix else ""
+        old = f"<w:legacy {legacy}/>" if legacy else ""
+        level = (
+            f'<w:lvl w:ilvl="0"><w:start w:val="{start}"/><w:numFmt w:val="{fmt}"/>{suff}'
+            f'<w:lvlText w:val="{text}"/>{old}<w:lvlJc w:val="left"/>'
+            '<w:pPr><w:ind w:left="283" w:hanging="283"/></w:pPr>'
+            f'<w:rPr>{font}<w:sz w:val="{size}"/></w:rPr></w:lvl>'
+        )
+        abstracts.append(abstract(key, level))
+        nums.append(num(key, key))
+        body.append(
+            f'<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="{key}"/></w:numPr></w:pPr>'
+            f'<w:r><w:rPr><w:sz w:val="{size}"/></w:rPr><w:t>item {key}</w:t></w:r></w:p>'
+        )
+    deeper = len(abstracts) + 1
+    word6 = '<w:legacy w:legacy="1" w:legacySpace="0" w:legacyIndent="360"/>'
+    abstracts.append(abstract(deeper, lvl(0), lvl(1, text="%1.%2.", extra=word6)))
+    nums.append(num(deeper, deeper))
+    numbering = (
+        "".join(a + n for a, n in zip(abstracts, nums, strict=True))
+        if interleaved
+        else "".join(abstracts + nums)
+    )
+    return Case(
+        "Each abstractNum followed by its num, out of the schema's order."
+        if interleaved
+        else "Word 6 (legacy) levels: what Word writes after the label, by gap, size and w:suff.",
+        numbering,
+        "".join(body) + items((deeper, 0), (deeper, 1)),
+    )
+
+
 HEADING = (
     '<w:style w:type="paragraph" w:styleId="H2"><w:name w:val="H2"/><w:pPr><w:numPr>'
     '<w:numId w:val="1"/></w:numPr></w:pPr></w:style>'
@@ -646,6 +728,8 @@ CASES: dict[str, Case] = {
         abstract(1, lvl(0)) + num(1, 1, LEGACY),
         items((1, 0), (1, 0)),
     ),
+    "legacy-levels": _legacy_levels(),
+    "numbering-num-before-abstract": _legacy_levels(interleaved=True),
     "bullets": Case(
         "Bullets in Symbol, in Courier New, and in the paragraph mark's font.",
         abstract(1, lvl(0, "bullet", "", SYMBOL))

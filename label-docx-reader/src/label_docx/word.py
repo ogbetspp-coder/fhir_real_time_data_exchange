@@ -75,7 +75,7 @@ from label_docx.reader import (
 WORD = Path("/Applications/Microsoft Word.app")
 # What Word is asked and how its answers are judged: a change to this file changes it
 # (``scripts/lock.py``). A kept verdict or recorded answer of another version is not reused.
-VERIFIER = "word-verifier/1.0.6"
+VERIFIER = "word-verifier/1.0.7"
 
 
 class WordError(Exception):
@@ -283,7 +283,8 @@ on run argv
 end run
 """
 
-SUFFIXES = {"tab": "\t", "legacy": "\t", "space": " ", "nothing": ""}
+# What Word writes after a list label, by the reader's suffix.
+SUFFIXES = {"tab": "\t", "space": " ", "nothing": ""}
 _UNIT, _RECORD = "\x1c", "\x1b"
 
 # The document saved as text.

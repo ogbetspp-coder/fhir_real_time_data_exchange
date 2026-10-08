@@ -2253,12 +2253,21 @@ _SETTINGS = {
         )
         for value in ("1", "true", "on", "0")
     },
+    # A Word 6 level is followed by what w:suff says, as any level is (Word, legacy-levels).
     **{
-        f"legacy-{value}": (
-            _list(_level(0, "%1.", extra=f'<w:legacy w:legacy="{value}"/>')),
-            [(1, "1.", "legacy" if value == "1" else "tab")],
+        f"legacy-{value}-{suffix or 'unset'}": (
+            _list(
+                _level(
+                    0,
+                    "%1.",
+                    extra=(f'<w:suff w:val="{suffix}"/>' if suffix else "")
+                    + f'<w:legacy w:legacy="{value}"/>',
+                )
+            ),
+            [(1, "1.", suffix or "tab")],
         )
-        for value in ("1", "0", "false", "off")
+        for value in ("1", "0")
+        for suffix in ("", "space", "nothing")
     },
 }
 
@@ -2395,6 +2404,13 @@ def test_the_check_draws_no_label_it_cannot_draw_as_word_does(name: str) -> None
     data = docx("".join(_item(*item) for item in items), numbering=numbering + nums)
     with pytest.raises(CertificationError):
         DocxSource(data)
+
+
+def test_the_check_refuses_a_num_before_an_abstract_num() -> None:
+    # Word numbers the lists otherwise then (corpus/numbering-cases numbering-num-before-abstract).
+    path = CORPUS / "numbering-cases" / "numbering-num-before-abstract.docx"
+    with pytest.raises(CertificationError, match="a num before an abstractNum"):
+        DocxSource(path.read_bytes())
 
 
 def test_the_check_refuses_a_numbering_style_naming_no_list_back() -> None:

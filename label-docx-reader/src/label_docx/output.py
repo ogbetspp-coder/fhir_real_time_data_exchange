@@ -136,7 +136,7 @@ from label_docx.reader import (
 
 # The version of the shape above, and of the check that certifies it: versions.lock.json ties
 # it to both files (tests/test_locks.py).
-FORMAT_VERSION = "label-docx-json/1.18.1"
+FORMAT_VERSION = "label-docx-json/1.19.0"
 
 type Json = str | int | bool | list[Json] | dict[str, Json] | None
 

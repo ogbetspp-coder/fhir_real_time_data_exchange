@@ -104,7 +104,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT, WINGDINGS_BULLETS
 
-CHECKER_VERSION = "conservation-check/1.19.0"
+CHECKER_VERSION = "conservation-check/1.20.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -2255,10 +2255,8 @@ def _list_level(element: ET.Element) -> _ListLevel:
     if text_element is not None:
         null = text_element.get(_w("null")) in ("1", "true", "on")
         text = "" if null else text_element.get(_w("val"), "")
-    legacy = element.find(_w("legacy"))
+    # What w:suff says, a Word 6 level's (w:legacy) too [legacy-levels].
     suffix = value("suff") or "tab"
-    if legacy is not None and legacy.get(_w("legacy")) not in ("0", "false", "off"):
-        suffix = "legacy"
     start, restart = value("start"), value("lvlRestart")
     return _ListLevel(
         start=None if start is None else int(start),
@@ -2289,6 +2287,11 @@ class _Numbering:
         self.fonts = fonts
         self.abstracts: dict[int, tuple[dict[int, _ListLevel], str | None, str | None]] = {}
         self.nums: dict[int, tuple[int, dict[int, int], dict[int, _ListLevel]]] = {}
+        # A num before an abstractNum: Word numbers the lists otherwise then
+        # [numbering-num-before-abstract].
+        kinds = [] if root is None else [_local(c.tag) for c in root]
+        if "num" in kinds and "abstractNum" in kinds[kinds.index("num") :]:
+            raise CertificationError("a num before an abstractNum")
         # Anything defined twice (a list, a list's definition, a level of either) is refused:
         # which one Word takes is not on record.
         for element in [] if root is None else root.findall(_w("abstractNum")):
