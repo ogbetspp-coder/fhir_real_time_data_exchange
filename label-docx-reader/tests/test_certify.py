@@ -2454,6 +2454,10 @@ _TIMES_11 = _TIMES_FONT + '<w:sz w:val="22"/>'
 _HUGE = _TIMES_FONT + '<w:sz w:val="1024"/>'
 _GRID = '<w:sectPr><w:docGrid w:type="{}" w:linePitch="360"/></w:sectPr>'
 _STYLE = '<w:style w:type="{}" w:styleId="{}"><w:name w:val="S"/><w:pPr><w:bidi/></w:pPr></w:style>'
+_DEFAULT = (
+    '<w:style w:type="{}" w:default="1" w:styleId="D"><w:name w:val="D"/><w:pPr><w:bidi/></w:pPr>'
+    "</w:style>"
+)
 _TABLE = (
     '<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr><w:tblGrid><w:gridCol w:w="5000"/>'
     "</w:tblGrid><w:tr><w:tc>{}</w:tc></w:tr></w:tbl><w:p/>"
@@ -2496,6 +2500,12 @@ _WORD6: dict[str, tuple[dict[str, Any], str]] = {
     ),
     "right-to-left-table": ({"wrap": _TABLE, "styles": _STYLE.format("table", "T")}, "legacy"),
     "left-to-right-table": ({"wrap": _TABLE}, "tab"),
+    # The same from the default paragraph style, and the default table style of a table naming none.
+    "right-to-left-default-style": ({"styles": _DEFAULT.format("paragraph")}, "legacy"),
+    "right-to-left-default-table": (
+        {"wrap": _TABLE.replace('<w:tblStyle w:val="T"/>', ""), "styles": _DEFAULT.format("table")},
+        "legacy",
+    ),
     "grid-chars": ({"after": _GRID.format("linesAndChars")}, "legacy"),
     "grid-snap": ({"after": _GRID.format("snapToChars")}, "legacy"),
     "grid-lines": ({"after": _GRID.format("lines")}, "tab"),
