@@ -2567,7 +2567,7 @@ class _Numbering:
                 for x in sources
                 for j in x.findall(_w("jc"))
             )
-            or any(x.find(_w(n)) is not None for x in sources for n in ("bidi", "framePr"))
+            or not _paragraph_drawn(sources)
             or not all(
                 _stop_drawn(t) for x in sources for tabs in x.findall(_w("tabs")) for t in tabs
             )
@@ -2602,6 +2602,73 @@ _WORD6_FIXED = {
     "doNotFlipMirrorIndents=1",
     "differentiateMultirowTableHeaders=1",
 }
+
+
+# The paragraph properties Word drew Word 6 labels with: those checked on their own (the style,
+# numbering, mark, tab stops, indents, alignment, shading, spacing), and the rest by the w:val each
+# took (None: none).
+_WORD6_OWN = {"pStyle", "numPr", "rPr", "tabs", "ind", "jc"}
+_WORD6_VALUES: dict[str, set[str | None]] = {
+    "keepNext": {None},
+    "keepLines": {None},
+    "contextualSpacing": {None},
+    "pageBreakBefore": {None},
+    "widowControl": {None, "0"},
+    "overflowPunct": {"0"},
+    "autoSpaceDE": {"0"},
+    "autoSpaceDN": {"0"},
+    "adjustRightInd": {"0"},
+    "textAlignment": {"auto", "baseline", "center"},
+    "outlineLvl": {str(n) for n in range(9)},
+}
+
+
+def _paragraph_drawn(sources: list[ET.Element]) -> bool:
+    """Whether Word drew a Word 6 label in a paragraph with these properties, at every level."""
+    for properties in sources:
+        for child in properties:
+            name = _local(child.tag)
+            if not child.tag.startswith(f"{{{W}}}"):
+                return False
+            if name == "shd":
+                drawn = {"val": "clear", "color": "auto"}
+                if {_local(k): v for k, v in child.attrib.items()} not in (
+                    drawn | {"fill": "FFFFFF"},
+                    drawn | {"fill": "E6E6E6"},
+                ):
+                    return False
+            elif name == "spacing":
+                if not _spacing_drawn(child):
+                    return False
+            elif name in _WORD6_VALUES:
+                if any(k != _w("val") for k in child.attrib):
+                    return False
+                if child.get(_w("val")) not in _WORD6_VALUES[name]:
+                    return False
+            elif name not in _WORD6_OWN:
+                return False
+    return True
+
+
+def _spacing_drawn(spacing: ET.Element) -> bool:
+    """Whether Word drew a Word 6 label with this line spacing.
+
+    Before and after up to 240 twips, lines 240 to 480 (auto) or 200 to 1200 (exact, at least).
+    """
+    lines = {"auto": (240, 480), "exact": (200, 1200), "atLeast": (200, 1200)}.get(
+        spacing.get(_w("lineRule"), "auto")
+    )
+    if lines is None:
+        return False
+    for key, value in spacing.attrib.items():
+        if key == _w("lineRule"):
+            continue
+        if not re.fullmatch("[0-9]{1,4}", value):
+            return False
+        low, high = lines if key == _w("line") else (0, 240)
+        if key not in (_w("line"), _w("before"), _w("after")) or not low <= int(value) <= high:
+            return False
+    return True
 
 
 def _stop_drawn(stop: ET.Element) -> bool:
@@ -2663,8 +2730,9 @@ def _page_drawn(document: ET.Element, settings: ET.Element | None) -> bool:
         "useWord2013TrackBottomHyphenation=1",
     }
     rest = found - hyphenation - {"useFELayout", "doNotUseHTMLParagraphAutoSpacing"}
+    # No settings part is drawn; a part without compat options is not.
     return (
-        (not found or (len(hyphenation) == 1 and rest == _WORD6_FIXED))
+        (settings is None or (len(hyphenation) == 1 and rest == _WORD6_FIXED))
         and not any(
             g.get(_w("type")) in ("linesAndChars", "snapToChars")
             for g in document.iter(_w("docGrid"))

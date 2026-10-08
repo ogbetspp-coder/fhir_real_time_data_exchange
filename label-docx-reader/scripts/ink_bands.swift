@@ -5,8 +5,9 @@
 //
 // Each page is drawn at SCALE pixels a point on white. Band b of a page runs from TOP + b * LINE
 // to TOP + (b + 1) * LINE points below the page's top edge; for each of ROWS bands it prints the
-// page (from 1), the band (from 0), and where the red ink and the blue ink start and end across
-// it, in points from the page's left edge, or -1 where there is none. A pixel is red ink where its
+// page (from 1), the band (from 0), where the red ink and the blue ink start and end across it, in
+// points from the page's left edge, then where the red and the blue ink start and end down it, in
+// points from the page's top edge; -1 where there is none. A pixel is red ink where its
 // red is at least 64 above its green and blue (a quarter of a red glyph's coverage), blue alike.
 // The bitmap's memory holds the page's top row first: rows are read as they are, never flipped.
 import CoreGraphics
@@ -44,17 +45,27 @@ for number in 1...document.numberOfPages {
     let last = min(height, Int(((top + Double(band + 1) * line) * scale).rounded()))
     var red: (Int, Int)? = nil
     var blue: (Int, Int)? = nil
+    var redRows: (Int, Int)? = nil
+    var blueRows: (Int, Int)? = nil
     for row in first..<last {
       for column in 0..<width {
         let at = (row * width + column) * 4
         let (r, g, b) = (Int(pixels[at]), Int(pixels[at + 1]), Int(pixels[at + 2]))
-        if r - max(g, b) >= 64 { red = (min(red?.0 ?? column, column), max(red?.1 ?? column, column)) }
-        if b - max(r, g) >= 64 { blue = (min(blue?.0 ?? column, column), max(blue?.1 ?? column, column)) }
+        if r - max(g, b) >= 64 {
+          red = (min(red?.0 ?? column, column), max(red?.1 ?? column, column))
+          redRows = (min(redRows?.0 ?? row, row), max(redRows?.1 ?? row, row))
+        }
+        if b - max(r, g) >= 64 {
+          blue = (min(blue?.0 ?? column, column), max(blue?.1 ?? column, column))
+          blueRows = (min(blueRows?.0 ?? row, row), max(blueRows?.1 ?? row, row))
+        }
       }
     }
-    // An ink run's end is the right edge of its last column.
+    // An ink run's end is the right edge of its last column, or the bottom edge of its last row.
     print(
       "\(number)\t\(band)\t\(points(red?.0))\t\(points(red.map { $0.1 + 1 }))"
-        + "\t\(points(blue?.0))\t\(points(blue.map { $0.1 + 1 }))")
+        + "\t\(points(blue?.0))\t\(points(blue.map { $0.1 + 1 }))"
+        + "\t\(points(redRows?.0))\t\(points(redRows.map { $0.1 + 1 }))"
+        + "\t\(points(blueRows?.0))\t\(points(blueRows.map { $0.1 + 1 }))")
   }
 }

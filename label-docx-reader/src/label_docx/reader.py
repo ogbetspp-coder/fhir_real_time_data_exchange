@@ -267,11 +267,11 @@ can be no gap at all ("10.5 mg"). Its suffix is ``tab`` only where that gap is a
 Word draws after a label and everything else about it is as Word was recorded drawing it
 (``_word6_unrecorded`` and ``_word6_page``, from Word's drawing of the legacy-drawn cases: its font,
 characters, size, gap, run properties, alignment, its paragraph's tab stops and indents, the compat
-options, outside tables), else ``legacy``: a Word 6 label Word's drawing of which is not on record.
-A Word 6 level with ``w:suff`` is refused, and so is a numbering part out of the schema's order
-(picture bullets, definitions, lists, then at most one ``numIdMacAtCleanup``): with a ``num`` before
-an ``abstractNum``, Word numbered every list of the case on record as one
-[numbering-num-before-abstract].
+options, outside tables, its paragraph's other properties), else ``legacy``: a Word 6 label Word's
+drawing of which is not on record. A Word 6 level with ``w:suff`` is refused, and so is a numbering
+part out of the schema's order (picture bullets, definitions, lists, then at most one
+``numIdMacAtCleanup``): with a ``num`` before an ``abstractNum``, Word numbered every list of the
+case on record as one [numbering-num-before-abstract].
 
 Notes. ``read_document`` returns the footnotes and endnotes with the body, each note's paragraphs
 read by every rule above, in the order the body refers to them; ``read_docx`` returns the body
@@ -3575,11 +3575,28 @@ _WORD6_RUN = frozenset(
     _w(n) for n in ("rFonts", "sz", "szCs", "color", "lang", "noProof", "b", "bCs", "i", "iCs")
 )
 _WORD6_TABS = frozenset({"left", "clear", "num", "right"})
+# The paragraph properties Word drew them with, by element: the values its w:val took (None for
+# none), or None where it is checked apart (the style, numbering and mark's run properties, tab
+# stops, indents, alignment, spacing and shading).
+_WORD6_PARAGRAPH: dict[str, frozenset[str | None] | None] = {
+    **dict.fromkeys(("pStyle", "numPr", "rPr", "tabs", "ind", "jc", "spacing", "shd")),
+    **dict.fromkeys(
+        ("keepNext", "keepLines", "contextualSpacing", "pageBreakBefore"), frozenset({None})
+    ),
+    "widowControl": frozenset({None, "0"}),
+    **dict.fromkeys(
+        ("overflowPunct", "autoSpaceDE", "autoSpaceDN", "adjustRightInd"), frozenset({"0"})
+    ),
+    "textAlignment": frozenset({"auto", "baseline", "center"}),
+    "outlineLvl": frozenset("012345678"),
+}
+# Shading Word drew them under, and line spacing: before and after, and lines by rule.
+_WORD6_SHADING = frozenset({"FFFFFF", "E6E6E6"})
+_WORD6_LINES = {"auto": (240, 480), "exact": (200, 1200), "atLeast": (200, 1200)}
 _WORD6_INDENT = frozenset(_w(n) for n in ("left", "hanging", "firstLine", "right"))
 _WORD_URI = "http://schemas.microsoft.com/office/word"
 _WORD6_COMPAT = frozenset(
-    {frozenset()}
-    | {
+    {
         frozenset(
             {
                 ("compatibilityMode", "15", _WORD_URI),
@@ -3695,8 +3712,8 @@ def _level(element: ET.Element) -> _Level:
 def _word6_page(document: ET.Element, settings: ET.Element | None) -> bool:
     """Whether Word drew Word 6 labels in this document's layout (legacy-drawn*).
 
-    Its compat options one of ``_WORD6_COMPAT``'s, no character grid, every text direction
-    left to right.
+    No settings part, or one whose compat options are one of ``_WORD6_COMPAT``'s; no character
+    grid; every text direction left to right.
     """
     compat = None if settings is None else settings.find(_w("compat"))
     options = frozenset(
@@ -3705,14 +3722,32 @@ def _word6_page(document: ET.Element, settings: ET.Element | None) -> bool:
         else (_local(c.tag) if c.tag.startswith(f"{{{W}}}") else c.tag, c.get(_w("val"), ""), "")
         for c in ([] if compat is None else compat)
     )
+    # No settings part at all is drawn (legacy-drawn); a part without compat options is not.
     return (
-        options in _WORD6_COMPAT
+        (settings is None or options in _WORD6_COMPAT)
         and all(
             g.get(_w("type")) not in ("linesAndChars", "snapToChars")
             for g in document.iter(_w("docGrid"))
         )
         and all(t.get(_w("val")) == "lrTb" for t in document.iter(_w("textDirection")))
     )
+
+
+def _word6_spacing(spacing: ET.Element) -> bool:
+    """Whether Word drew Word 6 labels with this line spacing (``_WORD6_LINES``)."""
+    rule = spacing.get(_w("lineRule"), "auto")
+    if set(spacing.attrib) - {_w(n) for n in ("before", "after", "line", "lineRule")}:
+        return False
+    if rule not in _WORD6_LINES:
+        return False
+    for name in ("before", "after", "line"):
+        value = spacing.get(_w(name))
+        if value is None:
+            continue
+        low, high = _WORD6_LINES[rule] if name == "line" else (0, 240)
+        if not re.fullmatch("[0-9]{1,4}", value) or not low <= int(value) <= high:
+            return False
+    return True
 
 
 def _word6_unrecorded(
@@ -3722,9 +3757,11 @@ def _word6_unrecorded(
 
     On record: a label outside a table, of characters ``LEGACY_ADVANCES`` lists, in that font in
     both Latin slots, at 8 to 28 pt, legacySpace 0 to 340 and legacyIndent 0 to 1500, aligned
-    left, its run properties ``_WORD6_RUN``'s; its paragraph aligned left or justified, left to
-    right, in no frame, its tab stops ``_WORD6_TABS``' from -1985 to 1440, indented by left and
-    hanging 0 to 1500, right -29 to 720 and a firstLine of 0, hanging at most 360 past its left.
+    left, its run properties ``_WORD6_RUN``'s; its paragraph's properties (its own, its style's,
+    the defaults' and its level's) only ``_WORD6_PARAGRAPH``'s, with the values Word drew: aligned
+    left or justified, its tab stops ``_WORD6_TABS``' from -1985 to 1440, indented by left and
+    hanging 0 to 1500, right -29 to 720 and a firstLine of 0, hanging at most 360 past its left,
+    its spacing ``_WORD6_LINES``', its shading clear, of ``_WORD6_SHADING``.
     """
     space, indent = definition.legacy or (None, None)
     name = properties.font("ascii")
@@ -3753,8 +3790,24 @@ def _word6_unrecorded(
         for j in level.findall(_w("jc"))
     ):
         return "alignment"
-    if any(level.find(_w(n)) is not None for level in paragraph for n in ("bidi", "framePr")):
-        return "paragraph"
+    for level in paragraph:
+        for child in level:
+            name = _local(child.tag) if child.tag.startswith(f"{{{W}}}") else ""
+            if name not in _WORD6_PARAGRAPH:
+                return "paragraph"
+            values = _WORD6_PARAGRAPH[name]
+            if values is not None and (
+                set(child.attrib) - {_w("val")} or child.get(_w("val")) not in values
+            ):
+                return "paragraph"
+            if name == "shd" and (
+                set(child.attrib) != {_w("val"), _w("color"), _w("fill")}
+                or (child.get(_w("val")), child.get(_w("color"))) != ("clear", "auto")
+                or child.get(_w("fill")) not in _WORD6_SHADING
+            ):
+                return "paragraph"
+            if name == "spacing" and not _word6_spacing(child):
+                return "spacing"
     for stop in stops:
         position = stop.get(_w("pos"), "")
         if (

@@ -20,16 +20,23 @@ draws it, and refuses what Word's drawing does not cover:
     half-points; legacySpace 0 to 340 and legacyIndent 0 to 1500 twips; its level aligned left
     or not at all; run properties only fonts, size, colour, language, `noProof`, bold, italic
     and their complex-script forms (no character style, border, outline, spacing...);
-  - its paragraph: outside a table, aligned left or justified, with no `bidi` (in the paragraph,
-    its style or its level) and no frame; tab stops only left, clear, `num` or right, from -1985
+  - its paragraph: outside a table; its properties (its own, its style's, the defaults' and its
+    level's) only those Word drew, each with a value it drew: style, numbering, the mark's run
+    properties; aligned left or justified; tab stops only left, clear, `num` or right, from -1985
     to 1440 twips; indents only left and hanging (0 to 1500), right (-29 to 720) and a firstLine
-    of 0, hanging at most 360 past the least left;
-  - the document: no character grid, every text direction left to right, and compat options one
-    of the eight combinations recorded (the QRD template's, `compatibilityMode` 15 with its four
-    other fixed options, `useWord2013TrackBottomHyphenation` 0 or 1, with or without
-    `useFELayout` and `doNotUseHTMLParagraphAutoSpacing`) or none. No other setting is read: the
-    QRD template's `defaultTabStop` (720) and `characterSpacingControl` stood in every recorded
-    case with settings, and no tab stop moved Word's gap.
+    of 0, hanging at most 360 past the least left; line spacing auto (240 to 480), exact or at
+    least (200 to 1200), before and after up to 240; keep with next, keep lines, contextual
+    spacing, page break before (on); widow control (on or off); overflow punctuation, East Asian
+    spacing and right-indent adjustment (off); text alignment auto, baseline or centre; outline
+    level 0 to 8; clear shading in white or light grey. Anything else (no `bidi`, no frame, no
+    border, no mirrored indents...) is `legacy`;
+  - the document: no character grid, every text direction left to right, and either no settings
+    part or compat options that are one of the eight combinations recorded (the QRD template's,
+    `compatibilityMode` 15 with its four other fixed options, `useWord2013TrackBottomHyphenation`
+    0 or 1, with or without `useFELayout` and `doNotUseHTMLParagraphAutoSpacing`); a settings part
+    without compat options is `legacy`. No other setting is read: the QRD template's
+    `defaultTabStop` (720) and `characterSpacingControl` stood in every recorded case with
+    settings, and no tab stop moved Word's gap.
   - For a level of any other kind `tab` says what Word writes, not that Word draws a gap.
 - A Word 6 level with `w:suff` (with a value or without) is refused (`unsupported-numbering`)
   where a paragraph draws it: Word writes the suffix's character there, and what it draws is not
@@ -69,9 +76,22 @@ so the reader now carries only what Word's drawing proves.
   stretched), direct, style and level indents, right indents, a level hanging past its left.
   Every condition follows the rule to a pixel but two: a paragraph hanging further than
   legacyIndent moves the text further out (the rule is a floor there), and Word draws Symbol's
-  bold wider than the rule (not taken). Over the 2,318 Word 6 rows of all nine cases the reader
-  says `tab` 1,679 times, each drawn at least a space wide; of its 639 `legacy`, Word draws 561
-  under a space.
+  bold wider than the rule (not taken). Over the 3,878 Word 6 rows of the banded cases the
+  reader says `tab` 2,799 times, each drawn at least a space wide; of its 1,079 `legacy`, Word
+  draws 924 under a space.
+- `corpus/numbering-cases/legacy-drawn-styled-bare` (1,656 rows): the styled rows again with no
+  settings part; Word draws them as under the QRD template's settings.
+- `corpus/numbering-cases/legacy-drawn-sample-0` to `8`: 405 rows drawn at random from everything
+  the whitelist takes, jointly (seed 20261008): label characters (one to four, either font), size,
+  bold, italic and their complex-script forms, legacySpace and legacyIndent, the level's and the
+  paragraph's indents and tab stops, the style, alignment, line spacing and the paragraph's other
+  properties; case 0 with no settings part, the others one compat combination each. Each row
+  stands on its own page, followed by its label with a space suffix on the next, the space Word
+  draws there. Of the 405, the reader says `tab` 359 times, each drawn at least as wide as its
+  control's space (by 0.83 pt at the least); the 46 others are short of a space by the rule.
+- Every row of every case keeps its ink at least half a point from its band's edges, so no row's
+  ink is another's (a two-line justified paragraph with spacing is drawn above its own top: the
+  samples stand a page each).
 - `corpus/numbering-cases/numbering-num-before-abstract`: the interleaved numbering part.
 - Word's answers for the whole numbering-cases set were recorded again under 16.113.4; the 153
   earlier cases answered as under 16.113.3.

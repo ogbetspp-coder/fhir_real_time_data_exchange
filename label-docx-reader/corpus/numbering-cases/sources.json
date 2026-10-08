@@ -214,6 +214,66 @@
     },
     {
       "name": "Word 6 (legacy) levels as Word draws them: one row each, label red, text blue. Styled, under the QRD template's settings.",
+      "file": "legacy-drawn-styled-bare.docx",
+      "sha256": "2c6b64462107e9bcecbc8f3e32d3164d088c1595a8c0d4d8d665a6cf4fec1b6c",
+      "bytes": 1465382
+    },
+    {
+      "name": "Word 6 (legacy) levels as Word draws them: one row each, label red, text blue. Styled, under the QRD template's settings.",
+      "file": "legacy-drawn-sample-0.docx",
+      "sha256": "2ae34736fbea39ed2fb2c09b45d427eb7506a60b8cb531aef527d0c93bffe407",
+      "bytes": 90538
+    },
+    {
+      "name": "Word 6 (legacy) levels as Word draws them: one row each, label red, text blue. Styled, under the QRD template's settings.",
+      "file": "legacy-drawn-sample-1.docx",
+      "sha256": "d10a5574a44df3260e871ec364d0ffa93bba2f79d8f4b94c5b6b96a99df18b27",
+      "bytes": 91604
+    },
+    {
+      "name": "Word 6 (legacy) levels as Word draws them: one row each, label red, text blue. Styled, under the QRD template's settings.",
+      "file": "legacy-drawn-sample-2.docx",
+      "sha256": "602ba2d9527ac5e8aba8bda963d6304a232f544e9339a4197727689d7ef8b2b7",
+      "bytes": 91029
+    },
+    {
+      "name": "Word 6 (legacy) levels as Word draws them: one row each, label red, text blue. Styled, under the QRD template's settings.",
+      "file": "legacy-drawn-sample-3.docx",
+      "sha256": "658384f54643a7899e82630e9161367219422d2f4ae42bde5d8fb4656c0a55b3",
+      "bytes": 91483
+    },
+    {
+      "name": "Word 6 (legacy) levels as Word draws them: one row each, label red, text blue. Styled, under the QRD template's settings.",
+      "file": "legacy-drawn-sample-4.docx",
+      "sha256": "17a1cb842949d0120fed17205f0e7bab8dcea7b24c6b1b21513c3813d1723ce4",
+      "bytes": 90556
+    },
+    {
+      "name": "Word 6 (legacy) levels as Word draws them: one row each, label red, text blue. Styled, under the QRD template's settings.",
+      "file": "legacy-drawn-sample-5.docx",
+      "sha256": "e21d65c6dbd605e68677cb73a7b5ee612c63bf624eb87a9a74efa2640ae71195",
+      "bytes": 92793
+    },
+    {
+      "name": "Word 6 (legacy) levels as Word draws them: one row each, label red, text blue. Styled, under the QRD template's settings.",
+      "file": "legacy-drawn-sample-6.docx",
+      "sha256": "d2e6a76055f774d3351f2750111cd71d44568425217fcd0f1b0864e5811ded19",
+      "bytes": 90652
+    },
+    {
+      "name": "Word 6 (legacy) levels as Word draws them: one row each, label red, text blue. Styled, under the QRD template's settings.",
+      "file": "legacy-drawn-sample-7.docx",
+      "sha256": "7f21f5e472c24cb9ef5ba4abe4cd0353fdf22066ab577ef993e85edadb88e48f",
+      "bytes": 92391
+    },
+    {
+      "name": "Word 6 (legacy) levels as Word draws them: one row each, label red, text blue. Styled, under the QRD template's settings.",
+      "file": "legacy-drawn-sample-8.docx",
+      "sha256": "28a4e61d181e1b3c2e19b0c657fd20a181e49a281be5d88e460e6479954463e9",
+      "bytes": 91469
+    },
+    {
+      "name": "Word 6 (legacy) levels as Word draws them: one row each, label red, text blue. Styled, under the QRD template's settings.",
       "file": "legacy-drawn-compat-1.docx",
       "sha256": "6f3d93bcd328a851a24c199adf841e91bffdaa7994dbda80576bc07c8951a06f",
       "bytes": 21075

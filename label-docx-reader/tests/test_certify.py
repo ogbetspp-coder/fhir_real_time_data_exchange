@@ -2621,14 +2621,73 @@ _WORD6: dict[str, tuple[dict[str, Any], str]] = {
     ),
     "ind-style": ({"styles": _DEFAULT.format("paragraph", '<w:ind w:right="721"/>')}, "legacy"),
     "table": ({"wrap": _TABLE}, "legacy"),
+    # Paragraph properties Word drew (legacy-drawn-sample), each value; and others.
+    **{
+        f"paragraph-{name}": ({"props": xml}, "tab")
+        for name, xml in [
+            ("keep-next", "<w:keepNext/>"),
+            ("keep-lines", "<w:keepLines/>"),
+            ("contextual", "<w:contextualSpacing/>"),
+            ("widow", "<w:widowControl/>"),
+            ("widow-off", '<w:widowControl w:val="0"/>'),
+            ("punctuation-off", '<w:overflowPunct w:val="0"/>'),
+            ("space-de-off", '<w:autoSpaceDE w:val="0"/>'),
+            ("space-dn-off", '<w:autoSpaceDN w:val="0"/>'),
+            ("right-ind-off", '<w:adjustRightInd w:val="0"/>'),
+            ("align-auto", '<w:textAlignment w:val="auto"/>'),
+            ("align-baseline", '<w:textAlignment w:val="baseline"/>'),
+            ("align-center", '<w:textAlignment w:val="center"/>'),
+            ("outline-0", '<w:outlineLvl w:val="0"/>'),
+            ("outline-8", '<w:outlineLvl w:val="8"/>'),
+            ("shading-white", '<w:shd w:val="clear" w:color="auto" w:fill="FFFFFF"/>'),
+            ("shading-grey", '<w:shd w:val="clear" w:color="auto" w:fill="E6E6E6"/>'),
+            ("spacing-auto-least", '<w:spacing w:line="240" w:lineRule="auto"/>'),
+            ("spacing-auto-most", '<w:spacing w:line="480"/>'),
+            ("spacing-exact-most", '<w:spacing w:line="1200" w:lineRule="exact"/>'),
+            ("spacing-at-least", '<w:spacing w:line="200" w:lineRule="atLeast"/>'),
+            ("spacing-around", '<w:spacing w:before="240" w:after="240"/>'),
+        ]
+    },
+    **{
+        f"paragraph-{name}": ({"props": xml}, "legacy")
+        for name, xml in [
+            ("mirror", "<w:mirrorIndents/>"),
+            (
+                "border",
+                '<w:pBdr><w:left w:val="single" w:sz="4" w:space="4" w:color="auto"/></w:pBdr>',
+            ),
+            ("hyphens", "<w:suppressAutoHyphens/>"),
+            ("grid", '<w:snapToGrid w:val="0"/>'),
+            ("kinsoku", '<w:kinsoku w:val="0"/>'),
+            ("keep-next-off", '<w:keepNext w:val="0"/>'),
+            ("widow-on", '<w:widowControl w:val="1"/>'),
+            ("punctuation", "<w:overflowPunct/>"),
+            ("align-top", '<w:textAlignment w:val="top"/>'),
+            ("outline-9", '<w:outlineLvl w:val="9"/>'),
+            ("shading-other", '<w:shd w:val="clear" w:color="auto" w:fill="FFFF00"/>'),
+            ("shading-solid", '<w:shd w:val="solid" w:color="auto" w:fill="FFFFFF"/>'),
+            ("shading-no-colour", '<w:shd w:val="clear" w:fill="FFFFFF"/>'),
+            ("spacing-auto-under", '<w:spacing w:line="239"/>'),
+            ("spacing-auto-over", '<w:spacing w:line="481"/>'),
+            ("spacing-exact-over", '<w:spacing w:line="1201" w:lineRule="exact"/>'),
+            ("spacing-at-least-under", '<w:spacing w:line="199" w:lineRule="atLeast"/>'),
+            ("spacing-before-over", '<w:spacing w:before="241"/>'),
+            ("spacing-after-over", '<w:spacing w:after="241"/>'),
+            ("spacing-lines", '<w:spacing w:beforeLines="100"/>'),
+            ("spacing-rule", '<w:spacing w:line="240" w:lineRule="other"/>'),
+            ("spacing-not-a-number", '<w:spacing w:after="1e2"/>'),
+            ("toggle-attribute", '<w:keepNext w:x="1"/>'),
+        ]
+    },
     # The document: character grids, text direction, compat options.
     "grid-chars": ({"after": _GRID.format("linesAndChars")}, "legacy"),
     "grid-snap": ({"after": _GRID.format("snapToChars")}, "legacy"),
     "grid-lines": ({"after": _GRID.format("lines")}, "tab"),
     "direction-across": ({"after": _SECTION.format('textDirection w:val="lrTb"')}, "tab"),
     "direction-down": ({"after": _SECTION.format('textDirection w:val="tbRl"')}, "legacy"),
-    "settings-none": ({"settings": ""}, "tab"),
-    "compat-empty": ({"settings": "<w:compat/>"}, "tab"),
+    # No settings part is drawn (legacy-drawn); a part without compat options is not.
+    "settings-without-compat": ({"settings": ""}, "legacy"),
+    "compat-empty": ({"settings": "<w:compat/>"}, "legacy"),
     **{
         f"compat-{hyphenation}-{key}": ({"settings": _compat(hyphenation, flags)}, "tab")
         for hyphenation in ("0", "1")
@@ -2693,6 +2752,12 @@ def test_a_word_6_label_is_followed_by_a_tab_only_as_far_as_words_drawing_goes(n
         {"props": '<w:ind w:left="1e3"/>'},
         {"props": '<w:tabs><w:tab w:val="left" w:pos="5e2"/></w:tabs>'},
         {"rpr": _TIMES_11 + '<x:numSpacing xmlns:x="urn:x" x:val="tabular"/>'},
+        {"props": '<x:kinsoku xmlns:x="urn:x"/>'},
+        {"props": '<w:shd w:fill="FFFFFF"/>'},
+        # A tracked paragraph mark: the reader refuses the document (tracked-change), as it
+        # refuses every change; the check, on its own, takes the mark's w:ins for a run property
+        # Word's drawing is not on record for, and says legacy.
+        {"props": '<w:rPr><w:ins w:id="1" w:author="a" w:date="2026-10-08T00:00:00Z"/></w:rPr>'},
     ],
 )
 def test_the_check_on_its_own_does_not_take_what_the_reader_refuses_for_drawn(

@@ -37,13 +37,15 @@ TOP = 36.0  # the page's top margin, 720 twips
 LINE = numbering_cases.DRAWN_LINE / 20
 
 
-def bands(pdf: Path) -> list[list[float]]:
-    """Each band's red start and end and blue start and end, page by page, -1 where none."""
+def bands(
+    pdf: Path, line: float = LINE, rows: int = numbering_cases.DRAWN_ROWS
+) -> list[list[float]]:
+    """Each band's red and blue ink across, then down, page by page, -1 where none."""
     with tempfile.TemporaryDirectory() as folder:
         tool = Path(folder) / "ink_bands"
         subprocess.run(["swiftc", "-O", str(TOOL), "-o", str(tool)], check=True)
         done = subprocess.run(
-            [str(tool), str(pdf), str(TOP), str(LINE), str(numbering_cases.DRAWN_ROWS), str(SCALE)],
+            [str(tool), str(pdf), str(TOP), str(line), str(rows), str(SCALE)],
             check=True,
             capture_output=True,
             text=True,
@@ -52,7 +54,10 @@ def bands(pdf: Path) -> list[list[float]]:
 
 
 def drawn(case: Path) -> list[list[float]]:
-    """Word's PDF of ``case``, as ink: one [label start, label end, text start, text end] a row."""
+    """Word's PDF of ``case``, as ink, a row each.
+
+    Its label's and text's start and end across, then down (``inside``).
+    """
     word.CONTAINER.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=word.CONTAINER) as folder:
         copy, pdf = Path(folder) / case.name, Path(folder) / f"{case.stem}.pdf"
@@ -60,13 +65,29 @@ def drawn(case: Path) -> list[list[float]]:
         done = word._osascript(["osascript", "-", str(copy), str(pdf), case.name], word.PRINT)
         if done.returncode != 0 or not pdf.exists():
             raise SystemExit(f"{case.name}: Word failed: {done.stderr.strip()}")
-        found = bands(pdf)
+        height, per_page = numbering_cases.GEOMETRY[case.stem]
+        found = bands(pdf, height / 20, per_page)
     rows = len(numbering_cases.ROWS[case.stem]())
-    if any(band != [-1.0] * 4 for band in found[rows:]):
+    if any(band != [-1.0] * 8 for band in found[rows:]):
         raise SystemExit(f"{case.name}: ink below the last row")
     if len(found) < rows or any(-1.0 in band for band in found[:rows]):
         raise SystemExit(f"{case.name}: a row without its label's or its text's ink")
+    for index, band in enumerate(found[:rows]):
+        if not inside(case.stem, index, band):
+            raise SystemExit(f"{case.name}: row {index + 1}'s ink reaches its band's edge")
     return found[:rows]
+
+
+# How far from its band's edges a row's ink must stay, in points: a row whose ink comes nearer
+# may have ink in its neighbour's band.
+CLEARANCE = 0.5
+
+
+def inside(case: str, index: int, band: list[float]) -> bool:
+    """Whether a row's ink, down the page, keeps clear of its band's top and bottom edges."""
+    height, per_page = numbering_cases.GEOMETRY[case]
+    top = TOP + (index % per_page) * height / 20
+    return all(top + CLEARANCE <= y <= top + height / 20 - CLEARANCE for y in band[4:])
 
 
 def main() -> int:
