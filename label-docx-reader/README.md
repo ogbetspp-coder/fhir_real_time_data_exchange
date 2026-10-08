@@ -194,7 +194,9 @@ uv run --frozen python scripts/word_oracle.py compare *.docx  # against Word (ma
 ## Corpus
 
 Public or synthetic documents only, each set with its `sources.json`; `expected.json` locks what
-each document reads to, `word.json` and `browser.json` hold Word's and Chrome's answers.
+each document reads to, `word.json` and `browser.json` hold Word's and Chrome's answers, and
+`word-gaps.json` and `word-drawn.json` what Word drew (`scripts/word_gaps.py`,
+`scripts/word_drawn.py record`, macOS with Word).
 
 | Set               | Documents | What                                                              |
 | ----------------- | --------: | ----------------------------------------------------------------- |
