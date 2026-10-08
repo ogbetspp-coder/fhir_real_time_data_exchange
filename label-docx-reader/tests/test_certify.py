@@ -2270,6 +2270,13 @@ _SETTINGS = {
         for suffix in ("", "space", "nothing")
     },
     "legacy-1": (_list(_level(0, "%1.", extra='<w:legacy w:legacy="1"/>')), [(1, "1.", "legacy")]),
+    **{
+        f"legacy-{value}": (
+            _list(_level(0, "%1.", extra=f'<w:legacy w:legacy="{value}"/>')),
+            [(1, "1.", "tab")],
+        )
+        for value in ("false", "off")
+    },
 }
 
 
@@ -2446,6 +2453,11 @@ _TIMES_11 = _TIMES_FONT + '<w:sz w:val="22"/>'
 # dash at legacyIndent, 2849 at legacySpace.
 _HUGE = _TIMES_FONT + '<w:sz w:val="1024"/>'
 _GRID = '<w:sectPr><w:docGrid w:type="{}" w:linePitch="360"/></w:sectPr>'
+_STYLE = '<w:style w:type="{}" w:styleId="{}"><w:name w:val="S"/><w:pPr><w:bidi/></w:pPr></w:style>'
+_TABLE = (
+    '<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr><w:tblGrid><w:gridCol w:w="5000"/>'
+    "</w:tblGrid><w:tr><w:tc>{}</w:tc></w:tr></w:tbl><w:p/>"
+)
 _WORD6: dict[str, tuple[dict[str, Any], str]] = {
     "dash": ({}, "tab"),
     "bullet": (
@@ -2477,6 +2489,13 @@ _WORD6: dict[str, tuple[dict[str, Any], str]] = {
     "no-space": ({"gap": (None, 360)}, "legacy"),
     "right-to-left": ({"props": "<w:bidi/>"}, "legacy"),
     "left-to-right": ({"props": '<w:bidi w:val="0"/>'}, "tab"),
+    # Right to left by the paragraph's style or its table's, and the table without it.
+    "right-to-left-style": (
+        {"props": '<w:pStyle w:val="P"/>', "styles": _STYLE.format("paragraph", "P")},
+        "legacy",
+    ),
+    "right-to-left-table": ({"wrap": _TABLE, "styles": _STYLE.format("table", "T")}, "legacy"),
+    "left-to-right-table": ({"wrap": _TABLE}, "tab"),
     "grid-chars": ({"after": _GRID.format("linesAndChars")}, "legacy"),
     "grid-snap": ({"after": _GRID.format("snapToChars")}, "legacy"),
     "grid-lines": ({"after": _GRID.format("lines")}, "tab"),
@@ -2510,9 +2529,8 @@ def test_the_check_follows_a_word_6_label_by_a_tab_only_where_word_draws_a_space
         f'<w:legacy w:legacy="1"{widths}/>{parts.get("extra", "")}'
         f"<w:rPr>{parts.get('rpr', _TIMES_11)}</w:rPr></w:lvl>"
     )
-    data = docx(
-        _item(1, 0, parts.get("props", "")) + parts.get("after", ""), numbering=_list(level) + _NUM
-    )
+    item = parts.get("wrap", "{}").format(_item(1, 0, parts.get("props", "")))
+    data = docx(item + parts.get("after", ""), parts.get("styles"), numbering=_list(level) + _NUM)
     numbering = DocxSource(data).body.paragraphs[0].numbering
     assert numbering is not None
     assert numbering["suffix"] == suffix

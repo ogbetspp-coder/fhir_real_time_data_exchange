@@ -3666,7 +3666,7 @@ def _level(element: ET.Element) -> _Level:
     )
 
 
-def _word6_spaced(definition: _Level, label: str, font: str, properties: _Properties) -> bool:
+def _word6_spaced(definition: _Level, label: str, properties: _Properties) -> bool:
     """Whether Word draws at least a space between a Word 6 level's label and its text.
 
     Only where it is on record (``LEGACY_ADVANCES``): a label aligned left, in Times New Roman in
@@ -3674,7 +3674,7 @@ def _word6_spaced(definition: _Level, label: str, font: str, properties: _Proper
     nothing that draws it wider or elsewhere, and with both its legacySpace and legacyIndent.
     """
     space, indent = definition.legacy or (None, None)
-    name = "Symbol" if font == "symbol" else properties.font("ascii")
+    name = properties.font("ascii")
     widths = LEGACY_ADVANCES.get(name or "")
     size = properties.value("sz")
     if (
@@ -3684,7 +3684,7 @@ def _word6_spaced(definition: _Level, label: str, font: str, properties: _Proper
         or size is None
         or not size.isdigit()
         or definition.justified not in (None, "left")
-        or (font == "text" and properties.font("hAnsi") != name)
+        or properties.font("hAnsi") != name
         or properties.value("rFonts", "hint") not in (None, "default")
         or any(x.find(_w(n)) is not None for x in properties.levels() for n in _RESHAPING)
         or any(c not in widths for c in label)
@@ -4065,9 +4065,7 @@ class _Lists:
             raise _refuse_numbering("a list label in capitals")
         if definition.legacy is None:
             return label, definition.suffix
-        spaced = not (self.grid or context.bidi) and _word6_spaced(
-            definition, label, font, properties
-        )
+        spaced = not (self.grid or context.bidi) and _word6_spaced(definition, label, properties)
         return label, "tab" if spaced else "legacy"
 
 

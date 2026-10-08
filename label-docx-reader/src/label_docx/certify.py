@@ -2308,7 +2308,7 @@ _PART_SCHEMA = {"numPicBullet": "p", "abstractNum": "a", "num": "n", "numIdMacAt
 class _Numbering:
     """The labels of a document's lists, counted in document order."""
 
-    def __init__(self, root: ET.Element | None, fonts: _Fonts, grid: bool = False) -> None:
+    def __init__(self, root: ET.Element | None, fonts: _Fonts, grid: bool) -> None:
         self.fonts = fonts
         # Whether a section lays characters on a grid.
         self.grid = grid
@@ -2502,16 +2502,11 @@ class _Numbering:
             raise CertificationError("a list label in capitals")
         if look.word6 is None:
             return out, look.suffix
-        spaced = self._word6_spaced(look, out, family, label_levels, paragraph)
+        spaced = self._word6_spaced(look, out, label_levels, paragraph)
         return out, "tab" if spaced else "legacy"
 
     def _word6_spaced(
-        self,
-        look: _ListLevel,
-        label: str,
-        family: str,
-        levels: list[ET.Element],
-        paragraph: _Paragraph,
+        self, look: _ListLevel, label: str, levels: list[ET.Element], paragraph: _Paragraph
     ) -> bool:
         """Whether Word draws a space's width or more after a Word 6 label [legacy-drawn].
 
@@ -2521,8 +2516,8 @@ class _Numbering:
         wider or elsewhere, in a paragraph left to right, on no character grid.
         """
         space, indent = look.word6 or (None, None)
-        name = "Symbol" if family == "symbol" else self.fonts.font(levels, "ascii")
-        if family == "text" and self.fonts.font(levels, "hAnsi") != name:
+        name = self.fonts.font(levels, "ascii")
+        if self.fonts.font(levels, "hAnsi") != name:
             return False
         widths = LEGACY_ADVANCES.get(name or "")
         hint = next(
@@ -2545,7 +2540,7 @@ class _Numbering:
             or hint not in (None, "default")
             or not size.isdigit()
             or any(x.find(_w(n)) is not None for x in levels for n in _WIDER)
-            or not set(label) <= set(widths)
+            or any(c not in widths for c in label)
         ):
             return False
         # Both sides in twips times the em.
@@ -2576,11 +2571,10 @@ def _right_to_left(fonts: _Fonts, paragraph: _Paragraph) -> bool:
         ),
         fonts.doc_ppr,
     ]
-    for source in sources:
-        found = None if source is None else source.find(_w("bidi"))
-        if found is not None:
-            return _on(found) is True
-    return False
+    found = next(
+        (b for x in sources if x is not None and (b := x.find(_w("bidi"))) is not None), None
+    )
+    return _on(found) is True
 
 
 def _numbering_of(fonts: _Fonts, paragraph: _Paragraph) -> tuple[int, int] | None:
