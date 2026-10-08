@@ -1072,9 +1072,10 @@ def test_the_grey_span_holds_the_other_marks() -> None:
         *("highlight-darkGray", "shading-D9D9D8", "highlight-yellow"),
         # Word draws these in other colours than the template's two (its own print, 2026-10-07).
         *("shading-BFBFBF", "shading-E6E6E6"),
-        # Word prints 15% auto on auto or white as D9D9D9, but the reader spells no theme pattern
-        # colour (a themed accent reads the same) and an auto fill may let a cell's paint through.
+        # Word prints 15% auto on auto or white as D9D9D9 (its fill opaque white); the reader spells
+        # a theme pattern colour from docx-reader/1.34.0, and these wait for a fidelity norm.
         *("shading-pct15-AUTO-AUTO", "shading-pct15-AUTO-FFFFFF", "shading-pct15-AUTO-E6E6E6"),
+        *("shading-pct15-THEME-accent2-AUTO", "shading-pct15-THEME-text1-AUTO"),
         # Nothing on record says how Word draws these.
         *("shading-pct10-AUTO-AUTO", "shading-pct20-AUTO-AUTO", "shading-pct15-AUTO-D9D9D9"),
         *("shading-pct15-000000-AUTO", "shading-pct15-AUTO-C0C0C0", "shading-C0C0C1"),
@@ -1279,7 +1280,8 @@ def test_a_heading_may_end_in_spaces_word_paints_over_nothing() -> None:
         (_p("struck", (0, 6, "strike")), "formatting"),
         (_p("Caps", (0, 4, "caps")), "formatting"),
         (_p("faint", (0, 5, "faint")), "formatting"),
-        (_p("raised", (0, 6, "position")), "formatting"),
+        (_p("raised", (0, 6, "position-1-size22-in22")), "formatting"),
+        (_p("raised", (0, 6, "position+8-size14-in22")), "formatting"),
         (_p("x", (0, 1, "highlight-yellow")), "formatting"),
         (_p("\u00a0", (0, 1, "shading-FFFF00")), "formatting"),
         (_p("x", (0, 1, "superscript"), (0, 1, "subscript")), "script"),
