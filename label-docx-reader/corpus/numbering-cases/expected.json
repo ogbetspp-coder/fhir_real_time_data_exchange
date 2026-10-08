@@ -233,10 +233,15 @@
     "resultSha256": "b1fe55dadd5695e0705f3dc1694ee6873c44c34052fea8d6dc77ffac4df73e1b",
     "sha256": "494ff88e90f40d1f4216752a2f4bf44c85b6f019a6e6471e139d2f53eab325e4"
   },
+  "legacy-drawn.docx": {
+    "certificateSha256": "dcba310c4ab390fcdcdb6844f71bc4d18f7eab1193b7bb263f205006b29326b6",
+    "paragraphsSha256": "93358fe4102eca34e1e82724bd18f7da8046b916dad747918a0f0823b194d885",
+    "resultSha256": "2a2d64a66ef9473a90e15e8edc68948975395ac59897b2a245f9b7bf9d250816",
+    "sha256": "6df42a80497676c6be6fb3f0420ff711398d28daa296d15c71c169ad5be3f635"
+  },
   "legacy-levels.docx": {
-    "certificateSha256": "3cb9dc79acf9b03dd926cab73ac9140b86910e199be2cc3847e1862c85872ddd",
-    "paragraphsSha256": "637fb3451514e2a1998da40759f457fd4d40f4382c85d6b8cfce478d7da0336c",
-    "resultSha256": "8c0a0ef4468f9073a1eda70bc721e73f4cf4239ff2abeb63d443964530325001",
+    "refusal": "unsupported-numbering",
+    "resultSha256": "6eb9cb5b38c346c4ebd21484cdf52cf6487db08940a4347eecfedaf968e7f829",
     "sha256": "a7146dfe924d28e64138480defcc1a9b3656df0fa7ee2cc1d30fdcb9c3e275e8"
   },
   "legal.docx": {
@@ -265,8 +270,8 @@
   },
   "level-override.docx": {
     "certificateSha256": "c54eb288d36a98e5fa4e9d5d671f975084d7ec6a06d290083bb08af94977b16b",
-    "paragraphsSha256": "ddcffe09dc4dea70b15574b35cd1daf584e029dbeed1fd388352ecdab50b0476",
-    "resultSha256": "4ae2269a6112fe3a9bed96e1823e6a71f6d95ad68287b74665eec1bb82157bf5",
+    "paragraphsSha256": "8a1f7e49d77250e56003598e2f6fad7896903ece5d5659fd33bb65a579b35304",
+    "resultSha256": "e13b472b893cad4b210f724b809349ec0d230fc733f99f44f907b90f76f71a91",
     "sha256": "9a345eee6dbd4ae92fca25235e2ec006f2fab5f3b82d806cc03608a188c4015e"
   },
   "missing-start.docx": {
@@ -360,7 +365,7 @@
   },
   "numbering-num-before-abstract.docx": {
     "refusal": "unsupported-numbering",
-    "resultSha256": "520a56a4a6f3ec29d630dee99b13eaddbd7e23c23a405a1539515cfaa9d3b3e6",
+    "resultSha256": "cb27a585cf86a010c0e7207fefaae91f8d28f41f03ee957bc18e3f12cbedc349",
     "sha256": "5dd0d103fbf59c446da8f3ed23379b1a5ee9a84d982c56f6164cb11c76602eed"
   },
   "numbering-style-link-one-way.docx": {

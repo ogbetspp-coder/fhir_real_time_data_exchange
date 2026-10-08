@@ -2253,22 +2253,23 @@ _SETTINGS = {
         )
         for value in ("1", "true", "on", "0")
     },
-    # A Word 6 level is followed by what w:suff says, as any level is (Word, legacy-levels).
+    # A level that is not Word 6's is followed by what w:suff says; a Word 6 one in no font set
+    # is not known to be followed by a space (legacy-drawn).
     **{
-        f"legacy-{value}-{suffix or 'unset'}": (
+        f"legacy-0-{suffix or 'unset'}": (
             _list(
                 _level(
                     0,
                     "%1.",
                     extra=(f'<w:suff w:val="{suffix}"/>' if suffix else "")
-                    + f'<w:legacy w:legacy="{value}"/>',
+                    + '<w:legacy w:legacy="0"/>',
                 )
             ),
             [(1, "1.", suffix or "tab")],
         )
-        for value in ("1", "0")
         for suffix in ("", "space", "nothing")
     },
+    "legacy-1": (_list(_level(0, "%1.", extra='<w:legacy w:legacy="1"/>')), [(1, "1.", "legacy")]),
 }
 
 
@@ -2409,8 +2410,118 @@ def test_the_check_draws_no_label_it_cannot_draw_as_word_does(name: str) -> None
 def test_the_check_refuses_a_num_before_an_abstract_num() -> None:
     # Word numbers the lists otherwise then (corpus/numbering-cases numbering-num-before-abstract).
     path = CORPUS / "numbering-cases" / "numbering-num-before-abstract.docx"
-    with pytest.raises(CertificationError, match="a num before an abstractNum"):
+    with pytest.raises(CertificationError, match="out of the schema's order"):
         DocxSource(path.read_bytes())
+
+
+_PICTURE = '<w:numPicBullet w:numPicBulletId="0"/>'
+_CLEANUP = '<w:numIdMacAtCleanup w:val="1"/>'
+
+
+@pytest.mark.parametrize(
+    ("numbering", "refused"),
+    [
+        (_list(_level(0, "%1.")) + _NUM + _list(_level(0, "%1."), key=2), True),
+        (_list(_level(0, "%1.")) + _PICTURE + _NUM, True),
+        (_list(_level(0, "%1.")) + _NUM + _PICTURE, True),
+        (_list(_level(0, "%1.")) + _CLEANUP + _NUM, True),
+        (_list(_level(0, "%1.")) + _NUM + _CLEANUP + _CLEANUP, True),
+        (_PICTURE + _list(_level(0, "%1.")) + _NUM + _CLEANUP, False),
+    ],
+)
+def test_the_check_reads_the_numbering_part_only_in_the_schemas_order(
+    numbering: str, refused: bool
+) -> None:
+    data = docx(_item(1, 0), numbering=numbering)
+    if refused:
+        with pytest.raises(CertificationError, match="out of the schema's order"):
+            DocxSource(data)
+    else:
+        assert _labels_certified(data) == [(1, "1.", "tab")]
+
+
+_TIMES_FONT = '<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/>'
+_TIMES_11 = _TIMES_FONT + '<w:sz w:val="22"/>'
+# At 1024 half-points the gap Word must draw, a space and a margin, is whole twips: 6259 after a
+# dash at legacyIndent, 2849 at legacySpace.
+_HUGE = _TIMES_FONT + '<w:sz w:val="1024"/>'
+_GRID = '<w:sectPr><w:docGrid w:type="{}" w:linePitch="360"/></w:sectPr>'
+_WORD6: dict[str, tuple[dict[str, Any], str]] = {
+    "dash": ({}, "tab"),
+    "bullet": (
+        {
+            "text": "\uf0b7",
+            "rpr": '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/><w:sz w:val="22"/>',
+        },
+        "tab",
+    ),
+    "ten-touching": ({"text": "%1.", "start": 10, "gap": (0, 0)}, "legacy"),
+    "ten-spaced": ({"text": "%1.", "start": 10, "gap": (144, 0)}, "tab"),
+    "dash-28-pt": ({"gap": (144, 0), "rpr": _TIMES_FONT + '<w:sz w:val="56"/>'}, "legacy"),
+    "indent-exactly": ({"gap": (0, 6259), "rpr": _HUGE}, "tab"),
+    "indent-short": ({"gap": (0, 6258), "rpr": _HUGE}, "legacy"),
+    "space-exactly": ({"gap": (2849, 0), "rpr": _HUGE}, "tab"),
+    "space-short": ({"gap": (2848, 0), "rpr": _HUGE}, "legacy"),
+    "arial": ({"rpr": '<w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="22"/>'}, "legacy"),
+    "other-slot": (
+        {"rpr": '<w:rFonts w:ascii="Times New Roman" w:hAnsi="Arial"/><w:sz w:val="22"/>'},
+        "legacy",
+    ),
+    "hint": ({"rpr": _TIMES_11.replace("/>", ' w:hint="eastAsia"/>', 1)}, "legacy"),
+    "hint-default": ({"rpr": _TIMES_11.replace("/>", ' w:hint="default"/>', 1)}, "tab"),
+    "no-size": ({"rpr": _TIMES_FONT}, "legacy"),
+    "character": ({"text": "x"}, "legacy"),
+    "centred": ({"extra": '<w:lvlJc w:val="center"/>'}, "legacy"),
+    "left": ({"extra": '<w:lvlJc w:val="left"/>'}, "tab"),
+    "no-indent": ({"gap": (0, None)}, "legacy"),
+    "no-space": ({"gap": (None, 360)}, "legacy"),
+    "right-to-left": ({"props": "<w:bidi/>"}, "legacy"),
+    "left-to-right": ({"props": '<w:bidi w:val="0"/>'}, "tab"),
+    "grid-chars": ({"after": _GRID.format("linesAndChars")}, "legacy"),
+    "grid-snap": ({"after": _GRID.format("snapToChars")}, "legacy"),
+    "grid-lines": ({"after": _GRID.format("lines")}, "tab"),
+    **{
+        f"wider-{name}": ({"rpr": _TIMES_11 + f"<w:{name}{attributes}/>"}, "legacy")
+        for name, attributes in [
+            *((n, "") for n in ("b", "bCs", "i", "iCs", "cs", "rtl")),
+            ("spacing", ' w:val="20"'),
+            ("w", ' w:val="90"'),
+            ("kern", ' w:val="16"'),
+            ("fitText", ' w:val="600" w:id="1"'),
+            ("vertAlign", ' w:val="superscript"'),
+            ("eastAsianLayout", ' w:id="1" w:combine="1"'),
+        ]
+    },
+}
+
+
+@pytest.mark.parametrize("name", sorted(_WORD6))
+def test_the_check_follows_a_word_6_label_by_a_tab_only_where_word_draws_a_space(name: str) -> None:
+    parts, suffix = _WORD6[name]
+    text, gap = parts.get("text", "-"), parts.get("gap", (0, 360))
+    widths = "".join(
+        f' w:{attribute}="{value}"'
+        for attribute, value in zip(("legacySpace", "legacyIndent"), gap, strict=True)
+        if value is not None
+    )
+    level = (
+        f'<w:lvl w:ilvl="0"><w:start w:val="{parts.get("start", 1)}"/>'
+        f'<w:numFmt w:val="{"decimal" if "%" in text else "bullet"}"/><w:lvlText w:val="{text}"/>'
+        f'<w:legacy w:legacy="1"{widths}/>{parts.get("extra", "")}'
+        f"<w:rPr>{parts.get('rpr', _TIMES_11)}</w:rPr></w:lvl>"
+    )
+    data = docx(
+        _item(1, 0, parts.get("props", "")) + parts.get("after", ""), numbering=_list(level) + _NUM
+    )
+    numbering = DocxSource(data).body.paragraphs[0].numbering
+    assert numbering is not None
+    assert numbering["suffix"] == suffix
+
+
+def test_the_check_refuses_a_word_6_level_with_a_suffix() -> None:
+    level = _level(0, "%1.", extra='<w:suff w:val="space"/><w:legacy w:legacy="1"/>')
+    with pytest.raises(CertificationError, match="Word 6"):
+        DocxSource(docx(_item(1, 0), numbering=_list(level) + _NUM))
 
 
 def test_the_check_refuses_a_numbering_style_naming_no_list_back() -> None:

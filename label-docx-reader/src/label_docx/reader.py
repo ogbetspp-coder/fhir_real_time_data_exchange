@@ -259,10 +259,17 @@ is its bullet. The label is drawn in the level's run properties over the paragra
 mark's character style), so its fonts are placed as a run's are: a Symbol bullet (U+F0B7) is mapped
 to "•", a Wingdings bullet through ``WINGDINGS_BULLETS`` (U+F0A7 to "▪"), and a bullet in any other
 dingbat font is refused. ``suffix`` is what Word writes after the label, as ``w:suff`` says:
-``tab`` (also when it says nothing), ``space`` or ``nothing``. A Word 6 level (``w:legacy``) is
-no exception: whatever its ``legacySpace`` and ``legacyIndent``, Word writes what ``w:suff`` says.
-A ``num`` before an ``abstractNum`` is refused: Word then numbers the lists otherwise than they
-say, in the case on record all as one [numbering-num-before-abstract].
+``tab`` (also when it says nothing), ``space`` or ``nothing``. After a Word 6 level's label
+(``w:legacy``, no ``w:suff``) Word writes a tab but draws its own gap: the text starts
+max(legacyIndent, the label's advance + legacySpace) after the label starts, which can be no gap
+at all ("10.5 mg"). Its suffix is ``tab`` only where that gap is on record as at least the space
+Word draws after a label (``LEGACY_ADVANCES``, from Word's drawing of legacy-drawn: a label aligned
+left, in Times New Roman or Symbol, of characters whose advances are listed, at a size set, in no
+run property that draws it wider or elsewhere, in a paragraph left to right on no character grid),
+else ``legacy``. A Word 6 level with ``w:suff`` is refused, and so is a numbering part out of the
+schema's order (picture bullets, definitions, lists, then at most one ``numIdMacAtCleanup``): with
+a ``num`` before an ``abstractNum``, Word numbered every list of the case on record as one
+[numbering-num-before-abstract].
 
 Notes. ``read_document`` returns the footnotes and endnotes with the body, each note's paragraphs
 read by every rule above, in the order the body refers to them; ``read_docx`` returns the body
@@ -379,17 +386,18 @@ What it refuses (``DocxRefusedError.code``):
   properties, say), run content standing outside a run, a note nothing refers to, or a comment
   nothing anchors (Word does not show them; their text is in the file all the same).
 - ``unsupported-numbering``: a list label the reader cannot draw exactly: a ``numId`` or level with
-  no definition (or no numbering part), a ``num`` before an ``abstractNum`` in the numbering part,
-  numbered paragraphs or not (Word then numbers every list as one), a paragraph's level outside 0 to
-  8, a format or suffix other than those above (ordinal and text formats depend on the language), a
-  custom format, a level with no ``lvlText`` or one over ``MAX_LEVEL_TEXT`` characters, a picture
-  bullet, a level holding anything else the reader does not know (alternate content, say), a
-  negative ``lvlRestart``, an ``lvlRestart`` at the paragraph's level or above that restarts it
-  after the level directly above (written out), itself or a deeper one (Word draws such a level
-  empty), a ``%`` in ``lvlText`` that names no level or a deeper or undefined one, a bullet level
-  that shows a counter or is shown in another's, ``isLgl`` showing a level of format none, a number
-  past a format's range, a label in capitals or small capitals with letters in it, a numbering-style
-  link the reader cannot follow (no ``styleLink`` back, or to a list with overrides), a list (or its
+  no definition (or no numbering part), a numbering part out of the schema's order, numbered
+  paragraphs or not (with a ``num`` before an ``abstractNum``, Word numbered every list of the case
+  on record as one), a Word 6 level with a suffix, a paragraph's level outside 0 to 8, a format or
+  suffix other than those above (ordinal and text formats depend on the language), a custom format,
+  a level with no ``lvlText`` or one over ``MAX_LEVEL_TEXT`` characters, a picture bullet, a level
+  holding anything else the reader does not know (alternate content, say), a negative
+  ``lvlRestart``, an ``lvlRestart`` at the paragraph's level or above that restarts it after the
+  level directly above (written out), itself or a deeper one (Word draws such a level empty), a
+  ``%`` in ``lvlText`` that names no level or a deeper or undefined one, a bullet level that shows a
+  counter or is shown in another's, ``isLgl`` showing a level of format none, a number past a
+  format's range, a label in capitals or small capitals with letters in it, a numbering-style link
+  the reader cannot follow (no ``styleLink`` back, or to a list with overrides), a list (or its
   level) set by a table style, a list in a note, header, footer or comment, a custom note number
   format or one other than those above, a note symbol past ††, or a note ``numRestart`` other than
   ``continuous``, ``eachSect`` or ``eachPage``.
@@ -677,8 +685,9 @@ class Numbering:
     """The list a paragraph belongs to. ``num_id`` 0 means "not in a list".
 
     ``text`` is the label Word draws before the paragraph ("4.8.", "b)", "•", or "" for a level
-    that shows nothing) and ``suffix`` what follows it: ``tab``, ``space`` or ``nothing``. Both
-    are None when ``num_id`` is 0.
+    that shows nothing) and ``suffix`` what follows it: ``tab``, ``space`` or ``nothing``, or
+    ``legacy`` after a Word 6 level's label, where Word writes a tab but what it draws there is
+    not known to be a space. Both are None when ``num_id`` is 0.
     """
 
     num_id: int
@@ -3348,6 +3357,8 @@ class _Context:
     symbolic: bool = False
     # How many table rows, in any table, ended before the paragraph in its story.
     rows_ended: int = 0
+    # Whether the paragraph runs right to left (bidi).
+    bidi: bool = False
     # How many fields are open in their results when the paragraph ends (a table of contents).
     fields_open: int = 0
     # The height of its tallest character, at least (its text's and its mark's size), in points.
@@ -3429,6 +3440,14 @@ def _paragraph(
         bookmark_starts=tuple(reader.bookmark_starts),
         bookmark_ends=tuple(reader.bookmark_ends),
         fields_open=reader.carried + len(reader.fields),
+        bidi=bool(
+            _on(
+                next(
+                    (e for x in levels if x is not None and (e := x.find(_w("bidi"))) is not None),
+                    None,
+                )
+            )
+        ),
     )
     return Paragraph(
         text=text,
@@ -3535,6 +3554,29 @@ _LEVEL_CHILDREN = {
     )
 }
 _PLACEHOLDER = re.compile(r"(%[1-9])")
+# Word draws a Word 6 label's text max(legacyIndent, the label's advance + legacySpace) after the
+# label's start, whatever the paragraph's indents, for every label, size and gap of
+# corpus/numbering-cases legacy-drawn (Word's PDF, word-gaps.json, to a sixth of a point). The
+# advances, in 2048ths of an em, are those of the fonts Word draws with (its own times.ttf and
+# symbol.ttf), for the characters Word drew there; a label of any other font or character is not
+# on record.
+LEGACY_ADVANCES: dict[str, dict[str, int]] = {
+    "Times New Roman": {"-": 682, ".": 512, "i": 569, **dict.fromkeys("0123456789", 1024)},
+    "Symbol": {"\u2022": 942, "\u2212": 1124},
+}
+LEGACY_EM = 2048
+# The space Word draws after a label whose suffix is a space, in either font and at every size:
+# 569 2048ths of an em (legacy-drawn's controls), wider than either font's own space (512).
+LEGACY_SPACE = 569
+# The twips a gap must be wider than that space to be one: Word's drawing agrees with the rule to
+# a sixth of a point (3.33 twips), so a gap within that of a space is not known to be one.
+LEGACY_MARGIN = 4
+# Run properties that change how wide Word draws characters, or where: a label in any of them is
+# not on record.
+_RESHAPING = (
+    *("b", "bCs", "i", "iCs", "cs", "rtl", "spacing", "w", "kern"),
+    *("fitText", "vertAlign", "eastAsianLayout"),
+)
 # The longest lvlText drawn: a label is rebuilt for every list item, and Word's answer for a
 # longer one is not on record.
 MAX_LEVEL_TEXT = 255
@@ -3566,6 +3608,9 @@ class _Level:
     rpr: ET.Element | None
     # Why the level cannot be drawn, if it cannot; refused only when a paragraph uses it.
     unsupported: str | None
+    # A Word 6 level's legacySpace and legacyIndent (None where unset), else None; and lvlJc.
+    legacy: tuple[int | None, int | None] | None = None
+    justified: str | None = None
 
 
 def _level(element: ET.Element) -> _Level:
@@ -3589,11 +3634,22 @@ def _level(element: ET.Element) -> _Level:
         text = "" if null else text_element.get(_w("val"), "")
         if len(text) > MAX_LEVEL_TEXT:
             unsupported = unsupported or f"a list level text over {MAX_LEVEL_TEXT} characters"
-    # A Word 6 level's too (w:legacy, whatever its gap): Word writes what w:suff says, a tab
-    # when it says nothing [legacy-levels].
     suffix = value("suff") or "tab"
     if suffix not in ("tab", "space", "nothing"):
         unsupported = unsupported or f"the suffix {suffix}"
+    old = element.find(_w("legacy"))
+    legacy = None
+    if old is not None and old.get(_w("legacy")) not in ("0", "false", "off"):
+        # A Word 6 level: Word writes a tab after its label, but draws its own gap there
+        # [legacy-levels, legacy-drawn]. With w:suff, Word writes that, and what it draws is not
+        # on record.
+        if value("suff") is not None:
+            unsupported = unsupported or "a Word 6 level with a suffix"
+        space, indent = (old.get(_w(name)) for name in ("legacySpace", "legacyIndent"))
+        legacy = (
+            None if space is None else _int(space, "legacySpace"),
+            None if indent is None else _int(indent, "legacyIndent"),
+        )
     start = value("start")
     restart = value("lvlRestart")
     return _Level(
@@ -3605,7 +3661,39 @@ def _level(element: ET.Element) -> _Level:
         suffix=suffix,
         rpr=element.find(_w("rPr")),
         unsupported=unsupported,
+        legacy=legacy,
+        justified=value("lvlJc"),
     )
+
+
+def _word6_spaced(definition: _Level, label: str, font: str, properties: _Properties) -> bool:
+    """Whether Word draws at least a space between a Word 6 level's label and its text.
+
+    Only where it is on record (``LEGACY_ADVANCES``): a label aligned left, in Times New Roman in
+    both Latin slots or in Symbol, of characters the font's advances list, at a size set, with
+    nothing that draws it wider or elsewhere, and with both its legacySpace and legacyIndent.
+    """
+    space, indent = definition.legacy or (None, None)
+    name = "Symbol" if font == "symbol" else properties.font("ascii")
+    widths = LEGACY_ADVANCES.get(name or "")
+    size = properties.value("sz")
+    if (
+        widths is None
+        or space is None
+        or indent is None
+        or size is None
+        or not size.isdigit()
+        or definition.justified not in (None, "left")
+        or (font == "text" and properties.font("hAnsi") != name)
+        or properties.value("rFonts", "hint") not in (None, "default")
+        or any(x.find(_w(n)) is not None for x in properties.levels() for n in _RESHAPING)
+        or any(c not in widths for c in label)
+    ):
+        return False
+    # Twips, each times the em: the label's advance, the gap Word draws after it, and a space.
+    advance = sum(widths[c] for c in label) * int(size) * 10
+    gap = max(indent * LEGACY_EM - advance, space * LEGACY_EM)
+    return gap >= LEGACY_SPACE * int(size) * 10 + LEGACY_MARGIN * LEGACY_EM
 
 
 def _ilvl(element: ET.Element) -> int:
@@ -3655,24 +3743,33 @@ class _Counters:
     higher_rows: list[int | None] = field(default_factory=lambda: [None] * len(_LEVELS))
 
 
+_PART_ORDER = {
+    _w(name): rank
+    for rank, name in enumerate(("numPicBullet", "abstractNum", "num", "numIdMacAtCleanup"))
+}
+
+
 def _refuse_numbering(detail: str) -> DocxRefusedError:
     return DocxRefusedError("unsupported-numbering", detail)
 
 
 class _Lists:
-    def __init__(self, root: ET.Element | None, styles: _Styles) -> None:
+    def __init__(self, root: ET.Element | None, styles: _Styles, grid: bool = False) -> None:
         self.styles = styles
+        # Whether a section lays characters on a grid, which spaces them otherwise.
+        self.grid = grid
         self.present = root is not None
         self.abstracts: dict[int, _Abstract] = {}
         self.nums: dict[int, _Num] = {}
         self.counters: dict[int, _Counters] = {}
         if root is None:
             return
-        # Each abstractNum before every num, in the schema's order: else Word draws every list as
-        # one, not as each names [numbering-num-before-abstract].
-        order = [c.tag == _w("num") for c in root if c.tag in (_w("abstractNum"), _w("num"))]
-        if order != sorted(order):
-            raise _refuse_numbering("a num before an abstractNum")
+        # The schema's order: picture bullets, definitions, lists, then at most one
+        # numIdMacAtCleanup. Out of it, Word draws the lists otherwise than they say (with a num
+        # before an abstractNum, as one list [numbering-num-before-abstract]).
+        ranks = [_PART_ORDER[c.tag] for c in root if c.tag in _PART_ORDER]
+        if ranks != sorted(ranks) or ranks.count(3) > 1:
+            raise _refuse_numbering("the numbering part out of the schema's order")
         for element in root.findall(_w("abstractNum")):
             key = _int(element.get(_w("abstractNumId"), ""), "abstractNumId")
             if key in self.abstracts:
@@ -3785,8 +3882,8 @@ class _Lists:
                 )
         counters = self.counters.setdefault(key, _Counters())
         self._count(counters, numbering.num_id, num, level, base, levels, context.rows_ended)
-        text = self._draw(counters, level, levels, definition, context)
-        return replace(numbering, text=text, suffix=definition.suffix)
+        text, suffix = self._draw(counters, level, levels, definition, context)
+        return replace(numbering, text=text, suffix=suffix)
 
     @staticmethod
     def _base_start(counters: _Counters, base: dict[int, _Level], level: int) -> None:
@@ -3917,7 +4014,8 @@ class _Lists:
         levels: dict[int, _Level],
         definition: _Level,
         context: _Context,
-    ) -> str:
+    ) -> tuple[str, str]:
+        """The label Word draws, and its suffix."""
         if definition.unsupported is not None:
             raise _refuse_numbering(definition.unsupported)
         if definition.text is None:
@@ -3965,7 +4063,12 @@ class _Lists:
             label = _characters(drawn, font == "symbol")
         if (properties.toggle("caps") or properties.toggle("smallCaps")) and label.upper() != label:
             raise _refuse_numbering("a list label in capitals")
-        return label
+        if definition.legacy is None:
+            return label, definition.suffix
+        spaced = not (self.grid or context.bidi) and _word6_spaced(
+            definition, label, font, properties
+        )
+        return label, "tab" if spaced else "legacy"
 
 
 def _number(value: int, fmt: str) -> str:
@@ -5014,7 +5117,8 @@ def read_document(data: bytes) -> Document:
                 (v.get(_w("name")), v.get(_w("val")))
                 for v in parts[3].iterfind(f"{_w('docVars')}/{_w('docVar')}")
             ]
-        lists = _Lists(parts[4], styles)
+        grids = (g.get(_w("type")) for g in document.iter(_w("docGrid")))
+        lists = _Lists(parts[4], styles, any(t in ("linesAndChars", "snapToChars") for t in grids))
         even = parts[3] is not None and bool(_on(parts[3].find(_w("evenAndOddHeaders"))))
         stories = _story_parts(package, mains[0], document, even)
         comment_parts = package.related(mains[0], "comments")

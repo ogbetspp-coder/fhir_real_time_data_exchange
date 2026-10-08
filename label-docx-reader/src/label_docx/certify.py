@@ -102,7 +102,14 @@ from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from typing import Any
 
-from label_docx.reader import SYMBOL_FONT, WINGDINGS_BULLETS
+from label_docx.reader import (
+    LEGACY_ADVANCES,
+    LEGACY_EM,
+    LEGACY_MARGIN,
+    LEGACY_SPACE,
+    SYMBOL_FONT,
+    WINGDINGS_BULLETS,
+)
 
 CHECKER_VERSION = "conservation-check/1.20.0"
 
@@ -2240,6 +2247,9 @@ class _ListLevel:
     suffix: str
     rpr: ET.Element | None
     picture: bool
+    # A Word 6 level's legacySpace and legacyIndent (None where unset), else None; and lvlJc.
+    word6: tuple[int | None, int | None] | None = None
+    jc: str | None = None
 
 
 def _list_level(element: ET.Element) -> _ListLevel:
@@ -2255,8 +2265,17 @@ def _list_level(element: ET.Element) -> _ListLevel:
     if text_element is not None:
         null = text_element.get(_w("null")) in ("1", "true", "on")
         text = "" if null else text_element.get(_w("val"), "")
-    # What w:suff says, a Word 6 level's (w:legacy) too [legacy-levels].
     suffix = value("suff") or "tab"
+    legacy = element.find(_w("legacy"))
+    word6 = None
+    if legacy is not None and legacy.get(_w("legacy")) not in ("0", "false", "off"):
+        if value("suff") is not None:
+            raise CertificationError("a Word 6 list level with a suffix")  # not on record
+        gaps = [legacy.get(_w(name)) for name in ("legacySpace", "legacyIndent")]
+        word6 = (
+            None if gaps[0] is None else int(gaps[0]),
+            None if gaps[1] is None else int(gaps[1]),
+        )
     start, restart = value("start"), value("lvlRestart")
     return _ListLevel(
         start=None if start is None else int(start),
@@ -2267,6 +2286,8 @@ def _list_level(element: ET.Element) -> _ListLevel:
         suffix=suffix,
         rpr=element.find(_w("rPr")),
         picture=element.find(_w("lvlPicBulletId")) is not None,
+        word6=word6,
+        jc=value("lvlJc"),
     )
 
 
@@ -2280,18 +2301,24 @@ def _once[T](pairs: Iterator[tuple[int, T]]) -> dict[int, T]:
     return out
 
 
+# The numbering part's children, in the schema's order.
+_PART_SCHEMA = {"numPicBullet": "p", "abstractNum": "a", "num": "n", "numIdMacAtCleanup": "c"}
+
+
 class _Numbering:
     """The labels of a document's lists, counted in document order."""
 
-    def __init__(self, root: ET.Element | None, fonts: _Fonts) -> None:
+    def __init__(self, root: ET.Element | None, fonts: _Fonts, grid: bool = False) -> None:
         self.fonts = fonts
+        # Whether a section lays characters on a grid.
+        self.grid = grid
         self.abstracts: dict[int, tuple[dict[int, _ListLevel], str | None, str | None]] = {}
         self.nums: dict[int, tuple[int, dict[int, int], dict[int, _ListLevel]]] = {}
-        # A num before an abstractNum: Word numbers the lists otherwise then
+        # Out of the schema's order Word numbers the lists otherwise than they say
         # [numbering-num-before-abstract].
-        kinds = [] if root is None else [_local(c.tag) for c in root]
-        if "num" in kinds and "abstractNum" in kinds[kinds.index("num") :]:
-            raise CertificationError("a num before an abstractNum")
+        order = "".join(_PART_SCHEMA.get(_local(c.tag), "") for c in ([] if root is None else root))
+        if not re.fullmatch("p*a*n*c?", order):
+            raise CertificationError("the numbering part out of the schema's order")
         # Anything defined twice (a list, a list's definition, a level of either) is refused:
         # which one Word takes is not on record.
         for element in [] if root is None else root.findall(_w("abstractNum")):
@@ -2473,7 +2500,87 @@ class _Numbering:
             raise CertificationError("a hidden list label")
         if out != out.upper() and any_level("caps", "smallCaps"):
             raise CertificationError("a list label in capitals")
-        return out, look.suffix
+        if look.word6 is None:
+            return out, look.suffix
+        spaced = self._word6_spaced(look, out, family, label_levels, paragraph)
+        return out, "tab" if spaced else "legacy"
+
+    def _word6_spaced(
+        self,
+        look: _ListLevel,
+        label: str,
+        family: str,
+        levels: list[ET.Element],
+        paragraph: _Paragraph,
+    ) -> bool:
+        """Whether Word draws a space's width or more after a Word 6 label [legacy-drawn].
+
+        Word starts the text max(legacyIndent, the label's advance + legacySpace) after the label,
+        as far as its drawing is on record: a label aligned left, in Times New Roman (both Latin
+        slots) or Symbol, of characters whose advances are on record, at a size set, drawn no
+        wider or elsewhere, in a paragraph left to right, on no character grid.
+        """
+        space, indent = look.word6 or (None, None)
+        name = "Symbol" if family == "symbol" else self.fonts.font(levels, "ascii")
+        if family == "text" and self.fonts.font(levels, "hAnsi") != name:
+            return False
+        widths = LEGACY_ADVANCES.get(name or "")
+        hint = next(
+            (
+                f.get(_w("hint"))
+                for x in levels
+                if (f := x.find(_w("rFonts"))) is not None and f.get(_w("hint")) is not None
+            ),
+            None,
+        )
+        sizes = [x.find(_w("sz")) for x in levels]
+        size = next((z.get(_w("val"), "") for z in sizes if z is not None), "")
+        if (
+            widths is None
+            or space is None
+            or indent is None
+            or self.grid
+            or _right_to_left(self.fonts, paragraph)
+            or look.jc not in (None, "left")
+            or hint not in (None, "default")
+            or not size.isdigit()
+            or any(x.find(_w(n)) is not None for x in levels for n in _WIDER)
+            or not set(label) <= set(widths)
+        ):
+            return False
+        # Both sides in twips times the em.
+        needed = LEGACY_SPACE * int(size) * 10 + LEGACY_MARGIN * LEGACY_EM
+        after = indent * LEGACY_EM - sum(widths[c] for c in label) * int(size) * 10
+        return after >= needed or space * LEGACY_EM >= needed
+
+
+# Run properties under which Word draws characters wider, narrower or elsewhere.
+_WIDER = (
+    *("b", "bCs", "i", "iCs", "cs", "rtl", "spacing", "w", "kern"),
+    *("fitText", "vertAlign", "eastAsianLayout"),
+)
+
+
+def _right_to_left(fonts: _Fonts, paragraph: _Paragraph) -> bool:
+    """Whether the paragraph runs right to left: the nearest bidi of its properties' levels."""
+    sources = [
+        paragraph.properties,
+        *(fonts.ppr.get(i) for i in fonts.style_ids(paragraph.style, "paragraph")),
+        *(
+            fonts.ppr.get(i)
+            for i in (
+                fonts.style_ids(paragraph.table_style, "table")
+                if paragraph.table is not None
+                else []
+            )
+        ),
+        fonts.doc_ppr,
+    ]
+    for source in sources:
+        found = None if source is None else source.find(_w("bidi"))
+        if found is not None:
+            return _on(found) is True
+    return False
 
 
 def _numbering_of(fonts: _Fonts, paragraph: _Paragraph) -> tuple[int, int] | None:
@@ -2739,7 +2846,12 @@ class DocxSource:
             if body is None:
                 raise CertificationError("no body")
             self.body = self._part(body, None, main)
-            self.lists = _Numbering(parse.get(related.get("numbering", "")), self.fonts)
+            grid = {g.get(_w("type")) for g in parse[main].iter(_w("docGrid"))}
+            self.lists = _Numbering(
+                parse.get(related.get("numbering", "")),
+                self.fonts,
+                bool(grid & {"linesAndChars", "snapToChars"}),
+            )
             for paragraph in self.body.paragraphs:
                 paragraph.numbering = self._label(paragraph, None)
             sections: list[ET.Element | None] = [

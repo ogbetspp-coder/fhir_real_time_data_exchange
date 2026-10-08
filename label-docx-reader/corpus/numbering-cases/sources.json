@@ -201,6 +201,12 @@
       "bytes": 47743
     },
     {
+      "name": "Word 6 (legacy) levels as Word draws them: one row each, label red, text blue.",
+      "file": "legacy-drawn.docx",
+      "sha256": "6df42a80497676c6be6fb3f0420ff711398d28daa296d15c71c169ad5be3f635",
+      "bytes": 671650
+    },
+    {
       "name": "Each abstractNum followed by its num, out of the schema's order.",
       "file": "numbering-num-before-abstract.docx",
       "sha256": "5dd0d103fbf59c446da8f3ed23379b1a5ee9a84d982c56f6164cb11c76602eed",

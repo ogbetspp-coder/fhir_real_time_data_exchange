@@ -142,7 +142,7 @@ def released_problems(lock: Lock, history: list[tuple[str, Lock]]) -> list[str]:
 
 
 # A corpus set's own records, beside its documents.
-MANIFESTS = {"sources", "expected", "word", "browser"}
+MANIFESTS = {"sources", "expected", "word", "browser", "word-gaps"}
 
 
 def _certificate(result: bytes) -> dict[str, str]:

@@ -283,8 +283,9 @@ on run argv
 end run
 """
 
-# What Word writes after a list label, by the reader's suffix.
-SUFFIXES = {"tab": "\t", "space": " ", "nothing": ""}
+# What Word writes after a list label, by the reader's suffix: after a Word 6 level's, a tab
+# (legacy-levels), where what Word draws is not known to be a space (``legacy``) or is (``tab``).
+SUFFIXES = {"tab": "\t", "legacy": "\t", "space": " ", "nothing": ""}
 _UNIT, _RECORD = "\x1c", "\x1b"
 
 # The document saved as text.
@@ -709,7 +710,11 @@ def _label_fonts(path: Path, saved: bytes, labels: list[str]) -> tuple[list[str 
         _loose(a) != _loose(b) for a, b in zip(found, labels, strict=False)
     ):
         raise SystemExit(f"{path.name}: Word's saved labels are not the ones it drew")
-    return [f if a == b else None for f, a, b in zip(fonts, found, labels, strict=True)], at
+    # Word's text shows a Symbol label's space suffix as U+F020, and its copy as U+0020: one code.
+    return [
+        f if a == b or (b.endswith("\uf020") and a == b[:-1] + " ") else None
+        for f, a, b in zip(fonts, found, labels, strict=True)
+    ], at
 
 
 def _marked(xml: str, kind: str, tag: str, count: itertools.count[int]) -> tuple[str, int]:

@@ -1583,8 +1583,8 @@ def test_lvl_restart_zero_never_restarts_and_n_restarts_after_level_n_minus_1() 
         ("", "tab"),
         ('<w:suff w:val="space"/>', "space"),
         ('<w:suff w:val="nothing"/>', "nothing"),
-        # A Word 6 level: Word writes a tab after it (corpus/numbering-cases legacy-levels).
-        ('<w:legacy w:legacy="1" w:legacySpace="0" w:legacyIndent="360"/>', "tab"),
+        # A Word 6 level in no font named: what Word draws after it is not on record.
+        ('<w:legacy w:legacy="1" w:legacySpace="0" w:legacyIndent="360"/>', "legacy"),
     ],
 )
 def test_the_suffix_is_reported(extra: str, suffix: str) -> None:
@@ -1644,7 +1644,7 @@ def test_a_level_override_replaces_the_level_whole() -> None:
         '<w:legacy w:legacy="1" w:legacySpace="0" w:legacyIndent="360"/></w:lvl>',
     )
     paragraph = read_docx(docx(li(6), numbering=NUMBERING + num(6, 0, legacy)))[0]
-    assert paragraph.numbering == Numbering(6, 0, "-", "tab")
+    assert paragraph.numbering == Numbering(6, 0, "-", "legacy")
 
 
 SHARED_LISTS = (
@@ -1815,10 +1815,10 @@ def test_the_template_draws_its_bullets_and_dashes() -> None:
         for x in read_docx(data)
         if x.numbering is not None and x.numbering.num_id
     ]
-    # Symbol U+F0B7 bullets, and Word 6 dash bullets from the lists that override a level, each
-    # followed by the tab Word writes.
-    assert sorted(set(drawn)) == [("-", "tab"), ("•", "tab")]
-    assert (drawn.count(("•", "tab")), drawn.count(("-", "tab"))) == (7, 9)
+    # Symbol U+F0B7 bullets, and Word 6 dash bullets from the lists that override a level: in
+    # Times New Roman 11 pt, eight drawn a space's width or more from their text.
+    assert sorted(set(drawn)) == [("-", "legacy"), ("-", "tab"), ("•", "tab")]
+    assert [drawn.count(x) for x in [("•", "tab"), ("-", "tab"), ("-", "legacy")]] == [7, 8, 1]
 
 
 @pytest.mark.parametrize(
@@ -1836,14 +1836,101 @@ def test_a_numbering_part_that_defines_something_twice_is_refused(numbering: str
     assert refusal(p(r("<w:t>x</w:t>")), numbering=numbering) == "invalid-package"
 
 
-def test_a_num_before_an_abstract_num_is_refused() -> None:
-    # Word then draws every list as one (corpus/numbering-cases numbering-num-before-abstract).
+PICTURE_BULLET = '<w:numPicBullet w:numPicBulletId="0"/>'
+CLEANUP = '<w:numIdMacAtCleanup w:val="1"/>'
+
+
+@pytest.mark.parametrize(
+    "numbering",
+    [
+        # A num before an abstractNum: Word then draws every list as one
+        # (corpus/numbering-cases numbering-num-before-abstract).
+        abstract(1, lvl(0, "bullet", "-")) + num(1, 1) + abstract(2, lvl(0)),
+        num(1, 1) + abstract(1, lvl(0, "bullet", "-")),
+        # A picture bullet after a definition or a list, a cleanup mark before one or twice.
+        abstract(1, lvl(0)) + PICTURE_BULLET + num(1, 1),
+        abstract(1, lvl(0)) + num(1, 1) + PICTURE_BULLET,
+        abstract(1, lvl(0)) + CLEANUP + num(1, 1),
+        abstract(1, lvl(0)) + num(1, 1) + CLEANUP + CLEANUP,
+    ],
+)
+def test_a_numbering_part_out_of_the_schemas_order_is_refused(numbering: str) -> None:
+    assert refusal(li(1), numbering=numbering) == "unsupported-numbering"
+
+
+def test_a_numbering_part_in_the_schemas_order_is_read() -> None:
     dash = abstract(1, lvl(0, "bullet", "-"))
-    assert refusal(li(1), numbering=dash + num(1, 1) + abstract(2, lvl(0))) == (
-        "unsupported-numbering"
-    )
-    assert refusal(li(1), numbering=num(1, 1) + dash) == "unsupported-numbering"
-    assert labels(li(1), dash + abstract(2, lvl(0)) + num(1, 1)) == ["-"]
+    assert labels(li(1), PICTURE_BULLET + dash + abstract(2, lvl(0)) + num(1, 1) + CLEANUP) == ["-"]
+
+
+TIMES_11 = (
+    '<w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="22"/>'
+)
+SYMBOL_11 = '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/><w:sz w:val="22"/>'
+
+
+def word6(
+    text: str = "-", gap: str = 'w:legacySpace="0" w:legacyIndent="360"', **parts: str
+) -> str:
+    """The suffix the reader gives a Word 6 level's label: ``rpr`` (closed here), ``extra``..."""
+    fmt, start = ("bullet", 1) if "%" not in text else ("decimal", int(parts.get("start", "10")))
+    rpr = parts.get("rpr", TIMES_11) + parts.get("run", "") + "</w:rPr>"
+    level = lvl(0, fmt, text, f'<w:legacy w:legacy="1" {gap}/>{parts.get("extra", "")}{rpr}', start)
+    body = li(1, props=parts.get("props", "")) + parts.get("after", "")
+    found = read_docx(docx(body, numbering=abstract(1, level) + num(1, 1)))[0].numbering
+    assert found is not None
+    return str(found.suffix)
+
+
+@pytest.mark.parametrize(
+    ("label", "parts", "suffix"),
+    [
+        # The EMA template's dash: 18 pt from its start, Word draws its text 14.3 pt after it.
+        ("-", {}, "tab"),
+        ("\uf0b7", {"rpr": SYMBOL_11}, "tab"),
+        # "10." at legacyIndent 0: Word draws "10.5 mg", no gap (legacy-drawn).
+        ("%1.", {"gap": 'w:legacySpace="0" w:legacyIndent="0"'}, "legacy"),
+        # legacySpace 144 (7.2 pt) after it, more than the 3.1 pt Word draws for a space at 11 pt.
+        ("%1.", {"gap": 'w:legacySpace="144" w:legacyIndent="0"'}, "tab"),
+        # At 28 pt, a space Word draws is 7.8 pt: 7.2 pt is not one.
+        (
+            "-",
+            {
+                "gap": 'w:legacySpace="144" w:legacyIndent="0"',
+                "rpr": TIMES_11.replace('"22"', '"56"'),
+            },
+            "legacy",
+        ),
+        # Not on record: another font, none, bold, a character, alignment, a gap left unset.
+        (
+            "-",
+            {"rpr": '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="22"/>'},
+            "legacy",
+        ),
+        ("-", {"rpr": '<w:rPr><w:sz w:val="22"/>'}, "legacy"),
+        ("-", {"run": "<w:b/>"}, "legacy"),
+        ("x", {}, "legacy"),
+        ("-", {"extra": '<w:lvlJc w:val="center"/>'}, "legacy"),
+        ("-", {"gap": 'w:legacySpace="0"'}, "legacy"),
+        # A paragraph right to left, a character grid.
+        ("-", {"props": "<w:bidi/>"}, "legacy"),
+        (
+            "-",
+            {"after": '<w:sectPr><w:docGrid w:type="linesAndChars" w:linePitch="360"/></w:sectPr>'},
+            "legacy",
+        ),
+    ],
+)
+def test_a_word_6_label_is_followed_by_a_tab_only_where_word_draws_a_space_or_more(
+    label: str, parts: dict[str, str], suffix: str
+) -> None:
+    assert word6(label, **parts) == suffix
+
+
+def test_a_word_6_level_with_a_suffix_is_refused() -> None:
+    # Word writes the suffix's character there (legacy-levels); what it draws is not on record.
+    level = lvl(0, "bullet", "-", '<w:suff w:val="space"/><w:legacy w:legacy="1"/>')
+    assert refusal(li(1), numbering=abstract(1, level) + num(1, 1)) == "unsupported-numbering"
 
 
 def test_a_link_to_a_list_that_overrides_a_level_is_refused() -> None:

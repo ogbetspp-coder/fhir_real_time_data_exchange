@@ -517,6 +517,108 @@ def _legacy_levels(interleaved: bool = False) -> Case:
     )
 
 
+# legacy-drawn: Word 6 levels as Word draws them, measured from its PDF (scripts/word_gaps.py).
+# Each row is a paragraph of its own list on an exact line of DRAWN_LINE twips, DRAWN_ROWS a page,
+# the label in red and the text in blue, so each row's ink is found in its own band.
+DRAWN_LINE = 800
+DRAWN_ROWS = 16
+TIMES = '<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/>'
+SYMBOL_FONTS = '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/>'
+DRAWN_LABELS = {
+    "dash": ("bullet", "-", TIMES, 1),
+    "bullet": ("bullet", "", SYMBOL_FONTS, 1),
+    "minus": ("bullet", "", SYMBOL_FONTS, 1),
+    "1.": ("decimal", "%1.", TIMES, 1),
+    "10.": ("decimal", "%1.", TIMES, 10),
+    "iii.": ("lowerRoman", "%1.", TIMES, 3),
+    "2345.": ("decimal", "%1.", TIMES, 2345),
+    "6789.": ("decimal", "%1.", TIMES, 6789),
+}
+# The labels drawn at every gap and indent; the others draw the remaining digits.
+DRAWN_SHAPES = ("dash", "bullet", "minus", "1.", "10.", "iii.")
+DRAWN_SIZES = (16, 18, 20, 22, 28, 40, 56)
+
+
+class DrawnRow(NamedTuple):
+    """One row of legacy-drawn: its label, size (half-points), level layout and indentation."""
+
+    label: str
+    size: int
+    suff: str  # "" for none
+    legacy: tuple[int, int] | None  # (legacySpace, legacyIndent)
+    ind: str  # the level's w:ind attributes, "" for none
+
+
+def drawn_rows() -> list[DrawnRow]:
+    """The rows: each label and size by gap and indent, indentation apart, then the controls."""
+    rows = []
+    for label in DRAWN_SHAPES:
+        for size in DRAWN_SIZES:
+            for indent in (0, 120, 283, 360, 454, 567, 708):
+                ind = f'w:left="{indent}" w:hanging="{indent}"' if indent else ""
+                rows += [DrawnRow(label, size, "", (space, indent), ind) for space in (0, 144)]
+    for label in ("dash", "10."):
+        for size in (22, 56):
+            for indent in (0, 360, 708):
+                for space in (0, 340):
+                    for ind in (
+                        f'w:left="1440" w:hanging="{indent}"',
+                        'w:left="851" w:firstLine="0"',
+                        "",
+                    ):
+                        rows.append(DrawnRow(label, size, "", (space, indent), ind))
+    for label in ("2345.", "6789."):
+        ind = 'w:left="1500" w:hanging="1500"'
+        rows += [DrawnRow(label, size, "", (0, 1500), ind) for size in DRAWN_SIZES]
+    for label in DRAWN_LABELS:
+        for size in DRAWN_SIZES:
+            rows += [DrawnRow(label, size, suff, None, "") for suff in ("nothing", "space")]
+    return rows
+
+
+def _legacy_drawn() -> Case:
+    abstracts, nums, body = [], [], []
+    for key, row in enumerate(drawn_rows(), 1):
+        fmt, text, fonts, start = DRAWN_LABELS[row.label]
+        suff = f'<w:suff w:val="{row.suff}"/>' if row.suff else ""
+        legacy = (
+            ""
+            if row.legacy is None
+            else f'<w:legacy w:legacy="1" w:legacySpace="{row.legacy[0]}" '
+            f'w:legacyIndent="{row.legacy[1]}"/>'
+        )
+        ind = f"<w:ind {row.ind}/>" if row.ind else ""
+        abstracts.append(
+            abstract(
+                key,
+                f'<w:lvl w:ilvl="0"><w:start w:val="{start}"/><w:numFmt w:val="{fmt}"/>{suff}'
+                f'<w:lvlText w:val="{text}"/>{legacy}<w:lvlJc w:val="left"/>'
+                f"<w:pPr>{ind}</w:pPr>"
+                f'<w:rPr>{fonts}<w:color w:val="FF0000"/><w:sz w:val="{row.size}"/></w:rPr>'
+                "</w:lvl>",
+            )
+        )
+        nums.append(num(key, key))
+        page = "<w:pageBreakBefore/>" if key > 1 and (key - 1) % DRAWN_ROWS == 0 else ""
+        sized = f'{TIMES}<w:sz w:val="{row.size}"/>'
+        body.append(
+            f"<w:p><w:pPr>{page}"
+            f'<w:numPr><w:ilvl w:val="0"/><w:numId w:val="{key}"/></w:numPr>'
+            f'<w:spacing w:before="0" w:after="0" w:line="{DRAWN_LINE}" w:lineRule="exact"/>'
+            f"<w:rPr>{sized}</w:rPr></w:pPr>"
+            f'<w:r><w:rPr>{sized}<w:color w:val="0000FF"/></w:rPr><w:t>5 mg</w:t></w:r></w:p>'
+        )
+    return Case(
+        "Word 6 (legacy) levels as Word draws them: one row each, label red, text blue.",
+        "".join(abstracts + nums),
+        "".join(body),
+        final=(
+            '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="720" w:right="1134" '
+            'w:bottom="720" w:left="1134" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr>'
+        ),
+    )
+
+
 HEADING = (
     '<w:style w:type="paragraph" w:styleId="H2"><w:name w:val="H2"/><w:pPr><w:numPr>'
     '<w:numId w:val="1"/></w:numPr></w:pPr></w:style>'
@@ -729,6 +831,7 @@ CASES: dict[str, Case] = {
         items((1, 0), (1, 0)),
     ),
     "legacy-levels": _legacy_levels(),
+    "legacy-drawn": _legacy_drawn(),
     "numbering-num-before-abstract": _legacy_levels(interleaved=True),
     "bullets": Case(
         "Bullets in Symbol, in Courier New, and in the paragraph mark's font.",

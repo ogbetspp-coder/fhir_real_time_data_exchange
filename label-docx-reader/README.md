@@ -108,7 +108,8 @@ from another web page.
 
 - Offsets (`marks`, `notes`, `pages`, `comments`) count Unicode code points of `text`.
 - `numbering` is the list label Word draws before the paragraph (`text`, `suffix`); it is not
-  part of `text`. Its `level` counts from 0 in a .docx (Word's `ilvl`) and from 1 in an ePI (the
+  part of `text`. `suffix` is `tab`, `space` or `nothing`, or `legacy` after a Word 6 label where
+  Word writes a tab but draws a gap not known to be a space wide. Its `level` counts from 0 in a .docx (Word's `ilvl`) and from 1 in an ePI (the
   lists around the item). `table` is `[table, row, cell]`, counted from 0, `cell` among the
   row's cells.
 - `tables` lists each body table, in document order, a nested table as its own entry with its
