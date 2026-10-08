@@ -1042,6 +1042,12 @@ request (key `48c680712be78fa7…`) was published once to `ema-flow-dev-word-dra
 `src/render/word-drawing/keys/dev/1.pem`, dev, key version 1, image `sha256:eff4827a…`, `word-drawing/1.2.1` and that
 request (exit 0, commit 1fa5212).
 
+**The record for `word-epi/1.5.0` (2026-10-08, main 35feaa0, #211).** The synthetic SmPC's request for
+this build (key `20a0a9887d3f757b…`) was published once at 07:58:23 UTC; the build succeeded and stored
+`word/20a0a988…/978b736d…/1.json`, which `scripts/word-drawing/stored.py` accepts against
+`src/render/word-drawing/keys/dev/1.pem`, dev, key version 1, image `sha256:eff4827a…`,
+`word-drawing/1.2.2` and that request (exit 0, commit 35feaa0).
+
 **`word-epi/1.5.0` (`fidelity-norm/3.5.0`, 2026-10-08).** The builder's version moves the
 request's path again, and the drawing's version (`word-drawing/1.2.2`) its drawing id, so this
 build finds the record for `word-epi/1.4.0` nowhere; the tests keep the test key, as above, and
