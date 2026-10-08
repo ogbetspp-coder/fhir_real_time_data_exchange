@@ -1,7 +1,7 @@
 {
   "registryVersion": "1.3.2",
-  "readerVersion": "docx-reader/1.32.0",
-  "readerFormat": "label-docx-json/1.18.1",
+  "readerVersion": "docx-reader/1.33.0",
+  "readerFormat": "label-docx-json/1.19.0",
   "template": {
     "family": "EMA QRD product-information template, centralised procedure",
     "version": "10.4",

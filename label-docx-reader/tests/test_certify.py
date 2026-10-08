@@ -26,7 +26,7 @@ from typing import Any
 
 import pytest
 
-from label_docx import epi_output, output
+from label_docx import certify, epi_output, output, reader
 from label_docx.certify import (
     CHECKED_MARKS,
     CHECKER_VERSION,
@@ -2253,12 +2253,29 @@ _SETTINGS = {
         )
         for value in ("1", "true", "on", "0")
     },
+    # A level that is not Word 6's is followed by what w:suff says; a Word 6 one in no font set
+    # is not known to be followed by a space (legacy-drawn).
+    **{
+        f"legacy-0-{suffix or 'unset'}": (
+            _list(
+                _level(
+                    0,
+                    "%1.",
+                    extra=(f'<w:suff w:val="{suffix}"/>' if suffix else "")
+                    + '<w:legacy w:legacy="0"/>',
+                )
+            ),
+            [(1, "1.", suffix or "tab")],
+        )
+        for suffix in ("", "space", "nothing")
+    },
+    "legacy-1": (_list(_level(0, "%1.", extra='<w:legacy w:legacy="1"/>')), [(1, "1.", "legacy")]),
     **{
         f"legacy-{value}": (
             _list(_level(0, "%1.", extra=f'<w:legacy w:legacy="{value}"/>')),
-            [(1, "1.", "legacy" if value == "1" else "tab")],
+            [(1, "1.", "tab")],
         )
-        for value in ("1", "0", "false", "off")
+        for value in ("false", "off")
     },
 }
 
@@ -2395,6 +2412,546 @@ def test_the_check_draws_no_label_it_cannot_draw_as_word_does(name: str) -> None
     data = docx("".join(_item(*item) for item in items), numbering=numbering + nums)
     with pytest.raises(CertificationError):
         DocxSource(data)
+
+
+def test_the_check_refuses_a_num_before_an_abstract_num() -> None:
+    # Word numbers the lists otherwise then (corpus/numbering-cases numbering-num-before-abstract).
+    path = CORPUS / "numbering-cases" / "numbering-num-before-abstract.docx"
+    with pytest.raises(CertificationError, match="out of the schema's order"):
+        DocxSource(path.read_bytes())
+
+
+_PICTURE = '<w:numPicBullet w:numPicBulletId="0"/>'
+_CLEANUP = '<w:numIdMacAtCleanup w:val="1"/>'
+
+
+@pytest.mark.parametrize(
+    ("numbering", "refused"),
+    [
+        (_list(_level(0, "%1.")) + _NUM + _list(_level(0, "%1."), key=2), True),
+        (_list(_level(0, "%1.")) + _PICTURE + _NUM, True),
+        (_list(_level(0, "%1.")) + _NUM + _PICTURE, True),
+        (_list(_level(0, "%1.")) + _CLEANUP + _NUM, True),
+        (_list(_level(0, "%1.")) + _NUM + _CLEANUP + _CLEANUP, True),
+        (_PICTURE + _list(_level(0, "%1.")) + _NUM + _CLEANUP, False),
+    ],
+)
+def test_the_check_reads_the_numbering_part_only_in_the_schemas_order(
+    numbering: str, refused: bool
+) -> None:
+    data = docx(_item(1, 0), numbering=numbering)
+    if refused:
+        with pytest.raises(CertificationError, match="out of the schema's order"):
+            DocxSource(data)
+    else:
+        assert _labels_certified(data) == [(1, "1.", "tab")]
+
+
+_TIMES_FONT = '<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/>'
+_TIMES_11 = _TIMES_FONT + '<w:sz w:val="22"/>'
+_TIMES_28 = _TIMES_FONT + '<w:sz w:val="56"/>'
+_SYMBOL_11 = '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/><w:sz w:val="22"/>'
+_SECTION = "<w:sectPr><w:{}/></w:sectPr>"
+_GRID = '<w:sectPr><w:docGrid w:type="{}" w:linePitch="360"/></w:sectPr>'
+_DEFAULT = (
+    '<w:style w:type="{}" w:default="1" w:styleId="D"><w:name w:val="D"/><w:pPr>{}</w:pPr>'
+    "</w:style>"
+)
+_TABLE = (
+    '<w:tbl><w:tblGrid><w:gridCol w:w="5000"/></w:tblGrid><w:tr><w:tc>{}</w:tc></w:tr></w:tbl>'
+    "<w:p/>"
+)
+_WORD_URI = "http://schemas.microsoft.com/office/word"
+_FIXED = "".join(
+    f'<w:compatSetting w:name="{name}" w:uri="{_WORD_URI}" w:val="{value}"/>'
+    for name, value in [
+        ("compatibilityMode", "15"),
+        ("overrideTableStyleFontSizeAndJustification", "1"),
+        ("enableOpenTypeFeatures", "1"),
+        ("doNotFlipMirrorIndents", "1"),
+        ("differentiateMultirowTableHeaders", "1"),
+    ]
+)
+
+
+_DRAWN = '<w:defaultTabStop w:val="720"/><w:characterSpacingControl w:val="doNotCompress"/>'
+_PITCH = '<w:sectPr><w:docGrid w:linePitch="{}"/></w:sectPr>'
+_LANG = '<w:lang w:val="en-GB"/>'
+_DEFAULTS_RUN = "<w:docDefaults><w:rPrDefault><w:rPr>{}</w:rPr></w:rPrDefault></w:docDefaults>"
+_DEFAULT_RUN = (
+    '<w:style w:type="paragraph" w:default="1" w:styleId="D"><w:name w:val="D"/><w:rPr>{}</w:rPr>'
+    "</w:style>"
+)
+
+
+def _settings(stop: str | None) -> str:
+    """A default tab stop (None: none) and characters not compressed."""
+    tab = "" if stop is None else f'<w:defaultTabStop w:val="{stop}"/>'
+    return tab + '<w:characterSpacingControl w:val="doNotCompress"/>'
+
+
+def _compat(hyphenation: str = "0", flags: str = "", fixed: str = _FIXED) -> str:
+    setting = (
+        f'<w:compatSetting w:name="useWord2013TrackBottomHyphenation" w:uri="{_WORD_URI}" '
+        f'w:val="{hyphenation}"/>'
+    )
+    return f"<w:compat>{flags}{fixed}{setting}</w:compat>"
+
+
+def _tab(kind: str = "left", place: str = "567") -> str:
+    return f'<w:tabs><w:tab w:val="{kind}" w:pos="{place}"/></w:tabs>'
+
+
+# Each condition Word's drawing of a Word 6 label is or is not on record for (legacy-drawn*):
+# the label, its gap and run properties, its level's alignment and pPr, the paragraph's, its
+# style's, a table, the sections and the compat options. A dash in Times New Roman at 11 pt,
+# legacyIndent 360, unless the case says otherwise.
+_WORD6: dict[str, tuple[dict[str, Any], str]] = {
+    "dash": ({}, "tab"),
+    "bullet": ({"text": "", "rpr": _SYMBOL_11}, "tab"),
+    "minus": ({"text": "", "rpr": _SYMBOL_11}, "tab"),
+    "ten-touching": ({"text": "%1.", "start": 10, "gap": (0, 0)}, "legacy"),
+    "ten-spaced": ({"text": "%1.", "start": 10, "gap": (144, 0)}, "tab"),
+    "character": ({"text": "x"}, "legacy"),
+    # At 28 pt the space Word draws is 7.8 pt, and the margin 0.2 pt: a dash's gap is one from
+    # legacyIndent 347 (346 is not), or from legacySpace 160 (159 is not).
+    "indent-enough": ({"gap": (0, 347), "rpr": _TIMES_28}, "tab"),
+    "indent-short": ({"gap": (0, 346), "rpr": _TIMES_28}, "legacy"),
+    "space-enough": ({"gap": (160, 0), "rpr": _TIMES_28}, "tab"),
+    # At 8 pt, "-iiiii" from legacyIndent 324 is a space and the margin exactly, but no label
+    # longer than four characters (two in Symbol) was drawn at random; no shorter one is ever
+    # exactly a space and the margin from its text.
+    "label-past-four": (
+        {"text": "-iiiii", "gap": (0, 324), "rpr": _TIMES_FONT + '<w:sz w:val="16"/>'},
+        "legacy",
+    ),
+    "label-four": ({"text": "----", "gap": (0, 700)}, "tab"),
+    "label-five": ({"text": "-----", "gap": (0, 700)}, "legacy"),
+    "symbol-two": ({"text": "\uf0b7\uf02d", "rpr": _SYMBOL_11, "gap": (0, 700)}, "tab"),
+    "symbol-three": ({"text": "\uf0b7" * 3, "rpr": _SYMBOL_11, "gap": (0, 700)}, "legacy"),
+    # The label's font, size and faces from the mark, its style or the defaults, as drawn
+    # (legacy-drawn-sample-9 to 17); the defaults setting only fonts, sizes and language.
+    "from-mark": (
+        {"rpr": "", "props": f'<w:rPr>{_TIMES_FONT}<w:b/><w:sz w:val="22"/></w:rPr>'},
+        "tab",
+    ),
+    "from-style": (
+        {"rpr": "", "styles": _DEFAULT_RUN.format(_TIMES_11 + '<w:i w:val="0"/>')},
+        "tab",
+    ),
+    "symbol-from-mark": (
+        {"text": "\uf0b7", "rpr": "", "props": f"<w:rPr>{_SYMBOL_11}</w:rPr>"},
+        "tab",
+    ),
+    "symbol-from-style": (
+        {"text": "\uf0b7", "rpr": "", "styles": _DEFAULT_RUN.format(_SYMBOL_11)},
+        "legacy",
+    ),
+    "symbol-hansi-only": (
+        {
+            "text": "\uf0b7",
+            "rpr": '<w:rFonts w:hAnsi="Symbol"/><w:sz w:val="22"/>',
+            "styles": _DEFAULT_RUN.format(_SYMBOL_11),
+        },
+        "legacy",
+    ),
+    # The defaults' paragraph properties: line spacing, widow control and East Asian spacing.
+    **{
+        f"defaults-paragraph-{name}": (
+            {
+                "styles": "<w:docDefaults><w:pPrDefault><w:pPr>"
+                f"{xml}</w:pPr></w:pPrDefault></w:docDefaults>"
+            },
+            suffix,
+        )
+        for name, xml, suffix in [
+            ("spacing", '<w:spacing w:after="160" w:line="259" w:lineRule="auto"/>', "tab"),
+            ("spaced-off", '<w:widowControl w:val="0"/><w:autoSpaceDE w:val="0"/>', "tab"),
+            ("dn-off", '<w:autoSpaceDN w:val="0"/>', "tab"),
+            ("jc", '<w:jc w:val="left"/>', "legacy"),
+            ("keep", "<w:keepNext/>", "legacy"),
+            ("tabs", _tab(), "legacy"),
+        ]
+    },
+    "from-defaults": ({"rpr": "", "styles": _DEFAULTS_RUN.format(_TIMES_11 + _LANG)}, "tab"),
+    "defaults-szcs": ({"styles": _DEFAULTS_RUN.format(_TIMES_11 + '<w:szCs w:val="22"/>')}, "tab"),
+    **{
+        f"defaults-{name}": ({"styles": _DEFAULTS_RUN.format(xml)}, "legacy")
+        for name, xml in [
+            ("bold", "<w:b/>"),
+            ("italic", "<w:i/>"),
+            ("colour", '<w:color w:val="000000"/>'),
+            ("no-proof", "<w:noProof/>"),
+        ]
+    },
+    "space-short": ({"gap": (159, 0), "rpr": _TIMES_28}, "legacy"),
+    # The gaps and sizes drawn: legacySpace 0 to 340, legacyIndent 0 to 1500, 16 to 56 half-points.
+    "space-most": ({"gap": (340, 0)}, "tab"),
+    "space-past": ({"gap": (341, 0)}, "legacy"),
+    "space-negative": ({"gap": (-1, 360)}, "legacy"),
+    "indent-most": ({"gap": (0, 1500)}, "tab"),
+    "indent-past": ({"gap": (0, 1501)}, "legacy"),
+    "indent-negative": ({"gap": (144, -1)}, "legacy"),
+    "no-indent": ({"gap": (0, None)}, "legacy"),
+    "no-space": ({"gap": (None, 360)}, "legacy"),
+    "size-least": ({"rpr": _TIMES_FONT + '<w:sz w:val="16"/>'}, "tab"),
+    "size-under": ({"rpr": _TIMES_FONT + '<w:sz w:val="15"/>'}, "legacy"),
+    "size-most": ({"rpr": _TIMES_28, "gap": (0, 700)}, "tab"),
+    "size-over": ({"rpr": _TIMES_FONT + '<w:sz w:val="57"/>', "gap": (0, 700)}, "legacy"),
+    "size-zero": ({"rpr": _TIMES_FONT + '<w:sz w:val="0"/>', "gap": (0, 4)}, "legacy"),
+    "size-leading-zero": ({"rpr": _TIMES_FONT + '<w:sz w:val="022"/>'}, "legacy"),
+    "size-arabic-indic": ({"rpr": _TIMES_FONT + '<w:sz w:val="٢٢"/>'}, "legacy"),
+    "size-superscript": ({"rpr": _TIMES_FONT + '<w:sz w:val="²²"/>'}, "legacy"),
+    "no-size": ({"rpr": _TIMES_FONT}, "legacy"),
+    # Fonts and their slots.
+    "arial": ({"rpr": '<w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="22"/>'}, "legacy"),
+    "other-slot": (
+        {"rpr": '<w:rFonts w:ascii="Times New Roman" w:hAnsi="Arial"/><w:sz w:val="22"/>'},
+        "legacy",
+    ),
+    "hint": ({"rpr": _TIMES_11.replace("/>", ' w:hint="eastAsia"/>', 1)}, "legacy"),
+    "hint-default": ({"rpr": _TIMES_11.replace("/>", ' w:hint="default"/>', 1)}, "tab"),
+    # Run properties Word drew, and others (bold Symbol: Word draws its made-up bold wider).
+    **{
+        f"run-{name}": ({"rpr": _TIMES_11 + f"<w:{name}/>"}, "tab")
+        for name in ("noProof", "b", "bCs", "i", "iCs")
+    },
+    "run-colour-lang": (
+        {"rpr": _TIMES_11 + '<w:color w:val="FF0000"/><w:szCs w:val="22"/><w:lang w:val="en-GB"/>'},
+        "tab",
+    ),
+    "symbol-bold": ({"text": "", "rpr": _SYMBOL_11 + "<w:b/>"}, "legacy"),
+    "symbol-italic": ({"text": "", "rpr": _SYMBOL_11 + "<w:i/>"}, "tab"),
+    **{
+        f"run-{name}": ({"rpr": _TIMES_11 + f"<w:{name}{attributes}/>"}, "legacy")
+        for name, attributes in [
+            ("kern", ' w:val="16"'),
+            ("spacing", ' w:val="20"'),
+            ("w", ' w:val="90"'),
+            ("bdr", ' w:val="single"'),
+            ("outline", ""),
+            ("shadow", ""),
+            ("rStyle", ' w:val="X"'),
+            ("cs", ""),
+            ("rtl", ""),
+            ("fitText", ' w:val="600" w:id="1"'),
+            ("vertAlign", ' w:val="superscript"'),
+            ("eastAsianLayout", ' w:id="1" w:combine="1"'),
+        ]
+    },
+    # The level's alignment.
+    "level-left": ({"extra": '<w:lvlJc w:val="left"/>'}, "tab"),
+    # Word drew every level aligned left by its own lvlJc; none (left by default) is not drawn.
+    "level-none": ({"extra": ""}, "legacy"),
+    **{
+        f"level-{value or 'unset'}": (
+            {"extra": "<w:lvlJc/>" if not value else f'<w:lvlJc w:val="{value}"/>'},
+            "legacy",
+        )
+        for value in ("", "center", "right", "both", "distribute", "start")
+    },
+    # The paragraph: alignment, direction, frames, tab stops and indents, its own, its style's
+    # or its level's.
+    "jc-left": ({"props": '<w:jc w:val="left"/>'}, "tab"),
+    "jc-both": ({"props": '<w:jc w:val="both"/>'}, "tab"),
+    **{
+        f"jc-{value}": ({"props": f'<w:jc w:val="{value}"/>'}, "legacy")
+        for value in ("right", "center", "distribute", "start")
+    },
+    "jc-style": ({"styles": _DEFAULT.format("paragraph", '<w:jc w:val="right"/>')}, "legacy"),
+    "bidi": ({"props": "<w:bidi/>"}, "legacy"),
+    "bidi-off": ({"props": '<w:bidi w:val="0"/>'}, "legacy"),
+    "bidi-style": ({"styles": _DEFAULT.format("paragraph", "<w:bidi/>")}, "legacy"),
+    "bidi-level": ({"level": "<w:bidi/>"}, "legacy"),
+    "frame": ({"props": '<w:framePr w:w="2000"/>'}, "legacy"),
+    **{f"tab-{kind}": ({"props": _tab(kind)}, "tab") for kind in ("left", "clear", "num", "right")},
+    **{f"tab-{kind}": ({"props": _tab(kind)}, "legacy") for kind in ("center", "decimal", "bar")},
+    "tab-least": ({"props": _tab(place="-1985")}, "tab"),
+    "tab-under": ({"props": _tab(place="-1986")}, "legacy"),
+    "tab-most": ({"props": _tab(place="1440")}, "tab"),
+    "tab-over": ({"props": _tab(place="1441")}, "legacy"),
+    "tab-unplaced": ({"props": '<w:tabs><w:tab w:val="left"/></w:tabs>'}, "legacy"),
+    "tab-style": ({"styles": _DEFAULT.format("paragraph", _tab("center"))}, "legacy"),
+    "tab-level": ({"level": _tab("center")}, "legacy"),
+    "ind-direct": ({"props": '<w:ind w:left="567" w:hanging="567"/>'}, "tab"),
+    "ind-right-least": ({"props": '<w:ind w:right="-29"/>'}, "tab"),
+    "ind-right-under": ({"props": '<w:ind w:right="-30"/>'}, "legacy"),
+    "ind-right-most": ({"props": '<w:ind w:right="720"/>'}, "tab"),
+    "ind-right-over": ({"props": '<w:ind w:right="721"/>'}, "legacy"),
+    "ind-first-zero": ({"props": '<w:ind w:left="360" w:firstLine="0"/>'}, "tab"),
+    "ind-first-line": ({"props": '<w:ind w:left="360" w:firstLine="1"/>'}, "legacy"),
+    "ind-left-most": ({"props": '<w:ind w:left="1500" w:hanging="1500"/>'}, "tab"),
+    "ind-left-over": ({"props": '<w:ind w:left="1501"/>'}, "legacy"),
+    "ind-hanging-over": ({"props": '<w:ind w:left="1501" w:hanging="1501"/>'}, "legacy"),
+    "ind-negative": ({"props": '<w:ind w:left="-1"/>'}, "legacy"),
+    "ind-chars": ({"props": '<w:ind w:leftChars="100"/>'}, "legacy"),
+    "ind-start": ({"props": '<w:ind w:start="360"/>'}, "legacy"),
+    "ind-hangs-360-past": ({"level": '<w:ind w:left="0" w:hanging="360"/>'}, "tab"),
+    "ind-hangs-361-past": ({"level": '<w:ind w:left="0" w:hanging="361"/>'}, "legacy"),
+    "ind-hangs-360-no-left": ({"props": '<w:ind w:hanging="360"/>'}, "tab"),
+    "ind-hangs-361-no-left": ({"props": '<w:ind w:hanging="361"/>'}, "legacy"),
+    # The level's own paragraph properties: tab stops and indents of the shapes drawn only.
+    **{
+        f"level-ind-{name}": ({"level": f"<w:ind {attributes}/>"}, suffix)
+        for name, attributes, suffix in [
+            ("left-hanging", 'w:left="360" w:hanging="360"', "tab"),
+            ("right", 'w:left="360" w:hanging="360" w:right="100"', "tab"),
+            ("first-line", 'w:left="360" w:firstLine="0"', "tab"),
+            ("left", 'w:left="360"', "legacy"),
+            ("hanging", 'w:hanging="360"', "legacy"),
+            ("right-only", 'w:right="100"', "legacy"),
+            ("first-hanging", 'w:left="360" w:hanging="0" w:firstLine="0"', "legacy"),
+            ("left-right", 'w:left="360" w:right="100"', "legacy"),
+            ("other-namespace", 'w:left="360" x:hanging="360" xmlns:x="urn:x"', "legacy"),
+        ]
+    },
+    "level-tabs": ({"level": _tab()}, "tab"),
+    **{
+        f"level-{name}": ({"level": xml}, "legacy")
+        for name, xml in [
+            ("jc-both", '<w:jc w:val="both"/>'),
+            ("jc-left", '<w:jc w:val="left"/>'),
+            ("spacing", '<w:spacing w:after="0"/>'),
+            ("keep-next", "<w:keepNext/>"),
+            ("shading", '<w:shd w:val="clear" w:color="auto" w:fill="FFFFFF"/>'),
+            ("widow", '<w:widowControl w:val="0"/>'),
+        ]
+    },
+    "ind-style-hangs-past": (
+        {"styles": _DEFAULT.format("paragraph", '<w:ind w:left="0" w:hanging="400"/>')},
+        "legacy",
+    ),
+    "ind-style": ({"styles": _DEFAULT.format("paragraph", '<w:ind w:right="721"/>')}, "legacy"),
+    "table": ({"wrap": _TABLE}, "legacy"),
+    # Paragraph properties Word drew (legacy-drawn-sample), each value; and others.
+    **{
+        f"paragraph-{name}": ({"props": xml}, "tab")
+        for name, xml in [
+            ("keep-next", "<w:keepNext/>"),
+            ("keep-lines", "<w:keepLines/>"),
+            ("contextual", "<w:contextualSpacing/>"),
+            ("widow", "<w:widowControl/>"),
+            ("widow-off", '<w:widowControl w:val="0"/>'),
+            ("punctuation-off", '<w:overflowPunct w:val="0"/>'),
+            ("space-de-off", '<w:autoSpaceDE w:val="0"/>'),
+            ("space-dn-off", '<w:autoSpaceDN w:val="0"/>'),
+            ("right-ind-off", '<w:adjustRightInd w:val="0"/>'),
+            ("align-auto", '<w:textAlignment w:val="auto"/>'),
+            ("align-baseline", '<w:textAlignment w:val="baseline"/>'),
+            ("align-center", '<w:textAlignment w:val="center"/>'),
+            ("outline-0", '<w:outlineLvl w:val="0"/>'),
+            ("outline-8", '<w:outlineLvl w:val="8"/>'),
+            ("shading-white", '<w:shd w:val="clear" w:color="auto" w:fill="FFFFFF"/>'),
+            ("shading-grey", '<w:shd w:val="clear" w:color="auto" w:fill="E6E6E6"/>'),
+            ("spacing-auto-least", '<w:spacing w:line="240" w:lineRule="auto"/>'),
+            ("spacing-auto-most", '<w:spacing w:line="480"/>'),
+            ("spacing-exact-most", '<w:spacing w:line="1200" w:lineRule="exact"/>'),
+            ("spacing-at-least", '<w:spacing w:line="220" w:lineRule="atLeast"/>'),
+            ("spacing-at-least-most", '<w:spacing w:line="1200" w:lineRule="atLeast"/>'),
+            ("spacing-exact-least", '<w:spacing w:line="220" w:lineRule="exact"/>'),
+            ("spacing-around", '<w:spacing w:before="240" w:after="240"/>'),
+        ]
+    },
+    **{
+        f"paragraph-{name}": ({"props": xml}, "legacy")
+        for name, xml in [
+            ("mirror", "<w:mirrorIndents/>"),
+            (
+                "border",
+                '<w:pBdr><w:left w:val="single" w:sz="4" w:space="4" w:color="auto"/></w:pBdr>',
+            ),
+            ("hyphens", "<w:suppressAutoHyphens/>"),
+            ("grid", '<w:snapToGrid w:val="0"/>'),
+            ("kinsoku", '<w:kinsoku w:val="0"/>'),
+            ("keep-next-off", '<w:keepNext w:val="0"/>'),
+            ("widow-on", '<w:widowControl w:val="1"/>'),
+            ("punctuation", "<w:overflowPunct/>"),
+            ("align-top", '<w:textAlignment w:val="top"/>'),
+            ("outline-9", '<w:outlineLvl w:val="9"/>'),
+            ("shading-other", '<w:shd w:val="clear" w:color="auto" w:fill="FFFF00"/>'),
+            ("shading-solid", '<w:shd w:val="solid" w:color="auto" w:fill="FFFFFF"/>'),
+            ("shading-no-colour", '<w:shd w:val="clear" w:fill="FFFFFF"/>'),
+            ("spacing-exact-under-label", '<w:spacing w:line="219" w:lineRule="exact"/>'),
+            ("spacing-at-least-under-label", '<w:spacing w:line="219" w:lineRule="atLeast"/>'),
+            ("spacing-auto-under", '<w:spacing w:line="239"/>'),
+            ("spacing-auto-over", '<w:spacing w:line="481"/>'),
+            ("spacing-exact-over", '<w:spacing w:line="1201" w:lineRule="exact"/>'),
+            ("spacing-at-least-under", '<w:spacing w:line="199" w:lineRule="atLeast"/>'),
+            ("spacing-at-least-over", '<w:spacing w:line="1201" w:lineRule="atLeast"/>'),
+            ("spacing-before-over", '<w:spacing w:before="241"/>'),
+            ("spacing-after-over", '<w:spacing w:after="241"/>'),
+            ("spacing-lines", '<w:spacing w:beforeLines="100"/>'),
+            ("spacing-rule", '<w:spacing w:line="240" w:lineRule="other"/>'),
+            ("spacing-not-a-number", '<w:spacing w:after="1e2"/>'),
+            ("toggle-attribute", '<w:keepNext w:x="1"/>'),
+        ]
+    },
+    # An exact or at-least line no lower than the label (8 pt: the 10 pt bound).
+    **{
+        f"spacing-{rule}-{line}-at-8": (
+            {
+                "props": f'<w:spacing w:line="{line}" w:lineRule="{rule}"/>',
+                "rpr": _TIMES_FONT + '<w:sz w:val="16"/>',
+            },
+            "tab" if line == 200 else "legacy",
+        )
+        for rule, line in [("exact", 200), ("atLeast", 200), ("atLeast", 199)]
+    },
+    # The document: line pitches only, text direction, compat options, default tab stops.
+    "grid-chars": ({"after": _GRID.format("linesAndChars")}, "legacy"),
+    "grid-snap": ({"after": _GRID.format("snapToChars")}, "legacy"),
+    "grid-lines": ({"after": _GRID.format("lines")}, "legacy"),
+    **{
+        f"grid-pitch-{pitch}": ({"after": _PITCH.format(pitch)}, "tab")
+        for pitch in ("233", "299", "326", "360")
+    },
+    "grid-pitch-300": ({"after": _PITCH.format("300")}, "legacy"),
+    "grid-char-space": ({"after": _PITCH.format('360" w:charSpace="0')}, "legacy"),
+    "grid-empty": ({"after": "<w:sectPr><w:docGrid/></w:sectPr>"}, "legacy"),
+    "direction-across": ({"after": _SECTION.format('textDirection w:val="lrTb"')}, "tab"),
+    "direction-down": ({"after": _SECTION.format('textDirection w:val="tbRl"')}, "legacy"),
+    # No settings part is drawn (legacy-drawn); a part without compat options is not.
+    "settings-without-compat": ({"settings": ""}, "legacy"),
+    "compat-empty": ({"settings": "<w:compat/>"}, "legacy"),
+    **{
+        f"compat-{hyphenation}-{key}": ({"settings": _DRAWN + _compat(hyphenation, flags)}, "tab")
+        for hyphenation in ("0", "1")
+        for key, flags in [
+            ("bare", ""),
+            ("fe", "<w:useFELayout/>"),
+            ("html", "<w:doNotUseHTMLParagraphAutoSpacing/>"),
+            ("both", "<w:doNotUseHTMLParagraphAutoSpacing/><w:useFELayout/>"),
+        ]
+    },
+    "compat-mode-14": (
+        {"settings": _DRAWN + _compat(fixed=_FIXED.replace('"15"', '"14"'))},
+        "legacy",
+    ),
+    "compat-no-mode": ({"settings": _DRAWN + _compat(fixed=_FIXED.split("/>", 1)[1])}, "legacy"),
+    "compat-no-hyphenation": ({"settings": _DRAWN + f"<w:compat>{_FIXED}</w:compat>"}, "legacy"),
+    "compat-both-hyphenations": (
+        {"settings": _DRAWN + _compat(flags=_compat("1")[len("<w:compat>") : -len("</w:compat>")])},
+        "legacy",
+    ),
+    "compat-other-flag": (
+        {"settings": _DRAWN + _compat(flags="<w:doNotExpandShiftReturn/>")},
+        "legacy",
+    ),
+    "compat-flag-valued": (
+        {"settings": _DRAWN + _compat(flags='<w:useFELayout w:val="1"/>')},
+        "legacy",
+    ),
+    "compat-other-uri": ({"settings": _DRAWN + _compat().replace(_WORD_URI, "urn:x", 1)}, "legacy"),
+    "compat-other-namespace": (
+        {"settings": _DRAWN + _compat(flags='<x:useFELayout xmlns:x="urn:x"/>')},
+        "legacy",
+    ),
+    **{
+        f"tab-stop-{stop}": ({"settings": _settings(stop) + _compat()}, "tab")
+        for stop in ("561", "562", "567", "708", "720", "850")
+    },
+    "tab-stop-709": ({"settings": _settings("709") + _compat()}, "legacy"),
+    "tab-stop-none": ({"settings": _settings(None) + _compat()}, "legacy"),
+    "tab-stop-twice": ({"settings": _settings("720") + _DRAWN + _compat()}, "legacy"),
+    "tab-stop-attribute": (
+        {"settings": _DRAWN.replace("/>", ' w:x="1"/>', 1) + _compat()},
+        "legacy",
+    ),
+    "compressed": (
+        {"settings": _DRAWN.replace("doNotCompress", "compressPunctuation") + _compat()},
+        "legacy",
+    ),
+    "compress-unset": ({"settings": _DRAWN.split("<w:char")[0] + _compat()}, "legacy"),
+}
+
+
+def _word6_docx(parts: dict[str, Any]) -> bytes:
+    """A .docx of one paragraph in a Word 6 list, as ``parts`` (``_WORD6``) set it."""
+    text, gap = parts.get("text", "-"), parts.get("gap", (0, 360))
+    widths = "".join(
+        f' w:{attribute}="{value}"'
+        for attribute, value in zip(("legacySpace", "legacyIndent"), gap, strict=True)
+        if value is not None
+    )
+    level = (
+        f'<w:lvl w:ilvl="0"><w:start w:val="{parts.get("start", 1)}"/>'
+        f'<w:numFmt w:val="{"decimal" if "%" in text else "bullet"}"/><w:lvlText w:val="{text}"/>'
+        f'<w:legacy w:legacy="1"{widths}/>{parts.get("extra", '<w:lvlJc w:val="left"/>')}'
+        f"<w:pPr>{parts.get('level', '')}</w:pPr>"
+        f"<w:rPr>{parts.get('rpr', _TIMES_11)}</w:rPr></w:lvl>"
+    )
+    item = parts.get("wrap", "{}").format(_item(1, 0, parts.get("props", "")))
+    return docx(
+        item + parts.get("after", ""),
+        parts.get("styles"),
+        numbering=_list(level) + _NUM,
+        settings=parts.get("settings"),
+    )
+
+
+@pytest.mark.parametrize("name", sorted(_WORD6))
+def test_a_word_6_label_is_followed_by_a_tab_only_as_far_as_words_drawing_goes(name: str) -> None:
+    # The reader's suffix, certified: the check's own reading agrees with it.
+    parts, suffix = _WORD6[name]
+    assert _labels_certified(_word6_docx(parts))[0][2] == suffix
+
+
+@pytest.mark.parametrize(
+    "parts",
+    [
+        {"props": '<w:ind w:left="1e3"/>'},
+        {"props": '<w:tabs><w:tab w:val="left" w:pos="5e2"/></w:tabs>'},
+        {"rpr": _TIMES_11 + '<x:numSpacing xmlns:x="urn:x" x:val="tabular"/>'},
+        {"props": '<x:kinsoku xmlns:x="urn:x"/>'},
+        {"props": '<w:shd w:fill="FFFFFF"/>'},
+        # Shading whose w:val is in no namespace: the reader refuses it (w:shd without w:val).
+        {"props": '<w:shd val="clear" w:color="auto" w:fill="FFFFFF"/>'},
+        {"props": '<x:keepNext xmlns:x="urn:x"/>'},
+        # An exact line under 10 pt clips the paragraph's 10 pt text, which the reader refuses.
+        {"props": '<w:spacing w:line="199" w:lineRule="exact"/>'},
+        # A tracked paragraph mark: the reader refuses the document (tracked-change), as it
+        # refuses every change; the check, on its own, takes the mark's w:ins for a run property
+        # Word's drawing is not on record for, and says legacy.
+        {"props": '<w:rPr><w:ins w:id="1" w:author="a" w:date="2026-10-08T00:00:00Z"/></w:rPr>'},
+    ],
+)
+def test_the_check_on_its_own_does_not_take_what_the_reader_refuses_for_drawn(
+    parts: dict[str, str],
+) -> None:
+    # The reader refuses these first; the check, reading on its own, never calls them spaced.
+    numbering = DocxSource(_word6_docx(parts)).body.paragraphs[0].numbering
+    assert numbering is not None
+    assert numbering["suffix"] == "legacy"
+
+
+@pytest.mark.parametrize("measure", ["\u0663\u0666\u0660", "36O", ""])
+def test_the_check_reads_a_word_6_gap_only_in_ascii_digits(measure: str) -> None:
+    # The reader refuses these first (invalid-package); the check on its own refuses them too.
+    with pytest.raises(CertificationError, match="a measure"):
+        DocxSource(_word6_docx({"gap": (0, measure)}))
+
+
+def test_the_check_holds_its_own_copy_of_words_widths_and_space() -> None:
+    assert certify._WORD6_WIDTHS == reader.LEGACY_ADVANCES
+    assert certify._WORD6_LONGEST == reader._WORD6_LONGEST
+    assert certify._WORD6_DEFAULTS == reader._WORD6_DEFAULTS
+    assert certify._WORD6_DEFAULT_PPR == reader._WORD6_DEFAULT_PARAGRAPH
+    assert certify._WORD6_TAB_STOPS == reader._WORD6_TAB_STOPS
+    assert certify._WORD6_PITCHES == reader._WORD6_PITCHES
+    assert (certify._WORD6_EM, certify._WORD6_SPACE, certify._WORD6_MARGIN) == (
+        reader.LEGACY_EM,
+        reader.LEGACY_SPACE,
+        reader.LEGACY_MARGIN,
+    )
+
+
+@pytest.mark.parametrize("suffix", ['<w:suff w:val="space"/>', "<w:suff/>"])
+def test_the_check_refuses_a_word_6_level_with_a_suffix_a_paragraph_draws(suffix: str) -> None:
+    level = _level(0, "%1.", extra=f'{suffix}<w:legacy w:legacy="1"/>')
+    with pytest.raises(CertificationError, match="Word 6"):
+        DocxSource(docx(_item(1, 0), numbering=_list(level) + _NUM))
+    unused = _list(_level(0, "%1."), _level(1, "%2.", extra=f'{suffix}<w:legacy w:legacy="1"/>'))
+    assert _labels_certified(docx(_item(1, 0), numbering=unused + _NUM)) == [(1, "1.", "tab")]
 
 
 def test_the_check_refuses_a_numbering_style_naming_no_list_back() -> None:

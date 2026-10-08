@@ -16,13 +16,16 @@ on any machine.
 from __future__ import annotations
 
 import argparse
+import functools
 import hashlib
 import io
 import json
+import random
 import struct
 import sys
 import zipfile
 import zlib
+from collections.abc import Callable
 from pathlib import Path
 from typing import NamedTuple
 
@@ -435,6 +438,724 @@ LEGACY = (
     '<w:lvlText w:val="-"/><w:legacy w:legacy="1" w:legacySpace="0" w:legacyIndent="360"/>'
     "</w:lvl></w:lvlOverride>"
 )
+
+
+def _legacy_variants() -> list[tuple[str, str, str, int, str, str, int]]:
+    """Each paragraph of legacy-levels: numFmt, lvlText, font, start, suff, legacy, size.
+
+    The labels, gaps and sizes of the probe put to Word on 2026-10-07 and its two controls, then
+    each way a level says it is Word 6's or not, with and without w:suff.
+    """
+    labels = [
+        ("bullet", "", '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/>', 1),
+        ("bullet", "-", "", 1),
+        ("decimal", "%1.", "", 1),
+        ("decimal", "%1.", "", 10),
+        ("lowerRoman", "%1.", "", 3),
+    ]
+    out = []
+    for fmt, text, font, start in labels:
+        for space, indent in [(0, 283), (0, 360), (0, 0), (144, 0), (0, 120), (144, 360)]:
+            legacy = f'w:legacy="1" w:legacySpace="{space}" w:legacyIndent="{indent}"'
+            out += [(fmt, text, font, start, "", legacy, size) for size in (22, 56)]
+        out += [(fmt, text, font, start, suffix, "", 22) for suffix in ("tab", "nothing")]
+    gap = 'w:legacySpace="0" w:legacyIndent="360"'
+    for suffix, on in [
+        ("tab", 'w:legacy="1"'),
+        ("space", 'w:legacy="1"'),
+        ("nothing", 'w:legacy="1"'),
+        ("", 'w:legacy="true"'),
+        ("", 'w:legacy="on"'),
+        ("nothing", 'w:legacy="true"'),
+        ("nothing", 'w:legacy="on"'),
+        ("", ""),
+        ("nothing", ""),
+        ("space", ""),
+        ("nothing", 'w:legacy="0"'),
+        ("nothing", 'w:legacy="false"'),
+        ("nothing", 'w:legacy="off"'),
+        ("space", None),
+    ]:
+        legacy = "" if on is None else f"{on} {gap}".strip()
+        out.append(("bullet", "-", "", 1, suffix, legacy, 22))
+    return out
+
+
+def _legacy_levels(interleaved: bool = False) -> Case:
+    """One list per paragraph, each level in the schema's order; then a Word 6 deeper level.
+
+    Interleaved, each abstractNum is followed by its num, out of the schema's order.
+    """
+    abstracts, nums, body = [], [], []
+    for key, (fmt, text, font, start, suffix, legacy, size) in enumerate(_legacy_variants(), 1):
+        suff = f'<w:suff w:val="{suffix}"/>' if suffix else ""
+        old = f"<w:legacy {legacy}/>" if legacy else ""
+        level = (
+            f'<w:lvl w:ilvl="0"><w:start w:val="{start}"/><w:numFmt w:val="{fmt}"/>{suff}'
+            f'<w:lvlText w:val="{text}"/>{old}<w:lvlJc w:val="left"/>'
+            '<w:pPr><w:ind w:left="283" w:hanging="283"/></w:pPr>'
+            f'<w:rPr>{font}<w:sz w:val="{size}"/></w:rPr></w:lvl>'
+        )
+        abstracts.append(abstract(key, level))
+        nums.append(num(key, key))
+        body.append(
+            f'<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="{key}"/></w:numPr></w:pPr>'
+            f'<w:r><w:rPr><w:sz w:val="{size}"/></w:rPr><w:t>item {key}</w:t></w:r></w:p>'
+        )
+    deeper = len(abstracts) + 1
+    word6 = '<w:legacy w:legacy="1" w:legacySpace="0" w:legacyIndent="360"/>'
+    abstracts.append(abstract(deeper, lvl(0), lvl(1, text="%1.%2.", extra=word6)))
+    nums.append(num(deeper, deeper))
+    numbering = (
+        "".join(a + n for a, n in zip(abstracts, nums, strict=True))
+        if interleaved
+        else "".join(abstracts + nums)
+    )
+    return Case(
+        "Each abstractNum followed by its num, out of the schema's order."
+        if interleaved
+        else "Word 6 (legacy) levels: what Word writes after the label, by gap, size and w:suff.",
+        numbering,
+        "".join(body) + items((deeper, 0), (deeper, 1)),
+    )
+
+
+# legacy-drawn: Word 6 levels as Word draws them, measured from its PDF (scripts/word_gaps.py).
+# Each row is a paragraph of its own list on an exact line of DRAWN_LINE twips, DRAWN_ROWS a page,
+# the label in red and the text in blue, so each row's ink is found in its own band.
+DRAWN_LINE = 800
+DRAWN_ROWS = 16
+TIMES = '<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/>'
+SYMBOL_FONTS = '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/>'
+DRAWN_LABELS = {
+    "dash": ("bullet", "-", TIMES, 1),
+    "bullet": ("bullet", "", SYMBOL_FONTS, 1),
+    "minus": ("bullet", "", SYMBOL_FONTS, 1),
+    "1.": ("decimal", "%1.", TIMES, 1),
+    "10.": ("decimal", "%1.", TIMES, 10),
+    "iii.": ("lowerRoman", "%1.", TIMES, 3),
+    "2345.": ("decimal", "%1.", TIMES, 2345),
+    "6789.": ("decimal", "%1.", TIMES, 6789),
+}
+# The labels drawn at every gap and indent; the others draw the remaining digits.
+DRAWN_SHAPES = ("dash", "bullet", "minus", "1.", "10.", "iii.")
+DRAWN_SIZES = (16, 18, 20, 22, 28, 40, 56)
+
+
+class DrawnRow(NamedTuple):
+    """One row of legacy-drawn: its label, size (half-points), level layout and indentation."""
+
+    label: str
+    size: int
+    suff: str  # "" for none
+    legacy: tuple[int, int] | None  # (legacySpace, legacyIndent)
+    ind: str  # the level's w:ind attributes, "" for none
+    condition: str = ""  # one of DRAWN_CONDITIONS, "" for none
+    # A sampled row's parts (label "sample": its "text" and "font" too), as DRAWN_CONDITIONS'.
+    extra: tuple[tuple[str, str], ...] = ()
+
+
+# What a row of legacy-drawn-styled sets besides its level: run properties of its label
+# ("rpr"), the level's own indent ("level"), the paragraph's style, tab stops, indent and
+# alignment, and a second line after a break ("two", its text green), which a justified line
+# before a break is stretched for.
+_TABS = '<w:tabs><w:tab w:val="{}" w:pos="{}"/></w:tabs>'
+DRAWN_CONDITIONS: dict[str, dict[str, str]] = {
+    "plain": {},
+    "noProof": {"rpr": "<w:noProof/>"},
+    "b": {"rpr": "<w:b/>"},
+    "i": {"rpr": "<w:i/>"},
+    "bCs": {"rpr": "<w:bCs/>"},
+    "iCs": {"rpr": "<w:iCs/>"},
+    "bi": {"rpr": "<w:b/><w:i/>"},
+    "tab-left": {"tabs": _TABS.format("left", 567)},
+    "tab-style": {"style": "Tab567"},
+    "tab-clear": {"style": "Tab567", "tabs": _TABS.format("clear", 567)},
+    "tab-num": {"tabs": _TABS.format("num", 567)},
+    "tab-right": {"tabs": _TABS.format("right", 567)},
+    "tab-120": {"tabs": _TABS.format("left", 120)},
+    "tab-360": {"tabs": _TABS.format("left", 360)},
+    "tab-1440": {"tabs": _TABS.format("left", 1440)},
+    "tab-negative": {"tabs": _TABS.format("left", -1985)},
+    "jc-left": {"jc": "left"},
+    "jc-both": {"jc": "both"},
+    "jc-both-two": {"jc": "both", "two": "1"},
+    "ind-direct": {"ind": 'w:left="567" w:hanging="567"'},
+    "ind-style": {"style": "Ind567"},
+    "ind-style-direct": {"style": "Ind567", "ind": 'w:left="720"'},
+    "ind-right-2": {"ind": 'w:right="-2"'},
+    "ind-right-29": {"ind": 'w:right="-29"'},
+    "ind-right-720": {"ind": 'w:right="720"'},
+    "level-negative": {"level": 'w:left="0" w:hanging="360"'},
+}
+# Faces a label is drawn in, and so its controls.
+DRAWN_FACES = ("plain", "b", "i", "bi")
+
+
+def drawn_styles(size: int = 22, ppr: str = "") -> str:
+    """The styled cases' styles: defaults, Normal, and Tab567 and Ind567 based on it.
+
+    The defaults: Times New Roman at ``size`` half-points, and paragraph properties ``ppr``.
+    """
+    defaults = f"<w:pPrDefault><w:pPr>{ppr}</w:pPr></w:pPrDefault>" if ppr else "<w:pPrDefault/>"
+    return (
+        '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" '
+        'w:eastAsia="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/>'
+        f'<w:sz w:val="{size}"/><w:szCs w:val="{size}"/><w:lang w:val="en-GB" '
+        'w:eastAsia="en-US" w:bidi="ar-SA"/></w:rPr></w:rPrDefault>'
+        f"{defaults}</w:docDefaults>"
+        '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/>'
+        "</w:style>"
+        '<w:style w:type="paragraph" w:styleId="Tab567"><w:name w:val="Tab567"/>'
+        f'<w:basedOn w:val="Normal"/><w:pPr>{_TABS.format("left", 567)}</w:pPr></w:style>'
+        '<w:style w:type="paragraph" w:styleId="Ind567"><w:name w:val="Ind567"/>'
+        '<w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="567" w:hanging="567"/></w:pPr>'
+        "</w:style>"
+    )
+
+
+DRAWN_STYLES = drawn_styles()
+# The QRD template's settings that bear on layout (qrd-product-information-template-version-104):
+# its compat options, in each combination of the three EMA's files vary in.
+_WORD = "http://schemas.microsoft.com/office/word"
+
+
+def drawn_settings(
+    hyphenation: str = "0", fe_layout: bool = True, html: bool = True, tab: int = 720
+) -> str:
+    """The settings of a legacy-drawn case: the QRD template's, as given.
+
+    Its varying compat options, and its default tab stop.
+    """
+    fixed = [
+        ("compatibilityMode", "15"),
+        ("overrideTableStyleFontSizeAndJustification", "1"),
+        ("enableOpenTypeFeatures", "1"),
+        ("doNotFlipMirrorIndents", "1"),
+        ("differentiateMultirowTableHeaders", "1"),
+        ("useWord2013TrackBottomHyphenation", hyphenation),
+    ]
+    options = "".join(
+        f'<w:compatSetting w:name="{name}" w:uri="{_WORD}" w:val="{value}"/>'
+        for name, value in fixed
+    )
+    flags = ("<w:doNotUseHTMLParagraphAutoSpacing/>" if html else "") + (
+        "<w:useFELayout/>" if fe_layout else ""
+    )
+    return (
+        f'<w:defaultTabStop w:val="{tab}"/><w:characterSpacingControl w:val="doNotCompress"/>'
+        f"<w:compat>{flags}{options}</w:compat>"
+    )
+
+
+# The compat options of each case beyond legacy-drawn-styled's (hyphenation, FE layout, HTML).
+DRAWN_COMPAT = {
+    f"legacy-drawn-compat-{key}": options
+    for key, options in enumerate(
+        [
+            (h, f, m)
+            for h in ("0", "1")
+            for f in (True, False)
+            for m in (True, False)
+            if (h, f, m) != ("0", True, True)
+        ],
+        1,
+    )
+}
+
+
+def styled_rows() -> list[DrawnRow]:
+    """legacy-drawn-styled: each condition for four labels, three sizes and five gaps."""
+    rows = []
+    gaps = [(0, 360), (0, 283), (0, 567), (144, 0), (0, 0)]
+    for condition in DRAWN_CONDITIONS:
+        for label in ("dash", "bullet", "1.", "10."):
+            for size in (16, 22, 28):
+                for space, indent in gaps:
+                    ind = f'w:left="{indent}" w:hanging="{indent}"' if indent else ""
+                    rows.append(DrawnRow(label, size, "", (space, indent), ind, condition))
+    for face in DRAWN_FACES:
+        for label in ("dash", "bullet", "1.", "10."):
+            for size in (16, 22, 28):
+                rows += [
+                    DrawnRow(label, size, suff, None, "", face) for suff in ("nothing", "space")
+                ]
+    return rows
+
+
+# legacy-drawn-sample-0 to 17: rows drawn at random, seeded, each followed by its label with a
+# space suffix and nothing else, the space Word draws there. 0 to 8 vary the label (its characters,
+# size and faces, set in its level), its gaps, the level's and the paragraph's indents and tab
+# stops, and the paragraph's own properties and style; from INHERITED they vary too where the
+# label's run properties and the paragraph's properties are set (sample_rows, inherited_rows).
+SAMPLE_SEED = 20261008
+SAMPLES = 45
+
+
+class SamplePage(NamedTuple):
+    """A sample case's document, besides its rows.
+
+    Its compat options (None: no settings part), default tab stop, docGrid linePitch (None: no
+    docGrid), and its defaults' size and paragraph properties.
+    """
+
+    compat: tuple[str, bool, bool] | None
+    tab: int = 720
+    pitch: int | None = None
+    size: int = 22
+    ppr: str = ""
+
+
+_COMBINATIONS = [
+    (hyphenation, fe_layout, html)
+    for hyphenation in ("0", "1")
+    for fe_layout in (True, False)
+    for html in (True, False)
+]
+# From INHERITED, the corpus's (EMA's Word PI) default tab stops, line pitches and defaults'
+# paragraph properties besides 720, none and none.
+_AFTER_160 = '<w:spacing w:after="160" w:line="259" w:lineRule="auto"/>'
+_AFTER_200 = '<w:spacing w:after="200" w:line="276" w:lineRule="auto"/>'
+_UNSPACED = '<w:widowControl w:val="0"/><w:autoSpaceDE w:val="0"/><w:autoSpaceDN w:val="0"/>'
+INHERITED = 9
+DRAWN_SAMPLE_PAGES = [
+    SamplePage(None),
+    *(SamplePage(options) for options in _COMBINATIONS),
+    SamplePage(_COMBINATIONS[0], 567, 299),
+    SamplePage(_COMBINATIONS[1], 850, 299, 20, _AFTER_160),
+    SamplePage(_COMBINATIONS[2], 562, 360, 24, _UNSPACED),
+    SamplePage(_COMBINATIONS[3], 561, 233),
+    SamplePage(_COMBINATIONS[4], 708, 326, 18, _AFTER_200),
+    SamplePage(_COMBINATIONS[5], 720, 299, 22, _UNSPACED),
+    SamplePage(_COMBINATIONS[6], 567, None, 28, _AFTER_160),
+    SamplePage(_COMBINATIONS[7], 850, 360, 16),
+    SamplePage(_COMBINATIONS[4], 567, 299, 22, _AFTER_160),
+]
+
+
+def _sample_indents(rng: random.Random, style: str) -> tuple[str, str]:
+    """A level's and a paragraph's w:ind attributes, hanging at most 360 past the least left."""
+    while True:
+        left = rng.randint(0, 1500)
+        level = f'w:left="{left}" w:hanging="{rng.randint(0, min(1500, left + 360))}"'
+        direct = []
+        if rng.random() < 0.4:
+            direct.append(f'w:left="{rng.randint(0, 1500)}"')
+            if rng.random() < 0.5:
+                direct.append(f'w:hanging="{rng.randint(0, 1500)}"')
+            elif rng.random() < 0.5:
+                direct.append('w:firstLine="0"')
+        if rng.random() < 0.3:
+            direct.append(f'w:right="{rng.randint(-29, 720)}"')
+        attributes = [
+            level,
+            *direct,
+            *(['w:left="567" w:hanging="567"'] if style == "Ind567" else []),
+        ]
+        values = " ".join(attributes)
+        lefts = [int(v) for v in _numbers(values, "left")]
+        hangings = [int(v) for v in _numbers(values, "hanging")]
+        if max(hangings, default=0) - min(lefts, default=0) <= 360:
+            return level, " ".join(direct)
+
+
+def _numbers(attributes: str, name: str) -> list[str]:
+    return [part.split('"')[1] for part in attributes.split(" ") if part.startswith(f"w:{name}=")]
+
+
+def _sample_tabs(rng: random.Random) -> str:
+    stops = "".join(
+        f'<w:tab w:val="{rng.choice(["left", "clear", "num", "right"])}" '
+        f'w:pos="{rng.randint(-1985, 1440)}"/>'
+        for _ in range(rng.randint(1, 2))
+    )
+    return f"<w:tabs>{stops}</w:tabs>"
+
+
+def sample_rows(case: int) -> list[DrawnRow]:
+    """legacy-drawn-sample-{case}: SAMPLES rows at random, each followed by its control."""
+    rng = random.Random(SAMPLE_SEED * 10 + case)
+    rows = []
+    for _ in range(SAMPLES):
+        symbol = rng.random() < 0.3
+        characters = ["\uf0b7", "\uf02d"] if symbol else list("-.i0123456789")
+        text = "".join(rng.choice(characters) for _ in range(rng.randint(1, 2 if symbol else 4)))
+        two = rng.random() < 0.15
+        size = rng.randint(16, 28 if two else 56)
+        faces = ("b", "i", "bCs", "iCs", "noProof")
+        rpr = "".join(
+            f"<w:{n}/>" for n in faces if rng.random() < 0.3 and not (symbol and n == "b")
+        )
+        style = rng.choice(["", "", "Tab567", "Ind567"])
+        level, direct = _sample_indents(rng, style)
+        rule = rng.choice(["auto", "exact", "atLeast"])
+        # An exact line no lower than the text (the reader refuses one that clips it).
+        line = rng.randint(240, 480) if rule == "auto" else rng.randint(max(200, size * 10), 1200)
+        spacing = (
+            f'<w:spacing w:before="{rng.randint(0, 240)}" w:after="{rng.randint(0, 240)}" '
+            f'w:line="{line}" w:lineRule="{rule}"/>'
+        )
+        flags = _sample_flags(rng)
+        parts: dict[str, str] = {
+            "text": text,
+            "font": "Symbol" if symbol else "Times New Roman",
+            "rpr": rpr,
+            "level": level,
+            "spacing": spacing,
+            **{k: v for k, v in flags.items() if v},
+        }
+        if style:
+            parts["style"] = style
+        if direct:
+            parts["ind"] = direct
+        if rng.random() < 0.4:
+            parts["tabs"] = _sample_tabs(rng)
+        if rng.random() < 0.2:
+            parts["level tabs"] = _sample_tabs(rng)
+        jc = rng.choice(["", "", "left", "both"])
+        if jc:
+            parts["jc"] = jc
+        if two:
+            parts.update(jc="both", two="1")
+        gap = (rng.randint(0, 340), rng.randint(0, 1500))
+        rows.append(DrawnRow("sample", size, "", gap, "", "", tuple(sorted(parts.items()))))
+        control = {"text": text, "font": parts["font"], "rpr": rpr}
+        rows.append(DrawnRow("sample", size, "space", None, "", "", tuple(sorted(control.items()))))
+    return rows
+
+
+def _sample_flags(rng: random.Random) -> dict[str, str]:
+    """A sampled paragraph's other properties, by kind ("" for none)."""
+    return {
+        "keep": "".join(rng.sample(["<w:keepNext/>", "<w:keepLines/>"], rng.randint(0, 2))),
+        "widow": rng.choice(["", "", '<w:widowControl w:val="0"/>', "<w:widowControl/>"]),
+        "shd": rng.choice(
+            [
+                "",
+                "",
+                '<w:shd w:val="clear" w:color="auto" w:fill="FFFFFF"/>',
+                '<w:shd w:val="clear" w:color="auto" w:fill="E6E6E6"/>',
+            ]
+        ),
+        "auto": "".join(
+            x
+            for x in (
+                '<w:overflowPunct w:val="0"/>',
+                '<w:autoSpaceDE w:val="0"/>',
+                '<w:autoSpaceDN w:val="0"/>',
+                '<w:adjustRightInd w:val="0"/>',
+            )
+            if rng.random() < 0.25
+        ),
+        "context": rng.choice(["", "", "<w:contextualSpacing/>"]),
+        "text alignment": rng.choice(
+            [
+                "",
+                "",
+                "",
+                '<w:textAlignment w:val="auto"/>',
+                '<w:textAlignment w:val="baseline"/>',
+                '<w:textAlignment w:val="center"/>',
+            ]
+        ),
+        "outline": rng.choice(["", "", "", f'<w:outlineLvl w:val="{rng.randint(0, 8)}"/>']),
+    }
+
+
+# From INHERITED: where a label's run properties are set (its level, the paragraph's mark, its
+# style, the style that is based on, or, for its font and size, the defaults), in the schema's
+# order; where the paragraph's are (its own, its style, the base); the advances the rows near a
+# space aim by, in 2048ths of an em (Word's drawing decides); and how many rows a case ends with
+# whose gap is 0.2 to 0.5 pt either side of a space.
+_SOURCES = ("level", "mark", "style", "base", "defaults")
+_RUN_ORDER = ("rFonts", "b", "bCs", "i", "iCs", "noProof", "color", "sz", "szCs", "lang")
+_PPR_ORDER = (
+    *("keep", "widow", "shd", "tabs", "auto", "spacing", "ind", "context", "jc"),
+    *("text alignment", "outline"),
+)
+_AIM = {
+    "-": 682,
+    ".": 512,
+    "i": 569,
+    "\uf0b7": 942,
+    "\uf02d": 1124,
+    **dict.fromkeys("0123456789", 1024),
+}
+NEAR = 5
+
+
+def inherited_rows(case: int) -> list[DrawnRow]:
+    """legacy-drawn-sample-{case} from INHERITED: SAMPLES rows at random, each with its control.
+
+    As sample_rows, and: each of the label's run properties set at random where Word takes them
+    from (_SOURCES), its mark's size and its text's apart from its own, its level indented on the
+    right, each paragraph property in the paragraph, its style or its base style, its spacing at
+    times none (the defaults'); the last NEAR rows plain, their gap near a space.
+    """
+    page = DRAWN_SAMPLE_PAGES[case]
+    rng = random.Random(SAMPLE_SEED * 10 + case)
+    rows = []
+    for index in range(SAMPLES):
+        near = index >= SAMPLES - NEAR
+        symbol = rng.random() < 0.3
+        characters = ["\uf0b7", "\uf02d"] if symbol else list("-.i0123456789")
+        text = "".join(rng.choice(characters) for _ in range(rng.randint(1, 2 if symbol else 4)))
+        two = not near and rng.random() < 0.15
+        at: dict[str, dict[str, str]] = {source: {} for source in _SOURCES}
+        at["level"]["color"] = '<w:color w:val="FF0000"/>'
+        # Symbol in the level or the mark: Word names a font it takes from the paragraph's style
+        # on none of the label's runs when it writes the label in, so its labels are not on record.
+        at[rng.choice(_SOURCES[:2] if symbol else _SOURCES)]["rFonts"] = (
+            SYMBOL_FONTS if symbol else TIMES
+        )
+        sized = rng.choice(_SOURCES)
+        size = page.size if sized == "defaults" else rng.randint(16, 56)
+        at[sized]["sz"] = f'<w:sz w:val="{size}"/>'
+        # The mark's own size, under a level's.
+        mark = page.size if sized == "level" else size
+        if sized == "level" and rng.random() < 0.5:
+            mark = rng.randint(16, 56)
+            at["mark"]["sz"] = f'<w:sz w:val="{mark}"/>'
+        for name in ("b", "bCs", "i", "iCs", "noProof", "color", "lang", "szCs"):
+            if rng.random() >= 0.3 or (symbol and name == "b"):
+                continue
+            where = rng.choice(_SOURCES[1:4] if name == "color" else _SOURCES[:4])
+            at[where][name] = {
+                "color": '<w:color w:val="000000"/>',
+                "lang": '<w:lang w:val="en-GB"/>',
+                "szCs": f'<w:szCs w:val="{rng.randint(16, size)}"/>',
+            }.get(name) or (f"<w:{name}/>" if rng.random() < 0.75 else f'<w:{name} w:val="0"/>')
+        text_size = size if rng.random() < 0.6 else rng.randint(16, 56)
+        tallest = max(size, text_size, mark, page.size)
+        base = "Normal" if near else rng.choice(["Normal", "Normal", "Tab567", "Ind567"])
+        level, direct = _sample_indents(rng, base)
+        if not near and rng.random() < 0.3:
+            level += f' w:right="{rng.randint(-29, 720)}"'
+        groups = {k: v for k, v in _sample_flags(rng).items() if v}
+        rule = rng.choice(["auto", "exact", "atLeast", ""])
+        if rule:
+            # An exact line no lower than the text (the reader refuses one that clips it).
+            line = rng.randint(240, 480) if rule == "auto" else rng.randint(tallest * 10, 1200)
+            groups["spacing"] = (
+                f'<w:spacing w:before="{rng.randint(0, 240)}" w:after="{rng.randint(0, 240)}" '
+                f'w:line="{line}" w:lineRule="{rule}"/>'
+            )
+        if direct and not near:
+            groups["ind"] = f"<w:ind {direct}/>"
+        if not near and rng.random() < 0.4:
+            groups["tabs"] = _sample_tabs(rng)
+        jc = "both" if two else rng.choice(["", "", "left"] if near else ["", "", "left", "both"])
+        if jc:
+            groups["jc"] = f'<w:jc w:val="{jc}"/>'
+        if near:
+            # legacyIndent a space and 0.2 to 0.5 pt past the label, or short of it, in twips.
+            advance = sum(_AIM[c] for c in text) * size * 10 / 2048
+            space = 569 * size * 10 / 2048
+            indent = round(advance + space + rng.choice((-1, 1)) * rng.uniform(4, 10))
+            gap = (rng.randint(0, int(space) - 20), indent)
+            level = f'w:left="{indent}" w:hanging="{indent}"'
+        else:
+            gap = (rng.randint(0, 340), rng.randint(0, 1500))
+        styled = {
+            "style": f"S{index}",
+            "base": base,
+            **{f"{s} rpr": "".join(at[s].get(n, "") for n in _RUN_ORDER) for s in _SOURCES[:4]},
+        }
+        parts = {"text": text, "font": "Symbol" if symbol else "Times New Roman", **styled}
+        placed: dict[str, dict[str, str]] = {"style": {}, "base": {}}
+        for group, xml in groups.items():
+            where = rng.choice(["own", "own", "style", "base"])
+            if where == "own":
+                parts[group] = {"ind": direct, "jc": jc}.get(group, xml)
+            else:
+                placed[where][group] = xml
+        for where in placed:
+            parts[f"{where} ppr"] = "".join(placed[where].get(g, "") for g in _PPR_ORDER)
+        parts["level"] = level
+        parts["text size"] = str(text_size)
+        if not near and rng.random() < 0.2:
+            parts["level tabs"] = _sample_tabs(rng)
+        if two:
+            parts["two"] = "1"
+        rows.append(DrawnRow("sample", size, "", gap, "", "", tuple(sorted(parts.items()))))
+        control = {
+            k: parts[k] for k in ("text", "font", "style ppr", "base ppr", "text size", *styled)
+        }
+        rows.append(DrawnRow("sample", size, "space", None, "", "", tuple(sorted(control.items()))))
+    return rows
+
+
+def compat_rows() -> list[DrawnRow]:
+    """A legacy-drawn-compat case: the plain rows at 11 pt, three gaps, with their controls."""
+    rows = [
+        DrawnRow(label, 22, "", gap, 'w:left="360" w:hanging="360"' if gap[1] else "", "plain")
+        for label in ("dash", "bullet", "1.", "10.")
+        for gap in ((0, 360), (144, 0), (0, 0))
+    ]
+    for label in ("dash", "bullet", "1.", "10."):
+        rows += [DrawnRow(label, 22, suff, None, "", "plain") for suff in ("nothing", "space")]
+    return rows
+
+
+def drawn_rows() -> list[DrawnRow]:
+    """The rows: each label and size by gap and indent, indentation apart, then the controls."""
+    rows = []
+    for label in DRAWN_SHAPES:
+        for size in DRAWN_SIZES:
+            for indent in (0, 120, 283, 360, 454, 567, 708):
+                ind = f'w:left="{indent}" w:hanging="{indent}"' if indent else ""
+                rows += [DrawnRow(label, size, "", (space, indent), ind) for space in (0, 144)]
+    for label in ("dash", "10."):
+        for size in (22, 56):
+            for indent in (0, 360, 708):
+                for space in (0, 340):
+                    for ind in (
+                        f'w:left="1440" w:hanging="{indent}"',
+                        'w:left="851" w:firstLine="0"',
+                        "",
+                    ):
+                        rows.append(DrawnRow(label, size, "", (space, indent), ind))
+    for label in ("2345.", "6789."):
+        ind = 'w:left="1500" w:hanging="1500"'
+        rows += [DrawnRow(label, size, "", (0, 1500), ind) for size in DRAWN_SIZES]
+    for label in DRAWN_LABELS:
+        for size in DRAWN_SIZES:
+            rows += [DrawnRow(label, size, suff, None, "") for suff in ("nothing", "space")]
+    return rows
+
+
+# The rows of each legacy-drawn case.
+ROWS: dict[str, Callable[[], list[DrawnRow]]] = {
+    "legacy-drawn": drawn_rows,
+    "legacy-drawn-styled": styled_rows,
+    "legacy-drawn-styled-bare": styled_rows,
+    **dict.fromkeys(DRAWN_COMPAT, compat_rows),
+    **{
+        f"legacy-drawn-sample-{case}": functools.partial(
+            sample_rows if case < INHERITED else inherited_rows, case
+        )
+        for case in range(len(DRAWN_SAMPLE_PAGES))
+    },
+}
+
+
+# Each case's row height (twips) and rows a page: the samples' rows are taller, for their spacing,
+# sizes and vertical alignment, and an even number a page keeps a row and its control together.
+# A sample's row is its page (its text area: 769 pt of A4 between 36 pt margins).
+GEOMETRY = {name: (15380, 1) if "sample" in name else (DRAWN_LINE, DRAWN_ROWS) for name in ROWS}
+
+
+def _legacy_drawn(
+    rows: list[DrawnRow] | None = None,
+    styles: str = "",
+    settings: str = "",
+    geometry: tuple[int, int] = (DRAWN_LINE, DRAWN_ROWS),
+    pitch: int | None = None,
+) -> Case:
+    height, per_page = geometry
+    abstracts, nums, body = [], [], []
+    # inherited_rows' paragraph styles, each based on its own base style.
+    defined: dict[str, str] = {}
+    for key, row in enumerate(drawn_rows() if rows is None else rows, 1):
+        if row.label == "sample":
+            parts = dict(row.extra)
+            fmt, text, start = "bullet", parts["text"], 1
+            fonts = SYMBOL_FONTS if parts["font"] == "Symbol" else TIMES
+        else:
+            fmt, text, fonts, start = DRAWN_LABELS[row.label]
+            parts = DRAWN_CONDITIONS[row.condition] if row.condition else {}
+        suff = f'<w:suff w:val="{row.suff}"/>' if row.suff else ""
+        legacy = (
+            ""
+            if row.legacy is None
+            else f'<w:legacy w:legacy="1" w:legacySpace="{row.legacy[0]}" '
+            f'w:legacyIndent="{row.legacy[1]}"/>'
+        )
+        level_ind = parts.get("level", row.ind)
+        ind = f"<w:ind {level_ind}/>" if level_ind else ""
+        # An inherited_rows row sets each part's run properties itself, its text's size apart.
+        inherited = "text size" in parts
+        level_rpr = parts.get(
+            "level rpr",
+            f'{fonts}{parts.get("rpr", "")}<w:color w:val="FF0000"/><w:sz w:val="{row.size}"/>',
+        )
+        abstracts.append(
+            abstract(
+                key,
+                f'<w:lvl w:ilvl="0"><w:start w:val="{start}"/><w:numFmt w:val="{fmt}"/>{suff}'
+                f'<w:lvlText w:val="{text}"/>{legacy}<w:lvlJc w:val="left"/>'
+                f"<w:pPr>{parts.get('level tabs', '')}{ind}</w:pPr>"
+                f"<w:rPr>{level_rpr}</w:rPr></w:lvl>",
+            )
+        )
+        nums.append(num(key, key))
+        page = "<w:pageBreakBefore/>" if key > 1 and (key - 1) % per_page == 0 else ""
+        sized = f'{TIMES}<w:sz w:val="{row.size}"/>'
+
+        # The text's run properties, blue, and a second line's, green.
+        blue, green = (
+            f'{TIMES}<w:color w:val="{colour}"/><w:sz w:val="{parts["text size"]}"/>'
+            if inherited
+            else f'{sized}<w:color w:val="{colour}"/>'
+            for colour in ("0000FF", "00A000")
+        )
+
+        mark = parts.get("mark rpr", sized)
+        two = "two" in parts
+        if inherited and parts["style"] not in defined:
+            defined[parts["style"]] = "".join(
+                f'<w:style w:type="paragraph" w:styleId="{key}"><w:name w:val="{key}"/>'
+                f'<w:basedOn w:val="{based}"/>'
+                + (f"<w:pPr>{parts[f'{kind} ppr']}</w:pPr>" if parts[f"{kind} ppr"] else "")
+                + (f"<w:rPr>{parts[f'{kind} rpr']}</w:rPr>" if parts[f"{kind} rpr"] else "")
+                + "</w:style>"
+                for key, based, kind in (
+                    (parts["style"] + "b", parts["base"], "base"),
+                    (parts["style"], parts["style"] + "b", "style"),
+                )
+            )
+        style = f'<w:pStyle w:val="{parts["style"]}"/>' if "style" in parts else ""
+        indent = f"<w:ind {parts['ind']}/>" if "ind" in parts else ""
+        align = f'<w:jc w:val="{parts["jc"]}"/>' if "jc" in parts else ""
+        text = f"<w:r><w:rPr>{blue}</w:rPr><w:t>{'5 mg 5 mg 5 mg' if two else '5 mg'}</w:t></w:r>"
+        if two:
+            text += f"<w:r><w:br/></w:r><w:r><w:rPr>{green}</w:rPr><w:t>x</w:t></w:r>"
+        before, after = int(parts.get("before", "0")), int(parts.get("after", "0"))
+        line = (height - before - after) // (2 if two else 1)
+        spacing = parts.get("spacing") or (
+            ""
+            if inherited
+            else f'<w:spacing w:before="{before}" w:after="{after}" w:line="{line}" '
+            'w:lineRule="exact"/>'
+        )
+        kept = any("keepNext" in parts.get(k, "") for k in ("keep", "style ppr", "base ppr"))
+        body.append(
+            f"<w:p><w:pPr>{style}{parts.get('keep', '')}{page}{parts.get('widow', '')}"
+            f'<w:numPr><w:ilvl w:val="0"/><w:numId w:val="{key}"/></w:numPr>'
+            f"{parts.get('shd', '')}{parts.get('tabs', '')}{parts.get('auto', '')}"
+            f"{spacing}{indent}{parts.get('context', '')}{align}"
+            f"{parts.get('text alignment', '')}{parts.get('outline', '')}"
+            + (f"<w:rPr>{mark}</w:rPr>" if mark else "")
+            + f"</w:pPr>{text}</w:p>"
+            # A paragraph kept with the next is kept with an empty one, on its own page.
+            + ("<w:p/>" if kept else "")
+        )
+    return Case(
+        "Word 6 (legacy) levels as Word draws them: one row each, label red, text blue."
+        + (" Styled, under the QRD template's settings." if styles else ""),
+        "".join(abstracts + nums),
+        "".join(body),
+        styles=styles + "".join(defined.values()),
+        settings=settings,
+        final=(
+            '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="720" w:right="1134" '
+            'w:bottom="720" w:left="1134" w:header="0" w:footer="0" w:gutter="0"/>'
+            + ("" if pitch is None else f'<w:docGrid w:linePitch="{pitch}"/>')
+            + "</w:sectPr>"
+        ),
+    )
+
+
 HEADING = (
     '<w:style w:type="paragraph" w:styleId="H2"><w:name w:val="H2"/><w:pPr><w:numPr>'
     '<w:numId w:val="1"/></w:numPr></w:pPr></w:style>'
@@ -646,6 +1367,25 @@ CASES: dict[str, Case] = {
         abstract(1, lvl(0)) + num(1, 1, LEGACY),
         items((1, 0), (1, 0)),
     ),
+    "legacy-levels": _legacy_levels(),
+    "legacy-drawn": _legacy_drawn(),
+    "legacy-drawn-styled": _legacy_drawn(styled_rows(), DRAWN_STYLES, drawn_settings()),
+    "legacy-drawn-styled-bare": _legacy_drawn(styled_rows(), DRAWN_STYLES),
+    **{
+        f"legacy-drawn-sample-{case}": _legacy_drawn(
+            ROWS[f"legacy-drawn-sample-{case}"](),
+            drawn_styles(page.size, page.ppr),
+            "" if page.compat is None else drawn_settings(*page.compat, tab=page.tab),
+            GEOMETRY[f"legacy-drawn-sample-{case}"],
+            page.pitch,
+        )
+        for case, page in enumerate(DRAWN_SAMPLE_PAGES)
+    },
+    **{
+        name: _legacy_drawn(compat_rows(), DRAWN_STYLES, drawn_settings(*options))
+        for name, options in DRAWN_COMPAT.items()
+    },
+    "numbering-num-before-abstract": _legacy_levels(interleaved=True),
     "bullets": Case(
         "Bullets in Symbol, in Courier New, and in the paragraph mark's font.",
         abstract(1, lvl(0, "bullet", "", SYMBOL))

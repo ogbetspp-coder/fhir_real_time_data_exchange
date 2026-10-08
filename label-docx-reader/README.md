@@ -89,7 +89,7 @@ from another web page.
 
 ```json
 {"certificate": {…}, "comments": [], "endnotes": [], "footers": [], "footnotes": [],
- "format": "label-docx-json/1.18.1", "headers": [],
+ "format": "label-docx-json/1.19.0", "headers": [],
  "paragraphs": [{"anchored": [{"kind": "text-box", "offset": 2, "read": false}],
    "comments": [], "markHidden": false,
    "marks": [{"end": 5, "kind": "superscript", "start": 4}], "notes": [], "numbering": null,
@@ -97,7 +97,7 @@ from another web page.
      "offset": 8, "part": "word/media/image1.png", "pixels": [8, 8], "reason": null,
      "sha256": "…", "type": "png"}],
    "style": "Heading2", "table": [0, 1, 0], "text": "x 109/l \ufffc"}],
- "reader": "docx-reader/1.32.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
+ "reader": "docx-reader/1.33.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
  "tables": [{"grid": {"columns": 2, "rows": [
    {"after": 0, "before": 0, "cells": [{"column": 0, "merge": null, "span": 2}],
     "exactHeight": false},
@@ -108,7 +108,10 @@ from another web page.
 
 - Offsets (`marks`, `notes`, `pages`, `comments`) count Unicode code points of `text`.
 - `numbering` is the list label Word draws before the paragraph (`text`, `suffix`); it is not
-  part of `text`. Its `level` counts from 0 in a .docx (Word's `ilvl`) and from 1 in an ePI (the
+  part of `text`. `suffix` is `tab`, `space` or `nothing`, or `legacy` after a Word 6 label where
+  Word writes a tab but its drawing of the gap is not on record. Only for a Word 6 label does
+  `tab` also say that Word draws at least a space there; after any other label it says only
+  what Word writes. Its `level` counts from 0 in a .docx (Word's `ilvl`) and from 1 in an ePI (the
   lists around the item). `table` is `[table, row, cell]`, counted from 0, `cell` among the
   row's cells.
 - `tables` lists each body table, in document order, a nested table as its own entry with its
@@ -163,7 +166,7 @@ Every key: the docstrings of [`output.py`](src/label_docx/output.py) and
 | Tracked views are Word's Accept All / Reject All (42 of 50 cases; 8 refused) | Word's own files (`test_tracked.py`) |
 | ePI sections are what Chrome shows                            | Chrome's recorded answers (`test_browser_oracle.py`) |
 | Every result read is certified; seeded changes to each corpus result read are caught | `test_certify.py` |
-| Each fault put into the checker is caught by its tests, or recorded as unable to change a result | the mutation record (`test_checker_mutants.py`): 3,420 of 3,514 faults killed, 94 recorded as unable to change a result, none unexplained |
+| Each fault put into the checker is caught by its tests, or recorded as unable to change a result | the mutation record (`test_checker_mutants.py`): 4,253 of 4,361 faults killed, 108 recorded as unable to change a result, none unexplained |
 | Up to two seeded edits of each kind in `scripts/mutate.py` to the `document.xml` of each corpus .docx not refused: one to what the reader reports changes the result or is refused; others (font size, bookkeeping) change nothing | `test_mutations.py` |
 | Same bytes across processes, hash seeds, locales and zip layouts; seeded damage to four corpus files never crashes it | `test_determinism.py`, `test_robustness.py` |
 
@@ -194,7 +197,7 @@ each document reads to, `word.json` and `browser.json` hold Word's and Chrome's 
 | ----------------- | --------: | ----------------------------------------------------------------- |
 | `ema-qrd`         |         4 | EMA QRD files the rules were first written from                   |
 | `ema-templates`   |        18 | EMA product-information templates                                 |
-| `numbering-cases` |       151 | one Word rule each, synthetic                                     |
+| `numbering-cases` |       155 | one Word rule each, synthetic                                     |
 | `fda-templates`   |         3 | FDA prescribing information, medication guide and patient insert templates |
 | `word-authored`   |         2 | written by Word itself (a table of contents)                      |
 | `tracked-cases`   |        39 | tracked changes, with Word's Accept All and Reject All files      |

@@ -19,9 +19,10 @@ from typing import Any
 
 import pytest
 
+import numbering_cases
 import word_oracle
 from label_docx import word as word_module
-from label_docx.reader import DocxRefusedError, read_document
+from label_docx.reader import DocxRefusedError, read_document, read_docx
 from label_docx.word import (
     _has_computed_fields,
     _has_stories,
@@ -85,6 +86,11 @@ REFUSED = {
     "numbering-cases/fields-noteref-stale.docx": "stale-field",
     # A SEQ with no stored result: Word shows nothing on screen and prints 1.
     "numbering-cases/fields-seq-shown-no-result.docx": "field-without-result",
+    # A num before an abstractNum: Word numbers every list as one, not as each names.
+    "numbering-cases/numbering-num-before-abstract.docx": "unsupported-numbering",
+    # Word 6 levels with a suffix: Word writes the suffix's character, and what it draws there is
+    # not on record.
+    "numbering-cases/legacy-levels.docx": "unsupported-numbering",
     # EMA's stray U+F02D in Times New Roman, a code no font draws as the template means it.
     "ema-templates/qrd-product-information-template-version-104_es.docx": "private-use-character",
 }
@@ -147,6 +153,32 @@ def test_the_reader_draws_words_labels_or_refuses_as_listed(
         assert result == f"reader refuses: {REFUSED[key]}"
     else:
         assert result == "agrees"
+
+
+def test_each_suffix_is_named_for_what_word_writes_after_the_label() -> None:
+    """Held by name, not by character: ``tab`` and ``legacy`` where Word writes a tab.
+
+    ``legacy`` only for a Word 6 level, where what Word draws there is not known to be a space
+    (``tests/test_word_gaps.py``); Word writes a tab after every one (legacy-levels, legacy-drawn).
+    """
+    path = CORPUS / "numbering-cases" / "legacy-drawn.docx"
+    record = _record(path.parent / "word.json")
+    word, at = record["drawn"][path.name], record["at"][path.name]
+    paragraphs = read_docx(path.read_bytes())
+    rows = numbering_cases.drawn_rows()
+    written = {"\t": "tab", " ": "space", "\uf020": "space"}
+    for index, label in zip(at, word, strict=True):
+        numbering = paragraphs[index].numbering
+        assert numbering is not None
+        named = "tab" if numbering.suffix == "legacy" else numbering.suffix
+        assert named == written.get(label[-1:], "nothing")
+        assert numbering.suffix != "legacy" or rows[index].legacy is not None
+    assert {p.numbering.suffix for p in paragraphs if p.numbering} == {
+        "legacy",
+        "nothing",
+        "space",
+        "tab",
+    }
 
 
 @pytest.mark.parametrize(
@@ -291,6 +323,19 @@ def test_label_fonts_are_read_from_words_saved_copy_and_must_be_its_labels(tmp_p
         f"<w:p>{number}<w:r><w:t>two</w:t></w:r></w:p>"
     )
     assert _label_fonts(original, saved, ["\uf0a7\t", "1."]) == (["Wingdings", "mixed"], [0, 1])
+    # A Symbol label's space, which Word's text shows as U+F020, is its copy's space.
+    bullet = run.format("Symbol", "Symbol", "\uf0b7 ")
+    spaced = docx(
+        f"<w:p>{bullet}<w:r><w:t>one</w:t></w:r></w:p><w:p><w:r><w:t>two</w:t></w:r></w:p>"
+    )
+    assert _label_fonts(original, spaced, ["\uf0b7\uf020"]) == (["Symbol"], [0])
+    assert _label_fonts(original, spaced, ["\uf0b7 "]) == (["Symbol"], [0])
+    # Shown in capitals, a label is the copy's loosely, and gets no font.
+    lower = docx(
+        f"<w:p>{run.format('Arial', 'Arial', 'a ')}<w:r><w:t>one</w:t></w:r></w:p>"
+        "<w:p><w:r><w:t>two</w:t></w:r></w:p>"
+    )
+    assert _label_fonts(original, lower, ["A\uf020"]) == ([None], [0])
     with pytest.raises(SystemExit):
         _label_fonts(original, saved, ["\uf0a7\t"])  # not the labels Word drew
     with pytest.raises(SystemExit):

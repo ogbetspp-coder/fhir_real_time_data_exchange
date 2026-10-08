@@ -104,7 +104,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT, WINGDINGS_BULLETS
 
-CHECKER_VERSION = "conservation-check/1.19.0"
+CHECKER_VERSION = "conservation-check/1.20.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -2240,6 +2240,12 @@ class _ListLevel:
     suffix: str
     rpr: ET.Element | None
     picture: bool
+    # A Word 6 level's legacySpace and legacyIndent (None where unset), else None; whether it
+    # has a suffix; lvlJc (None where there is none, "" where it has no value); its pPr.
+    word6: tuple[int | None, int | None] | None
+    suffixed: bool
+    jc: str | None
+    ppr: ET.Element | None
 
 
 def _list_level(element: ET.Element) -> _ListLevel:
@@ -2255,10 +2261,15 @@ def _list_level(element: ET.Element) -> _ListLevel:
     if text_element is not None:
         null = text_element.get(_w("null")) in ("1", "true", "on")
         text = "" if null else text_element.get(_w("val"), "")
-    legacy = element.find(_w("legacy"))
     suffix = value("suff") or "tab"
+    legacy = element.find(_w("legacy"))
+    word6 = None
     if legacy is not None and legacy.get(_w("legacy")) not in ("0", "false", "off"):
-        suffix = "legacy"
+        gaps = [legacy.get(_w(name)) for name in ("legacySpace", "legacyIndent")]
+        word6 = (
+            None if gaps[0] is None else _twips(gaps[0]),
+            None if gaps[1] is None else _twips(gaps[1]),
+        )
     start, restart = value("start"), value("lvlRestart")
     return _ListLevel(
         start=None if start is None else int(start),
@@ -2269,7 +2280,18 @@ def _list_level(element: ET.Element) -> _ListLevel:
         suffix=suffix,
         rpr=element.find(_w("rPr")),
         picture=element.find(_w("lvlPicBulletId")) is not None,
+        word6=word6,
+        suffixed=element.find(_w("suff")) is not None,
+        jc=None if element.find(_w("lvlJc")) is None else value("lvlJc") or "",
+        ppr=element.find(_w("pPr")),
     )
+
+
+def _twips(value: str) -> int:
+    """A measure as written, digits only (a sign aside)."""
+    if not re.fullmatch("-?[0-9]{1,9}", value):
+        raise CertificationError(f"a measure {value!r}")
+    return int(value)
 
 
 def _once[T](pairs: Iterator[tuple[int, T]]) -> dict[int, T]:
@@ -2282,13 +2304,24 @@ def _once[T](pairs: Iterator[tuple[int, T]]) -> dict[int, T]:
     return out
 
 
+# The numbering part's children, in the schema's order.
+_PART_SCHEMA = {"numPicBullet": "p", "abstractNum": "a", "num": "n", "numIdMacAtCleanup": "c"}
+
+
 class _Numbering:
     """The labels of a document's lists, counted in document order."""
 
-    def __init__(self, root: ET.Element | None, fonts: _Fonts) -> None:
+    def __init__(self, root: ET.Element | None, fonts: _Fonts, drawn_page: bool) -> None:
         self.fonts = fonts
+        # Whether Word drew Word 6 labels in the document's layout (``_page_drawn``).
+        self.drawn_page = drawn_page
         self.abstracts: dict[int, tuple[dict[int, _ListLevel], str | None, str | None]] = {}
         self.nums: dict[int, tuple[int, dict[int, int], dict[int, _ListLevel]]] = {}
+        # Out of the schema's order Word numbers the lists otherwise than they say
+        # [numbering-num-before-abstract].
+        order = "".join(_PART_SCHEMA.get(_local(c.tag), "") for c in ([] if root is None else root))
+        if not re.fullmatch("p*a*n*c?", order):
+            raise CertificationError("the numbering part out of the schema's order")
         # Anything defined twice (a list, a list's definition, a level of either) is refused:
         # which one Word takes is not on record.
         for element in [] if root is None else root.findall(_w("abstractNum")):
@@ -2470,7 +2503,303 @@ class _Numbering:
             raise CertificationError("a hidden list label")
         if out != out.upper() and any_level("caps", "smallCaps"):
             raise CertificationError("a list label in capitals")
-        return out, look.suffix
+        if look.word6 is None:
+            return out, look.suffix
+        if look.suffixed:
+            raise CertificationError("a Word 6 list level with a suffix")  # not on record
+        spaced = self._word6_spaced(look, out, label_levels, paragraph)
+        return out, "tab" if spaced else "legacy"
+
+    def _word6_spaced(
+        self, look: _ListLevel, label: str, levels: list[ET.Element], paragraph: _Paragraph
+    ) -> bool:
+        """Whether Word draws a space's width or more after a Word 6 label [legacy-drawn].
+
+        Word starts the text max(legacyIndent, the label's advance + legacySpace) after the label,
+        or further where the paragraph hangs further, as far as its drawing is on record
+        (``_WORD6_WIDTHS`` and the checks below): else ``legacy``.
+        """
+        space, indent = look.word6 or (None, None)
+        name = self.fonts.font(levels, "ascii")
+        widths = _WORD6_WIDTHS.get(name or "")
+        hint = next(
+            (
+                f.get(_w("hint"))
+                for x in levels
+                if (f := x.find(_w("rFonts"))) is not None and f.get(_w("hint")) is not None
+            ),
+            None,
+        )
+        sizes = [x.find(_w("sz")) for x in levels]
+        size = next((z.get(_w("val"), "") for z in sizes if z is not None), "")
+        tags = {c.tag for x in levels for c in x}
+        sources = [
+            x
+            for x in (
+                paragraph.properties,
+                *(
+                    self.fonts.ppr.get(i)
+                    for i in self.fonts.style_ids(paragraph.style, "paragraph")
+                ),
+                self.fonts.doc_ppr,
+                look.ppr,
+            )
+            if x is not None
+        ]
+        if (
+            widths is None
+            or paragraph.table is not None
+            or not self.drawn_page
+            or self.fonts.font(levels, "hAnsi") != name
+            or (name == "Symbol" and not _symbol_named(look.rpr, paragraph.properties))
+            or hint not in (None, "default")
+            or any(c not in widths for c in label)
+            or len(label) > _WORD6_LONGEST[str(name)]
+            or not re.fullmatch("[1-5][0-9]", size)
+            or not 16 <= int(size) <= 56
+            or space is None
+            or indent is None
+            or not 0 <= space <= 340
+            or not 0 <= indent <= 1500
+            or tags - _WORD6_RUN
+            or (name == "Symbol" and _w("b") in tags)
+            or {c.tag for c in ([] if self.fonts.doc_rpr is None else self.fonts.doc_rpr)}
+            - _WORD6_DEFAULTS
+            or {c.tag for c in ([] if self.fonts.doc_ppr is None else self.fonts.doc_ppr)}
+            - _WORD6_DEFAULT_PPR
+            or look.jc != "left"
+            or any(
+                j.get(_w("val")) not in ("left", "both")
+                for x in sources
+                for j in x.findall(_w("jc"))
+            )
+            or not _level_drawn(look.ppr)
+            or not _paragraph_drawn(sources, int(size))
+            or not all(
+                _stop_drawn(t) for x in sources for tabs in x.findall(_w("tabs")) for t in tabs
+            )
+            or not _indents_drawn([i for x in sources for i in x.findall(_w("ind"))])
+        ):
+            return False
+        # Both sides in twips times the em.
+        needed = _WORD6_SPACE * int(size) * 10 + _WORD6_MARGIN * _WORD6_EM
+        after = indent * _WORD6_EM - sum(widths[c] for c in label) * int(size) * 10
+        return max(after, space * _WORD6_EM) >= needed
+
+
+# Word's drawing of Word 6 labels (legacy-drawn*), written here on its own, equal to the reader's
+# (a test holds them so): its fonts' advances of the characters it drew, in 2048ths of an em; the
+# space it draws after a label; the margin over the rule's agreement with the drawing, in twips.
+_WORD6_EM = 2048
+_WORD6_WIDTHS = {
+    "Times New Roman": {"-": 682, ".": 512, "i": 569, **dict.fromkeys("0123456789", 1024)},
+    "Symbol": {"\u2022": 942, "\u2212": 1124},
+}
+_WORD6_SPACE = 569
+_WORD6_MARGIN = 4
+# The longest labels drawn at random, by font; what the defaults' run properties set.
+_WORD6_LONGEST = {"Times New Roman": 4, "Symbol": 2}
+_WORD6_DEFAULTS = {_w(n) for n in ("rFonts", "sz", "szCs", "lang")}
+# What the defaults' paragraph properties set.
+_WORD6_DEFAULT_PPR = {_w(n) for n in ("spacing", "widowControl", "autoSpaceDE", "autoSpaceDN")}
+# The default tab stops and line pitches of the documents Word drew them in.
+_WORD6_TAB_STOPS = {"561", "562", "567", "708", "720", "850"}
+_WORD6_PITCHES = {"233", "299", "326", "360"}
+# The run properties Word drew a Word 6 label in.
+_WORD6_RUN = {
+    _w(n) for n in ("rFonts", "sz", "szCs", "color", "lang", "noProof", "b", "bCs", "i", "iCs")
+}
+# The compat options of every combination Word drew them under (but none at all).
+_WORD6_FIXED = {
+    "compatibilityMode=15",
+    "overrideTableStyleFontSizeAndJustification=1",
+    "enableOpenTypeFeatures=1",
+    "doNotFlipMirrorIndents=1",
+    "differentiateMultirowTableHeaders=1",
+}
+
+
+# The paragraph properties Word drew Word 6 labels with: those checked on their own (the style,
+# numbering, mark, tab stops, indents, alignment, shading, spacing), and the rest by the w:val each
+# took (None: none).
+_WORD6_OWN = {"pStyle", "numPr", "rPr", "tabs", "ind", "jc"}
+_WORD6_VALUES: dict[str, set[str | None]] = {
+    "keepNext": {None},
+    "keepLines": {None},
+    "contextualSpacing": {None},
+    "pageBreakBefore": {None},
+    "widowControl": {None, "0"},
+    "overflowPunct": {"0"},
+    "autoSpaceDE": {"0"},
+    "autoSpaceDN": {"0"},
+    "adjustRightInd": {"0"},
+    "textAlignment": {"auto", "baseline", "center"},
+    "outlineLvl": {str(n) for n in range(9)},
+}
+
+
+def _symbol_named(level: ET.Element | None, paragraph: ET.Element | None) -> bool:
+    """Whether a label's level or its paragraph's mark names Symbol its font.
+
+    Word names no font on a label it takes from the paragraph's style when it writes it in.
+    """
+    mark = None if paragraph is None else paragraph.find(_w("rPr"))
+    for source in (level, mark):
+        fonts = None if source is None else source.find(_w("rFonts"))
+        if fonts is not None and fonts.get(_w("ascii")) == "Symbol":
+            return True
+    return False
+
+
+def _level_drawn(properties: ET.Element | None) -> bool:
+    """Whether Word drew a Word 6 label with its level's own paragraph properties.
+
+    Tab stops, and indents by left and hanging (and right), or by left and firstLine.
+    """
+    shapes = [{_w(n) for n in s.split()} for s in ("left hanging", "left hanging right")]
+    shapes.append({_w("left"), _w("firstLine")})
+    return all(
+        child.tag == _w("tabs") or (child.tag == _w("ind") and set(child.attrib) in shapes)
+        for child in ([] if properties is None else properties)
+    )
+
+
+def _paragraph_drawn(sources: list[ET.Element], size: int) -> bool:
+    """Whether Word drew a Word 6 label in a paragraph with these properties, at every level.
+
+    ``size``: the label's, in half-points.
+    """
+    for properties in sources:
+        for child in properties:
+            name = _local(child.tag)
+            if not child.tag.startswith(f"{{{W}}}"):
+                return False
+            if name == "shd":
+                drawn = {_w("val"): "clear", _w("color"): "auto"}
+                if dict(child.attrib) not in (
+                    drawn | {_w("fill"): "FFFFFF"},
+                    drawn | {_w("fill"): "E6E6E6"},
+                ):
+                    return False
+            elif name == "spacing":
+                if not _spacing_drawn(child, size):
+                    return False
+            elif name in _WORD6_VALUES:
+                if any(k != _w("val") for k in child.attrib):
+                    return False
+                if child.get(_w("val")) not in _WORD6_VALUES[name]:
+                    return False
+            elif name not in _WORD6_OWN:
+                return False
+    return True
+
+
+def _spacing_drawn(spacing: ET.Element, size: int) -> bool:
+    """Whether Word drew a Word 6 label of ``size`` half-points with this line spacing.
+
+    Before and after up to 240 twips, lines 240 to 480 (auto) or 200 to 1200 (exact, at least)
+    and, these, none under the label.
+    """
+    rule = spacing.get(_w("lineRule"), "auto")
+    lines = {"auto": (240, 480), "exact": (200, 1200), "atLeast": (200, 1200)}.get(rule)
+    if lines is None:
+        return False
+    if rule != "auto":
+        lines = (max(lines[0], size * 10), lines[1])
+    for key, value in spacing.attrib.items():
+        if key == _w("lineRule"):
+            continue
+        if not re.fullmatch("[0-9]{1,4}", value):
+            return False
+        low, high = lines if key == _w("line") else (0, 240)
+        if key not in (_w("line"), _w("before"), _w("after")) or not low <= int(value) <= high:
+            return False
+    return True
+
+
+def _stop_drawn(stop: ET.Element) -> bool:
+    """Whether Word drew a Word 6 label beside a tab stop of this kind and place."""
+    place = stop.get(_w("pos"), "")
+    return (
+        stop.tag == _w("tab")
+        and stop.get(_w("val")) in ("left", "clear", "num", "right")
+        and re.fullmatch("-?[0-9]{1,4}", place) is not None
+        and -1985 <= int(place) <= 1440
+    )
+
+
+def _indents_drawn(indents: list[ET.Element]) -> bool:
+    """Whether Word drew a Word 6 label in a paragraph indented so.
+
+    By left, hanging, right and a zero firstLine, hanging at most 360 twips past the least left.
+    """
+    lefts: list[int] = []
+    hangings: list[int] = []
+    for x in indents:
+        for key, value in x.attrib.items():
+            if not re.fullmatch("-?[0-9]{1,4}", value):
+                return False
+            number = int(value)
+            if key == _w("right"):
+                if not -29 <= number <= 720:
+                    return False
+            elif key == _w("firstLine"):
+                if number != 0:
+                    return False
+            elif key not in (_w("left"), _w("hanging")) or not 0 <= number <= 1500:
+                return False
+        if _w("left") in x.attrib:
+            lefts.append(int(x.attrib[_w("left")]))
+        if _w("hanging") in x.attrib:
+            hangings.append(int(x.attrib[_w("hanging")]))
+    return not hangings or max(hangings) - min(lefts, default=0) <= 360
+
+
+def _page_drawn(document: ET.Element, settings: ET.Element | None) -> bool:
+    """Whether Word drew Word 6 labels in this document's layout.
+
+    Compat options it drew them under, with a default tab stop it drew and no compressed
+    characters; a docGrid only of a line pitch it drew; every text direction left to right.
+    """
+    compat = None if settings is None else settings.find(_w("compat"))
+    found: set[str] = set()
+    for option in [] if compat is None else compat:
+        if option.tag == _w("compatSetting"):
+            if option.get(_w("uri")) != "http://schemas.microsoft.com/office/word":
+                return False
+            found.add(f"{option.get(_w('name'))}={option.get(_w('val'))}")
+        elif not option.tag.startswith(f"{{{W}}}") or option.attrib:
+            return False
+        else:
+            found.add(_local(option.tag))
+    hyphenation = found & {
+        "useWord2013TrackBottomHyphenation=0",
+        "useWord2013TrackBottomHyphenation=1",
+    }
+    rest = found - hyphenation - {"useFELayout", "doNotUseHTMLParagraphAutoSpacing"}
+
+    # No settings part is drawn; a part without compat options is not.
+    def only(element: ET.Element, name: str, values: set[str]) -> bool:
+        return [dict(x.attrib) for x in element.findall(_w(name))] in [
+            [{_w("val"): v}] for v in values
+        ]
+
+    return (
+        (
+            settings is None
+            or (
+                len(hyphenation) == 1
+                and rest == _WORD6_FIXED
+                and only(settings, "defaultTabStop", _WORD6_TAB_STOPS)
+                and only(settings, "characterSpacingControl", {"doNotCompress"})
+            )
+        )
+        and all(
+            dict(g.attrib) in [{_w("linePitch"): p} for p in _WORD6_PITCHES]
+            for g in document.iter(_w("docGrid"))
+        )
+        and all(d.get(_w("val")) == "lrTb" for d in document.iter(_w("textDirection")))
+    )
 
 
 def _numbering_of(fonts: _Fonts, paragraph: _Paragraph) -> tuple[int, int] | None:
@@ -2736,7 +3065,11 @@ class DocxSource:
             if body is None:
                 raise CertificationError("no body")
             self.body = self._part(body, None, main)
-            self.lists = _Numbering(parse.get(related.get("numbering", "")), self.fonts)
+            self.lists = _Numbering(
+                parse.get(related.get("numbering", "")),
+                self.fonts,
+                _page_drawn(parse[main], settings_root),
+            )
             for paragraph in self.body.paragraphs:
                 paragraph.numbering = self._label(paragraph, None)
             sections: list[ET.Element | None] = [

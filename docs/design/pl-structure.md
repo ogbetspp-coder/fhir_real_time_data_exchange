@@ -92,10 +92,11 @@ On the EMA's published Word product information in English (internal corpus, cou
   two in 47. What is left is wording the template does not have: "You must not be given X", "Do
   not take X:", "Pregnancy" alone, "Marketing Authorisation Holder:", or a revision date written
   as "{date}".
-- **Built:** in the 68 files whose every leaflet is ready (97 leaflets), 1,406 of 1,649
-  sections are carried. The rest are refused section by section on the builder's closed lists
-  (list-label 83, formatting 45, tab 35, list-level 24, picture 19, table-shape 15,
-  anchored-object 12, heading-in-table 9, underline 1); one file is refused whole.
+- **Built** (`word-epi/1.5.0`, `docx-reader/1.33.0`, 2026-10-08): in the 69 files whose every
+  leaflet is ready (98 leaflets), 1,526 of 1,666 sections are carried, every one in 14 files. The
+  rest are refused section by section on the builder's closed lists (formatting 38, list-level 25,
+  tab 21, picture 20, list-label 14, anchored-object 12, heading-in-table 9, underline 1); one
+  file is refused whole.
 
 ## Zone B
 
@@ -169,12 +170,16 @@ to an EMA ePI Bundle as an SmPC is, by its own manifest, in a dry run
 
 ## Next
 
-- The leaflet's own refusals. The commonest (101 sections of ready leaflets) is a list whose level
-  is Word 6 numbering (`w:legacy`), as the template's own dash list is: the reader reports its
-  suffix as `legacy`, and the builder refuses it, since ISO 29500 (17.9.5) says the text starts
-  exactly `legacySpace` after the label, and these levels set `legacySpace` to 0 with a
-  `legacyIndent` of 360. Whether Word draws a gap there is Word's answer to record with the
-  reader's Word oracle, not a rule to infer. Then a tab (44), nested lists (26) and shading (35).
+- The leaflet's own refusals. A list whose level is Word 6 numbering (`w:legacy`), as the template's
+  own dash list is, was the commonest (`list-label`, 85 sections). Word's drawing of it is now on
+  record (`label-docx-reader/corpus/numbering-cases/legacy-drawn*`, Word 16.113.4): the text starts
+  max(legacyIndent, the label's advance + legacySpace) after the label, or further where the
+  paragraph hangs further, which can be no gap at all ("10.5 mg"). The reader reports `tab` only
+  where that gap is at least the space Word draws after a label and the label is as Word was
+  recorded drawing it, and `legacy`, which the builder still refuses, elsewhere
+  (`docx-reader/1.33.0`; `docs/validation/changes/2026-10-08-docx-reader-1-33-0-word-6-lists.md`).
+  14 sections are still refused for a list label. Then formatting (38), nested lists (25) and a tab
+  (21).
 - Candidates for a named section a person must confirm (a line in its section that starts with
   the template's wording), for the review screen.
 - The query service and the signer, by the record's manifest.
