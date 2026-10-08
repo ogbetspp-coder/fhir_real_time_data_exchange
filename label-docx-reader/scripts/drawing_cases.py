@@ -177,11 +177,12 @@ PICTURES: dict[str, tuple[tuple[int, int, int, int], str, str]] = {
 }
 
 
-def picture(effect: tuple[int, int, int, int], fill: str, shape: str) -> str:
+def picture(effect: tuple[int, int, int, int], fill: str, shape: str, props: str = "") -> str:
     """A paragraph holding one in-line picture of the checkerboard, as Word writes it."""
     left, top, right, bottom = effect
     return (
-        '<w:p><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">'
+        f"<w:p>{f'<w:pPr>{props}</w:pPr>' if props else ''}"
+        '<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">'
         f'<wp:extent {EXTENT}/><wp:effectExtent l="{left}" t="{top}" r="{right}" b="{bottom}"/>'
         '<wp:docPr id="1" name="Picture 1"/><wp:cNvGraphicFramePr/>'
         '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">'
@@ -190,6 +191,33 @@ def picture(effect: tuple[int, int, int, int], fill: str, shape: str) -> str:
         f'</pic:blipFill><pic:spPr bwMode="auto">{shape}</pic:spPr></pic:pic></a:graphicData>'
         "</a:graphic></wp:inline></w:drawing></w:r></w:p>"
     )
+
+
+# Pictures whose effect extent stands where its space may not be free: a narrow cell of fixed
+# width, and a frame of exact height.
+PLACED: dict[str, str] = {
+    "extent-cell-fixed": (
+        '<w:tbl><w:tblPr><w:tblW w:w="1200" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr>'
+        '<w:tblGrid><w:gridCol w:w="1200"/></w:tblGrid><w:tr><w:tc><w:tcPr>'
+        '<w:tcW w:w="1200" w:type="dxa"/></w:tcPr>'
+        + picture((952500, 0, 0, 0), "", SHAPE + UNFILLED)
+        + "</w:tc></w:tr></w:tbl><w:p/>"
+    ),
+    "extent-cell-wide": (
+        '<w:tbl><w:tblPr><w:tblW w:w="8000" w:type="dxa"/></w:tblPr>'
+        '<w:tblGrid><w:gridCol w:w="8000"/></w:tblGrid><w:tr><w:tc><w:tcPr>'
+        '<w:tcW w:w="8000" w:type="dxa"/></w:tcPr>'
+        + picture((95250, 0, 0, 0), "", SHAPE + UNFILLED)
+        + "</w:tc></w:tr></w:tbl><w:p/>"
+    ),
+    "extent-frame-exact": picture(
+        (0, 476250, 0, 476250),
+        "",
+        SHAPE + UNFILLED,
+        '<w:framePr w:w="2000" w:h="300" w:hRule="exact" w:hSpace="0" w:wrap="around" '
+        'w:vAnchor="text" w:hAnchor="text" w:x="0" w:y="0"/>',
+    ),
+}
 
 
 # --- rows ----------------------------------------------------------------------------------
@@ -298,6 +326,9 @@ def ptab(leader: str) -> str:
     )
 
 
+BAR = '<w:tabs><w:tab w:val="bar" w:pos="360"/></w:tabs>'
+
+
 def numbered(key: int) -> str:
     """A paragraph's list ``key`` at level 0."""
     return f'<w:numPr><w:ilvl w:val="0"/><w:numId w:val="{key}"/></w:numPr>'
@@ -339,6 +370,9 @@ TABS: list[tuple[str, str, str]] = [
     ("label-tab-no-stop", _text("B", BLUE), numbered(2)),
     ("ptab-dot", ptab("dot"), ""),
     ("ptab-none", ptab("none"), ""),
+    # A bar stop draws a rule down the line, with a tab or without one.
+    ("bar", TABBED, BAR),
+    ("bar-no-tab", _text("A", RED) + _text("B", BLUE), BAR),
 ]
 TABLE_STYLE = (
     '<w:style w:type="table" w:styleId="LeaderTable"><w:name w:val="Leader Table"/>'
@@ -353,6 +387,69 @@ def _table(content: str) -> str:
         '</w:tblPr><w:tblGrid><w:gridCol w:w="8000"/></w:tblGrid><w:tr><w:tc><w:tcPr>'
         f'<w:tcW w:w="8000" w:type="dxa"/></w:tcPr>{content}</w:tc></w:tr></w:tbl>'
     )
+
+
+def _conditional(style: str, part: str) -> str:
+    """A table style whose conditional part ``part`` has a tab stop with a dot leader."""
+    return (
+        f'<w:style w:type="table" w:styleId="{style}"><w:name w:val="{style}"/><w:tblPr>'
+        '<w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/>'
+        f'</w:tblCellMar></w:tblPr><w:tblStylePr w:type="{part}"><w:pPr>{stop("dot")}</w:pPr>'
+        "</w:tblStylePr></w:style>"
+    )
+
+
+def _styled_table(style: str, content: str, cell: str = "") -> str:
+    """A table of one cell in ``style``, its look the first row's, holding ``content``."""
+    return (
+        f'<w:tbl><w:tblPr><w:tblStyle w:val="{style}"/><w:tblW w:w="8000" w:type="dxa"/>'
+        '<w:tblLook w:val="0020" w:firstRow="1" w:lastRow="0" w:firstColumn="0" '
+        'w:lastColumn="0" w:noHBand="0" w:noVBand="0"/></w:tblPr><w:tblGrid>'
+        '<w:gridCol w:w="8000"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="8000" w:type="dxa"/>'
+        f"{cell}</w:tcPr>{content}</w:tc></w:tr></w:tbl>"
+    )
+
+
+def _cell(content: str, shd: str = "") -> str:
+    """A table of one plain cell, shaded by ``shd``'s attributes, holding ``content``."""
+    return (
+        '<w:tbl><w:tblPr><w:tblW w:w="8000" w:type="dxa"/><w:tblCellMar><w:top w:w="0" '
+        'w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>'
+        '<w:gridCol w:w="8000"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="8000" w:type="dxa"/>'
+        f"{f'<w:shd {shd}/>' if shd else ''}</w:tcPr>{content}</w:tc></w:tr></w:tbl>"
+    )
+
+
+GREY = 'w:val="clear" w:color="auto" w:fill="D9D9D9"'
+WHITE = 'w:val="clear" w:color="auto" w:fill="FFFFFF"'
+SHADE_80 = f'{BG1} w:fill="808080" w:themeFillShade="80"'
+SPACES = " " * 10
+
+
+def _spaces(shd: str) -> str:
+    return f'<w:r><w:rPr><w:shd {shd}/></w:rPr><w:t xml:space="preserve">{SPACES}</w:t></w:r>'
+
+
+# A white run over painted ground, and controls (each row a band; a table's row is one too).
+WHITE_ROWS = (
+    row(shaded(WHITE), f"<w:shd {GREY}/>", 0)
+    + row(shaded(f'{BG1} w:fill="FFFFFF"'), f"<w:shd {GREY}/>", 1)
+    + row(plain(), f"<w:shd {GREY}/>", 2)
+    + _cell(row(shaded(WHITE)), GREY)
+    + row("", "", 4)
+    + _cell(row(plain()), GREY)
+    + row("", "", 6)
+    + row(shaded(WHITE), "", 7)
+)
+# A theme's shade over spaces that end a paragraph or a cell, and between words.
+TRAILING_ROWS = (
+    row(_text("A", RED) + _spaces(SHADE_80), "", 0)
+    + row(_text("A", RED) + _spaces(SHADE_80) + _text("B", BLUE), "", 1)
+    + row(_spaces(SHADE_80), "", 2)
+    + _cell(row(_spaces(SHADE_80)))
+    + row("", "", 4)
+    + row(_text("A", RED) + _spaces('w:val="clear" w:color="auto" w:fill="808080"'), "", 5)
+)
 
 
 def _defaults(ppr: str) -> str:
@@ -386,16 +483,11 @@ def _cases() -> dict[str, Case]:
         cases[f"picture-{name}"] = Case(
             f"An in-line picture: {name}.", picture(*shape), picture=True
         )
-        cases[f"picture-{name}-compat"] = Case(
-            f"An in-line picture: {name}, in the QRD template's compatibility mode.",
-            picture(*shape),
-            settings=COMPAT,
-            picture=True,
-        )
+    for name, body in PLACED.items():
+        cases[f"picture-{name}"] = Case(f"An in-line picture: {name}.", body, picture=True)
     window = '<a:sysClr val="window" lastClr="FFFFFF"/>'
     for name, lt1, settings, entries in (
         ("shading", window, MAPPING, SHADINGS),
-        ("shading-compat", window, COMPAT + MAPPING, SHADINGS),
         ("shading-srgb-white", '<a:srgbClr val="FFFFFF"/>', MAPPING, SHADINGS),
         ("shading-red", '<a:srgbClr val="FF0000"/>', MAPPING, SHADINGS),
         ("shading-unmapped", window, "", SHADINGS),
@@ -413,19 +505,25 @@ def _cases() -> dict[str, Case]:
             theme=lt1,
             rows=len(entries),
         )
-    cases["tabs"] = Case(
-        "A tab, a list label's tab and a positional tab, each with and without a leader.",
-        rows([(content, props) for _, content, props in TABS]),
-        styles=TAB_STYLES,
-        numbering=TAB_NUMBERING,
-        rows=len(TABS),
+    cases["shading-white"] = Case(
+        "A white run over a grey paragraph and a grey cell, and the same unshaded.",
+        WHITE_ROWS,
+        settings=MAPPING,
+        theme=window,
+        rows=8,
     )
-    cases["tabs-compat"] = Case(
-        "The tab rows in the QRD template's compatibility mode.",
+    cases["shading-trailing"] = Case(
+        "A theme's shade over spaces that end a paragraph or a cell, and between words.",
+        TRAILING_ROWS,
+        settings=MAPPING,
+        theme=window,
+        rows=6,
+    )
+    cases["tabs"] = Case(
+        "A tab, a list label's tab, a positional tab and a bar stop, with and without a leader.",
         rows([(content, props) for _, content, props in TABS]),
         styles=TAB_STYLES,
         numbering=TAB_NUMBERING,
-        settings=COMPAT,
         rows=len(TABS),
     )
     cases["tabs-defaults"] = Case(
@@ -440,6 +538,21 @@ def _cases() -> dict[str, Case]:
         styles=TABLE_STYLE,
         rows=1,
     )
+    cases["tabs-conditional"] = Case(
+        "A tab under a leader a table style's first-row or whole-table part gives.",
+        _styled_table("CondFirst", row(TABBED))
+        + row("", "", 1)
+        + _styled_table("CondWhole", row(TABBED))
+        + row("", "", 3),
+        styles=_conditional("CondFirst", "firstRow") + _conditional("CondWhole", "wholeTable"),
+        rows=4,
+    )
+    # Each case again in the QRD template's compatibility mode.
+    for name, case in list(cases.items()):
+        cases[f"{name}-compat"] = case._replace(
+            question=f"{case.question[:-1]}, in the QRD template's compatibility mode.",
+            settings=COMPAT + (case.settings or ""),
+        )
     return cases
 
 

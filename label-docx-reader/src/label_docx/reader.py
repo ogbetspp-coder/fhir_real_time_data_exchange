@@ -30,7 +30,9 @@ What a paragraph carries:
   subscript, raised or lowered text (its shift, the run's size and its paragraph's), capitals and
   small capitals, single and double strike-through, highlight with its colour, shading with its
   fill (or its pattern, colour and fill; a theme's fill resolved only where Word's drawing of it
-  is on record, a pattern's theme colour named) on the run or the paragraph, right-to-left (the
+  is on record, else named with its tint and shade, a pattern's theme colour named; white only
+  where anything but white is painted under it, ``_ParagraphReader.ground``) on the run or the
+  paragraph, right-to-left (the
   run's own ``rtl``, a ``dir`` embedding, a ``bidi`` paragraph), and faint text (a colour whose
   contrast with what is painted under it, the run's highlight or shading, else the paragraph's,
   the cell's or the page, is below 1.33:1; under two points in any unit; or scaled under a fifth),
@@ -91,13 +93,16 @@ text under a part's fonts is refused.
 Tables. ``read_document`` reports each body table (``Document.tables``), one ``Table`` per
 ``<w:tbl>`` in document order, a nested table after the table holding it and as its own entry,
 with ``parent`` the (table, row, cell) it stands in, and its ``grid``: ``columns``, the number of
-``gridCol`` in its ``tblGrid``, and its rows, each with the grid columns it leaves out before and
+``gridCol`` in its ``tblGrid``, their ``widths`` (each one's ``w:w`` in twips, in grid order, as
+the view read stores it: the original view of a tracked grid change its former grid), and its
+rows, each with the grid columns it leaves out before and
 after its cells (``gridBefore``, ``gridAfter``; 0 when absent) and its ``<w:tc>`` cells in order,
 each with the first grid column it covers (from 0: ``before`` plus the spans before it), its
 ``span`` (``gridSpan``, 1 when absent) and its ``merge`` as stored (``vMerge``: None, ``restart``,
 or ``continue``, which is also what a ``vMerge`` with no value means). Nothing is inferred: where
 Word's grid is not on record the grid is None and ``reason`` says why (``REASONS``, the first
-found): no ``tblGrid`` (Word builds one by rules of its own) or more than one, a count that is not
+found): no ``tblGrid`` (Word builds one by rules of its own) or more than one, a column whose width
+is not digits from 1 to 31,680 twips (``bad-width``: Word works it out), a count that is not
 digits, a legacy horizontal merge (``hMerge``: Word shows the merged-away cell's text as its own
 cell's, but where it draws it is not on record), a ``vMerge`` of another value, a span of 0, or a
 row whose ``before`` + spans + ``after`` is not ``columns``. The text is read all the same: no
@@ -144,26 +149,26 @@ is not a number); ``cropped`` (any side not 0); ``rotated`` (``a:xfrm`` ``rot`` 
 nearest ``spacing`` with a ``lineRule`` through its styles and the defaults: Word clips the
 picture to it); ``row-height`` (in a row whose height may be exact, at any depth of tables; see
 "Tables"); ``border`` (a ``w:bdr`` other than none on its run, by the run's nearest level that
-sets one); and ``effects``, anything else that may make Word draw other than the pixels
-stretched over the extent, by a closed list: an effect extent with a side under 0 (Word clips the
-picture) or over 952,500 EMU (Word draws 0 to that as space round it alone, corpus/drawing-cases
-picture-extent-*); a ``pic:pic`` of other than its non-visual properties, one ``blipFill`` and
-its shape properties, or hidden (``cNvPr``); a ``blipFill`` with attributes but ``rotWithShape``
-(0, 1, true or false: Word draws an unturned picture alike, and a turned one has its own reason),
-or of other than its ``blip``, a ``srcRect`` and a stretch of a bare ``fillRect``; a ``blip``
-with attributes but ``r:embed``, ``r:link`` and ``cstate``, or children but extensions of Word's
-compression setting (``a14:useLocalDpi``) alone (so any recolouring, transparency, duotone,
-grayscale, artistic effect or SVG); shape properties with attributes but ``bwMode``, or children
-but each of a transform (``a:xfrm``, with ``rot``, ``flipH`` and ``flipV`` alone, at offset 0 and
-of the extent), a rectangle (``prstGeom`` ``rect``, no adjustments), no fill, a line Word draws
-nothing of (of no fill, then a miter with a limit up to 800,000 or none, a round or a bevel or no
-join, then a bare head end, tail end or both, its width up to 190,500 EMU its only attribute),
-and, last, an extension list holding only Word's note that its shadow is hidden
-(``a14:shadowObscured``, bare), once each (an effect list, a shadow among them, stays
-``effects``) [drawing-cases picture-*]. Whether Word draws
-it larger than its pixels is for the caller: ``extent`` and ``pixels`` are both given (9525 EMU
-are a pixel at 96 dpi). Only the image's headers are read, chunk by chunk with none kept, never
-its pixels; and the reader never refuses for a picture.
+sets one); and ``effects``, anything else that may make Word draw other than the pixels stretched
+over the extent, by a closed list: an effect extent with a side under 0 (Word clips the picture) or
+over 952,500 EMU, or any but 0 in a table cell or a frame (Word draws 0 to that as space round it
+alone in a paragraph of its own, and none of it in a narrow fixed cell or a low frame,
+corpus/drawing-cases picture-extent-*); a ``pic:pic`` of other than its non-visual properties, one
+``blipFill`` and its shape properties, or hidden (``cNvPr``); a ``blipFill`` with attributes but
+``rotWithShape`` (0, 1, true or false: Word draws an unturned picture alike, and a turned one has
+its own reason), or of other than its ``blip``, a ``srcRect`` and a stretch of a bare ``fillRect``;
+a ``blip`` with attributes but ``r:embed``, ``r:link`` and ``cstate``, or children but extensions of
+Word's compression setting (``a14:useLocalDpi``) alone (so any recolouring, transparency, duotone,
+grayscale, artistic effect or SVG); shape properties with attributes but ``bwMode``, or children but
+each of a transform (``a:xfrm``, with ``rot``, ``flipH`` and ``flipV`` alone, at offset 0 and of the
+extent), a rectangle (``prstGeom`` ``rect``, no adjustments), no fill, a line Word draws nothing of
+(of no fill, then a miter with a limit up to 800,000 or none, a round or a bevel or no join, then a
+bare head end, tail end or both, its width up to 190,500 EMU its only attribute), and, last, an
+extension list holding only Word's note that its shadow is hidden (``a14:shadowObscured``, bare),
+once each (an effect list, a shadow among them, stays ``effects``) [drawing-cases picture-*].
+Whether Word draws it larger than its pixels is for the caller: ``extent`` and ``pixels`` are both
+given (9525 EMU are a pixel at 96 dpi). Only the image's headers are read, chunk by chunk with none
+kept, never its pixels; and the reader never refuses for a picture.
 
 Anchored. Word draws an object anchored to a paragraph apart from the text, and its text shows
 none of it [drawing-anchored-picture, drawing-anchored-shape, drawing-vml-floating-picture]. Each
@@ -372,10 +377,13 @@ What it refuses (``DocxRefusedError.code``):
   another; a run property read for a mark, size or layout, or any shading, without its ``w:val``
   (but ``u``, which then sets nothing: Word draws no underline and shows the next level's); a
   highlight set by a style or the defaults; a shift (``position``) or the size of shifted text that
-  is not a whole number of half-points; a tab in the text, or after a list label (``tab`` or
-  ``legacy``), where a tab stop of the paragraph, its styles, its table style, the defaults or its
-  list level has a leader other than none, and a positional tab with one (Word draws the leader
-  across the gap, drawing-cases tabs*); and layout that may clip or overdraw text: a row of
+  is not a whole number of half-points, and shifted complex script; a theme tint or shade of no
+  theme colour on a shading; a tab in the text, or after a list label (``tab`` or ``legacy``),
+  where a tab stop of the paragraph, its styles, its table style or any of its parts, the
+  defaults or its list level has a leader other than none, a positional tab whose leader is not
+  none, and a bar tab stop there, tab or none (Word draws the leader across the gap and the bar
+  down the line, drawing-cases tabs*; every such stop counts, though a nearer level clears it, no
+  tab reaches it or its part is not applied); and layout that may clip or overdraw text: a row of
   exact height lower than its cell's lines (each its largest text or mark size), exact line spacing
   lower than the text, line spacing under 0.8 lines, a frame or floating table more than an inch
   before or 22 inches past its anchor, a frame of exact height lower than its text, a paragraph or
@@ -720,9 +728,10 @@ class Mark:
     One of bold, italic, superscript, subscript, ``position<shift>-size<run>-in<paragraph>``
     (signed half-points, then two sizes in half-points: ``position-1-size22-in22``), caps,
     smallCaps, strike, dstrike, ``highlight-<colour>`` (Word's colour name, e.g.
-    ``highlight-lightGray``), ``shading-<FILL>`` (e.g. ``shading-D9D9D9``; ``THEME-<name>`` for a
-    theme's fill not resolved) or ``shading-<pattern>-<COLOUR>-<FILL>`` (a theme's colour
-    ``THEME-<name>`` with ``-tint<value>`` and ``-shade<value>`` where set), rtl
+    ``highlight-lightGray``), ``shading-<FILL>`` (e.g. ``shading-D9D9D9``; ``shading-FFFFFF`` only
+    over paint; ``THEME-<name>``, with ``-tint<value>`` and ``-shade<value>`` where set, for a
+    theme's fill not resolved) or ``shading-<pattern>-<COLOUR>-<FILL>`` (a theme's colour named
+    alike), rtl
     (right-to-left), faint (a contrast under 1.33:1 with what is painted under it, under two
     points, or scaled under a fifth) and underline. Marks of one kind that touch or overlap are
     merged; marks of different kinds may overlap.
@@ -905,17 +914,33 @@ class TableRow:
 
 @dataclass(frozen=True)
 class TableGrid:
-    """A table's grid: its ``columns`` (``gridCol``) and its rows, each laid on them."""
+    """A table's grid: its ``columns`` (``gridCol``), its rows, each laid on them, its widths.
+
+    ``widths`` holds each column's ``w:w`` in twips, in grid order.
+    """
 
     columns: int
     rows: tuple[TableRow, ...]
+    widths: tuple[int, ...] = ()
 
 
 # Why a table's grid is not reported, the first found in this order: no ``tblGrid`` or more than
-# one; then row by row, a ``gridBefore`` or ``gridAfter`` that is not a count; cell by cell, a
-# horizontal merge (``hMerge``), a ``vMerge`` other than restart or continue, a ``gridSpan`` that
-# is not a count or is 0; and the row not filling the grid exactly.
-REASONS = ("no-grid", "two-grids", "bad-number", "h-merge", "bad-merge", "bad-span", "row-off-grid")
+# one; a ``gridCol`` whose width is not digits from 1 to ``_WIDEST`` twips; then row by row, a
+# ``gridBefore`` or ``gridAfter`` that is not a count; cell by cell, a horizontal merge
+# (``hMerge``), a ``vMerge`` other than restart or continue, a ``gridSpan`` that is not a count or
+# is 0; and the row not filling the grid exactly.
+REASONS = (
+    "no-grid",
+    "two-grids",
+    "bad-width",
+    "bad-number",
+    "h-merge",
+    "bad-merge",
+    "bad-span",
+    "row-off-grid",
+)
+# A grid column's widest width, in twips: the widest page (22 inches).
+_WIDEST = 31680
 
 
 @dataclass(frozen=True)
@@ -1266,6 +1291,8 @@ class _Styles:
     # Whether the settings map background1 to light1 and the theme's lt1 is white as Word was
     # asked to draw it (``_white_background``), so a shading of background1 is resolved.
     white_background: bool = False
+    # Whether the page has a colour other than white (``w:background``), painted under the text.
+    ground: bool = False
     # What may be painted under the text where nothing nearer is: the white page, and the
     # page colour (w:background), which Word shows on screen and does not print by default.
     page: tuple[_Rgb, ...] = ((0xFF, 0xFF, 0xFF),)
@@ -2167,11 +2194,14 @@ class _Pictures:
         digest, kind, pixels, reasons = self.package.images[name]
         return name, digest, kind, pixels, set(reasons)
 
-    def read(self, element: ET.Element, offset: int, around: frozenset[str]) -> Picture:
+    def read(
+        self, element: ET.Element, offset: int, around: frozenset[str], boxed: bool = False
+    ) -> Picture:
         """What a ``w:drawing``, ``w:pict`` or alternate content read as U+FFFC stands for.
 
         ``around`` holds the reasons its place gives (``field``, ``line-height``, ``row-height``,
-        ``border``).
+        ``border``); ``boxed``, whether it stands in a table cell or a frame, where the space of
+        an effect extent may not be free.
         """
         found: set[str] = set(around)
         if element.tag == _w("pict"):
@@ -2185,9 +2215,12 @@ class _Pictures:
         extent = None if size is None else (size[0], size[1])
         effect = inline.find(f"{{{WP}}}effectExtent")
         sides = None if effect is None else _numbers(effect, ("l", "t", "r", "b"), found)
-        if sides is not None and not all(0 <= side <= _EFFECT_SPACE for side in sides):
-            # Space around the picture, which Word draws as it is; a side below 0 clips it
-            # [drawing-cases picture-extent-*].
+        if sides is not None and (
+            not all(0 <= side <= _EFFECT_SPACE for side in sides) or (boxed and any(sides))
+        ):
+            # Space around the picture, which Word draws as it is in a paragraph of its own; a
+            # side below 0 clips it [drawing-cases picture-extent-*]. In a table cell or a
+            # frame, where the space may not be free, only none is on record.
             found.add("effects")
         graphics = [n for n in inline.iter() if n.tag == _a("graphicData")]
         if any(g.get("uri") == _SHAPE_URI for g in graphics):
@@ -2541,6 +2574,10 @@ class _ParagraphReader:
         self.carried = carried
         # What may be painted under the paragraph's text (its shading, its cell's, the page).
         self.under = under or styles.page
+        # Whether anything but white is painted under the paragraph (its cell's, a table's, the
+        # page's), and under its runs (that, or its own shading): set by ``_paragraph``.
+        self.beneath = False
+        self.ground = False
         # The largest size the paragraph's text is drawn at, in points.
         self.line = 0.0
         self.paragraph_style = paragraph_style
@@ -2939,8 +2976,9 @@ class _ParagraphReader:
 
     def _special(self, child: ET.Element) -> str:
         tag = child.tag
-        if tag == _w("ptab") and child.get(_w("leader")) not in (None, "none"):
-            # Word draws its leader across the gap [drawing-cases tabs, ptab-dot].
+        if tag == _w("ptab") and child.get(_w("leader")) != "none":
+            # Word draws its leader across the gap [drawing-cases tabs, ptab-dot]; one with no
+            # leader named is not a positional tab the schema allows.
             raise DocxRefusedError("unsupported-formatting", "a tab with a leader")
         if tag in (_w("tab"), _w("ptab")):
             return "\t"
@@ -2968,7 +3006,7 @@ class _ParagraphReader:
             return _alternate(child)
         raise DocxRefusedError("unsupported-element", _local(tag))
 
-    def _position(self, properties: _Properties) -> str | None:
+    def _position(self, properties: _Properties, start: int, end: int) -> str | None:
         """The mark of text raised or lowered by ``w:position``, or None where it is 0.
 
         ``position``, the shift in signed half-points, then the run's size and its paragraph's,
@@ -2977,7 +3015,7 @@ class _ParagraphReader:
         ``position+8-size14-in22`` raised four points and smaller, as a superscript typed by hand.
         The paragraph's size is what its styles and the defaults give its text, with no run style
         or run properties of its own. A shift or a size that is not a whole number of half-points
-        is refused.
+        is refused, and shifted complex script, which Word draws at ``szCs``.
         """
         value = properties.value("position")
         if value is None or value == "0":
@@ -2986,6 +3024,13 @@ class _ParagraphReader:
             raise DocxRefusedError("unsupported-formatting", f"position {value!r}")
         if int(value) == 0:
             return None
+        if (
+            self.rtl
+            or properties.toggle("rtl")
+            or properties.toggle("cs")
+            or any(_complex_script(c) for c in "".join(self.parts)[start:end])
+        ):
+            raise DocxRefusedError("unsupported-formatting", "raised or lowered complex script")
         paragraph = _Properties(
             self.styles, None, self.paragraph_style, self.table_style, None, self.conditional
         )
@@ -2999,7 +3044,7 @@ class _ParagraphReader:
         vertical = properties.value("vertAlign")
         if vertical in ("superscript", "subscript"):
             kinds.append(vertical)
-        shift = self._position(properties)
+        shift = self._position(properties, start, end)
         if shift is not None:
             kinds.append(shift)
         kinds += [kind for name, kind in _TOGGLE_MARKS.items() if properties.shown(name)]
@@ -3007,6 +3052,8 @@ class _ParagraphReader:
         if highlight not in (None, "none"):
             kinds.append(f"highlight-{highlight}")
         shading = _shading(properties.element("shd"), self.styles)
+        if shading == "shading-FFFFFF" and not self.ground and highlight in (None, "none"):
+            shading = None  # white over white: nothing painted
         if shading is not None:
             kinds.append(shading)
         if (
@@ -3037,30 +3084,49 @@ class _ParagraphReader:
 
 
 def _shading(element: ET.Element | None, styles: _Styles) -> str | None:
-    """The mark kind a shading element gives, or None for no shading or a white one.
+    """The mark kind a shading element gives, or None for no shading.
 
     ``shading-<fill>`` for a plain fill, ``shading-<pattern>-<colour>-<fill>`` for a pattern. A
-    theme's fill is ``THEME-<name>`` but where Word's drawing of it is on record
-    (``_theme_fill``); a pattern's theme colour is ``THEME-<name>``, then ``-tint<value>`` and
-    ``-shade<value>`` where set, so it never reads as the automatic colour.
+    theme's fill is resolved where Word's drawing of it is on record (``_theme_fill``), else named
+    (``_theme_name``); a pattern's theme colour is named, so it never reads as the automatic one.
+    White is ``shading-FFFFFF``, which a caller leaves out only where nothing is painted under it
+    (Word paints it over a grey paragraph or cell, drawing-cases shading-white).
     """
     if element is None:
         return None
     pattern = element.get(_w("val"))
     fill = (element.get(_w("fill")) or "auto").upper()
-    if element.get(_w("themeFill")) is not None:
-        fill = _theme_fill(element, styles) or "THEME-" + (element.get(_w("themeFill")) or "")
+    named = _theme_name(element, "themeFill", "themeFillTint", "themeFillShade")
+    if named is not None:
+        fill = _theme_fill(element, styles) or named
     if pattern not in (None, "clear", "nil"):
-        colour = (element.get(_w("color")) or "auto").upper()
-        if element.get(_w("themeColor")) is not None:
-            colour = "THEME-" + (element.get(_w("themeColor")) or "")
-            for name, attribute in (("tint", "themeTint"), ("shade", "themeShade")):
-                if element.get(_w(attribute)) is not None:
-                    colour += f"-{name}{(element.get(_w(attribute)) or '').upper()}"
-        return f"shading-{pattern}-{colour}-{fill}"
-    if fill in ("AUTO", "FFFFFF"):
+        colour = _theme_name(element, "themeColor", "themeTint", "themeShade")
+        return f"shading-{pattern}-{colour or (element.get(_w('color')) or 'auto').upper()}-{fill}"
+    return None if fill == "AUTO" else f"shading-{fill}"
+
+
+def _theme_name(element: ET.Element, name: str, tint: str, shade: str) -> str | None:
+    """``THEME-<name>``, then ``-tint<value>`` and ``-shade<value>`` where set; None for none.
+
+    A tint or a shade with no theme colour to apply to is refused: what Word draws is not on
+    record.
+    """
+    named = element.get(_w(name))
+    if named is None:
+        if element.get(_w(tint)) is not None or element.get(_w(shade)) is not None:
+            raise DocxRefusedError("unsupported-formatting", "a theme tint or shade of no colour")
         return None
-    return f"shading-{fill}"
+    spelt = "THEME-" + named
+    for word, attribute in (("tint", tint), ("shade", shade)):
+        value = element.get(_w(attribute))
+        if value is not None:
+            spelt += f"-{word}{value.upper()}"
+    return spelt
+
+
+def _paints(element: ET.Element | None, styles: _Styles) -> bool:
+    """Whether a shading paints anything but white (``_shading``: a kind, not white)."""
+    return _shading(element, styles) not in (None, "shading-FFFFFF")
 
 
 # The attributes of a shading of background1 Word was asked to draw (drawing-cases shading*).
@@ -3528,8 +3594,9 @@ class _Context:
     layout: tuple[ET.Element, ...] = ()
     # Whether the paragraph stands in a table cell.
     in_table: bool = False
-    # Whether its text holds a tab.
+    # Whether its text holds a tab, and the paragraph properties whose tab stops apply to it.
     tabbed: bool = False
+    stops: tuple[ET.Element, ...] = ()
     # How many fields are open in their results when the paragraph ends (a table of contents).
     fields_open: int = 0
     # The height of its tallest character, at least (its text's and its mark's size), in points.
@@ -3549,7 +3616,13 @@ def _paragraph(
     conditional: tuple[ET.Element, ...] = (),
     pictures: _Pictures | None = None,
     exact_row: bool = False,
+    ground: bool = False,
 ) -> tuple[Paragraph, _Context]:
+    """One paragraph read, and what the document's later passes need of it (``_Context``).
+
+    ``under`` is what may be painted under it, for faint text; ``ground``, whether its cell, a
+    table it stands in or their style paints anything but white under it (``_paints``).
+    """
     ppr = element.find(_w("pPr"))
     style = None
     if ppr is not None:
@@ -3577,6 +3650,10 @@ def _paragraph(
     reader = _ParagraphReader(
         styles, style, table_style, runs, story, carried, painted, conditional
     )
+    # What is painted under the paragraph (its cell's, a table's, the page's), and under its
+    # runs (that, or the paragraph's own shading): a white shading over nothing is no mark.
+    reader.beneath = ground or styles.ground
+    reader.ground = reader.beneath or _paints(shading, styles)
     reader.container(element)
     if reader.in_instruction():
         raise DocxRefusedError("unbalanced-field", "a paragraph ends inside a field instruction")
@@ -3587,8 +3664,13 @@ def _paragraph(
     if reader.layout:
         raise DocxRefusedError("unbalanced-field", "a page number runs past its paragraph")
     text = "".join(reader.parts)
-    if "\t" in text:
-        _no_leader(levels)
+    # The tab stops that apply: the paragraph's levels, and its table style's conditional parts
+    # (each, as the reader does not say which of them Word applies to the cell).
+    stops = [
+        *levels,
+        *(part.find(_w("pPr")) for s in styles.chain(table_style) for part in s.parts.values()),
+    ]
+    _tab_stops(stops, "\t" in text)
     for instruction, start, end in reader.variables:
         if text[start:end] != _variable(styles, instruction):
             raise DocxRefusedError("computed-field", "a DOCVARIABLE showing other than its value")
@@ -3616,6 +3698,7 @@ def _paragraph(
         layout=tuple(x for x in levels if x is not None),
         in_table=table is not None,
         tabbed="\t" in text,
+        stops=tuple(x for x in stops if x is not None),
     )
     return Paragraph(
         text=text,
@@ -3630,24 +3713,35 @@ def _paragraph(
         pictures=()
         if pictures is None
         else tuple(
-            pictures.read(element, offset, why | _clipped(levels, exact_row))
+            pictures.read(
+                element,
+                offset,
+                why | _clipped(levels, exact_row),
+                table is not None
+                or any(x is not None and x.find(_w("framePr")) is not None for x in levels),
+            )
             for offset, element, why in reader.objects
         ),
         anchored=tuple(reader.anchored),
     ), context
 
 
-def _no_leader(levels: list[ET.Element | None]) -> None:
-    """Refuse where a tab stop of these paragraph properties has a leader.
+def _tab_stops(levels: list[ET.Element | None], tabbed: bool) -> None:
+    """Refuse a bar stop among these paragraph properties' tab stops, and one with a leader.
 
-    Word draws a stop's leader (dots, a line...) across the gap of a tab that reaches it, where
-    the text holds a tab alone: the paragraph's own stops, its style's and those it is based
-    on, its table style's, the defaults' and its list level's alike [drawing-cases tabs*]. A
-    stop a nearer level clears is counted all the same.
+    The leader's only where ``tabbed``: a tab in the text or after a list label. Word draws a bar
+    stop's rule down the paragraph's line, with a tab or without one, and a stop's leader (dots,
+    a line...) across the gap of a tab that reaches it, where the text holds a tab alone: the
+    paragraph's own stops, its style's and those it is based on, its table style's and its
+    conditional parts', the defaults' and its list level's alike [drawing-cases tabs*]. Every
+    stop counts, though a nearer level clears it, no tab reaches it, or its part is not applied
+    (Word drew no leader from a whole-table part): refusals beyond Word's drawing, never short.
     """
     for level in levels:
         for stop in [] if level is None else level.findall(f"{_w('tabs')}/{_w('tab')}"):
-            if stop.get(_w("leader")) not in (None, "none"):
+            if stop.get(_w("val")) == "bar":
+                raise DocxRefusedError("unsupported-formatting", "a bar tab stop")
+            if tabbed and stop.get(_w("leader")) not in (None, "none"):
                 raise DocxRefusedError("unsupported-formatting", "a tab with a leader")
 
 
@@ -3689,6 +3783,8 @@ def _paragraph_marks(reader: _ParagraphReader, levels: list[ET.Element | None]) 
         )
 
     shading = _shading(nearest("shd"), reader.styles)
+    if shading == "shading-FFFFFF" and not reader.beneath:
+        shading = None  # white over white: nothing painted
     if reader.length and shading is not None:
         marks.append(Mark(0, reader.length, shading))
     if reader.length and _on(nearest("bidi")):
@@ -4285,9 +4381,8 @@ class _Lists:
         counters = self.counters.setdefault(key, _Counters())
         self._count(counters, numbering.num_id, num, level, base, levels, context.rows_ended)
         text, suffix = self._draw(counters, level, levels, definition, context)
-        if context.tabbed or suffix in ("tab", "legacy"):
-            # A tab in the text or after the label, under the list level's stops too.
-            _no_leader([*context.layout, definition.ppr])
+        # The list level's stops apply too, to a tab in the text or after the label.
+        _tab_stops([*context.stops, definition.ppr], context.tabbed or suffix in ("tab", "legacy"))
         return replace(numbering, text=text, suffix=suffix)
 
     @staticmethod
@@ -4983,6 +5078,7 @@ class _Body:
         table_style: str | None,
         under: tuple[_Rgb, ...] = (),
         conditional: tuple[ET.Element, ...] = (),
+        ground: bool = False,
     ) -> None:
         for child in element:
             tag = child.tag
@@ -5000,6 +5096,7 @@ class _Body:
                     conditional,
                     self.pictures,
                     self.exact_rows > 0,
+                    ground,
                 )
                 self.out.append(paragraph)
                 self.contexts.append(replace(context, rows_ended=self.rows_ended))
@@ -5007,14 +5104,14 @@ class _Body:
                 if closing is not None:
                     self.sections.append(closing)
             elif tag == _w("tbl"):
-                self.table(child, table, under)
+                self.table(child, table, under, ground)
             elif tag == _w("sdt"):
                 _content_control(child)
                 content = child.find(_w("sdtContent"))
                 if content is not None:
-                    self.blocks(content, table, table_style, under, conditional)
+                    self.blocks(content, table, table_style, under, conditional, ground)
             elif tag == _w("customXml"):
-                self.blocks(child, table, table_style, under, conditional)
+                self.blocks(child, table, table_style, under, conditional, ground)
             elif tag in (_w("bookmarkStart"), _w("bookmarkEnd")):
                 self.loose_bookmarks.add(child.get(_w("id"), ""))
             elif tag in (_w("sectPr"), _w("tcPr")) or tag in _PROPERTIES or tag in _MARKERS:
@@ -5023,7 +5120,11 @@ class _Body:
                 raise DocxRefusedError("unsupported-element", _local(tag))
 
     def table(
-        self, element: ET.Element, outer: tuple[int, int, int] | None, under: tuple[_Rgb, ...] = ()
+        self,
+        element: ET.Element,
+        outer: tuple[int, int, int] | None,
+        under: tuple[_Rgb, ...] = (),
+        ground: bool = False,
     ) -> None:
         index = self.tables
         self.tables += 1
@@ -5079,6 +5180,7 @@ class _Body:
         # the table and the parts tblLook turns on would narrow it, if refusals call for it.
         painted = [c for shd in shadings for c in self.styles.painted(shd)]
         table_under = tuple(dict.fromkeys([*painted, *(under or self.styles.page)]))
+        table_ground = ground or any(_paints(shd, self.styles) for shd in shadings)
         for row_index, (row, cells) in enumerate(zip(rows, cells_of, strict=True)):
             self.exact_rows += exact[row_index]
             for cell_index, cell in enumerate(cells):
@@ -5096,6 +5198,7 @@ class _Body:
                     table_style,
                     own or table_under,
                     () if unknown else applied,
+                    table_ground or _paints(cell.find(f"{_w('tcPr')}/{_w('shd')}"), self.styles),
                 )
                 height = row.find(f"{_w('trPr')}/{_w('trHeight')}")
                 if (
@@ -5426,7 +5529,11 @@ def _laid(
     grids = element.findall(_w("tblGrid"))
     if len(grids) != 1:
         return None, "two-grids" if grids else "no-grid"
-    columns = len(grids[0].findall(_w("gridCol")))
+    stated = [column.get(_w("w"), "") for column in grids[0].findall(_w("gridCol"))]
+    if not all(re.fullmatch("[0-9]{1,5}", w) and 0 < int(w) <= _WIDEST for w in stated):
+        # A column whose width Word works out by rules of its own.
+        return None, "bad-width"
+    columns = len(stated)
     placed: list[TableRow] = []
     for row, cells, fixed in zip(rows, cells_of, exact, strict=True):
         before = _grid_count(row.find(_w("trPr")), "gridBefore", 0)
@@ -5456,7 +5563,7 @@ def _laid(
             # Word lays such a row out by rules not on record.
             return None, "row-off-grid"
         placed.append(TableRow(before, after, tuple(laid), fixed))
-    return TableGrid(columns, tuple(placed)), None
+    return TableGrid(columns, tuple(placed), tuple(int(w) for w in stated)), None
 
 
 def _grid_count(properties: ET.Element | None, name: str, default: int) -> int | None:
@@ -5534,6 +5641,12 @@ def read_document(data: bytes) -> Document:
         if comment_parts and comments_root is None:
             raise DocxRefusedError("invalid-package", f"no {comment_parts[0]}")
     background = document.find(_w("background"))
+    # A page colour other than white, or one the reader does not resolve, paints under the text.
+    styles.ground = background is not None and bool(
+        len(background)
+        or set(background.attrib) - {_w("color")}
+        or (background.get(_w("color")) or "auto").upper() not in ("AUTO", "FFFFFF")
+    )
     if background is not None:
         page = styles.colours(background, "color", "themeColor", "themeTint", "themeShade")
         styles.page = tuple(dict.fromkeys([*styles.page, *page]))

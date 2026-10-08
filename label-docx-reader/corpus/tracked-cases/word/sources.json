@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "application": "Microsoft Word 16.113.3 (macOS)",
+  "application": "Microsoft Word 16.113.4 (macOS)",
   "note": "Each case with every change accepted, and every change rejected, by Word.",
   "sources": [
     {
@@ -308,86 +308,6 @@
       "caseSha256": "392ea91b70c5f490065124141f9a43313e5888a8730c308080fb94361f6c61bd"
     },
     {
-      "case": "mark-deleted-before-table.docx",
-      "view": "accepted",
-      "file": "mark-deleted-before-table.accepted.docx",
-      "sha256": "310a84dc8152c07940fee8594f7e6669c55c4c10dd332b487a9e61fecfb9310c",
-      "bytes": 13208,
-      "caseSha256": "ff1b7c394b8bce207d611fea41f13f93926b461fd04aa750051e1fe133c62803"
-    },
-    {
-      "case": "mark-deleted-before-table.docx",
-      "view": "original",
-      "file": "mark-deleted-before-table.original.docx",
-      "sha256": "f1e7fdd1c22ffd5eefcf21c8ea2b80db05cd52c908d7e5ec872df186f93a8ed2",
-      "bytes": 13207,
-      "caseSha256": "ff1b7c394b8bce207d611fea41f13f93926b461fd04aa750051e1fe133c62803"
-    },
-    {
-      "case": "row-inserted.docx",
-      "view": "accepted",
-      "file": "row-inserted.accepted.docx",
-      "sha256": "b690e191a5cf3129b490648909eab62ae203ade4a4f15d1a622bfbeb20063f5e",
-      "bytes": 13219,
-      "caseSha256": "7c2045d0b39df4bdc9d817007f7014697cf827050d123756412696744e40f1a0"
-    },
-    {
-      "case": "row-inserted.docx",
-      "view": "original",
-      "file": "row-inserted.original.docx",
-      "sha256": "4f1b2e5f55e7ecf1da9947e3708e56d0ea8d5c5df24d7fb6d6ff6ff3992abf2f",
-      "bytes": 13186,
-      "caseSha256": "7c2045d0b39df4bdc9d817007f7014697cf827050d123756412696744e40f1a0"
-    },
-    {
-      "case": "mark-deleted-before-nested-table.docx",
-      "caseSha256": "42b2cf83b177ebea8136e07b9b71d32060c474d0ebc1058d904823a88c7a6134",
-      "view": "accepted",
-      "file": "mark-deleted-before-nested-table.accepted.docx",
-      "sha256": "d53f8aca5b01dec436a22e1050043daae94acdb4cda35fe23dc875614ca723c9",
-      "bytes": 13178
-    },
-    {
-      "case": "mark-deleted-before-nested-table.docx",
-      "caseSha256": "42b2cf83b177ebea8136e07b9b71d32060c474d0ebc1058d904823a88c7a6134",
-      "view": "original",
-      "file": "mark-deleted-before-nested-table.original.docx",
-      "sha256": "32be6e89642d78b1dc740269a741001739d179f26a10d0236e2b29be4503ac0e",
-      "bytes": 13285
-    },
-    {
-      "case": "mark-deleted-before-table-styled.docx",
-      "caseSha256": "c2ef9e498233563b81e1495ac6b2a4f9b41c20f49e7715df5a01e73e790580f5",
-      "view": "accepted",
-      "file": "mark-deleted-before-table-styled.accepted.docx",
-      "sha256": "c82bc7288c00ce23453cadfb608bb71a572ddbf857c6ed2d84b258dede9a2c07",
-      "bytes": 13269
-    },
-    {
-      "case": "mark-deleted-before-table-styled.docx",
-      "caseSha256": "c2ef9e498233563b81e1495ac6b2a4f9b41c20f49e7715df5a01e73e790580f5",
-      "view": "original",
-      "file": "mark-deleted-before-table-styled.original.docx",
-      "sha256": "40f932a1a9c35d21d7687c699cef8e55b8b6eef147997dc8efe3b6743769e89e",
-      "bytes": 13281
-    },
-    {
-      "case": "mark-deleted-last-in-cell.docx",
-      "caseSha256": "35b57d5e28223a3ea448d136dcbd77822aaeb13d6e69c6b12cd5633bdda6731f",
-      "view": "accepted",
-      "file": "mark-deleted-last-in-cell.accepted.docx",
-      "sha256": "08aea6c334db288ca5882ea031f25b1dd82361c1bb50b8ad61bd533e55b23087",
-      "bytes": 13009
-    },
-    {
-      "case": "mark-deleted-last-in-cell.docx",
-      "caseSha256": "35b57d5e28223a3ea448d136dcbd77822aaeb13d6e69c6b12cd5633bdda6731f",
-      "view": "original",
-      "file": "mark-deleted-last-in-cell.original.docx",
-      "sha256": "7e1e1866f7b6117e9c3ee2e56d7102745b190155a24947446db5766b7039d9a3",
-      "bytes": 13204
-    },
-    {
       "case": "mark-deleted-last-in-body.docx",
       "caseSha256": "5db4c68d6384d62b96fd10208f00bfc180258fb447aa38171b2e606f8a233c3b",
       "view": "accepted",
@@ -420,38 +340,6 @@
       "bytes": 13052
     },
     {
-      "case": "row-deleted.docx",
-      "caseSha256": "31791b4bc578fcdbecf27b66bbb996b4d410697a045bedcba736491900b42dbb",
-      "view": "accepted",
-      "file": "row-deleted.accepted.docx",
-      "sha256": "608aa1647908f7cbe20a9026105a855318636e0c22f23de401a8dc9f5e4a8586",
-      "bytes": 13225
-    },
-    {
-      "case": "row-deleted.docx",
-      "caseSha256": "31791b4bc578fcdbecf27b66bbb996b4d410697a045bedcba736491900b42dbb",
-      "view": "original",
-      "file": "row-deleted.original.docx",
-      "sha256": "463e686becfdec4d5ce0777def37c157d328448f6563ac505c51c0575b637066",
-      "bytes": 13250
-    },
-    {
-      "case": "format-table.docx",
-      "caseSha256": "70325cc7fb886924b9e30ba91c2df73b4bd305067ceaf57de787037054d30f45",
-      "view": "accepted",
-      "file": "format-table.accepted.docx",
-      "sha256": "bdeac216fac85c4afc39a5988005ef8519bc8f727a7e64536d3c950bca51d1cc",
-      "bytes": 13243
-    },
-    {
-      "case": "format-table.docx",
-      "caseSha256": "70325cc7fb886924b9e30ba91c2df73b4bd305067ceaf57de787037054d30f45",
-      "view": "original",
-      "file": "format-table.original.docx",
-      "sha256": "ebc2b3109737e168fa46987b11c50e56edfa39ac4ad2f572fe392923662f9195",
-      "bytes": 13196
-    },
-    {
       "case": "format-section.docx",
       "caseSha256": "3719a4dc0c160f41e8db05b2108027bebfbbf2337065ca22e880838be68a6aec",
       "view": "accepted",
@@ -466,54 +354,6 @@
       "file": "format-section.original.docx",
       "sha256": "7874c156ef4fbda35f927bf32d984380f5759e4305b4f3f469867e6cf4bfa9a2",
       "bytes": 13022
-    },
-    {
-      "case": "table-deleted-whole.docx",
-      "caseSha256": "8d4420dd6a9bffbfcf3084a56d8ad08ad5cfb1fc25215af618604b361300cd39",
-      "view": "accepted",
-      "file": "table-deleted-whole.accepted.docx",
-      "sha256": "3c5f7527fb60c69c9e6b4c39e8b436cba9ec4d984f8bb042d0a3245bd7421b0a",
-      "bytes": 13218
-    },
-    {
-      "case": "table-deleted-whole.docx",
-      "caseSha256": "8d4420dd6a9bffbfcf3084a56d8ad08ad5cfb1fc25215af618604b361300cd39",
-      "view": "original",
-      "file": "table-deleted-whole.original.docx",
-      "sha256": "0702ba69452779c6feabce4fd90c42922c5517136c5a343c2bb065c3870de95e",
-      "bytes": 13245
-    },
-    {
-      "case": "table-inserted-whole.docx",
-      "caseSha256": "5ce82e7808ad91ad345061af3b25001230c34f9eb42efa155233a009b337c4ac",
-      "view": "accepted",
-      "file": "table-inserted-whole.accepted.docx",
-      "sha256": "fcb0765154916fea305fbc3324244164b5974aa49761439a209151dfc75a5975",
-      "bytes": 13244
-    },
-    {
-      "case": "table-inserted-whole.docx",
-      "caseSha256": "5ce82e7808ad91ad345061af3b25001230c34f9eb42efa155233a009b337c4ac",
-      "view": "original",
-      "file": "table-inserted-whole.original.docx",
-      "sha256": "ad0289978fabfbb729ef94de8230fac8a56165dfe0e45c5e6f5559ff75ef9c71",
-      "bytes": 13204
-    },
-    {
-      "case": "mark-deleted-before-table-first-row-deleted.docx",
-      "caseSha256": "4a302c2452b605baf3ca2bf85c4909b8eef96def7aae4b61de0988d109f39227",
-      "view": "accepted",
-      "file": "mark-deleted-before-table-first-row-deleted.accepted.docx",
-      "sha256": "d1185e9dfeeac2f0de41891913a939874efb7b3f2d4f2f4f8c322e98da05dbac",
-      "bytes": 13279
-    },
-    {
-      "case": "mark-deleted-before-table-first-row-deleted.docx",
-      "caseSha256": "4a302c2452b605baf3ca2bf85c4909b8eef96def7aae4b61de0988d109f39227",
-      "view": "original",
-      "file": "mark-deleted-before-table-first-row-deleted.original.docx",
-      "sha256": "bddc52ac2f53938c53a3d8a22b41742cd58d2985c6590f1084e8852d938a8289",
-      "bytes": 13241
     },
     {
       "case": "footnote-reference-deleted.docx",
@@ -708,54 +548,6 @@
       "bytes": 13021
     },
     {
-      "case": "mark-deleted-before-table-deleted-whole.docx",
-      "caseSha256": "f521ec274c50c7bbabf65077f7d8ea2906ffce3fe8e8201f2eb1afc2bc92d807",
-      "view": "accepted",
-      "file": "mark-deleted-before-table-deleted-whole.accepted.docx",
-      "sha256": "00c3a8a7669255e85042f4580e2b387bd7f5979fe59185b6e871a9b410c188b7",
-      "bytes": 12991
-    },
-    {
-      "case": "mark-deleted-before-table-deleted-whole.docx",
-      "caseSha256": "f521ec274c50c7bbabf65077f7d8ea2906ffce3fe8e8201f2eb1afc2bc92d807",
-      "view": "original",
-      "file": "mark-deleted-before-table-deleted-whole.original.docx",
-      "sha256": "3c947207fadbdbe296a1acd03eb27c5c5d471d6e5479bde71da89f32dc3e1c18",
-      "bytes": 13191
-    },
-    {
-      "case": "mark-and-text-deleted-before-table-deleted-whole.docx",
-      "caseSha256": "bfb55e1d63c9e0aff56f3b5b2bdb77e735011336315a4e756f5c3db2615a4a3f",
-      "view": "accepted",
-      "file": "mark-and-text-deleted-before-table-deleted-whole.accepted.docx",
-      "sha256": "611e95692c33ebc2d45a019486d64ef41ca797dbe4f3b9094297754b86c00029",
-      "bytes": 13008
-    },
-    {
-      "case": "mark-and-text-deleted-before-table-deleted-whole.docx",
-      "caseSha256": "bfb55e1d63c9e0aff56f3b5b2bdb77e735011336315a4e756f5c3db2615a4a3f",
-      "view": "original",
-      "file": "mark-and-text-deleted-before-table-deleted-whole.original.docx",
-      "sha256": "57fe30bc887d1100b9a1f8674bf97a99f6e2cb61d57fc54df213fd7869505fd5",
-      "bytes": 13238
-    },
-    {
-      "case": "mark-inserted-before-table-inserted-whole.docx",
-      "caseSha256": "b49c0dfd98e9541c9d41372341a4cde41f358d765c3ab51cf38b4a3cded29386",
-      "view": "accepted",
-      "file": "mark-inserted-before-table-inserted-whole.accepted.docx",
-      "sha256": "1885117d6186b2dacc79b0d05eabe074b2e166aa02f370d9e87bf3ee331fd786",
-      "bytes": 13254
-    },
-    {
-      "case": "mark-inserted-before-table-inserted-whole.docx",
-      "caseSha256": "b49c0dfd98e9541c9d41372341a4cde41f358d765c3ab51cf38b4a3cded29386",
-      "view": "original",
-      "file": "mark-inserted-before-table-inserted-whole.original.docx",
-      "sha256": "19acaba792693ee9276b8ac91954d60b1e994c127290c6d7c44c65e021a6f98e",
-      "bytes": 13268
-    },
-    {
       "case": "mark-deleted-before-bookmark-end.docx",
       "caseSha256": "cee9770b66fa5fa1211f208b0ecce2768d91b8d822a0ed89766625cd1e029031",
       "view": "accepted",
@@ -788,20 +580,228 @@
       "bytes": 13017
     },
     {
-      "case": "mark-inserted-empty-before-table-inserted-whole.docx",
-      "caseSha256": "28f66837ecf90cf434c100393b3ab7fd2cbdbe39e2fb8418bc1b0f8b080d39df",
+      "case": "mark-deleted-before-table.docx",
+      "caseSha256": "95d860130b045782d89288c486a961e8c9f8875239095507247e54ff889999db",
       "view": "accepted",
-      "file": "mark-inserted-empty-before-table-inserted-whole.accepted.docx",
-      "sha256": "7a9c371196ef19cd02abb8171d79e45bcaafbd46fde71c7e3ff539da7996ab90",
-      "bytes": 13221
+      "file": "mark-deleted-before-table.accepted.docx",
+      "sha256": "ac2c0227e9ca66e697cb7494bb831995cbb27ca26449c825326251a25b500b77",
+      "bytes": 13210
+    },
+    {
+      "case": "mark-deleted-before-table.docx",
+      "caseSha256": "95d860130b045782d89288c486a961e8c9f8875239095507247e54ff889999db",
+      "view": "original",
+      "file": "mark-deleted-before-table.original.docx",
+      "sha256": "8f844f3745f83913459dc0fbf7f4c94f8c1108d0b25770986338ab462abde107",
+      "bytes": 13214
+    },
+    {
+      "case": "mark-deleted-before-nested-table.docx",
+      "caseSha256": "c0641e8c1ee9520d36a9183cd1a681e908993d4f77d95faa8ca4ff6e47133320",
+      "view": "accepted",
+      "file": "mark-deleted-before-nested-table.accepted.docx",
+      "sha256": "a54da8c764e7c73d1c5fa547bc3cece692fe7b4d3fc2ad873270bf9e8d29700b",
+      "bytes": 13252
+    },
+    {
+      "case": "mark-deleted-before-nested-table.docx",
+      "caseSha256": "c0641e8c1ee9520d36a9183cd1a681e908993d4f77d95faa8ca4ff6e47133320",
+      "view": "original",
+      "file": "mark-deleted-before-nested-table.original.docx",
+      "sha256": "d8c20971bad314bd080c84ba0a424f1e01c3a74aa61fe616ad6369a456f8e379",
+      "bytes": 13259
+    },
+    {
+      "case": "mark-deleted-before-table-styled.docx",
+      "caseSha256": "e77217d4dd0297a0bb99d0357b91205712afd8af36f15bed65a7a3edd1150a93",
+      "view": "accepted",
+      "file": "mark-deleted-before-table-styled.accepted.docx",
+      "sha256": "b67c73e481670c9d39496b3e57d4ee01c9ee6d36cbe54729c30b960abe7e6596",
+      "bytes": 13249
+    },
+    {
+      "case": "mark-deleted-before-table-styled.docx",
+      "caseSha256": "e77217d4dd0297a0bb99d0357b91205712afd8af36f15bed65a7a3edd1150a93",
+      "view": "original",
+      "file": "mark-deleted-before-table-styled.original.docx",
+      "sha256": "989e11c2170790c4d8f4babbe6a8cb3fc7ec9eb229991b19e3d02f83296608a0",
+      "bytes": 13264
+    },
+    {
+      "case": "mark-deleted-last-in-cell.docx",
+      "caseSha256": "2b6432f4882a1a201107d84085cde04506d785df889d561ab8d0855b4db82b22",
+      "view": "accepted",
+      "file": "mark-deleted-last-in-cell.accepted.docx",
+      "sha256": "ef61883000392281bf34bce119dc64c3c3834f5f69fb0bfa83f6c39f1e1e1bb2",
+      "bytes": 13014
+    },
+    {
+      "case": "mark-deleted-last-in-cell.docx",
+      "caseSha256": "2b6432f4882a1a201107d84085cde04506d785df889d561ab8d0855b4db82b22",
+      "view": "original",
+      "file": "mark-deleted-last-in-cell.original.docx",
+      "sha256": "f546c732d9a7b4d446a64d46e97b818f9a2ec276379a8dc07858ac5b39da9a8b",
+      "bytes": 13206
+    },
+    {
+      "case": "row-deleted.docx",
+      "caseSha256": "3e9203cd866c769fcf065e1adc7eb9c706f0769b639ab9c1a04ef26d33cb496c",
+      "view": "accepted",
+      "file": "row-deleted.accepted.docx",
+      "sha256": "8dcd889c5d0d97f884d02eceac0a776f2bb80c80a8732dff2e88065b4a8c0f5d",
+      "bytes": 13227
+    },
+    {
+      "case": "row-deleted.docx",
+      "caseSha256": "3e9203cd866c769fcf065e1adc7eb9c706f0769b639ab9c1a04ef26d33cb496c",
+      "view": "original",
+      "file": "row-deleted.original.docx",
+      "sha256": "e48d786dd7585a23a74efa4766ee3a984b5b8d5cbd729d895163582079ad6f6f",
+      "bytes": 13250
+    },
+    {
+      "case": "format-table.docx",
+      "caseSha256": "704f94a62fc2604ff093a817bbfeb0b8602af65ea3ec91264819f6d1097728c3",
+      "view": "accepted",
+      "file": "format-table.accepted.docx",
+      "sha256": "259262ef5746d4e12ff8b504a6e76de46db23bf226fc68664966025400a9b5b8",
+      "bytes": 13241
+    },
+    {
+      "case": "format-table.docx",
+      "caseSha256": "704f94a62fc2604ff093a817bbfeb0b8602af65ea3ec91264819f6d1097728c3",
+      "view": "original",
+      "file": "format-table.original.docx",
+      "sha256": "b91282e22e88109337f4278cc98d2901efdb8bc81038e4fbbf4e94c6bfa15161",
+      "bytes": 13204
+    },
+    {
+      "case": "table-deleted-whole.docx",
+      "caseSha256": "35b2cafac43d256b8d72eb6e12187a6b804b901a4aec432a7c93f3dd192d436f",
+      "view": "accepted",
+      "file": "table-deleted-whole.accepted.docx",
+      "sha256": "9478c691812a4b459e864bd9627d451ca25ce32340c69d191d1720946d161843",
+      "bytes": 13216
+    },
+    {
+      "case": "table-deleted-whole.docx",
+      "caseSha256": "35b2cafac43d256b8d72eb6e12187a6b804b901a4aec432a7c93f3dd192d436f",
+      "view": "original",
+      "file": "table-deleted-whole.original.docx",
+      "sha256": "d6221e62f887d49a349bcd372d1ffe06f0951f003ec45b03e007e8eb7a82c82f",
+      "bytes": 13255
+    },
+    {
+      "case": "table-inserted-whole.docx",
+      "caseSha256": "80c2bf7630cd203824faf688e00ca489bd5a8c7d8cb685a0b0562e6cf002b939",
+      "view": "accepted",
+      "file": "table-inserted-whole.accepted.docx",
+      "sha256": "4be0cdf777cd542f7375f0152960dbf2e4b6ff54cf061fa3ef7ab2248b29feee",
+      "bytes": 13250
+    },
+    {
+      "case": "table-inserted-whole.docx",
+      "caseSha256": "80c2bf7630cd203824faf688e00ca489bd5a8c7d8cb685a0b0562e6cf002b939",
+      "view": "original",
+      "file": "table-inserted-whole.original.docx",
+      "sha256": "c11c73d71982ce9b2e4dab86bcbf027d5c7751130f94903e26e27feb1cbf44ac",
+      "bytes": 13222
+    },
+    {
+      "case": "mark-deleted-before-table-first-row-deleted.docx",
+      "caseSha256": "2fa74bf3f9a6cff6273093e0817a8b621918cca9b3b47494183137972c7be3fa",
+      "view": "accepted",
+      "file": "mark-deleted-before-table-first-row-deleted.accepted.docx",
+      "sha256": "16c0f2b41830a7d1610c55d33e97dca8d1e3007bfbcbb2d3dfc4e28b677cd3b5",
+      "bytes": 13285
+    },
+    {
+      "case": "mark-deleted-before-table-first-row-deleted.docx",
+      "caseSha256": "2fa74bf3f9a6cff6273093e0817a8b621918cca9b3b47494183137972c7be3fa",
+      "view": "original",
+      "file": "mark-deleted-before-table-first-row-deleted.original.docx",
+      "sha256": "e54e073a9b59b02748647f08a941b79edd5de8ef378d8e496f378c3f3403fdfe",
+      "bytes": 13250
+    },
+    {
+      "case": "row-inserted.docx",
+      "caseSha256": "0d32674e4c9f2d7d2c85cf75047bfb1ab5bd143a28dce4c1666fb71020bce7bb",
+      "view": "accepted",
+      "file": "row-inserted.accepted.docx",
+      "sha256": "e74d9c20d362329c034f9a1cc476b5e18071875ef8cd83f4c147456babf984ba",
+      "bytes": 13230
+    },
+    {
+      "case": "row-inserted.docx",
+      "caseSha256": "0d32674e4c9f2d7d2c85cf75047bfb1ab5bd143a28dce4c1666fb71020bce7bb",
+      "view": "original",
+      "file": "row-inserted.original.docx",
+      "sha256": "0e5962945e2b1d6af693e7169aa68ad7a9389ed45d67b926f842b432789aefdf",
+      "bytes": 13190
+    },
+    {
+      "case": "mark-deleted-before-table-deleted-whole.docx",
+      "caseSha256": "29ac6f75160d58c09c292d23b47ca685ed5cb9a54e2dd83c979ab630085a6841",
+      "view": "accepted",
+      "file": "mark-deleted-before-table-deleted-whole.accepted.docx",
+      "sha256": "cc96bb7a36356bd69b0fa0d57076ca9886d24e3ab4bf1f8bfb0b3e62b41a2d54",
+      "bytes": 12987
+    },
+    {
+      "case": "mark-deleted-before-table-deleted-whole.docx",
+      "caseSha256": "29ac6f75160d58c09c292d23b47ca685ed5cb9a54e2dd83c979ab630085a6841",
+      "view": "original",
+      "file": "mark-deleted-before-table-deleted-whole.original.docx",
+      "sha256": "004c8abdafef571124efa1473416c98e565dcb05cbc4901109f2bdc6bc19b8d8",
+      "bytes": 13194
+    },
+    {
+      "case": "mark-and-text-deleted-before-table-deleted-whole.docx",
+      "caseSha256": "db50a6b42b08c8754a89e17847918b1143f3578d2f82d709fa03298f61896676",
+      "view": "accepted",
+      "file": "mark-and-text-deleted-before-table-deleted-whole.accepted.docx",
+      "sha256": "9dbd9d2b0acd6f54ba70959e9c7f7e16e444062919b9f760982b72232f35db07",
+      "bytes": 13015
+    },
+    {
+      "case": "mark-and-text-deleted-before-table-deleted-whole.docx",
+      "caseSha256": "db50a6b42b08c8754a89e17847918b1143f3578d2f82d709fa03298f61896676",
+      "view": "original",
+      "file": "mark-and-text-deleted-before-table-deleted-whole.original.docx",
+      "sha256": "d5abbea8dfbe5ad3caea56826630333a098b5f2344dd563e4ddd0f9b71616f94",
+      "bytes": 13248
+    },
+    {
+      "case": "mark-inserted-before-table-inserted-whole.docx",
+      "caseSha256": "0b2eeb9ffd4b9f0f56e169d4340a368f440920449d043b86916bf04c1379fff6",
+      "view": "accepted",
+      "file": "mark-inserted-before-table-inserted-whole.accepted.docx",
+      "sha256": "2baa795147d0a81aab636e84a0724c486e987957cc28159b288b32be1a61e16b",
+      "bytes": 13261
+    },
+    {
+      "case": "mark-inserted-before-table-inserted-whole.docx",
+      "caseSha256": "0b2eeb9ffd4b9f0f56e169d4340a368f440920449d043b86916bf04c1379fff6",
+      "view": "original",
+      "file": "mark-inserted-before-table-inserted-whole.original.docx",
+      "sha256": "b4f333b08d5bce580406f81b2dbd25c8c8d11fe69c54169002a878ca9fe30841",
+      "bytes": 13267
     },
     {
       "case": "mark-inserted-empty-before-table-inserted-whole.docx",
-      "caseSha256": "28f66837ecf90cf434c100393b3ab7fd2cbdbe39e2fb8418bc1b0f8b080d39df",
+      "caseSha256": "9dcf58125bff1581776a85c4593dea6462fa5562ce2f5de0af34d5669f7a03b1",
+      "view": "accepted",
+      "file": "mark-inserted-empty-before-table-inserted-whole.accepted.docx",
+      "sha256": "bdeb833b0178741568c720e1d60a8a2c75046bc408fb040b5fc6d96462bd608e",
+      "bytes": 13228
+    },
+    {
+      "case": "mark-inserted-empty-before-table-inserted-whole.docx",
+      "caseSha256": "9dcf58125bff1581776a85c4593dea6462fa5562ce2f5de0af34d5669f7a03b1",
       "view": "original",
       "file": "mark-inserted-empty-before-table-inserted-whole.original.docx",
-      "sha256": "5d9f7bdfbe0b6cb5b896f870ae1c87bcbac0a9338a0385be0f0b8fa49df758af",
-      "bytes": 13008
+      "sha256": "78d32f5d9d8d902ad4d16cda4cff8fc8ad650829d7de718e63dafe8db8a323b8",
+      "bytes": 13006
     }
   ]
 }

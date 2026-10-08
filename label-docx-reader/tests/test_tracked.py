@@ -218,6 +218,25 @@ def test_table_and_section_formatting_is_former_in_the_original() -> None:
     }
 
 
+def test_each_view_of_a_changed_grid_carries_its_own_columns_widths() -> None:
+    # The accepted view the grid as it is, the original the one its change records.
+    grid = (
+        '<w:tblGrid><w:gridCol w:w="2000"/><w:gridCol w:w="2000"/><w:tblGridChange w:id="6">'
+        '<w:tblGrid><w:gridCol w:w="1500"/><w:gridCol w:w="2500"/></w:tblGrid></w:tblGridChange>'
+        "</w:tblGrid>"
+    )
+    body = (
+        f"<w:tbl>{grid}<w:tr><w:tc>{p(t('a'))}</w:tc><w:tc>{p(t('b'))}</w:tc></w:tr></w:tbl>"
+        + p(t("c"))
+    )
+    value = result(docx(body))
+    widths = {
+        view: [table["grid"]["widths"] for table in value["tracked"][view]["tables"]]
+        for view in ("accepted", "original")
+    }
+    assert widths == {"accepted": [[2000, 2000]], "original": [[1500, 2500]]}
+
+
 def test_what_the_reader_cannot_undo_exactly_is_refused() -> None:
     headed = with_parts(
         docx(

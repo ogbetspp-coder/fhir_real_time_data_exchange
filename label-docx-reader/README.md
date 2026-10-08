@@ -102,7 +102,7 @@ from another web page.
    {"after": 0, "before": 0, "cells": [{"column": 0, "merge": null, "span": 2}],
     "exactHeight": false},
    {"after": 1, "before": 0, "cells": [{"column": 0, "merge": null, "span": 1}],
-    "exactHeight": false}]},
+    "exactHeight": false}], "widths": [4513, 4513]},
    "parent": null, "reason": null}]}
 ```
 
@@ -115,12 +115,13 @@ from another web page.
   lists around the item). `table` is `[table, row, cell]`, counted from 0, `cell` among the
   row's cells.
 - `tables` lists each body table, in document order, a nested table as its own entry with its
-  `parent` cell, and its `grid`: `columns` (`gridCol`), and each row's `before` and `after`
+  `parent` cell, and its `grid`: `columns` (`gridCol`), their `widths` (each `w:w` in twips; a
+  column without digits from 1 to 31,680 there is no grid, `bad-width`), and each row's `before` and `after`
   (grid columns left out) and `cells`, each with its first grid `column`, its `span`
   (`gridSpan`) and its `merge` (`vMerge` as stored: null, `restart` or `continue`), and whether
   the row's height may be exact (`exactHeight`: its own `trHeight` of rule `exact`, or one its
   table's style sets), where Word clips what does not fit. Where Word's grid is not on record, `grid` is null and `reason` says why: `no-grid`, `two-grids`,
-  `bad-number`, `h-merge` (a legacy horizontal merge), `bad-merge`, `bad-span` or `row-off-grid`
+  `bad-width`, `bad-number`, `h-merge` (a legacy horizontal merge), `bad-merge`, `bad-span` or `row-off-grid`
   (a row that does not fill the grid exactly). The text is read either way. A body paragraph's
   `table` indexes `tables` (its own table, nested or not). Tables in notes, headers, footers and
   comments are not listed; there `table` is the outermost table's cell.
@@ -203,7 +204,7 @@ each document reads to, `word.json` and `browser.json` hold Word's and Chrome's 
 | `ema-qrd`         |         4 | EMA QRD files the rules were first written from                   |
 | `ema-templates`   |        18 | EMA product-information templates                                 |
 | `numbering-cases` |       155 | one Word rule each, synthetic                                     |
-| `drawing-cases`   |        58 | what Word draws for pictures, theme shading and tab leaders, synthetic |
+| `drawing-cases`   |        76 | what Word draws for pictures, theme shading and tab leaders, synthetic |
 | `fda-templates`   |         3 | FDA prescribing information, medication guide and patient insert templates |
 | `word-authored`   |         2 | written by Word itself (a table of contents)                      |
 | `tracked-cases`   |        39 | tracked changes, with Word's Accept All and Reject All files      |

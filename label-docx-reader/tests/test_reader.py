@@ -173,70 +173,118 @@ LEVEL = (
 )
 
 
-@pytest.mark.parametrize("leader", ["dot", "hyphen", "underscore", "heavy", "middleDot", "x"])
-def test_a_tab_under_a_stop_with_a_leader_is_refused_wherever_the_stop_is_set(leader: str) -> None:
-    # Word draws the leader across the tab's gap; the text holds a tab alone
-    # (corpus/drawing-cases tabs*).
-    stops = LEADER.format(leader)
-    styled = '<w:style w:type="paragraph" w:styleId="{0}"><w:basedOn w:val="{1}"/>{2}</w:style>'
-    cases = [
-        (p(TABBED, stops), None, None),
+_STYLED = '<w:style w:type="paragraph" w:styleId="{0}"><w:basedOn w:val="{1}"/>{2}</w:style>'
+_CONDITIONAL = (
+    '<w:style w:type="table" w:styleId="T"><w:tblStylePr w:type="{0}"><w:pPr>{1}</w:pPr>'
+    "</w:tblStylePr></w:style>"
+)
+
+
+def _in_table(paragraph: str, look: str = "") -> str:
+    return (
+        f'<w:tbl><w:tblPr><w:tblStyle w:val="T"/>{look}</w:tblPr>'
+        f"<w:tblGrid><w:gridCol/></w:tblGrid><w:tr><w:tc>{paragraph}</w:tc></w:tr></w:tbl>"
+    )
+
+
+def stop_cases(stops: str, body: str = TABBED) -> list[tuple[str, str | None, str | None]]:
+    """A paragraph holding ``body`` under ``stops`` from each place Word takes tab stops from:
+    the paragraph, its style, a style it is based on, the defaults, its table style and that
+    style's parts, and its list level (where ``body`` holds a tab, or after the label's)."""
+    return [
+        (p(body, stops), None, None),
         (
-            p(TABBED, '<w:pStyle w:val="L"/>'),
-            styled.format("L", "N", f"<w:pPr>{stops}</w:pPr>"),
+            p(body, '<w:pStyle w:val="L"/>'),
+            _STYLED.format("L", "N", f"<w:pPr>{stops}</w:pPr>"),
             None,
         ),
         (
-            p(TABBED, '<w:pStyle w:val="C"/>'),
-            styled.format("L", "N", f"<w:pPr>{stops}</w:pPr>") + styled.format("C", "L", ""),
+            p(body, '<w:pStyle w:val="C"/>'),
+            _STYLED.format("L", "N", f"<w:pPr>{stops}</w:pPr>") + _STYLED.format("C", "L", ""),
             None,
         ),
         (
-            p(TABBED),
+            p(body),
             f"<w:docDefaults><w:pPrDefault><w:pPr>{stops}</w:pPr></w:pPrDefault></w:docDefaults>",
             None,
         ),
         (
-            '<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr><w:tblGrid><w:gridCol/></w:tblGrid>'
-            f"<w:tr><w:tc>{p(TABBED)}</w:tc></w:tr></w:tbl>",
+            _in_table(p(body)),
             f'<w:style w:type="table" w:styleId="T"><w:pPr>{stops}</w:pPr></w:style>',
             None,
         ),
+        # A table style's parts, whichever Word applies to the cell (drawing-cases
+        # tabs-conditional: the first row's, not the whole table's, drew a leader).
+        (_in_table(p(body), LOOK), _CONDITIONAL.format("firstRow", stops), None),
+        (_in_table(p(body), LOOK), _CONDITIONAL.format("wholeTable", stops), None),
+        (_in_table(p(body), LOOK), _CONDITIONAL.format("band1Horz", stops), None),
         # The list level's stops, under a tab in the text or the label's own.
-        (p(TABBED, NUMBERED), None, LEVEL.format("nothing", stops)),
+        (p(body, NUMBERED), None, LEVEL.format("nothing", stops)),
         (p(r("<w:t>b</w:t>"), NUMBERED), None, LEVEL.format("tab", stops)),
         (p(r("<w:t>b</w:t>"), NUMBERED + stops), None, LEVEL.format("tab", "")),
-        (
-            p(r(f'<w:ptab w:relativeTo="margin" w:alignment="right" w:leader="{leader}"/>')),
-            None,
-            None,
-        ),
     ]
-    for body, styles, numbering in cases:
+
+
+LOOK = (
+    '<w:tblLook w:val="0020" w:firstRow="1" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" '
+    'w:noHBand="0" w:noVBand="0"/>'
+)
+PTAB = '<w:ptab w:relativeTo="margin" w:alignment="right"{}/>'
+# A bar stop: Word draws a rule down the line, with a tab or without one (drawing-cases tabs).
+BAR = '<w:tabs><w:tab w:val="bar" w:pos="360"/></w:tabs>'
+BAR_CASES = [*stop_cases(BAR), *stop_cases(BAR, r("<w:t>ab</w:t>"))]
+# Where no leader is drawn: none, no stop with one, or a leader no tab reaches.
+LEADER_FREE_CASES: list[tuple[str, str | None, str | None]] = [
+    (p(TABBED, LEADER.format("none")), None, None),
+    (p(TABBED, '<w:tabs><w:tab w:val="left" w:pos="4320"/></w:tabs>'), None, None),
+    (p(r("<w:t>ab</w:t>"), LEADER.format("dot")), None, None),
+    (p(r("<w:t>b</w:t>"), NUMBERED + LEADER.format("dot")), None, LEVEL.format("space", "")),
+    (p(r("<w:t>b</w:t>"), NUMBERED), None, LEVEL.format("nothing", LEADER.format("dot"))),
+    # A leader in a style the paragraph does not take, or a table style's part outside it.
+    (
+        p(TABBED),
+        '<w:style w:type="paragraph" w:styleId="L">'
+        f"<w:pPr>{LEADER.format('dot')}</w:pPr></w:style>",
+        None,
+    ),
+    (
+        p(TABBED) + _in_table(p(r("<w:t>c</w:t>")), LOOK),
+        _CONDITIONAL.format("firstRow", LEADER.format("dot")),
+        None,
+    ),
+    (p(r(PTAB.format(' w:leader="none"'))), None, None),
+]
+
+
+def leader_cases(leader: str) -> list[tuple[str, str | None, str | None]]:
+    """Each place a stop with ``leader`` applies to a tab, and a positional tab with it."""
+    return [
+        *stop_cases(LEADER.format(leader)),
+        (p(r(PTAB.format(f' w:leader="{leader}"'))), None, None),
+    ]
+
+
+@pytest.mark.parametrize("leader", ["dot", "hyphen", "underscore", "heavy", "middleDot", "x"])
+def test_a_tab_under_a_stop_with_a_leader_is_refused_wherever_the_stop_is_set(leader: str) -> None:
+    # Word draws the leader across the tab's gap; the text holds a tab alone
+    # (corpus/drawing-cases tabs*).
+    for body, styles, numbering in leader_cases(leader):
         with pytest.raises(DocxRefusedError, match="a tab with a leader") as caught:
             read_docx(docx(body, styles, numbering=numbering))
         assert caught.value.code == "unsupported-formatting"
 
 
+def test_a_bar_stop_and_a_positional_tab_with_no_leader_are_refused() -> None:
+    for body, styles, numbering in BAR_CASES:
+        with pytest.raises(DocxRefusedError, match="a bar tab stop"):
+            read_docx(docx(body, styles, numbering=numbering))
+    # Its leader is required: one without is not a positional tab Word writes.
+    with pytest.raises(DocxRefusedError, match="a tab with a leader"):
+        read_docx(docx(p(r(PTAB.format(""))), None))
+
+
 def test_a_tab_with_no_leader_or_a_leader_no_tab_reaches_is_read() -> None:
-    plain = LEADER.format("none")
-    cases = [
-        (p(TABBED, plain), None, None),
-        (p(TABBED, '<w:tabs><w:tab w:val="left" w:pos="4320"/></w:tabs>'), None, None),
-        # A leader, but no tab in the text and none after the label.
-        (p(r("<w:t>ab</w:t>"), LEADER.format("dot")), None, None),
-        (p(r("<w:t>b</w:t>"), NUMBERED + LEADER.format("dot")), None, LEVEL.format("space", "")),
-        (p(r("<w:t>b</w:t>"), NUMBERED), None, LEVEL.format("nothing", LEADER.format("dot"))),
-        # A leader in a style the paragraph does not take.
-        (
-            p(TABBED),
-            '<w:style w:type="paragraph" w:styleId="L">'
-            f"<w:pPr>{LEADER.format('dot')}</w:pPr></w:style>",
-            None,
-        ),
-        (p(r('<w:ptab w:relativeTo="margin" w:alignment="right" w:leader="none"/>')), None, None),
-    ]
-    for body, styles, numbering in cases:
+    for body, styles, numbering in LEADER_FREE_CASES:
         read_docx(docx(body, styles, numbering=numbering))
 
 
@@ -897,7 +945,7 @@ def test_a_body_tables_grid_is_reported_with_spans_merges_and_columns_left_out()
         TableRow(0, 0, (TableCell(0, 2, "continue"), TableCell(2, 1, None))),
         TableRow(1, 1, (TableCell(1, 1, None),)),
     )
-    assert document.tables == (Table(None, TableGrid(3, rows), None),)
+    assert document.tables == (Table(None, TableGrid(3, rows, (1000, 1000, 1000)), None),)
 
 
 def test_a_nested_table_is_its_own_table_and_its_paragraphs_carry_it() -> None:
@@ -927,9 +975,29 @@ def _span(value: str) -> str:
 _BEFORE = '<w:trPr><w:gridBefore w:val="-1"/></w:trPr>'
 _AFTER = '<w:trPr><w:gridAfter w:val="{}"/></w:trPr>'
 _H_MERGE = '<w:hMerge w:val="restart"/>'
+
+
 # Each reason a grid is not reported, the first one found, and a table that has it.
+def _wide(*widths: str | None, row: str = "") -> str:
+    """A table of one row of one cell over a grid of these widths (None: no ``w:w``)."""
+    columns = "".join("<w:gridCol/>" if w is None else f'<w:gridCol w:w="{w}"/>' for w in widths)
+    span = f'<w:tcPr><w:gridSpan w:val="{len(widths)}"/></w:tcPr>' if len(widths) > 1 else ""
+    cell = f"<w:tc>{span}{p(r('<w:t>a</w:t>'))}</w:tc>"
+    return f"<w:tbl><w:tblGrid>{columns}</w:tblGrid><w:tr>{row}{cell}</w:tr></w:tbl>"
+
+
 _NO_GRID = {
     "no-grid": ("no-grid", tbl(None, f"<w:tr>{tc('a')}</w:tr>")),
+    # A column whose width is not digits from 1 to 31,680 twips: Word works it out.
+    "no-width": ("bad-width", _wide("1000", None)),
+    "zero-width": ("bad-width", _wide("0")),
+    "point-width": ("bad-width", _wide("12.5")),
+    "unit-width": ("bad-width", _wide("1in")),
+    "signed-width": ("bad-width", _wide("-5")),
+    "plus-width": ("bad-width", _wide("+5")),
+    "too-wide": ("bad-width", _wide("31681")),
+    "six-digits": ("bad-width", _wide("010000")),
+    "width-first": ("bad-width", _wide("0", row=_AFTER.format("x"))),
     "two-grids": ("two-grids", tbl(1, f"{GRID1}<w:tr>{tc('a')}</w:tr>")),
     "not-a-number": ("bad-number", tbl(1, f"<w:tr>{tc('a', _span('one'))}</w:tr>")),
     "negative": ("bad-number", tbl(2, f"<w:tr>{_BEFORE}{tc('a', _span('3'))}</w:tr>")),
@@ -947,6 +1015,14 @@ _NO_GRID = {
     ),
     "merge-first": ("h-merge", tbl(1, f"<w:tr>{tc('a', _H_MERGE + _span('0'))}</w:tr>")),
 }
+
+
+def test_a_tables_grid_carries_each_columns_width_in_twips() -> None:
+    for widths in (("1", "31680"), ("01000", "2000", "3"), ("1440",)):
+        (table,) = read_document(docx(_wide(*widths))).tables
+        assert table.grid is not None
+        assert table.grid.widths == tuple(int(w) for w in widths)
+        assert table.grid.columns == len(widths)
 
 
 @pytest.mark.parametrize(("reason", "table"), _NO_GRID.values(), ids=_NO_GRID.keys())
@@ -1243,18 +1319,25 @@ def _kept_or_refused(shd: str, theme: str) -> list[str] | str:
 def test_a_theme_fill_word_was_not_asked_to_draw_keeps_its_theme_name() -> None:
     theme_kind = ["shading-THEME-background1"]
     shade = BACKGROUND.format("D9D9D9") + ' w:themeFillShade="{}"'
-    for attributes in (
-        BACKGROUND.format("FFFFFF") + ' w:themeFillTint="80"',
-        shade.format("D9") + ' w:themeFillTint="80"',  # Word draws the tint alone
-        shade.format("d9"),
-        shade.format("D9").replace('w:color="auto"', 'w:color="FF0000"'),
-        shade.format("D9").replace(' w:fill="D9D9D9"', ""),
-        shade.format("D9").replace('w:fill="D9D9D9"', 'w:fill="auto"'),
-        shade.format("D9") + ' w:themeColor="text1"',
-        shade.format("D9") + ' w:themeFillTint="FF"',
-        shade.format("D9").replace('w:val="clear"', 'w:val="nil"'),
+    # Named with its tint and shade, so no two read alike.
+    for attributes, kind in (
+        (BACKGROUND.format("FFFFFF") + ' w:themeFillTint="80"', "THEME-background1-tint80"),
+        # Word draws the tint alone.
+        (shade.format("D9") + ' w:themeFillTint="80"', "THEME-background1-tint80-shadeD9"),
+        (shade.format("d9"), "THEME-background1-shadeD9"),
+        (
+            shade.format("D9").replace('w:color="auto"', 'w:color="FF0000"'),
+            "THEME-background1-shadeD9",
+        ),
+        (shade.format("D9").replace(' w:fill="D9D9D9"', ""), "THEME-background1-shadeD9"),
+        (
+            shade.format("D9").replace('w:fill="D9D9D9"', 'w:fill="auto"'),
+            "THEME-background1-shadeD9",
+        ),
+        (shade.format("D9") + ' w:themeColor="text1"', "THEME-background1-shadeD9"),
+        (shade.format("D9").replace('w:val="clear"', 'w:val="nil"'), "THEME-background1-shadeD9"),
     ):
-        assert _shading_kinds(attributes) == theme_kind, attributes
+        assert _shading_kinds(attributes) == [f"shading-{kind}"], attributes
     assert _shading_kinds(BACKGROUND.format("FFFFFF").replace("clear", "solid")) == [
         "shading-solid-AUTO-THEME-background1"
     ]
@@ -1302,11 +1385,94 @@ def test_a_patterns_theme_colour_is_spelt_so_it_never_reads_as_automatic() -> No
     assert _shading_kinds(pattern.replace("auto", "000000", 1) + ' w:themeColor="text1"') == [
         "shading-pct15-THEME-text1-AUTO"
     ]
-    # Shade or tint alone name no theme colour; and a clear shading paints no pattern colour.
-    assert _shading_kinds(pattern + ' w:themeShade="BF"') == ["shading-pct15-AUTO-AUTO"]
+    # A clear shading paints no pattern colour.
     assert _shading_kinds('w:val="clear" w:fill="D9D9D9" w:themeColor="accent2"') == [
         "shading-D9D9D9"
     ]
+    # A tint or shade of no theme colour: what Word draws is not on record.
+    for orphan in (
+        pattern + ' w:themeShade="BF"',
+        pattern + ' w:themeTint="33"',
+        'w:val="clear" w:fill="D9D9D9" w:themeFillShade="BF"',
+        'w:val="pct15" w:fill="D9D9D9" w:themeFillTint="33"',
+    ):
+        with pytest.raises(DocxRefusedError, match="a theme tint or shade of no colour"):
+            _shading_kinds(orphan)
+
+
+def _paged(data: bytes, colour: str) -> bytes:
+    """``data`` with a page colour (``w:background``) before its body."""
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(out, "w") as target:
+        for info in source.infolist():
+            content = source.read(info)
+            if info.filename == "word/document.xml":
+                page = f'<w:background w:color="{colour}"/><w:body>'.encode()
+                content = content.replace(b"<w:body>", page)
+            target.writestr(info, content)
+    return out.getvalue()
+
+
+def test_a_white_shading_is_a_mark_only_where_something_is_painted_under_it() -> None:
+    # Word paints white over a grey paragraph or cell (drawing-cases shading-white); over the
+    # white page it paints nothing to see.
+    white, grey = (
+        'w:val="clear" w:color="auto" w:fill="FFFFFF"',
+        '<w:shd w:val="clear" w:fill="D9D9D9"/>',
+    )
+    resolved = BACKGROUND.format("FFFFFF")
+
+    def kinds(body: str, styles: str | None = None) -> list[list[str]]:
+        data = docx(body, styles, settings=MAPPED, theme=colour_theme())
+        return [[m.kind for m in q.marks] for q in read_docx(data)]
+
+    run = r("<w:t>ab</w:t>", f"<w:shd {white}/>")
+    assert kinds(p(run)) == [[]]
+    assert kinds(p(run, grey)) == [["shading-D9D9D9", "shading-FFFFFF"]]
+    assert kinds(p(r("<w:t>ab</w:t>", f"<w:shd {resolved}/>"), grey)) == [
+        ["shading-D9D9D9", "shading-FFFFFF"]
+    ]
+    # Under its own highlight, in a painted cell, in a table or row painted, under a table
+    # style's paint, over a coloured page.
+    assert kinds(p(r("<w:t>ab</w:t>", f'<w:highlight w:val="yellow"/><w:shd {white}/>'))) == [
+        ["highlight-yellow", "shading-FFFFFF"]
+    ]
+    cell = (
+        "<w:tbl>{0}<w:tblGrid><w:gridCol/></w:tblGrid><w:tr>{1}<w:tc>{2}{3}</w:tc></w:tr></w:tbl>"
+    )
+    painted = (
+        cell.format("", "", f"<w:tcPr>{grey}</w:tcPr>", p(run)),
+        cell.format(f"<w:tblPr>{grey}</w:tblPr>", "", "", p(run)),
+        cell.format("", f"<w:tblPrEx>{grey}</w:tblPrEx>", "", p(run)),
+        cell.format("", "", f"<w:tcPr>{grey}</w:tcPr>", cell.format("", "", "", p(run))),
+    )
+    for body in painted:
+        assert kinds(body)[-1] == ["shading-FFFFFF"], body
+    styled = cell.format('<w:tblPr><w:tblStyle w:val="T"/></w:tblPr>', "", "", p(run))
+    for where in ("<w:tcPr>{}</w:tcPr>", "<w:tblPr>{}</w:tblPr>"):
+        style = f'<w:style w:type="table" w:styleId="T">{where.format(grey)}</w:style>'
+        assert kinds(styled, style) == [["shading-FFFFFF"]]
+    part = f'<w:tblStylePr w:type="firstRow"><w:tcPr>{grey}</w:tcPr></w:tblStylePr>'
+    assert kinds(styled, f'<w:style w:type="table" w:styleId="T">{part}</w:style>') == [
+        ["shading-FFFFFF"]
+    ]
+    for colour, marked in (("FFFF00", [["shading-FFFFFF"]]), ("FFFFFF", [[]]), ("auto", [[]])):
+        paged = _paged(docx(p(run), settings=MAPPED, theme=colour_theme()), colour)
+        assert [[m.kind for m in q.marks] for q in read_docx(paged)] == marked, colour
+    # White over white: a cell, a table or a page of white, a paragraph of white.
+    plain = (
+        cell.format("", "", f"<w:tcPr><w:shd {white}/></w:tcPr>", p(run)),
+        cell.format("", "", '<w:tcPr><w:shd w:val="clear" w:fill="auto"/></w:tcPr>', p(run)),
+        cell.format("", "", f"<w:tcPr><w:shd {resolved}/></w:tcPr>", p(run)),
+        p(run, f"<w:shd {white}/>"),
+    )
+    for body in plain:
+        assert kinds(body) == [[]], body
+    # A white paragraph over a painted cell is a mark too.
+    over = cell.format(
+        "", "", f"<w:tcPr>{grey}</w:tcPr>", p(r("<w:t>ab</w:t>"), f"<w:shd {white}/>")
+    )
+    assert kinds(over) == [["shading-FFFFFF"]]
 
 
 def test_raised_or_lowered_text_carries_its_shift_and_sizes() -> None:
@@ -1357,6 +1523,19 @@ def test_a_shift_or_size_not_in_whole_half_points_is_refused(props: str) -> None
     with pytest.raises(DocxRefusedError) as caught:
         read_docx(docx(p(r("<w:t>a</w:t>", props))))
     assert caught.value.code == "unsupported-formatting"
+
+
+def test_shifted_complex_script_is_refused() -> None:
+    # Word draws it at szCs, which the mark does not report.
+    shifted = '<w:position w:val="2"/>'
+    for body in (
+        p(r("<w:t>\u05d0</w:t>", shifted)),
+        p(r("<w:t>a</w:t>", shifted + "<w:rtl/>")),
+        p(r("<w:t>a</w:t>", shifted + "<w:cs/>")),
+        p('<w:dir w:val="rtl">' + r("<w:t>a</w:t>", shifted) + "</w:dir>"),
+    ):
+        with pytest.raises(DocxRefusedError, match="raised or lowered complex script"):
+            read_docx(docx(body))
 
 
 def test_paragraph_marks_merge_with_run_marks_of_the_same_kind() -> None:
@@ -3162,6 +3341,8 @@ STYLED = '<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr>'
 # Where a picture stands, and the reason its place gives: Word prints a field's result again
 # (a REF to a bookmark round another picture prints that one), and clips a picture to an exact
 # line or row; a border on the run is drawn round it.
+SPACED = picture(effect='l="9525" t="0" r="0" b="0"')
+FRAME = '<w:framePr w:w="3000" w:hRule="atLeast" w:h="300"/>'
 PLACED_CASES: list[tuple[str, str, str | None, str | None]] = [
     ("plain", p(r(picture())), None, None),
     ("complex-field", p(field("DOCPROPERTY Title", r(picture()))), None, "field"),
@@ -3275,6 +3456,31 @@ PLACED_CASES: list[tuple[str, str, str | None, str | None]] = [
         tbl(1, f"<w:tr><w:tc>{p(r(picture()))}</w:tc></w:tr>"),
         f'<w:style w:type="table" w:default="1" w:styleId="T">{ROW}</w:style>',
         "row-height",
+    ),
+    # An effect extent's space, drawn as the picture's alone only in a paragraph of its own
+    # (drawing-cases picture-extent-cell-*, -frame-exact: a narrow cell and a frame clip it).
+    ("extent-in-a-cell", tbl(1, f"<w:tr><w:tc>{p(r(SPACED))}</w:tc></w:tr>"), None, "effects"),
+    ("no-extent-in-a-cell", tbl(1, f"<w:tr><w:tc>{p(r(picture()))}</w:tc></w:tr>"), None, None),
+    ("extent-in-a-frame", p(r(SPACED), FRAME), None, "effects"),
+    (
+        "extent-in-a-frame-by-style",
+        p(r(SPACED), '<w:pStyle w:val="F"/>'),
+        f'<w:style w:type="paragraph" w:styleId="F"><w:pPr>{FRAME}</w:pPr></w:style>',
+        "effects",
+    ),
+    (
+        "extent-in-a-frame-by-default",
+        p(r(SPACED)),
+        f"<w:docDefaults><w:pPrDefault><w:pPr>{FRAME}</w:pPr></w:pPrDefault></w:docDefaults>",
+        "effects",
+    ),
+    ("no-extent-in-a-frame", p(r(picture()), FRAME), None, None),
+    ("extent-beside-a-frame", p(r("<w:t>x</w:t>"), FRAME) + p(r(SPACED)), None, None),
+    (
+        "extent-after-a-table",
+        tbl(1, f"<w:tr><w:tc>{p('')}</w:tc></w:tr>") + p(r(SPACED)),
+        None,
+        None,
     ),
     (
         "row-after-an-exact-row",

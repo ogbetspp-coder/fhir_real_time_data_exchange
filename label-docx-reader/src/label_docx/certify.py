@@ -257,6 +257,10 @@ class _Paragraph:
     # The run properties of the table style's parts Word applies to its cell, nearest first.
     conditional: tuple[ET.Element, ...] = ()
     section: int = 0
+    # Its shading's mark, over every character, and whether anything but white is painted under
+    # its runs (``_Story.paragraph``).
+    shading: str | None = None
+    ground: bool = False
     # What the result must say of the paragraph beyond its text: whether Word hides its mark,
     # and its list label.
     mark_hidden: bool = False
@@ -335,6 +339,12 @@ class _Fonts:
         self.bands: dict[str, tuple[str | None, str | None]] = {}
         # Table styles whose row properties (their own, or a part's) make a row's height exact.
         self.fixed_rows: set[str] = set()
+        # Per table style, every shading of its table and cells, its parts' too.
+        self.cell_shadings: dict[str, list[ET.Element]] = {}
+        # Whether background1 is white as Word was asked to draw it (``_white``), and whether the
+        # page has a colour other than white (``w:background``): set by ``DocxSource``.
+        self.white = False
+        self.page_ground = False
         if styles is not None:
             for style in styles.findall(_w("style")):
                 style_id = style.get(_w("styleId"))
@@ -350,6 +360,12 @@ class _Fonts:
                 self.rpr[style_id] = style.find(_w("rPr"))
                 self.ppr[style_id] = style.find(_w("pPr"))
                 self.parts[style_id] = style.findall(_w("tblStylePr"))
+                self.cell_shadings[style_id] = [
+                    shading
+                    for holder in (style, *self.parts[style_id])
+                    for name in ("tblPr", "tcPr")
+                    for shading in holder.findall(f"{_w(name)}/{_w('shd')}")
+                ]
                 self.bands[style_id] = (_size_of(style, "Row"), _size_of(style, "Col"))
                 if any(
                     _row_fixed(holder.find(_w("trPr"))) for holder in (style, *self.parts[style_id])
@@ -755,6 +771,113 @@ def _bullet_reading(code: int) -> str:
     raise CertificationError(f"a Wingdings label outside the table: {code:#06x}")
 
 
+def _white(settings: ET.Element | None, theme: ET.Element | None) -> bool:
+    """Whether background1 is white as Word was asked to draw it (corpus/drawing-cases shading*).
+
+    The settings map bg1 to light1, and the theme's one colour scheme gives its one lt1 as the
+    window colour last seen FFFFFF, or as FFFFFF, with nothing else in it.
+    """
+    mapping = None if settings is None else settings.find(_w("clrSchemeMapping"))
+    if mapping is None or mapping.get(_w("bg1")) != "light1":
+        return False
+    if theme is None or _short(theme.tag) != "a:theme":
+        return False
+    schemes = [s for e in theme if _short(e.tag) == "a:themeElements" for s in e]
+    schemes = [s for s in schemes if _short(s.tag) == "a:clrScheme"]
+    light = [] if len(schemes) != 1 else [c for c in schemes[0] if _short(c.tag) == "a:lt1"]
+    if len(light) != 1 or len(light[0]) != 1 or len(light[0][0]):
+        return False
+    given = light[0][0]
+    return (_short(given.tag), given.attrib) in (
+        ("a:sysClr", {"val": "window", "lastClr": "FFFFFF"}),
+        ("a:srgbClr", {"val": "FFFFFF"}),
+    )
+
+
+def _named(shading: ET.Element, name: str, tint: str, shade: str) -> str | None:
+    """A theme colour as a kind spells it, with its tint and shade; refused with those alone."""
+    colour = shading.get(_w(name))
+    if colour is None:
+        if shading.get(_w(tint)) is not None or shading.get(_w(shade)) is not None:
+            raise CertificationError("a theme tint or shade of no colour")
+        return None
+    tinted = shading.get(_w(tint))
+    shaded = shading.get(_w(shade))
+    return (
+        f"THEME-{colour}"
+        + ("" if tinted is None else f"-tint{tinted.upper()}")
+        + ("" if shaded is None else f"-shade{shaded.upper()}")
+    )
+
+
+def _shade(shading: ET.Element | None, white: bool) -> str | None:
+    """The mark a shading gives, by this check's own reading; None where it paints nothing.
+
+    Word paints background1 white, or white times its shade (#ssssss), only as recorded: a clear
+    shading, the background white (``_white``), no tint, a pattern colour of auto, 000000 or
+    none, a stored fill of six hex digits (Word ignores it), a shade of two upper-case hex
+    digits. Any other theme colour is named, so it never reads as another.
+    """
+    if shading is None:
+        return None
+    pattern = shading.get(_w("val"))
+    if pattern is None:
+        raise CertificationError("a shading with no pattern")
+    fill = (shading.get(_w("fill")) or "auto").upper()
+    named = _named(shading, "themeFill", "themeFillTint", "themeFillShade")
+    if named is not None:
+        shade = shading.get(_w("themeFillShade"))
+        keys = {_local(k) for k in shading.attrib if k.startswith(f"{{{W}}}")}
+        plain = (
+            white
+            and pattern == "clear"
+            and shading.get(_w("themeFill")) == "background1"
+            and len(keys) == len(shading.attrib)
+            and keys <= {"val", "color", "fill", "themeFill", "themeFillShade"}
+            and shading.get(_w("color"), "auto") in ("auto", "000000")
+            and re.fullmatch("[0-9a-fA-F]{6}", shading.get(_w("fill"), "")) is not None
+        )
+        if plain and shade is None:
+            fill = "FFFFFF"
+        elif plain and shade is not None and re.fullmatch("[0-9A-F]{2}", shade):
+            fill = shade + shade + shade
+        else:
+            fill = named
+    if pattern not in ("clear", "nil"):
+        colour = _named(shading, "themeColor", "themeTint", "themeShade")
+        return f"shading-{pattern}-{colour or (shading.get(_w('color')) or 'auto').upper()}-{fill}"
+    return None if fill == "AUTO" else f"shading-{fill}"
+
+
+def _ground(shading: ET.Element | None, white: bool) -> bool:
+    """Whether a shading paints anything but white."""
+    return _shade(shading, white) not in (None, "shading-FFFFFF")
+
+
+def _stops(fonts: _Fonts, paragraph: _Paragraph, level: ET.Element | None, tabbed: bool) -> None:
+    """Never certify a paragraph under a bar tab stop, or, ``tabbed``, one with a leader.
+
+    The stops of its own properties, its style's (each it is based on), in a table its table
+    style's and every one of that style's parts', the defaults' and its list ``level``'s: Word
+    draws a bar stop's rule, and a leader across a tab's gap, with no character of text for it.
+    """
+    sources = [
+        paragraph.properties,
+        *(fonts.ppr.get(i) for i in fonts.style_ids(paragraph.style, "paragraph")),
+        fonts.doc_ppr,
+        level,
+    ]
+    if paragraph.table is not None:
+        for i in fonts.style_ids(paragraph.table_style, "table"):
+            sources += [fonts.ppr.get(i), *(part.find(_w("pPr")) for part in fonts.parts[i])]
+    for source in sources:
+        for stop in [] if source is None else source.iterfind(f"{_w('tabs')}/{_w('tab')}"):
+            if stop.get(_w("val")) == "bar":
+                raise CertificationError("a bar tab stop")
+            if tabbed and stop.get(_w("leader"), "none") != "none":
+                raise CertificationError("a tab under a stop with a leader")
+
+
 class _Story:
     """The tokens of one story (the body, a note, a header, a footer or a comment), by paragraph."""
 
@@ -791,6 +914,9 @@ class _Story:
         self.east_asian_symbol = False
         # The table style's parts Word applies to the cell being read (``_Applied``).
         self.conditional: tuple[ET.Element, ...] = ()
+        # Whether anything but white is painted under the paragraph being read: by its cell, a
+        # table round it, their style, or the page.
+        self.ground = fonts.page_ground
         # How many simple fields, and rows of exact height, hold what is being read.
         self.simple = 0
         self.fixed = 0
@@ -819,6 +945,19 @@ class _Story:
         rows = _owned(element, _w("tr"))
         cells = [_owned(row, _w("tc")) for row in rows]
         styled = not self.fonts.fixed_rows.isdisjoint(self.fonts.style_ids(own, "table"))
+        white = self.fonts.white
+        table_ground = self.ground or any(
+            _ground(shading, white)
+            for shading in (
+                element.find(f"{_w('tblPr')}/{_w('shd')}"),
+                *(row.find(f"{_w('tblPrEx')}/{_w('shd')}") for row in rows),
+                *(
+                    shading
+                    for i in self.fonts.style_ids(own, "table")
+                    for shading in self.fonts.cell_shadings[i]
+                ),
+            )
+        )
         fixed = [styled or _row_fixed(row.find(_w("trPr"))) for row in rows]
         self.met.append((element, outer, rows, cells, fixed))
         applied = _Applied(
@@ -835,10 +974,14 @@ class _Story:
                 before = len(self.paragraphs)
                 rprs, problem = applied.at(row_index, cell_index)
                 outside, self.conditional = self.conditional, () if problem else rprs
+                beneath, self.ground = (
+                    self.ground,
+                    table_ground or _ground(cell.find(f"{_w('tcPr')}/{_w('shd')}"), white),
+                )
                 here = (index, row_index, cell_index)
                 # A body paragraph is in its own table's cell; any other, in the outermost one's.
                 self.blocks(cell, here if self.story is None else outer or here, own)
-                self.conditional = outside
+                self.conditional, self.ground = outside, beneath
                 if problem and any(
                     any(s.text for s in p.segments)
                     or ((n := _numbering_of(self.fonts, p)) is not None and n[0] != 0)
@@ -886,6 +1029,24 @@ class _Story:
         )
         if properties is not None and properties.find(_w("sectPr")) is not None:
             self.section += 1
+        # The paragraph's shading, from its nearest properties that set one (its own, its style's,
+        # its table style's, the defaults'); white only where something is painted under it.
+        sources = [
+            properties,
+            *(self.fonts.ppr.get(i) for i in self.fonts.style_ids(here.style, "paragraph")),
+            *(
+                self.fonts.ppr.get(i)
+                for i in (self.fonts.style_ids(table_style, "table") if table is not None else [])
+            ),
+            self.fonts.doc_ppr,
+        ]
+        shading = next(
+            (found for s in sources if s is not None and (found := s.find(_w("shd"))) is not None),
+            None,
+        )
+        kind = _shade(shading, self.fonts.white)
+        here.shading = None if kind == "shading-FFFFFF" and not self.ground else kind
+        here.ground = self.ground or _ground(shading, self.fonts.white)
         # The paragraph mark: hidden (vanish, or specVanish) runs the paragraph on into the next.
         # The cautious reading and Word's toggle rule must agree, else it is not certain.
         own = None if properties is None else properties.find(_w("rPr"))
@@ -968,6 +1129,16 @@ class _Story:
         if hidden and not self.fonts.shown(own, chains, "vanish"):
             hidden = None  # hidden by any level, shown by Word's toggle rule: not on record
         kinds = self.fonts.marks(own, here.style, here.table_style, in_table, here.conditional)
+        # The run's shading, from the nearest level that sets one; white only over paint, or
+        # under its own highlight.
+        shading = _shade(
+            next((s for level in levels if (s := level.find(_w("shd"))) is not None), None),
+            self.fonts.white,
+        )
+        highlight = None if own is None else own.find(_w("highlight"))
+        lit = highlight is not None and highlight.get(_w("val")) not in (None, "none")
+        if shading is not None and (shading != "shading-FFFFFF" or here.ground or lit):
+            kinds = kinds | {shading}
         # Word draws complex script with bCs and iCs, and b and i are what this check reads.
         forced = bool(self.bidi) or any(
             _on(level.find(_w(name))) for level in levels for name in ("rtl", "cs")
@@ -1106,6 +1277,9 @@ class _Story:
                 raise CertificationError("a character Word does not show as itself")
             return text
         self.ledger.elements += 1
+        if local == "ptab" and child.get(_w("leader")) != "none":
+            # Word draws its leader across the gap; one with no leader is not one Word writes.
+            raise CertificationError("a positional tab with a leader")
         if local in ("tab", "ptab"):
             return "\t"
         if local == "br":
@@ -1496,8 +1670,9 @@ def _grid(
 
     Its grid: its ``tblGrid``'s ``gridCol`` elements, and each row's cells laid side by side from
     the column after the ``gridBefore`` it leaves out, each over its ``gridSpan`` (one when
-    absent), covering the columns exactly with ``gridAfter``. Else no grid, and the first reason,
-    in this order: no ``tblGrid`` or two; then row by row a ``gridBefore`` or ``gridAfter`` that
+    absent), covering the columns exactly with ``gridAfter``; and each column's width in twips.
+    Else no grid, and the first reason, in this order: no ``tblGrid`` or two; a ``gridCol`` whose
+    width is not digits from 1 to 31680; then row by row a ``gridBefore`` or ``gridAfter`` that
     is not digits; cell by cell a horizontal merge, a vertical merge that is neither ``restart``
     nor ``continue`` (as an empty one is), a ``gridSpan`` that is not digits or is 0; and the row
     not covering the columns.
@@ -1518,7 +1693,16 @@ def _grid_laid(
         raise _NoGridError("no-grid")
     if len(grids) > 1:
         raise _NoGridError("two-grids")
-    width = sum(1 for child in grids[0] if child.tag == _w("gridCol"))
+    widths: list[Json] = []
+    for child in grids[0]:
+        if child.tag != _w("gridCol"):
+            continue
+        twips = child.get(_w("w"), "")
+        # A column's width as Word stores it: digits, at least 1, at most a 22-inch page's.
+        if not re.fullmatch("[0-9]{1,5}", twips) or not 1 <= int(twips) <= 31680:
+            raise _NoGridError("bad-width")
+        widths.append(int(twips))
+    width = len(widths)
     out_rows: list[Json] = []
     for row, row_cells in zip(rows, cells, strict=True):
         skipped = _grid_number(row.find(_w("trPr")), "gridBefore", 0)
@@ -1542,7 +1726,7 @@ def _grid_laid(
             raise _NoGridError("row-off-grid")
         exact = fixed[len(out_rows)]
         out_rows.append({"after": left, "before": skipped, "cells": laid, "exactHeight": exact})
-    return {"columns": width, "rows": out_rows}
+    return {"columns": width, "rows": out_rows, "widths": widths}
 
 
 def _row_fixed(row_properties: ET.Element | None) -> bool:
@@ -2084,8 +2268,11 @@ def _match(paragraph: _Paragraph, value: dict[str, Json], where: str) -> None:
     ]:
         raise CertificationError(f"{where}: not the pictures the document holds")
     # The marks this check works out, character by character.
+    over = frozenset() if paragraph.shading is None else frozenset({paragraph.shading})
     shown = [
-        kinds for segment in paragraph.segments for kinds in [segment.kinds] * len(segment.text)
+        kinds | over
+        for segment in paragraph.segments
+        for kinds in [segment.kinds] * len(segment.text)
     ]
     claimed: list[set[str]] = [set() for _ in text]
     for mark in value["marks"]:
@@ -2095,7 +2282,7 @@ def _match(paragraph: _Paragraph, value: dict[str, Json], where: str) -> None:
             raise CertificationError(f"{where}: a mark that is no span of the text")
         if not (type(kind) is str and (kind in _MARK_KINDS or _MARK_PATTERN.fullmatch(kind))):
             raise CertificationError(f"{where}: a mark of no kind the result format names")
-        if kind in CHECKED_MARKS:
+        if kind in CHECKED_MARKS or kind.startswith("shading-"):
             for index in range(start, end):
                 claimed[index].add(kind)
     if [set(k) for k in shown] != claimed:
@@ -3109,6 +3296,14 @@ class DocxSource:
                 parse.get(related.get("fontTable", "")),
             )
             settings_root = parse.get(related.get("settings", ""))
+            self.fonts.white = _white(settings_root, parse.get(related.get("theme", "")))
+            # A page colour other than white, or one this check does not resolve.
+            background = parse[main].find(_w("background"))
+            self.fonts.page_ground = background is not None and (
+                len(background) > 0
+                or not _keys(background) <= {"w:color"}
+                or background.get(_w("color"), "auto").upper() not in ("AUTO", "FFFFFF")
+            )
             self.variables = [
                 (v.get(_w("name")), v.get(_w("val")))
                 for v in ([] if settings_root is None else settings_root.iter(_w("docVar")))
@@ -3124,6 +3319,18 @@ class DocxSource:
             )
             for paragraph in self.body.paragraphs:
                 paragraph.numbering = self._label(paragraph, None)
+                numbered = paragraph.numbering
+                if numbered is not None and numbered["numId"] != 0:
+                    look = self.lists.levels(int(str(numbered["numId"])))[3].get(
+                        int(str(numbered["level"]))
+                    )
+                    _stops(
+                        self.fonts,
+                        paragraph,
+                        None if look is None else look.ppr,
+                        numbered["suffix"] in ("tab", "legacy")
+                        or "\t" in "".join(s.text for s in paragraph.segments),
+                    )
             sections: list[ET.Element | None] = [
                 p.properties.find(_w("sectPr"))
                 for p in self.body.paragraphs
@@ -3284,16 +3491,32 @@ class DocxSource:
             for paragraph in walk.paragraphs:
                 paragraph.numbering = self._label(paragraph, story)
         for paragraph in walk.paragraphs:
+            _stops(self.fonts, paragraph, None, "\t" in "".join(s.text for s in paragraph.segments))
             # Where Word may clip the paragraph's pictures: an exact line, an exact row.
             clipped = {"line-height"} if _line_rule(self.fonts, paragraph) == "exact" else set()
             if paragraph.in_exact_row:
                 clipped.add("row-height")
+            # In a cell or a frame an effect extent's space may not be free.
+            boxed = paragraph.table is not None or any(
+                source is not None and source.find(_w("framePr")) is not None
+                for source in (
+                    paragraph.properties,
+                    *(
+                        self.fonts.ppr.get(i)
+                        for i in self.fonts.style_ids(paragraph.style, "paragraph")
+                    ),
+                    self.fonts.doc_ppr,
+                )
+            )
             paragraph.pictures = [
-                self._picture(d, source, around | clipped) for d, around in paragraph.drawings
+                self._picture(d, source, around | clipped, boxed)
+                for d, around in paragraph.drawings
             ]
         return _Part(walk.paragraphs, ledger, tables=walk.met)
 
-    def _picture(self, drawing: ET.Element, source: str, around: set[str]) -> dict[str, Json]:
+    def _picture(
+        self, drawing: ET.Element, source: str, around: set[str], boxed: bool = False
+    ) -> dict[str, Json]:
         """What one U+FFFC stands for, read from the source by this check's own rules.
 
         A VML picture's image is its first ``imagedata``'s; a DrawingML one's the ``blip`` of
@@ -3319,7 +3542,9 @@ class DocxSource:
             sides = None if spread is None else _whole(spread, ("l", "t", "r", "b"), why, True)
             # Space Word leaves round the picture, drawn as it is, as far as it was asked
             # (corpus/drawing-cases): a side under 0 clips the picture.
-            if sides is not None and (min(sides) < 0 or max(sides) > 952500):
+            if sides is not None and (
+                min(sides) < 0 or max(sides) > 952500 or (boxed and any(sides))
+            ):
                 why.add("effects")
             data = [n for n in frame.iter() if _short(n.tag) == "a:graphicData"]
             shape = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
