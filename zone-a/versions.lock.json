@@ -6,7 +6,8 @@
     "label-docx-json/1.16.0": "8ea8365876133a160b1e1da828b824ad26b4eb219f5f3b7b15a43e8cfc634f13",
     "label-docx-json/1.17.0": "08018a9a10d138d38b5f851bc2eee58a81b4af0818ca54481cbc880dbbfdf35e",
     "label-docx-json/1.18.0": "6e6444b5854c1cb5e35b83b464542ad59284a235388a8ffb08496e9317bfef08",
-    "label-docx-json/1.18.1": "8a763497e14f91d2f9eacf040221ee123063be8a198cbf71e3a4716bdd89f1fc"
+    "label-docx-json/1.18.1": "8a763497e14f91d2f9eacf040221ee123063be8a198cbf71e3a4716bdd89f1fc",
+    "label-docx-json/1.19.0": "c38df6d6ba10f60d8fcc47bc531600438b6f1e18462b9c16243f5ee49d1627c0"
   },
   "docx-reader": {
     "docx-reader/1.1.0": "fe8d2711b071d26ad210f9541ffa1d11ea13b49401f38d7ce77040f30d7cc572",
@@ -17,13 +18,15 @@
     "docx-reader/1.30.0": "ee775fa786ebcb0572a8b92c400c0746199748e6dd913a1b87d2fc0d810753ca",
     "docx-reader/1.30.1": "9e08c3fe16f3a994efdfda87ce2311c0c3135c6cd446063740375618b77f890d",
     "docx-reader/1.31.0": "fecc396b3667a845b1dfff45b0130252e7efc76f5783811ca2995d5b9f582052",
-    "docx-reader/1.32.0": "402a5499269696d44094f02f80d6cf6d938edb8a16f6ec1869e4b636d1586768"
+    "docx-reader/1.32.0": "402a5499269696d44094f02f80d6cf6d938edb8a16f6ec1869e4b636d1586768",
+    "docx-reader/1.33.0": "34fa2d2c80f6e6b3df387da1ea0de73cbc87cf1fd1dbf8ad5ec68af18fa8478a"
   },
   "epi-format": {
     "label-epi-json/1.11.10": "66d14a7c4db479bd132579b71160fde2d13d104eac6cfdd05226ca7f0a0a5182",
     "label-epi-json/1.11.11": "2f31812ef81edc47825fd8f5a8cbeaf52515516f76841cef5bd01d909b7d6b91",
     "label-epi-json/1.11.13": "ebbeb9cd8528512d297a43f39ba4c75debd4f042523a646c19d4ad809e386d37",
     "label-epi-json/1.11.14": "6e87fc7368d6448c19dff11f9c2df8e7d29871d3e797d83d97c704e5f09687a9",
+    "label-epi-json/1.11.15": "a7e8d2ea401898f0b484445789d8c6552c373e188640375e69f48f44f134c4fa",
     "label-epi-json/1.11.7": "6a8bcf96814f1cba3b8e02e0bd02bb40b13cc2f46d3aaf7a2c9e0a5d834fb007",
     "label-epi-json/1.11.8": "f4088ce541f0b97afacd7f480c1c1fce4a51bd5b55f484d2c7b5ea40e3254c26",
     "label-epi-json/1.11.9": "1a651a6c6ad5c98fea503bd91339eee8e94aceb5999f7948b9c9f429f63e409e"
@@ -37,7 +40,8 @@
     "epi-reader/1.3.5": "cf68d5e22e9f6c106ae85e43c4356f3a6bfe75f21e41b26f6c69153b6e4118c8",
     "epi-reader/1.3.6": "036bbade36b9d0e4f8c644496fe28ad8ef5ffc8a51dbd075d1037b6de71de3c0",
     "epi-reader/1.3.7": "93e1ae2356e82a49333f4d80fc54e61d714f2d6a23a8538838b8041027cdad2e",
-    "epi-reader/1.3.8": "9ef0d4f5a7decdbcf19af7eb675d55fa653df5759ce358806dc760baf698be62"
+    "epi-reader/1.3.8": "9ef0d4f5a7decdbcf19af7eb675d55fa653df5759ce358806dc760baf698be62",
+    "epi-reader/1.3.9": "62cd31a3a41c14c8e5df992f9dc721058523b912f1a9bb28368504ff656410ae"
   },
   "implementation-check": {
     "implementation-check/1.0.0": "8d0188c8c37aecdfce10776597c2645f99c7083d0326da4080a46d9512a7c031",
@@ -133,7 +137,8 @@
     "word-drawing/1.1.2": "273dc00ea89776665815572c9ec08963da295097b1dd871f9fc6596e8c2aaabd",
     "word-drawing/1.2.0": "b3ab2e12d472bfee02ec224688c9fc4610083ebbbb1693a35810850a5b934475",
     "word-drawing/1.2.1": "94218846eb47f1e887178fd4174d354732ed58004c71f477f88323563ce26331",
-    "word-drawing/1.2.2": "d93db10cb506e4f65951ec117560c474c6e274cf567fcb467ff3855f70de449b"
+    "word-drawing/1.2.2": "d93db10cb506e4f65951ec117560c474c6e274cf567fcb467ff3855f70de449b",
+    "word-drawing/1.2.3": "6414f91a74072cdf75fc9a364828fb917599addb3068ebf9df0852f9e3fcea0f"
   },
   "word-epi": {
     "word-epi/1.0.0": "be254f42d394d190be7bb080cf4497db17fa3fe64569bf4d37633c96b7859b19",
