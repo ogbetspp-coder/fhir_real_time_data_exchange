@@ -56,7 +56,7 @@ from zone_a.qrd.headings import collapse
 from zone_a.qrd.pattern import Token, children
 from zone_a.structure import find, line
 
-LEAFLET_VERSION = "pl-structure/1.0.0"
+LEAFLET_VERSION = "pl-structure/1.0.1"
 
 # Headings the template does not write that stand for one of its sections, each from the EMA's
 # own guidance (ADR 0006, owner decision 8). The annotated template

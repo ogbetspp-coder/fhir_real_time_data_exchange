@@ -6,10 +6,10 @@
   "reader": "epi-reader/1.3.8",
   "format": "label-epi-json/1.11.14",
   "inputs": {
-    "registrySha256": "dcfab25158f67252222c6dfc95c915b9715683611523656971d590f8a171667c",
+    "registrySha256": "b3f8094c1e976299c1a5fc425f9059ff94c88d0c179b66537127c82d2760270d",
     "mappingSha256": "9ba09319770c6f363b25baa78c37e72d5a2ebb05e5c16b8693b2fa38e2d286da"
   },
-  "checker": "qrd-check/1.6.0",
+  "checker": "qrd-check/1.6.1",
   "template": {
     "family": "EMA QRD product-information template, centralised procedure",
     "version": "10.4",
@@ -18,7 +18,7 @@
     "document": "Summary of product characteristics",
     "language": "en"
   },
-  "registryVersion": "1.3.0",
+  "registryVersion": "1.3.1",
   "mappingVersion": "1.5.0",
   "document": {
     "title": "Imatinib Teva",

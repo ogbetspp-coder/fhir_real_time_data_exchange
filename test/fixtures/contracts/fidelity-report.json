@@ -1,6 +1,6 @@
 {
   "reportVersion": "1.0.0",
-  "normalizationVersion": "fidelity-norm/3.3.0",
+  "normalizationVersion": "fidelity-norm/3.4.0",
   "extractedTextSha256": "b5a4c2af57e35ddf8258eb9d84ace5d1ef15cb77f382c0ecc8393fe0d4d21641",
   "narrativeBindingSha256": "dbc8cf153c23e248a34c79d2bb6176030b2b206646e92060ac9c7ce6e7b786dd",
   "status": "passed",
@@ -241,5 +241,5 @@
     "coveredCodePoints": 2155,
     "uncoveredGaps": 0
   },
-  "reportHash": "9522996f89d165c566f356105ac2a322dfae35baa950a02449d067e88b7ec141"
+  "reportHash": "5d6c87414fc468246905cf8bd6da8de02a55e3c11419a938b2cc807616154b21"
 }

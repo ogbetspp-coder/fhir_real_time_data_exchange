@@ -871,8 +871,8 @@
       ],
       "extractedText": {
         "uri": "gs://synthetic-bucket/import.pages.json",
-        "sha256": "fc2e452baeae33f536cf7613f5cf9245f76271b384095a9c4fb436e72eb0b7e6",
-        "extractorVersion": "authority-import/2.4.2"
+        "sha256": "6abf61e8b9f83c8fb2a0e92742f3975bbe2d7621b72ecbef2cfbd9724a6ce413",
+        "extractorVersion": "authority-import/2.4.3"
       }
     },
     "extraction": {
@@ -880,7 +880,7 @@
       "serviceVersion": "test",
       "parser": {
         "name": "authority-import",
-        "version": "2.4.2"
+        "version": "2.4.3"
       },
       "terminologyService": {
         "name": "cap-smpc-en",
@@ -2641,12 +2641,12 @@
       }
     ],
     "fidelity": {
-      "normalizationVersion": "fidelity-norm/3.3.0",
+      "normalizationVersion": "fidelity-norm/3.4.0",
       "status": "passed",
       "sectionsChecked": 32,
       "sectionsMatched": 32,
       "narrativeBindingSha256": "dbc8cf153c23e248a34c79d2bb6176030b2b206646e92060ac9c7ce6e7b786dd",
-      "reportSha256": "120655a4e95d2efe528b280fbc4c0a1cad684639da892ef56decd149dea37de2",
+      "reportSha256": "1c0486ae092d4e0f54c5ff6448c79b771766cccd6bd3baddcbd56db98c197829",
       "reportUri": "gs://synthetic-bucket/import.fidelity-report.json"
     }
   },
@@ -2665,6 +2665,6 @@
     },
     "requestedBy": "urn:requester:synthetic-01",
     "requestedAt": "2026-09-24T11:59:00Z",
-    "approvedContentSha256": "a8878ff3ab9aee29890aeeb34dbc5b217995e7762d578997d2d78b4335473c8c"
+    "approvedContentSha256": "ec3489324cf28bc23540b804e6540af1f19bcb2d8ff21cb5e506115e58f56568"
   }
 }

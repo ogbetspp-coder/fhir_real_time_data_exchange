@@ -49,11 +49,13 @@
     "implementation-check/1.1.5": "8821bbb5aa5deafa04fcc63153546f44dbc308a1a9c32d503ef27ba7cfdf7d8b"
   },
   "pl-structure": {
-    "pl-structure/1.0.0": "baef1e83dafe164adc5ededdd9577401aa9c1b75688c31b04f9336286ea21d42"
+    "pl-structure/1.0.0": "baef1e83dafe164adc5ededdd9577401aa9c1b75688c31b04f9336286ea21d42",
+    "pl-structure/1.0.1": "15dbb2d9f0674025f1fe5c084ff0d28b77958644f72676612b46621f532e15bf"
   },
   "product": {
     "product/1.0.0": "b6f1973ec1eb760f11fd254f6b3c950da944e5e50d35ab3e856ef55a071a4f6e",
     "product/1.0.1": "3dc2e85fdccd9bcfb1c56706cbaa182a2858add3110cc6745de44a8366c63fa8",
+    "product/1.0.10": "a38a503cbc0fff42b4a7c5248023ca9badd310f780d2bdb654991f16aa6e235e",
     "product/1.0.2": "56a5d448613c3a0d99928aa9c836bd3f0806379dcf39e63c02c5acb1e9fd5fd9",
     "product/1.0.3": "43f8ce2959cac3b6e18b70232b06f28bf99efb72e51ac883fbf080b216ad4cd8",
     "product/1.0.4": "ef5bab0d1c40cdba60738d12893f6da441c2267e105553b675c6dc9646d73c56",
@@ -75,7 +77,8 @@
     "qrd-check/1.4.6": "e2ee245e6d4732aa8aefa4aebd94ba4158f7f3d8492b2ef880b84a22ff2dee76",
     "qrd-check/1.5.0": "ea58bb5049b5d5b3ce75c755f78dfb27480a6df01e5947e33ed6b987eb70b11e",
     "qrd-check/1.5.1": "39f329ac35ea9f2faba9503733c12c273afbb36c6aedfe9a627e94b9f851f4a7",
-    "qrd-check/1.6.0": "00030a02a23822ca6ee759727b525ba06ea392aad2a09cf808a307da00f7c856"
+    "qrd-check/1.6.0": "00030a02a23822ca6ee759727b525ba06ea392aad2a09cf808a307da00f7c856",
+    "qrd-check/1.6.1": "c6d1f153247ea4b388e306a275fc9ca727c6e984ee01a896177db4f134dd1193"
   },
   "qrd-registry": {
     "1.0.0": "fa7df5a8d2c5a3900eb6b34c0cd3071f67d51af25182e68da29b44e7a23c32e7",
@@ -89,7 +92,8 @@
     "1.2.6": "08179bac204a8cd6864a31139b87475979943ee42eb272739fdb78335a77473c",
     "1.2.7": "e817f9dbcffbc4296b81240b3d805a59b1508bfe768952e92e4e91b253c62731",
     "1.2.8": "f274a1d8dc7072a85e1fc501a68f5c9aa1399239697c95bee966a5416c9e208c",
-    "1.3.0": "ecea5e662fa35cedee5532a1c305c8f15b8035433473bc3529edf3837380b169"
+    "1.3.0": "ecea5e662fa35cedee5532a1c305c8f15b8035433473bc3529edf3837380b169",
+    "1.3.1": "919cfd0944a2df28f2fbf05994153ed5d70f5708f2b037400065902489a203ed"
   },
   "recompute": {
     "recompute/1.0.0": "1ef5b40ecc5d7cb623f14781e12f83467cdfbbb6a1a227688143344c62fb4d38",
@@ -108,7 +112,8 @@
     "smpc-structure/1.1.0": "87af4e6c5d9e78e081edb134ff90168799936b1b726639fb45fb775e1ccaa682",
     "smpc-structure/1.1.1": "d6fa8d22fe0144c905606236dfe90d8f81b6c8b26662b863f20b944eab5d81d2",
     "smpc-structure/1.2.0": "10c79074a0ea91b8ca09800ae87f117e81dc1cd8970a75821f2f72659a7014fd",
-    "smpc-structure/1.3.0": "7ff168a57e50b1a96afdc80322bad179e1fcf0bd8e22db635cf0827779140435"
+    "smpc-structure/1.3.0": "7ff168a57e50b1a96afdc80322bad179e1fcf0bd8e22db635cf0827779140435",
+    "smpc-structure/1.3.1": "e0272c52363b2f4541b92efadf68d57cf6048f0ecb8194b4bd91687bb837ef62"
   },
   "word-drawing": {
     "word-drawing/1.0.0": "c3750aef78ac1f6ee7e61a1e4f1d121359be7bade1a29b1a0b02fb90ccd66a98",
@@ -121,7 +126,8 @@
     "word-drawing/1.1.0": "a53ff8d4cdc90506763e732adc8f8eb01a3b9e5def2617e46906378db320d5ef",
     "word-drawing/1.1.1": "acd3778277d12a41cd926d47d5cba9923787166296e6fe1051e2147412ebc8b9",
     "word-drawing/1.1.2": "273dc00ea89776665815572c9ec08963da295097b1dd871f9fc6596e8c2aaabd",
-    "word-drawing/1.2.0": "b3ab2e12d472bfee02ec224688c9fc4610083ebbbb1693a35810850a5b934475"
+    "word-drawing/1.2.0": "b3ab2e12d472bfee02ec224688c9fc4610083ebbbb1693a35810850a5b934475",
+    "word-drawing/1.2.1": "94218846eb47f1e887178fd4174d354732ed58004c71f477f88323563ce26331"
   },
   "word-epi": {
     "word-epi/1.0.0": "be254f42d394d190be7bb080cf4497db17fa3fe64569bf4d37633c96b7859b19",
@@ -133,6 +139,7 @@
     "word-epi/1.2.0": "c9e7ed4321d3543088076c5634c1ba0f22f329581d4fbb37606659807a8e364e",
     "word-epi/1.3.0": "2e8907a52f77b424c1c5fa41dffd5c1e645a01da4153aaeb0974ffafb86ca7e6",
     "word-epi/1.3.1": "cac490b4c1081b8d16426aaf77639f3296c5a9df4076aa38fd8fc781dca77b94",
-    "word-epi/1.3.2": "67f34bbd53ebf80e7d9eb0cfd1dc6d20986140f0bfa0f8867d3cf562c8cfa6fc"
+    "word-epi/1.3.2": "67f34bbd53ebf80e7d9eb0cfd1dc6d20986140f0bfa0f8867d3cf562c8cfa6fc",
+    "word-epi/1.4.0": "52dacd3eca671dded3205592718ee5714e934218ca9e500bcb2526e30db1eb41"
   }
 }

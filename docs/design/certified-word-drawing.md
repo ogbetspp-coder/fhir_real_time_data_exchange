@@ -1007,6 +1007,14 @@ committed synthetic SmPC, copied byte for byte into `test/fixtures/certified-wor
   worker's pipeline; not dry, `certified-word-document-unbound`, and without a record
   `certified-word-drawing-missing`; `invalid` and `mismatch` (the recompute's output in other bytes
   that make the same submission) dry or not; a Storage error failing the run.
+- **After a version move** (`word-epi/1.4.0` and `word-drawing/1.2.1`, 2026-10-07,
+  `docs/validation/changes/2026-10-07-fidelity-norm-3-4-0.md`): the real record is of the build it
+  was drawn by, so `drawing.test.ts` holds it to that build (the recompute's bytes it names,
+  frozen as `smpc.recompute.json`, its request, and dev's pins with `word-drawing/1.2.0`) and
+  shows a later build finds it nowhere; `recompute.test.ts` holds the gate to a record made as
+  dev's build makes one for this build, signed by a key made for the test, until dev draws the
+  synthetic SmPC again after the deploy and that record is committed. The image is unchanged: the
+  code is mounted from the checkout.
 - `test/infra/word-drawing.test.ts`: the worker named the record bucket and `var.environment`.
   `test/ci/images.test.ts`: the worker image, and only it, copies the pins.
 - Each rule of step 5 removed in turn from `drawing.ts` (the cap, `keyVersion`, the request's

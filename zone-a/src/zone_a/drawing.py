@@ -66,7 +66,7 @@ from zone_a.canonical_json import CanonicalJsonError, canonical_json, sha256_utf
 from zone_a.certified import Body
 from zone_a.word_epi import CAPITALS, GREY, WHITESPACE, blank, text_labels, unchanged_by_capitals
 
-DRAWING_VERSION: Final = "word-drawing/1.2.0"
+DRAWING_VERSION: Final = "word-drawing/1.2.1"
 RECORD_VERSION: Final = "word-drawing-record/1.0.0"
 LEFT_OUT: Final = frozenset({"underline"})
 # The template's grey as Chrome reports the narrative's silver span (``label_docx.browser``).

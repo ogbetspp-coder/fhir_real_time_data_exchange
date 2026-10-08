@@ -2891,6 +2891,28 @@ export const verifyCases: VerifyCase[] = [
     })(),
     expect: { status: "failed", sections: { "smpc.4.8": "mismatch" } },
   },
+  // fidelity-norm/3.4.0: the tab after a typed label is a space in a table cell as outside one,
+  // and a caption's "Table 1:", a raised footnote key and a non-breaking hyphen are typed labels.
+  // The page as zone_a.word_epi writes it from the read and the narrative it builds from the same
+  // read. Reviewed by hand: the caption and the raised key below the table are lines; in the cells
+  // the raised "a" is kept as a letter on the page and the hyphen kept as U+2011, each followed by
+  // the space written for its tab.
+  {
+    name: "certified-word-typed-labels-in-a-cell",
+    input: (() => {
+      const page =
+        "\nTable 1: Dose by age\n﷐\n﷒\t﷓\tAge\t﷓\tDose\n" +
+        "﷒\t﷓\ta Over 18 years\t﷓\t‑ 10 mg\n﷑\na See section 5.2.\n";
+      const narrative = div(
+        "<p>Table 1: Dose by age</p><table><tr><td><p>Age</p></td><td><p>Dose</p></td></tr>" +
+          "<tr><td><p><sup>a</sup> Over 18 years</p></td><td><p>‑ 10 mg</p></td></tr>" +
+          "</table><p><sup>a</sup> See section 5.2.</p>",
+      );
+      const source = wordSource(page);
+      return toInput(source, single("smpc.4.2.posology", narrative, [spanFor(source, 1, page)]));
+    })(),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
 ];
 
 export const throwCases: ThrowCase[] = [

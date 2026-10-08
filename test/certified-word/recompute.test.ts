@@ -1,3 +1,4 @@
+import { constants, generateKeyPairSync, sign } from "node:crypto";
 import {
   existsSync,
   mkdtempSync,
@@ -13,7 +14,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { loadConfig } from "../../src/config.js";
 import { sha256Bytes } from "../../src/authority/import.js";
-import { drawingPins, type DrawingSource } from "../../src/certified-word/drawing.js";
+import {
+  drawingId,
+  drawingPins,
+  recordKey,
+  type DrawingPins,
+  type DrawingSource,
+} from "../../src/certified-word/drawing.js";
 import {
   CERTIFIED_WORD_DOCUMENT_UNBOUND,
   CERTIFIED_WORD_DRAWING_INVALID,
@@ -54,7 +61,7 @@ import {
 import { loadEmaMapping, loadEmaMappings, type EmaMapping } from "../../src/fhir/mapping.js";
 import type { FhirComposition } from "../../src/fhir/types.js";
 import type { GcsObjectFetcher } from "../../src/gcp/submission-reader.js";
-import { sha256 } from "../../src/lib/hash.js";
+import { canonicalJson, sha256 } from "../../src/lib/hash.js";
 import { runPipeline } from "../../src/pipeline.js";
 
 // The certified Word gate, recomputing (docs/design/certified-word-import.md, "The gate"): the
@@ -732,26 +739,68 @@ describe(`the gate, recomputing (${PYTHON === undefined ? "the committed results
   });
 });
 
-// Step 5 (D3; docs/design/certified-word-drawing.md, section 3): the record bucket holds the real
-// record dev's drawing build signed for the committed synthetic SmPC, at its path in dev
-// (test/certified-word/drawing.test.ts verifies it field by field, and every way it is refused).
+// Step 5 (D3; docs/design/certified-word-drawing.md, section 3). The real record dev's drawing
+// build signed for the committed synthetic SmPC (test/fixtures/certified-word/drawing/, which
+// test/certified-word/drawing.test.ts verifies field by field against dev's key, and every way it
+// is refused) is of the build before word-epi/1.4.0: this build's request has another path, and
+// the gate finds it nowhere. Until dev draws the label again, the record bucket holds the record
+// dev's build makes for this build: the real record's fields with this build's request, output and
+// drawing version, signed by a key made for the test in version 1's place.
 describe(`the gate's step 5, the drawing record (${PYTHON === undefined ? "the committed results" : "Python"})`, () => {
-  const PATH =
+  const REAL_PATH =
     "word/7e4c389fdb72bf3b804e1240e043eba02352fd3a70ebe25283b06a53fcd92809/03d058be759c88620d0748c07ea6c747c468b7ad9b0e95f23476e07db67d4000/1.json";
   const REAL = readFileSync("test/fixtures/certified-word/drawing/smpc.record.json");
+  const own = generateKeyPairSync("rsa", { modulusLength: 3072 });
+  const pins: DrawingPins = { ...drawingPins("dev"), keys: [[1, own.publicKey]] };
+  let PATH: string;
+  let RECORD: Buffer;
+
+  beforeAll(() => {
+    const named = uploaded().submission.provenance.sourceDocument;
+    if (named.kind !== "certified-word") throw new Error("not a certified Word source");
+    const { record } = JSON.parse(REAL.toString("utf8")) as {
+      record: { drawing: object } & Record<string, unknown>;
+    };
+    const made = {
+      ...record,
+      request: { docxSha256: named.document.sha256, recompute: named.recompute },
+      recompute: { outputSha256: sha256Bytes(recomputed("smpc")) },
+      drawing: { ...record.drawing, version: pins.version },
+    };
+    const signature = sign("sha256", Buffer.from(canonicalJson(made)), {
+      key: own.privateKey,
+      padding: constants.RSA_PKCS1_PSS_PADDING,
+      saltLength: 32,
+    });
+    RECORD = Buffer.from(
+      canonicalJson({ record: made, signatureBase64: signature.toString("base64") }),
+    );
+    PATH = `word/${recordKey(named)}/${drawingId(pins.version, pins.imageDigest ?? "")}/1.json`;
+  });
 
   function records(
-    objects: Record<string, Uint8Array> = { [PATH]: REAL },
-    read: DrawingSource["read"] = (object) => Promise.resolve(objects[object]),
+    objects?: Record<string, Uint8Array>,
+    read: DrawingSource["read"] = (object) =>
+      Promise.resolve((objects ?? { [PATH]: RECORD })[object]),
   ): CertifiedWordSources {
-    return sources({ drawing: { pins: drawingPins("dev"), read } });
+    return sources({ drawing: { pins, read } });
   }
 
-  it("passes a dry run of the synthetic SmPC as drawn, by the real signed record", async () => {
+  it("passes a dry run of the synthetic SmPC as drawn, by a record dev's build signs", async () => {
     const input = uploaded();
     const passed = await gate(input, OPTIONS, records());
     expect(passed.gate.submission).toEqual(input.submission);
     expect(passed.check).toBe("drawn");
+  });
+
+  it("finds the real record of the build before nowhere, with dev's own pins", async () => {
+    const before = sources({
+      drawing: {
+        pins: drawingPins("dev"),
+        read: (object) => Promise.resolve({ [REAL_PATH]: REAL }[object]),
+      },
+    });
+    expect((await gate(uploaded(), OPTIONS, before)).check).toBe("recomputed");
   });
 
   it("refuses a run that is not dry: unbound once the record verifies, missing without one", async () => {
