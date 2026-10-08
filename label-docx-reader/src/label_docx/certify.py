@@ -104,7 +104,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT, WINGDINGS_BULLETS
 
-CHECKER_VERSION = "conservation-check/1.20.0"
+CHECKER_VERSION = "conservation-check/1.21.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -282,8 +282,11 @@ CHECKED_MARKS = frozenset({*_CHECKED_TOGGLES.values(), "superscript", "subscript
 # Every mark kind a .docx result may name (``reader.Mark``): the checked ones, the others (held
 # only by the reader's tests; Word is not asked about them), and highlight and shading, named
 # after their colour.
-_MARK_KINDS = CHECKED_MARKS | {"position", "rtl", "faint"}
-_MARK_PATTERN = re.compile(r"(?:highlight|shading)-.+", re.DOTALL)
+_MARK_KINDS = CHECKED_MARKS | {"rtl", "faint"}
+# Raised or lowered text by its shift, its size and its paragraph's, in half-points.
+_MARK_PATTERN = re.compile(
+    r"(?:highlight|shading)-.+|position[-+][1-9][0-9]{0,4}-size[0-9]{1,4}-in[0-9]{1,4}", re.DOTALL
+)
 
 _THEME_SLOT = {
     "ascii": "asciiTheme",
@@ -1681,10 +1684,12 @@ def _whole(
 def _blip_fill(fill: ET.Element, blip: ET.Element, why: set[str]) -> dict[str, int] | None:
     """The crop a picture's fill names; what in it may change Word's drawing is ``effects``."""
     stretch = _child(fill, "a:stretch")
-    if fill.attrib or _kids(fill) not in (
-        ["a:blip", "a:stretch"],
-        ["a:blip", "a:srcRect", "a:stretch"],
-    ):
+    # Whether the fill turns with the shape: drawn alike unturned (corpus/drawing-cases), and a
+    # turned or mirrored picture has its own reason, which comes first.
+    turns = fill.get("rotWithShape")
+    if not _keys(fill) <= {"rotWithShape"} or turns not in (None, "0", "1", "true", "false"):
+        why.add("effects")
+    if _kids(fill) not in (["a:blip", "a:stretch"], ["a:blip", "a:srcRect", "a:stretch"]):
         why.add("effects")
     if stretch is None or stretch.attrib or _kids(stretch) != ["a:fillRect"]:
         why.add("effects")
@@ -1726,7 +1731,21 @@ def _shape_properties(shape: ET.Element | None, extent: list[int] | None, why: s
     if (
         not _keys(shape) <= {"bwMode"}
         or sorted(set(names)) != sorted(names)
-        or not set(names) <= {"a:xfrm", "a:prstGeom", "a:noFill", "a:ln"}
+        or not set(names) <= {"a:xfrm", "a:prstGeom", "a:noFill", "a:ln", "a:extLst"}
+    ):
+        why.add("effects")
+    # Last, holding one extension alone: that the picture's shadow is hidden, with no shadow (no
+    # effect list) to hide. Word draws the picture as without it (corpus/drawing-cases).
+    extensions = _child(shape, "a:extLst")
+    only = extensions[0] if extensions is not None and len(extensions) == 1 else None
+    if extensions is not None and (
+        names[-1] != "a:extLst"
+        or extensions.attrib
+        or only is None
+        or _short(only.tag) != "a:ext"
+        or only.attrib != {"uri": "{53640926-AAD7-44D8-BBD7-CCE9431645EC}"}
+        or _kids(only) != ["a14:shadowObscured"]
+        or not _empty(only[0])
     ):
         why.add("effects")
     transform = _child(shape, "a:xfrm")
@@ -1763,8 +1782,41 @@ def _shape_properties(shape: ET.Element | None, extent: list[int] | None, why: s
     if fill is not None and not _empty(fill):
         why.add("effects")
     line = _child(shape, "a:ln")
-    if line is not None and (_kids(line) != ["a:noFill"] or not _empty(line[0])):
+    if line is not None and not _invisible(line):
         why.add("effects")
+
+
+def _invisible(line: ET.Element) -> bool:
+    """A line Word draws nothing of (corpus/drawing-cases): of no fill, then its ends' shapes.
+
+    No fill, bare; then one join or none, a miter (its limit up to 800000 or none), a round or a
+    bevel; then a bare head end, a bare tail end, or both in that order. Its width up to 190500
+    EMU, or none, and nothing else.
+    """
+    names = _kids(line)
+    if not names or names[0] != "a:noFill" or not _empty(line[0]):
+        return False
+    rest = names[1:]
+    if rest and rest[0] in ("a:miter", "a:round", "a:bevel"):
+        join = line[1]
+        if len(join) or not _keys(join) <= ({"lim"} if rest[0] == "a:miter" else set()):
+            return False
+        if not _at_most(join.get("lim"), 800000):
+            return False
+        rest = rest[1:]
+    if rest not in ([], ["a:headEnd"], ["a:tailEnd"], ["a:headEnd", "a:tailEnd"]):
+        return False
+    ends = list(line)[len(names) - len(rest) :]
+    return (
+        all(_empty(end) for end in ends)
+        and _keys(line) <= {"w"}
+        and _at_most(line.get("w"), 190500)
+    )
+
+
+def _at_most(value: str | None, most: int) -> bool:
+    """None, or a whole number of up to six digits no greater than ``most``."""
+    return value is None or (re.fullmatch("[0-9]{1,6}", value) is not None and int(value) <= most)
 
 
 def _png_facts(data: bytes) -> tuple[list[int] | None, set[str]]:
@@ -3264,7 +3316,10 @@ class DocxSource:
             extent = _whole(_child(frame, "wp:extent"), ("cx", "cy"), why, False)
             found["extent"] = extent
             spread = _child(frame, "wp:effectExtent")
-            if spread is not None and _whole(spread, ("l", "t", "r", "b"), why, True) != [0] * 4:
+            sides = None if spread is None else _whole(spread, ("l", "t", "r", "b"), why, True)
+            # Space Word leaves round the picture, drawn as it is, as far as it was asked
+            # (corpus/drawing-cases): a side under 0 clips the picture.
+            if sides is not None and (min(sides) < 0 or max(sides) > 952500):
                 why.add("effects")
             data = [n for n in frame.iter() if _short(n.tag) == "a:graphicData"]
             shape = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"

@@ -38,7 +38,7 @@ from label_docx.output import Json, canonical, certified, paragraphs
 
 # The version of the shape above, and of the check that certifies it: versions.lock.json ties
 # it to both files (tests/test_locks.py).
-FORMAT_VERSION = "label-epi-json/1.11.15"
+FORMAT_VERSION = "label-epi-json/1.11.16"
 
 
 def section(item: Section) -> dict[str, Json]:

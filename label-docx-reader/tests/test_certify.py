@@ -3084,8 +3084,9 @@ def test_a_mark_must_be_a_span_of_the_text_of_a_kind_the_format_names() -> None:
         spans = [{"kind": k, "start": s, "end": e} for k, s, e in marks]
         return _value({"text": "ab", "marks": spans})
 
-    kinds = ["position", "rtl", "faint", "highlight-yellow", "shading-D9D9D9"]
+    kinds = ["position-1-size22-in22", "rtl", "faint", "highlight-yellow", "shading-D9D9D9"]
     source.certify(marked(*((kind, 0, 2) for kind in kinds), ("faint", 1, 2)))
+    source.certify(marked(("position+99999-size0-in9999", 0, 2), ("position-1-size9999-in1", 0, 1)))
     wrong = [
         ("faint", -1, 1),  # text[-1:1] is empty
         ("faint", 1, 1),  # empty
@@ -3098,6 +3099,18 @@ def test_a_mark_must_be_a_span_of_the_text_of_a_kind_the_format_names() -> None:
         ("highlight-", 0, 2),
         ("shading", 0, 2),
         (None, 0, 2),
+        # Raised text with its shift and sizes, in whole half-points.
+        ("position", 0, 2),
+        ("position+0-size22-in22", 0, 2),
+        ("position2-size22-in22", 0, 2),
+        ("position+02-size22-in22", 0, 2),
+        ("position+123456-size22-in22", 0, 2),
+        ("position+2-size-in22", 0, 2),
+        ("position+2-size22-in", 0, 2),
+        ("position+2-size12345-in22", 0, 2),
+        ("position+2-size22-in12345", 0, 2),
+        ("position+2-size22", 0, 2),
+        ("position+2-size22-in22\n", 0, 2),
     ]
     for mark in wrong:
         with pytest.raises(CertificationError, match="a mark"):

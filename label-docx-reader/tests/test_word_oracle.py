@@ -93,6 +93,10 @@ REFUSED = {
     "numbering-cases/legacy-levels.docx": "unsupported-numbering",
     # EMA's stray U+F02D in Times New Roman, a code no font draws as the template means it.
     "ema-templates/qrd-product-information-template-version-104_es.docx": "private-use-character",
+    # A table of contents: each entry's page number follows a tab under a stop with a dot leader,
+    # which Word draws across the gap (corpus/drawing-cases tabs).
+    "word-authored/table-of-contents.docx": "unsupported-formatting",
+    "word-authored/table-of-contents-stale.docx": "unsupported-formatting",
 }
 
 

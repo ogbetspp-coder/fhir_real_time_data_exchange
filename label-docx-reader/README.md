@@ -89,7 +89,7 @@ from another web page.
 
 ```json
 {"certificate": {…}, "comments": [], "endnotes": [], "footers": [], "footnotes": [],
- "format": "label-docx-json/1.19.0", "headers": [],
+ "format": "label-docx-json/1.20.0", "headers": [],
  "paragraphs": [{"anchored": [{"kind": "text-box", "offset": 2, "read": false}],
    "comments": [], "markHidden": false,
    "marks": [{"end": 5, "kind": "superscript", "start": 4}], "notes": [], "numbering": null,
@@ -97,7 +97,7 @@ from another web page.
      "offset": 8, "part": "word/media/image1.png", "pixels": [8, 8], "reason": null,
      "sha256": "…", "type": "png"}],
    "style": "Heading2", "table": [0, 1, 0], "text": "x 109/l \ufffc"}],
- "reader": "docx-reader/1.33.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
+ "reader": "docx-reader/1.34.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
  "tables": [{"grid": {"columns": 2, "rows": [
    {"after": 0, "before": 0, "cells": [{"column": 0, "merge": null, "span": 2}],
     "exactHeight": false},
@@ -135,7 +135,9 @@ from another web page.
   `orientation` (Exif turns it), `bad-number`, `cropped`, `rotated`, `flipped`, `line-height`
   and `row-height` (Word clips it to an exact line or row), `border` (on its run) and `effects`
   (anything else on a closed list: recolouring, transparency, SVG, an outline, a shape other than
-  a rectangle, a shadow...). Null means only that nothing on those closed lists was found: the
+  a rectangle, a shadow, an effect extent under 0...; what Word draws nothing of, an effect
+  extent's space, a fill turning with an unturned shape, a hidden shadow, an unfilled line's join
+  and ends, is not, as Word's drawing of `corpus/drawing-cases` has it). Null means only that nothing on those closed lists was found: the
   lists rest on what is known of Word, not on Word's drawing, and the ePI builder and the browser
   hold the rest. Whether Word draws it larger than its pixels is the caller's to judge (9525 EMU
   a pixel at 96 dpi). No picture refuses a read; the lists: "Pictures" in
@@ -163,6 +165,7 @@ Every key: the docstrings of [`output.py`](src/label_docx/output.py) and
 | ------------------------------------------------------------- | ------------------------------------------ |
 | Each rule reads exactly or refuses                            | `test_reader.py`, `test_epi.py`, `test_tracked.py` |
 | Labels, notes, fields, text, headers, footers, bold, italic, caps and strike are what Word shows | Word's recorded answers (`test_word_oracle.py`) |
+| A picture carried as its pixels, a theme's shading resolved, a pattern's theme colour and a tab's leader are as Word draws them | Word's recorded drawing (`test_word_drawn.py`) |
 | Tracked views are Word's Accept All / Reject All (42 of 50 cases; 8 refused) | Word's own files (`test_tracked.py`) |
 | ePI sections are what Chrome shows                            | Chrome's recorded answers (`test_browser_oracle.py`) |
 | Every result read is certified; seeded changes to each corpus result read are caught | `test_certify.py` |
@@ -198,6 +201,7 @@ each document reads to, `word.json` and `browser.json` hold Word's and Chrome's 
 | `ema-qrd`         |         4 | EMA QRD files the rules were first written from                   |
 | `ema-templates`   |        18 | EMA product-information templates                                 |
 | `numbering-cases` |       155 | one Word rule each, synthetic                                     |
+| `drawing-cases`   |        32 | what Word draws for pictures, theme shading and tab leaders, synthetic |
 | `fda-templates`   |         3 | FDA prescribing information, medication guide and patient insert templates |
 | `word-authored`   |         2 | written by Word itself (a table of contents)                      |
 | `tracked-cases`   |        39 | tracked changes, with Word's Accept All and Reject All files      |

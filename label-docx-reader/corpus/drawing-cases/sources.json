@@ -1,0 +1,198 @@
+{
+  "schemaVersion": "1.0.0",
+  "note": "Synthetic drawing cases written by scripts/drawing_cases.py; Word's drawing of them is word-drawn.json (scripts/word_drawn.py).",
+  "sources": [
+    {
+      "name": "An in-line picture: plain.",
+      "file": "picture-plain.docx",
+      "sha256": "9caaa5cd63cf76dace900473cf2fd93100ab25bfc43d391c1dfb800bfe8903e9",
+      "bytes": 3696
+    },
+    {
+      "name": "An in-line picture: extent-even.",
+      "file": "picture-extent-even.docx",
+      "sha256": "d39cb87cb19181cc35a4b02bfa13d46a0581f53a422f1e9c800e1b5414da8cb8",
+      "bytes": 3712
+    },
+    {
+      "name": "An in-line picture: extent-left.",
+      "file": "picture-extent-left.docx",
+      "sha256": "405d8383d1fc7ebc8ba26747af4c225ef46195b6a3a231ad0eea14f9a45e1f02",
+      "bytes": 3700
+    },
+    {
+      "name": "An in-line picture: extent-right-bottom.",
+      "file": "picture-extent-right-bottom.docx",
+      "sha256": "2a53ec96017a718cee82d5ef9d2c5707cc1a432fd31b62917d931b20f1b31689",
+      "bytes": 3705
+    },
+    {
+      "name": "An in-line picture: extent-big.",
+      "file": "picture-extent-big.docx",
+      "sha256": "06625398f7978f48b80eeba3957f82252cf2e55924552ad68712da8781544541",
+      "bytes": 3716
+    },
+    {
+      "name": "An in-line picture: extent-negative.",
+      "file": "picture-extent-negative.docx",
+      "sha256": "b0803b6175e9dfe2247e033f90de124f72b9d556737204ab488742c184d4d73b",
+      "bytes": 3704
+    },
+    {
+      "name": "An in-line picture: extent-negative-bottom.",
+      "file": "picture-extent-negative-bottom.docx",
+      "sha256": "b80e43af82fa2beebfd67e8fe6aca4d0302ee0d7e0fd863755076590b06523ac",
+      "bytes": 3701
+    },
+    {
+      "name": "An in-line picture: rot-with-shape-1.",
+      "file": "picture-rot-with-shape-1.docx",
+      "sha256": "8ae117144318900ed05ae13fba55e9c3ba6a6cccc7a9a2e61a94965b483824ba",
+      "bytes": 3713
+    },
+    {
+      "name": "An in-line picture: rot-with-shape-0.",
+      "file": "picture-rot-with-shape-0.docx",
+      "sha256": "115a6f86bf068dbb4c999aab49ac06245b31a8128e857c69aa9ac0117e8298ea",
+      "bytes": 3713
+    },
+    {
+      "name": "An in-line picture: rot-with-shape-true.",
+      "file": "picture-rot-with-shape-true.docx",
+      "sha256": "baf6d8c0a8453d486e047f9dbc5e116eab4f0afebb21a5614879bfcf3c6e30ac",
+      "bytes": 3716
+    },
+    {
+      "name": "An in-line picture: rot-with-shape-false.",
+      "file": "picture-rot-with-shape-false.docx",
+      "sha256": "f55d4baba986af2865f4fa44e67b22c8266a7f3678cdc04b3bd42df87f544b02",
+      "bytes": 3717
+    },
+    {
+      "name": "An in-line picture: shadow-obscured.",
+      "file": "picture-shadow-obscured.docx",
+      "sha256": "9a4cca195e3fec2d657db22c75e43d5fc53c9ebe509f8c00319a9dc57175730d",
+      "bytes": 3798
+    },
+    {
+      "name": "An in-line picture: shadow-drawn.",
+      "file": "picture-shadow-drawn.docx",
+      "sha256": "a87c3093701cfe2e6c5c4ea2160f7f40102faa70152359ebffabe262faab1fe1",
+      "bytes": 3931
+    },
+    {
+      "name": "An in-line picture: line-miter.",
+      "file": "picture-line-miter.docx",
+      "sha256": "7b16b18e9bd6947b34d1789be0a7702976cfa9cf8fb252d28639af2f57acca47",
+      "bytes": 3743
+    },
+    {
+      "name": "An in-line picture: line-miter-width.",
+      "file": "picture-line-miter-width.docx",
+      "sha256": "8608ad3f36a198ea5ab1b5391259734e6b0e3186c62e7154c50179b54f2cf951",
+      "bytes": 3752
+    },
+    {
+      "name": "An in-line picture: line-miter-bare.",
+      "file": "picture-line-miter-bare.docx",
+      "sha256": "bf2f8384a94362b4aa73de3937c58b65e635af3e68e601929d514a35984b76dc",
+      "bytes": 3730
+    },
+    {
+      "name": "An in-line picture: line-miter-zero.",
+      "file": "picture-line-miter-zero.docx",
+      "sha256": "f3e5b0f8c534e99315b773a310accc8093fb1a1ba65663e55b633b4e40bb14f3",
+      "bytes": 3738
+    },
+    {
+      "name": "An in-line picture: line-round.",
+      "file": "picture-line-round.docx",
+      "sha256": "594193c93e949fdc32a4c1b3d237a5446aa4149fa474bf59a40e166cf6eca526",
+      "bytes": 3730
+    },
+    {
+      "name": "An in-line picture: line-bevel.",
+      "file": "picture-line-bevel.docx",
+      "sha256": "f2a9ff4ff55cb3368eca50a4de5d4bfac0e74266d20d7fcd24b40e8b152847a3",
+      "bytes": 3730
+    },
+    {
+      "name": "An in-line picture: line-head.",
+      "file": "picture-line-head.docx",
+      "sha256": "1b816e306b401fc6ec3762466530c86037308650501b3718f4497c17661a40d6",
+      "bytes": 3708
+    },
+    {
+      "name": "An in-line picture: line-tail.",
+      "file": "picture-line-tail.docx",
+      "sha256": "86fdad678880e019f88d08d9ee6ec8b769fc903b76cccf6134fc5ce8ab2b0749",
+      "bytes": 3708
+    },
+    {
+      "name": "An in-line picture: line-wide.",
+      "file": "picture-line-wide.docx",
+      "sha256": "1453aefeb3b3542fac6844bc1c29a2fb7b0ba11bbba71005f47e71783ef2f756",
+      "bytes": 3707
+    },
+    {
+      "name": "An in-line picture: line-drawn.",
+      "file": "picture-line-drawn.docx",
+      "sha256": "b560c2efcb60cf9a5e54476083e208dd9588ddda999941b79c66d0ec1b284aa4",
+      "bytes": 3794
+    },
+    {
+      "name": "An in-line picture: combo.",
+      "file": "picture-combo.docx",
+      "sha256": "0e4836317e7cddd6736f8c1ae2a820646329121d68e138214030ddca8386c5b0",
+      "bytes": 3882
+    },
+    {
+      "name": "Theme and pattern shadings, the theme's lt1 <a:sysClr val=\"window\" lastClr=\"FFFFFF\"/>.",
+      "file": "shading.docx",
+      "sha256": "928249ca733c567fed5511ba5ace4c5f5eae3ba6fdf63e1250f0e050d084dcd9",
+      "bytes": 17217
+    },
+    {
+      "name": "Theme and pattern shadings, the theme's lt1 <a:srgbClr val=\"FFFFFF\"/>.",
+      "file": "shading-srgb-white.docx",
+      "sha256": "4b71d352658e3cf74c3832838500070aff93efb4d92b07e8dd0777be243703af",
+      "bytes": 17201
+    },
+    {
+      "name": "Theme and pattern shadings, the theme's lt1 <a:srgbClr val=\"FF0000\"/>.",
+      "file": "shading-red.docx",
+      "sha256": "21c86202c5f5637e0ea42a29be56e30ba8ea5b12e5f09720b2df692324c12719",
+      "bytes": 17201
+    },
+    {
+      "name": "Theme and pattern shadings, the theme's lt1 <a:sysClr val=\"window\" lastClr=\"FFFFFF\"/>.",
+      "file": "shading-unmapped.docx",
+      "sha256": "2de43368ad8128a30bed9fe35cbc2c38f9f026666276134642406ef3ea255c2b",
+      "bytes": 16956
+    },
+    {
+      "name": "Theme and pattern shadings, the theme's lt1 <a:sysClr val=\"window\" lastClr=\"FFFFFF\"/>.",
+      "file": "shading-shades.docx",
+      "sha256": "d26d3167ad161677203186e7fc7b93064037bc00b1998ca9af6beccdf26d45af",
+      "bytes": 91315
+    },
+    {
+      "name": "A tab, a list label's tab and a positional tab, each with and without a leader.",
+      "file": "tabs.docx",
+      "sha256": "985f2547d494ce39fee65dbc4ce1221c651b21ab3dde1d0468065d3b7428bd05",
+      "bytes": 8902
+    },
+    {
+      "name": "A tab under a leader the document defaults' tab stop gives.",
+      "file": "tabs-defaults.docx",
+      "sha256": "2f4c1936a07b9418f594d6a1e22909bdcb071a027e55a661568462f1dc972b6c",
+      "bytes": 2971
+    },
+    {
+      "name": "A tab under a leader the table style's tab stop gives.",
+      "file": "tabs-table-style.docx",
+      "sha256": "51746d959cb18642bf16d2a15ebafb1edb04c45ef3d3ad759868d6218bdd49ff",
+      "bytes": 3424
+    }
+  ]
+}
