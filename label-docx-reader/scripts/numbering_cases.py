@@ -547,6 +547,129 @@ class DrawnRow(NamedTuple):
     suff: str  # "" for none
     legacy: tuple[int, int] | None  # (legacySpace, legacyIndent)
     ind: str  # the level's w:ind attributes, "" for none
+    condition: str = ""  # one of DRAWN_CONDITIONS, "" for none
+
+
+# What a row of legacy-drawn-styled sets besides its level: run properties of its label
+# ("rpr"), the level's own indent ("level"), the paragraph's style, tab stops, indent and
+# alignment, and a second line after a break ("two", its text green), which a justified line
+# before a break is stretched for.
+_TABS = '<w:tabs><w:tab w:val="{}" w:pos="{}"/></w:tabs>'
+DRAWN_CONDITIONS: dict[str, dict[str, str]] = {
+    "plain": {},
+    "noProof": {"rpr": "<w:noProof/>"},
+    "b": {"rpr": "<w:b/>"},
+    "i": {"rpr": "<w:i/>"},
+    "bCs": {"rpr": "<w:bCs/>"},
+    "iCs": {"rpr": "<w:iCs/>"},
+    "bi": {"rpr": "<w:b/><w:i/>"},
+    "tab-left": {"tabs": _TABS.format("left", 567)},
+    "tab-style": {"style": "Tab567"},
+    "tab-clear": {"style": "Tab567", "tabs": _TABS.format("clear", 567)},
+    "tab-num": {"tabs": _TABS.format("num", 567)},
+    "tab-right": {"tabs": _TABS.format("right", 567)},
+    "tab-120": {"tabs": _TABS.format("left", 120)},
+    "tab-360": {"tabs": _TABS.format("left", 360)},
+    "tab-1440": {"tabs": _TABS.format("left", 1440)},
+    "tab-negative": {"tabs": _TABS.format("left", -1985)},
+    "jc-left": {"jc": "left"},
+    "jc-both": {"jc": "both"},
+    "jc-both-two": {"jc": "both", "two": "1"},
+    "ind-direct": {"ind": 'w:left="567" w:hanging="567"'},
+    "ind-style": {"style": "Ind567"},
+    "ind-style-direct": {"style": "Ind567", "ind": 'w:left="720"'},
+    "ind-right-2": {"ind": 'w:right="-2"'},
+    "ind-right-29": {"ind": 'w:right="-29"'},
+    "ind-right-720": {"ind": 'w:right="720"'},
+    "level-negative": {"level": 'w:left="0" w:hanging="360"'},
+}
+# Faces a label is drawn in, and so its controls.
+DRAWN_FACES = ("plain", "b", "i", "bi")
+DRAWN_STYLES = (
+    '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" '
+    'w:eastAsia="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/>'
+    '<w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="en-GB" w:eastAsia="en-US" '
+    'w:bidi="ar-SA"/></w:rPr></w:rPrDefault><w:pPrDefault/></w:docDefaults>'
+    '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/>'
+    "</w:style>"
+    '<w:style w:type="paragraph" w:styleId="Tab567"><w:name w:val="Tab567"/>'
+    f'<w:basedOn w:val="Normal"/><w:pPr>{_TABS.format("left", 567)}</w:pPr></w:style>'
+    '<w:style w:type="paragraph" w:styleId="Ind567"><w:name w:val="Ind567"/>'
+    '<w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="567" w:hanging="567"/></w:pPr></w:style>'
+)
+# The QRD template's settings that bear on layout (qrd-product-information-template-version-104):
+# its compat options, in each combination of the three EMA's files vary in.
+_WORD = "http://schemas.microsoft.com/office/word"
+
+
+def drawn_settings(hyphenation: str = "0", fe_layout: bool = True, html: bool = True) -> str:
+    """The settings of a legacy-drawn case: the QRD template's, its varying options as given."""
+    fixed = [
+        ("compatibilityMode", "15"),
+        ("overrideTableStyleFontSizeAndJustification", "1"),
+        ("enableOpenTypeFeatures", "1"),
+        ("doNotFlipMirrorIndents", "1"),
+        ("differentiateMultirowTableHeaders", "1"),
+        ("useWord2013TrackBottomHyphenation", hyphenation),
+    ]
+    options = "".join(
+        f'<w:compatSetting w:name="{name}" w:uri="{_WORD}" w:val="{value}"/>'
+        for name, value in fixed
+    )
+    flags = ("<w:doNotUseHTMLParagraphAutoSpacing/>" if html else "") + (
+        "<w:useFELayout/>" if fe_layout else ""
+    )
+    return (
+        '<w:defaultTabStop w:val="720"/><w:characterSpacingControl w:val="doNotCompress"/>'
+        f"<w:compat>{flags}{options}</w:compat>"
+    )
+
+
+# The compat options of each case beyond legacy-drawn-styled's (hyphenation, FE layout, HTML).
+DRAWN_COMPAT = {
+    f"legacy-drawn-compat-{key}": options
+    for key, options in enumerate(
+        [
+            (h, f, m)
+            for h in ("0", "1")
+            for f in (True, False)
+            for m in (True, False)
+            if (h, f, m) != ("0", True, True)
+        ],
+        1,
+    )
+}
+
+
+def styled_rows() -> list[DrawnRow]:
+    """legacy-drawn-styled: each condition for four labels, three sizes and five gaps."""
+    rows = []
+    gaps = [(0, 360), (0, 283), (0, 567), (144, 0), (0, 0)]
+    for condition in DRAWN_CONDITIONS:
+        for label in ("dash", "bullet", "1.", "10."):
+            for size in (16, 22, 28):
+                for space, indent in gaps:
+                    ind = f'w:left="{indent}" w:hanging="{indent}"' if indent else ""
+                    rows.append(DrawnRow(label, size, "", (space, indent), ind, condition))
+    for face in DRAWN_FACES:
+        for label in ("dash", "bullet", "1.", "10."):
+            for size in (16, 22, 28):
+                rows += [
+                    DrawnRow(label, size, suff, None, "", face) for suff in ("nothing", "space")
+                ]
+    return rows
+
+
+def compat_rows() -> list[DrawnRow]:
+    """A legacy-drawn-compat case: the plain rows at 11 pt, three gaps, with their controls."""
+    rows = [
+        DrawnRow(label, 22, "", gap, 'w:left="360" w:hanging="360"' if gap[1] else "", "plain")
+        for label in ("dash", "bullet", "1.", "10.")
+        for gap in ((0, 360), (144, 0), (0, 0))
+    ]
+    for label in ("dash", "bullet", "1.", "10."):
+        rows += [DrawnRow(label, 22, suff, None, "", "plain") for suff in ("nothing", "space")]
+    return rows
 
 
 def drawn_rows() -> list[DrawnRow]:
@@ -576,10 +699,19 @@ def drawn_rows() -> list[DrawnRow]:
     return rows
 
 
-def _legacy_drawn() -> Case:
+# The rows of each legacy-drawn case.
+ROWS = {
+    "legacy-drawn": drawn_rows,
+    "legacy-drawn-styled": styled_rows,
+    **dict.fromkeys(DRAWN_COMPAT, compat_rows),
+}
+
+
+def _legacy_drawn(rows: list[DrawnRow] | None = None, styles: str = "", settings: str = "") -> Case:
     abstracts, nums, body = [], [], []
-    for key, row in enumerate(drawn_rows(), 1):
+    for key, row in enumerate(drawn_rows() if rows is None else rows, 1):
         fmt, text, fonts, start = DRAWN_LABELS[row.label]
+        parts = DRAWN_CONDITIONS[row.condition] if row.condition else {}
         suff = f'<w:suff w:val="{row.suff}"/>' if row.suff else ""
         legacy = (
             ""
@@ -587,31 +719,46 @@ def _legacy_drawn() -> Case:
             else f'<w:legacy w:legacy="1" w:legacySpace="{row.legacy[0]}" '
             f'w:legacyIndent="{row.legacy[1]}"/>'
         )
-        ind = f"<w:ind {row.ind}/>" if row.ind else ""
+        level_ind = parts.get("level", row.ind)
+        ind = f"<w:ind {level_ind}/>" if level_ind else ""
         abstracts.append(
             abstract(
                 key,
                 f'<w:lvl w:ilvl="0"><w:start w:val="{start}"/><w:numFmt w:val="{fmt}"/>{suff}'
                 f'<w:lvlText w:val="{text}"/>{legacy}<w:lvlJc w:val="left"/>'
                 f"<w:pPr>{ind}</w:pPr>"
-                f'<w:rPr>{fonts}<w:color w:val="FF0000"/><w:sz w:val="{row.size}"/></w:rPr>'
-                "</w:lvl>",
+                f'<w:rPr>{fonts}{parts.get("rpr", "")}<w:color w:val="FF0000"/>'
+                f'<w:sz w:val="{row.size}"/></w:rPr></w:lvl>',
             )
         )
         nums.append(num(key, key))
         page = "<w:pageBreakBefore/>" if key > 1 and (key - 1) % DRAWN_ROWS == 0 else ""
         sized = f'{TIMES}<w:sz w:val="{row.size}"/>'
+        two = "two" in parts
+        style = f'<w:pStyle w:val="{parts["style"]}"/>' if "style" in parts else ""
+        indent = f"<w:ind {parts['ind']}/>" if "ind" in parts else ""
+        align = f'<w:jc w:val="{parts["jc"]}"/>' if "jc" in parts else ""
+        text = (
+            f'<w:r><w:rPr>{sized}<w:color w:val="0000FF"/></w:rPr>'
+            f"<w:t>{'5 mg 5 mg 5 mg' if two else '5 mg'}</w:t></w:r>"
+        )
+        if two:
+            green = f'<w:rPr>{sized}<w:color w:val="00A000"/></w:rPr>'
+            text += f"<w:r><w:br/></w:r><w:r>{green}<w:t>x</w:t></w:r>"
         body.append(
-            f"<w:p><w:pPr>{page}"
-            f'<w:numPr><w:ilvl w:val="0"/><w:numId w:val="{key}"/></w:numPr>'
-            f'<w:spacing w:before="0" w:after="0" w:line="{DRAWN_LINE}" w:lineRule="exact"/>'
-            f"<w:rPr>{sized}</w:rPr></w:pPr>"
-            f'<w:r><w:rPr>{sized}<w:color w:val="0000FF"/></w:rPr><w:t>5 mg</w:t></w:r></w:p>'
+            f"<w:p><w:pPr>{style}{page}"
+            f'<w:numPr><w:ilvl w:val="0"/><w:numId w:val="{key}"/></w:numPr>{parts.get("tabs", "")}'
+            f'<w:spacing w:before="0" w:after="0" w:line="{DRAWN_LINE // (2 if two else 1)}" '
+            f'w:lineRule="exact"/>{indent}{align}'
+            f"<w:rPr>{sized}</w:rPr></w:pPr>{text}</w:p>"
         )
     return Case(
-        "Word 6 (legacy) levels as Word draws them: one row each, label red, text blue.",
+        "Word 6 (legacy) levels as Word draws them: one row each, label red, text blue."
+        + (" Styled, under the QRD template's settings." if styles else ""),
         "".join(abstracts + nums),
         "".join(body),
+        styles=styles,
+        settings=settings,
         final=(
             '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="720" w:right="1134" '
             'w:bottom="720" w:left="1134" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr>'
@@ -832,6 +979,11 @@ CASES: dict[str, Case] = {
     ),
     "legacy-levels": _legacy_levels(),
     "legacy-drawn": _legacy_drawn(),
+    "legacy-drawn-styled": _legacy_drawn(styled_rows(), DRAWN_STYLES, drawn_settings()),
+    **{
+        name: _legacy_drawn(compat_rows(), DRAWN_STYLES, drawn_settings(*options))
+        for name, options in DRAWN_COMPAT.items()
+    },
     "numbering-num-before-abstract": _legacy_levels(interleaved=True),
     "bullets": Case(
         "Bullets in Symbol, in Courier New, and in the paragraph mark's font.",

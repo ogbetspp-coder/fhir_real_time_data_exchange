@@ -1,15 +1,15 @@
-"""Record where Word draws each list label and its text in legacy-drawn (macOS with Word).
+"""Record where Word draws each list label and its text in the legacy-drawn cases (macOS, Word).
 
     uv run --frozen python scripts/word_gaps.py record
 
-Word saves corpus/numbering-cases/legacy-drawn.docx as PDF (``label_docx.word``: one script at a
-time, never with a document of that name open, on a copy in Word's sandbox, closed by name), and
+Word saves each corpus/numbering-cases/legacy-drawn*.docx as PDF (``label_docx.word``: one script at
+a time, never with a document of that name open, on a copy in Word's sandbox, closed by name), and
 ``scripts/ink_bands.swift`` draws each page and finds, in each row's band, the red ink (the label)
-and the blue ink (the text). Word's PDF is read for ink, not for its text: where a PDF places a
-character is not where Word drew it. ``word-gaps.json`` beside the case keeps, row by row (as
-``numbering_cases.drawn_rows`` lists them), where the label's ink starts and ends and the text's
-starts and ends, in points from the page's left edge; ``tests/test_word_gaps.py`` holds the
-reader to them without Word.
+and the blue ink (the text; a second line's is green, and left out). Word's PDF is read for ink, not
+for its text: where a PDF places a character is not where Word drew it. ``word-gaps.json`` beside
+the cases keeps, case by case and row by row (as ``numbering_cases.ROWS`` lists them), where the
+label's ink starts and ends and the text's starts and ends, in points from the page's left edge;
+``tests/test_word_gaps.py`` holds the reader to them without Word.
 """
 
 from __future__ import annotations
@@ -28,8 +28,8 @@ import numbering_cases
 from label_docx import word
 
 ROOT = Path(__file__).resolve().parents[1]
-CASE = ROOT / "corpus" / "numbering-cases" / "legacy-drawn.docx"
-RECORD = CASE.with_name("word-gaps.json")
+FOLDER = ROOT / "corpus" / "numbering-cases"
+RECORD = FOLDER / "word-gaps.json"
 TOOL = ROOT / "scripts" / "ink_bands.swift"
 # Pixels a point: an ink edge is found to a sixth of a point.
 SCALE = 6
@@ -61,7 +61,7 @@ def drawn(case: Path) -> list[list[float]]:
         if done.returncode != 0 or not pdf.exists():
             raise SystemExit(f"{case.name}: Word failed: {done.stderr.strip()}")
         found = bands(pdf)
-    rows = len(numbering_cases.drawn_rows())
+    rows = len(numbering_cases.ROWS[case.stem]())
     if any(band != [-1.0] * 4 for band in found[rows:]):
         raise SystemExit(f"{case.name}: ink below the last row")
     if len(found) < rows or any(-1.0 in band for band in found[:rows]):
@@ -74,21 +74,24 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Record Word's drawn list labels.")
     parser.add_subparsers(dest="command", required=True).add_parser("record")
     parser.parse_args()
-    rows = drawn(CASE)
+    cases = {
+        path.stem: {"rows": drawn(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+        for path in (FOLDER / f"{name}.docx" for name in numbering_cases.ROWS)
+    }
     record = {
         "application": word.word_version(),
+        "cases": cases,
         "method": (
             "Word saved the case as PDF; each page drawn at the scale's pixels a point; in each "
             "row's band (its exact line), where the red ink (the label) and the blue ink (the "
             "text) start and end, in points from the page's left edge"
         ),
         "recorded": datetime.date.today().isoformat(),
-        "rows": rows,
         "scale": SCALE,
-        "sha256": hashlib.sha256(CASE.read_bytes()).hexdigest(),
     }
     RECORD.write_text(json.dumps(record, indent=1) + "\n", "utf-8")
-    sys.stdout.write(f"wrote {RECORD.relative_to(ROOT)}: {len(rows)} rows\n")
+    total = sum(len(case["rows"]) for case in cases.values())
+    sys.stdout.write(f"wrote {RECORD.relative_to(ROOT)}: {len(cases)} cases, {total} rows\n")
     return 0
 
 

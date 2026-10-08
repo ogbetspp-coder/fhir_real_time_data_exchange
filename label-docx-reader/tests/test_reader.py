@@ -80,8 +80,11 @@ def docx(
     numbering: str | None = None,
     footnotes: str | None = None,
     endnotes: str | None = None,
+    settings: str | None = None,
 ) -> bytes:
     parts: dict[str, tuple[str, str]] = {}
+    if settings is not None:
+        parts["settings"] = ("settings.xml", f'<w:settings xmlns:w="{W}">{settings}</w:settings>')
     for kind, content in (("footnotes", footnotes), ("endnotes", endnotes)):
         if content is not None:
             parts[kind] = (f"{kind}.xml", f'<w:{kind} xmlns:w="{W}">{content}</w:{kind}>')
@@ -1815,10 +1818,10 @@ def test_the_template_draws_its_bullets_and_dashes() -> None:
         for x in read_docx(data)
         if x.numbering is not None and x.numbering.num_id
     ]
-    # Symbol U+F0B7 bullets, and Word 6 dash bullets from the lists that override a level: in
-    # Times New Roman 11 pt, eight drawn a space's width or more from their text.
-    assert sorted(set(drawn)) == [("-", "legacy"), ("-", "tab"), ("•", "tab")]
-    assert [drawn.count(x) for x in [("•", "tab"), ("-", "tab"), ("-", "legacy")]] == [7, 8, 1]
+    # Symbol U+F0B7 bullets, and Word 6 dash bullets from the lists that override a level, each
+    # drawn a space's width or more from its text (legacy-drawn-styled: one is bold).
+    assert sorted(set(drawn)) == [("-", "tab"), ("•", "tab")]
+    assert [drawn.count(x) for x in [("•", "tab"), ("-", "tab")]] == [7, 9]
 
 
 @pytest.mark.parametrize(
@@ -1901,17 +1904,24 @@ def word6(
             },
             "legacy",
         ),
-        # Not on record: another font, none, bold, a character, alignment, a gap left unset.
+        # Drawn: bold in Times New Roman, a tab stop, a justified paragraph (legacy-drawn-styled).
+        ("-", {"run": "<w:b/>"}, "tab"),
+        ("-", {"props": '<w:tabs><w:tab w:val="left" w:pos="567"/></w:tabs>'}, "tab"),
+        ("-", {"props": '<w:jc w:val="both"/>'}, "tab"),
+        # Not on record: another font, none, Symbol in bold (Word draws it wider), a character,
+        # alignment (none set too), a gap left unset, a centred tab stop, a table cell.
         (
             "-",
             {"rpr": '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="22"/>'},
             "legacy",
         ),
         ("-", {"rpr": '<w:rPr><w:sz w:val="22"/>'}, "legacy"),
-        ("-", {"run": "<w:b/>"}, "legacy"),
+        ("\uf0b7", {"rpr": SYMBOL_11, "run": "<w:b/>"}, "legacy"),
         ("x", {}, "legacy"),
         ("-", {"extra": '<w:lvlJc w:val="center"/>'}, "legacy"),
+        ("-", {"extra": "<w:lvlJc/>"}, "legacy"),
         ("-", {"gap": 'w:legacySpace="0"'}, "legacy"),
+        ("-", {"props": '<w:tabs><w:tab w:val="center" w:pos="567"/></w:tabs>'}, "legacy"),
         # A paragraph right to left, a character grid.
         ("-", {"props": "<w:bidi/>"}, "legacy"),
         (
@@ -1927,10 +1937,29 @@ def test_a_word_6_label_is_followed_by_a_tab_only_where_word_draws_a_space_or_mo
     assert word6(label, **parts) == suffix
 
 
-def test_a_word_6_level_with_a_suffix_is_refused() -> None:
+def test_a_word_6_label_in_a_table_cell_is_not_known_to_be_spaced() -> None:
+    level = lvl(
+        0,
+        "bullet",
+        "-",
+        f'<w:legacy w:legacy="1" w:legacySpace="0" w:legacyIndent="360"/>{TIMES_11}</w:rPr>',
+    )
+    grid = '<w:tblGrid><w:gridCol w:w="5000"/></w:tblGrid>'
+    cell = f"<w:tbl>{grid}<w:tr><w:tc>{li(1)}</w:tc></w:tr></w:tbl>"
+    found = read_docx(docx(cell + p(r("<w:t>x</w:t>")), numbering=abstract(1, level) + num(1, 1)))
+    assert found[0].numbering == Numbering(1, 0, "-", "legacy")
+
+
+@pytest.mark.parametrize("suffix", ['<w:suff w:val="space"/>', "<w:suff/>"])
+def test_a_word_6_level_with_a_suffix_is_refused(suffix: str) -> None:
     # Word writes the suffix's character there (legacy-levels); what it draws is not on record.
-    level = lvl(0, "bullet", "-", '<w:suff w:val="space"/><w:legacy w:legacy="1"/>')
+    level = lvl(0, "bullet", "-", f'{suffix}<w:legacy w:legacy="1"/>')
     assert refusal(li(1), numbering=abstract(1, level) + num(1, 1)) == "unsupported-numbering"
+    # Only where a paragraph draws it.
+    unused = abstract(
+        1, lvl(0, "bullet", "-"), lvl(1, "bullet", "-", f'{suffix}<w:legacy w:legacy="1"/>')
+    )
+    assert labels(li(1), unused + num(1, 1)) == ["-"]
 
 
 def test_a_link_to_a_list_that_overrides_a_level_is_refused() -> None:

@@ -33,7 +33,8 @@ so the reader now carries only what Word's drawing proves.
 **Evidence (Word 16.113.4 for Mac).**
 
 - `corpus/numbering-cases/legacy-levels` (86 items): Word writes after a Word 6 label exactly what
-  `w:suff` says, a tab when it says nothing, whatever the gap, label, size or `w:legacy` value.
+  `w:suff` says, a tab when it says nothing, for each gap, label, size and `w:legacy` value it
+  holds.
 - `corpus/numbering-cases/legacy-drawn` (786 rows, `word-gaps.json`): Word saved the case as PDF
   and each page was drawn at six pixels a point (`scripts/word_gaps.py`,
   `scripts/ink_bands.swift`), one row a paragraph on an exact line, label red, text blue. Over 674
