@@ -1012,8 +1012,9 @@ committed synthetic SmPC, copied byte for byte into `test/fixtures/certified-wor
   was drawn by, so `drawing.test.ts` holds it to that build (the recompute's bytes it names,
   frozen as `smpc.recompute.json`, its request, and dev's pins with `word-drawing/1.2.0`) and
   shows a later build finds it nowhere; `recompute.test.ts` holds the gate to a record made as
-  dev's build makes one for this build, signed by a key made for the test, until dev draws the
-  synthetic SmPC again after the deploy and that record is committed. The image is unchanged: the
+  dev's build makes one for this build, signed by a key made for the test (dev drew the synthetic
+  SmPC for this build on 2026-10-08, below; the tests keep the test key, since every reader or
+  builder version moves the path again). The image is unchanged: the
   code is mounted from the checkout.
 - `test/infra/word-drawing.test.ts`: the worker named the record bucket and `var.environment`.
   `test/ci/images.test.ts`: the worker image, and only it, copies the pins.
@@ -1029,7 +1030,7 @@ deployed worker is expected to be refused `certified-word-document-unbound`, whi
 the worker found under its own identity and verified with the key its image carries gives
 (the pull request's post-deploy steps).
 
-**Verified after the deploy (2026-10-08, main a00b4cd).** That run, through the deployed
+**Verified after the deploy (2026-10-08, main a00b4cd).** A run of the synthetic SmPC's submission, through the deployed
 worker under `ema-flow-workflow-dev`, answered HTTP 422 `certified-word-document-unbound`: step 5
 read the record under the worker's identity and verified it with the key its image carries.
 
@@ -1038,9 +1039,8 @@ request, so `fidelity-norm/3.4.0`'s build looks for the synthetic SmPC's record 
 request (key `48c680712be78fa7…`) was published once to `ema-flow-dev-word-drawing-requests` at
 02:33:40 UTC; the build succeeded and stored
 `word/48c68071…/a69dd51c…/1.json`, which `scripts/word-drawing/stored.py` accepts against
-`keys/dev/1.pem`, dev, key version 1, image `sha256:eff4827a…`, `word-drawing/1.2.1` and that
-request (exit 0, commit 1fa5212). The gate's tests keep their own record for the current build,
-signed by a test key, since every reader or builder version moves the path again.
+`src/render/word-drawing/keys/dev/1.pem`, dev, key version 1, image `sha256:eff4827a…`, `word-drawing/1.2.1` and that
+request (exit 0, commit 1fa5212).
 
 ## Build order, each change reviewed on its own
 
