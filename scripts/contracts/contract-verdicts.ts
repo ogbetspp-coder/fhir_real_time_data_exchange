@@ -39,7 +39,7 @@ const EXAMPLES: Readonly<Record<string, string>> = {
   ImageDigest: `sha256:${"0123456789abcdef".repeat(4)}`,
   IsoDateTime: "2026-09-28T12:30:05.250+02:00",
   LanguageTag: "en-GB",
-  NormalizationVersion: "fidelity-norm/3.5.0",
+  NormalizationVersion: "fidelity-norm/3.6.0",
   PackageRef: "hl7.fhir.uv.extensions.r5#5.3.0",
   PictureReference: "~/_entity/annotation/00000000-5979-4e74-8000-000000000009",
   PrincipalId: "urn:reviewer:synthetic-01",

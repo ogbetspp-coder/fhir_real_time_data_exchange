@@ -1054,6 +1054,13 @@ build finds the record for `word-epi/1.4.0` nowhere; the tests keep the test key
 dev's image is unchanged (the code is mounted from the checkout). Dev drew the synthetic SmPC again
 for this build after the deploy, as for 1.4.0 (the record below).
 
+**`word-epi/1.6.0` (`fidelity-norm/3.6.0`, 2026-10-09).** The builder's version moves the
+request's path again, and the drawing's version (`word-drawing/1.2.5`) its drawing id, so this
+build finds the record for `word-epi/1.5.0` or `1.5.1` nowhere; the tests keep the test key, as above, and
+dev's image is unchanged (the code is mounted from the checkout). The builder's version moves
+with the scanner it reads (section 5's half-life forms); the drawing check's rules do not change.
+The synthetic SmPC's request is to be published again after the deploy, as for 1.5.0.
+
 ## Build order, each change reviewed on its own
 
 1. **Measure first** (partly done 2026-10-07, above, in "Step 1": the corpus with the pinned

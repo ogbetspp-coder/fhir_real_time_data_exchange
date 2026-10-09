@@ -548,6 +548,18 @@ const WORD_GRID_NARRATIVE = div(
     "</table><p>Take with food.  </p>",
 );
 
+// fidelity-norm/3.6.0's half-lives: as zone_a.word_epi builds them (below).
+const WORD_HALF_LIFE_PAGE =
+  "\nHalf-lives: T½ 12 h, t½α 1.5 h, t½δ 4 h and t½ß 30 h.\n﷐\n" +
+  "﷒\t﷓\tPhase\t﷓\tHalf-life\n﷒\t﷓\tElimination\t﷓\tt½β 4 h\n" +
+  "﷑\n(T½) as above.\n";
+const WORD_HALF_LIFE_NARRATIVE = div(
+  "<p>Half-lives: T<sub>½</sub> 12 h, t<sub>½α</sub> 1.5 h, t<sub>½δ</sub> 4 h and " +
+    "t<sub>½ß</sub> 30 h.</p><table><tr><td><p>Phase</p></td><td><p>Half-life</p></td></tr>" +
+    "<tr><td><p>Elimination</p></td><td><p>t<sub>½β</sub> 4 h</p></td></tr></table>" +
+    "<p>(T<sub>½</sub>) as above.</p>",
+);
+
 export const verifyCases: VerifyCase[] = [
   // A body boundary inside a line, or a body that excludes more than a header/footer could hold,
   // invalidates the page: the extractor-declared range is bounded, not trusted.
@@ -2963,6 +2975,32 @@ export const verifyCases: VerifyCase[] = [
     })(),
     expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
   },
+  // fidelity-norm/3.6.0: the half-life's letter may be "T", and ½ in the sub may be followed by a
+  // phase's letter (α, β, γ, δ) or ß. The page as zone_a.word_epi writes it from a read with
+  // half-lives in a paragraph, in a table cell and in brackets, and the narrative it builds from
+  // the same read. Reviewed by hand: each half-life lowered as Word lowers it, the letters kept.
+  {
+    name: "certified-word-half-lives",
+    input: (() => {
+      const source = wordSource(WORD_HALF_LIFE_PAGE);
+      return toInput(
+        source,
+        single("smpc.5.2", WORD_HALF_LIFE_NARRATIVE, [spanFor(source, 1, WORD_HALF_LIFE_PAGE)]),
+      );
+    })(),
+    expect: { status: "passed", sections: { "smpc.5.2": "verified" } },
+  },
+  // ... and against a narrative with β where the label writes ß: labels write ß for β, but the text
+  // holds what Word holds, and it fails.
+  {
+    name: "certified-word-half-life-sharp-s-as-beta",
+    input: (() => {
+      const moved = WORD_HALF_LIFE_NARRATIVE.replace("t<sub>½ß</sub> 30 h", "t<sub>½β</sub> 30 h");
+      const source = wordSource(WORD_HALF_LIFE_PAGE);
+      return toInput(source, single("smpc.5.2", moved, [spanFor(source, 1, WORD_HALF_LIFE_PAGE)]));
+    })(),
+    expect: { status: "failed", sections: { "smpc.5.2": "mismatch" } },
+  },
 ];
 
 export const throwCases: ThrowCase[] = [
@@ -3971,6 +4009,189 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "rejects-sub-half-after-lowered-t",
     input: div("<p><sub>t</sub><sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  // fidelity-norm/3.6.0: the half-life's letter may be `T`, under the same word-start rule, and
+  // ½ in the `sub` may be followed by a phase's letter, α, β, γ or δ, or by ß, which labels write
+  // for β: none is part of a number or a unit. Not μ, the micro prefix, nor any other Greek
+  // letter. Everything else stands.
+  {
+    name: "sub-half-life-capital-t-kept",
+    input: div("<p>the T<sub>½</sub> was 4 hours (T<sub>½</sub>)</p>"),
+    expected: "\n\nthe T½ was 4 hours (T½)\n\n",
+  },
+  {
+    name: "sub-half-life-phase-letter-kept",
+    input: div("<p>t<sub>½α</sub> and t<sub>½β</sub>; (T<sub>½γ</sub>), t<sub>½δ</sub>.</p>"),
+    expected: "\n\nt½α and t½β; (T½γ), t½δ.\n\n",
+  },
+  {
+    name: "sub-half-life-sharp-s-kept",
+    input: div(
+      "<table><tr><td>t<sub>½ß</sub></td><td><em>T</em><sub>½ß</sub> 30 h</td></tr></table>",
+    ),
+    expected: "\n\n﷐\n﷒\t﷓\tt½ß\t\t﷓\tT½ß 30 h\t\n\n﷑\n\n",
+  },
+  {
+    name: "sub-half-life-phase-letter-references-kept",
+    input: div("<p>t<sub>&#189;&#x3B2;</sub> and t<sub>½&#948;</sub></p>"),
+    expected: "\n\nt½β and t½δ\n\n",
+  },
+  {
+    name: "rejects-sub-half-after-capital-t-in-word",
+    input: div("<p>AT<sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-capital-t-after-digit",
+    input: div("<p>2T<sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-lowered-capital-t",
+    input: div("<p><sub>T</sub><sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-fullwidth-capital-t",
+    input: div("<p>Ｔ<sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-roman-capital",
+    input: div("<p>V<sub>½</sub> and I<sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-two-phase-letters",
+    input: div("<p>t<sub>½αβ</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-then-digit",
+    input: div("<p>t<sub>½1</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-space-phase-letter",
+    input: div("<p>t<sub>½ α</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-phase-letter-before-half",
+    input: div("<p>t<sub>α½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-then-capital-greek",
+    input: div("<p>t<sub>½Β</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-then-greek-below-alpha",
+    input: div("<p>t<sub>½ΰ</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    // μ, the micro prefix: "T½μ g" is no half-life.
+    name: "rejects-sub-half-then-micro",
+    input: div("<p>T<sub>½μ</sub> g</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-then-micro-sign",
+    input: div("<p>t<sub>½\u00b5</sub> g</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-then-micro-reference",
+    input: div("<p>t<sub>&#189;&#x3BC;</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    // ε, just past δ.
+    name: "rejects-sub-half-then-epsilon",
+    input: div("<p>t<sub>½ε</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-then-lambda",
+    input: div("<p>t<sub>½λ</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-then-pi",
+    input: div("<p>t<sub>½π</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-then-final-sigma",
+    input: div("<p>t<sub>½ς</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-then-omega",
+    input: div("<p>t<sub>½ω</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-then-greek-above-omega",
+    input: div("<p>t<sub>½ϊ</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-then-beta-symbol",
+    input: div("<p>t<sub>½ϐ</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-then-subscript-beta",
+    input: div("<p>t<sub>½ᵦ</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-then-latin-letter",
+    input: div("<p>t<sub>½b</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-then-capital-sharp-s",
+    input: div("<p>t<sub>½ẞ</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-phase-letter-then-letter",
+    input: div("<p>t<sub>½β</sub>x</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-phase-letter-then-digit",
+    input: div("<p>t<sub>½β</sub>2</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-then-lowered-phase-letter",
+    input: div("<p>t<sub>½</sub><sub>β</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-then-phase-letter-outside",
+    input: div("<p>t<sub>½</sub>β</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-phase-letter-after-digit",
+    input: div("<p>2<sub>½β</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sup-half-after-capital-t",
+    input: div("<p>T<sup>½</sup></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sup-half-phase-letter",
+    input: div("<p>t<sup>½β</sup></p>"),
     expected: { error: "unmappable-script" },
   },
   // Checked after the scan: an error the scan finds later wins, and it comes before

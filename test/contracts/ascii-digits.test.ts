@@ -26,7 +26,7 @@ const DIGIT_CASES: [
   string,
 ][] = [
   ["PackageRef", PackageRef, "hl7.terminology.r5#7.3.0", "hl7.terminology.r5#7.3.D"],
-  ["NormalizationVersion", NormalizationVersion, "fidelity-norm/3.5.0", "fidelity-norm/3.5.D"],
+  ["NormalizationVersion", NormalizationVersion, "fidelity-norm/3.6.0", "fidelity-norm/3.6.D"],
   ["IsoDateTime", IsoDateTime, "2026-09-28T00:00:03Z", "2026-09-28T00:00:0DZ"],
   ["HttpUrl", HttpUrl, "https://example.org:8443/a", "https://example.org:844D/a"],
   ["TargetPath", TargetPath, "Composition.section[3]", "Composition.section[D]"],

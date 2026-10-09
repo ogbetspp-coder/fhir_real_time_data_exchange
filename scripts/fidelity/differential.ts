@@ -555,12 +555,19 @@ function scriptText(random: Random, classes: Set<string>): string {
 // drawn from forms on both sides of that rule.
 const HALF_BEFORE = [
   ...["t", "T", "x", "(t", "<em>t</em>", "<b>t</b>", "\u00e9", "t&#x2060;", "", "1", "-", " "],
+  // fidelity-norm/3.6.0: `T` starts a word as `t` does; not after a letter.
+  ...["(T", "AT"],
   ...["&#x2082;", "log\u2099", "log<sub>n</sub>", "t<sup>2</sup>", "&#x1878;", "2\u02b9"],
   ...["1\u00aa", "\u4e8c", "&#x1D4C9;", "</p><p>t"],
   ...["log", "VIII", "0xA", "log<sub>2</sub>t", "2t", "at", "&#x74;", "<sub>t</sub>", "<br/>t"],
   ...[" t", "the t", "2(t", "x t", "&#9;t"],
 ];
-const HALF_CONTENT = ["½", "&#189;", "&#xBD;", "½ ", "2½", "½½", "-½"];
+// fidelity-norm/3.6.0: ½ and a phase's letter (α, β, γ, δ) or ß; not μ, two letters, a space or
+// a digit.
+const HALF_CONTENT = [
+  ...["½", "&#189;", "&#xBD;", "½ ", "2½", "½½", "-½"],
+  ...["½β", "&#189;&#x3B4;", "½ß", "½μ", "½αβ", "½ α", "½1"],
+];
 const HALF_AFTER = [
   ...["", " x", ")", ".", ",", ";", ":", "x", "2", "&#x2060;2", "<sub>2</sub>", "<sup>+</sup>"],
   ...["<sub>n</sub>", "\u207f", "&#x200A;<sub>2</sub>", "&#x2800;2", "&#x301;", " t<sub>½</sub>"],

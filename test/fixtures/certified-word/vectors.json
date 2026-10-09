@@ -2,34 +2,34 @@
   "imports": [
     {
       "name": "smpc",
-      "resultSha256": "088e1f4aab14b9a19d8eb39d00f5ff8e5e1b41d2a6274793c2bb69ac12930989",
+      "resultSha256": "5f2f0c97659a6a4a621cd0bb569bebb30ffd8b8fcae06e3cf7179357674a1887",
       "outcome": {
         "imported": {
-          "submissionSha256": "e6fcf880545808dd1e25e61f3045b3211e7d19c5fdbf77fcdfb28cbe49a2b109",
-          "sourceTextSha256": "f62695f034a8aa2d3bc66c1037211719d261d6d75aac0b0b272be4ba2273b2ed",
-          "reportSha256": "099d6658feb7d40704a9e52a39188b210cbf07baf6ad92f76b42d058f2722308"
+          "submissionSha256": "fbe46465e72d711009cd4a19c64b0a5f62bb832ea9ec3bdbd4a223fede164225",
+          "sourceTextSha256": "66c055d6243e35777d11d4d091b456ec6e38ac664584218f4829b53674c280e0",
+          "reportSha256": "0e259553e589a7f8d4e8a9181c5a4d896c5c673bba30263709f69b04194f707d"
         }
       }
     },
     {
       "name": "smpc-tracked",
-      "resultSha256": "a562f175b1c6615a5202b3d3956ea0fec30856006c0714fc1bc94175cf51a65b",
+      "resultSha256": "9e7c2ea36f63e70c376c5463d022c6d4c5c2670dd8c3e7460dc4ae214005b888",
       "outcome": {
         "imported": {
-          "submissionSha256": "b8fb6fbe1a103a99bf8492025766e9fb5ade5e3455607053c060f2da052917d6",
-          "sourceTextSha256": "45163c16e2c4915402fea494284c209d10006296429dff0cf32b6d369fc44ba1",
-          "reportSha256": "6619b04ff3d896d96d56702b8b37e760a35f21e56244397224f3f18aa19fb00a"
+          "submissionSha256": "37a1717734353e14f5b2e78d6466b4d328fe99017f983c2284db72a4e8b17781",
+          "sourceTextSha256": "6f80e26ec5385c2eb6d5cec398731d371485ba4f75d28c25a25afb169cdcea5e",
+          "reportSha256": "1b47b958612c5bcbc7da6cd262ab83801c5104a56da5987ecc3ea5be9f98184a"
         }
       }
     },
     {
       "name": "smpc-assigned",
-      "resultSha256": "d59c2fe3a2a82bb0fcacf657176cea0434360402933f7724199c68b67b9dfa44",
+      "resultSha256": "50b568bed14ca571adf1c3d7de6ffc6b91b525cf4a50e369ca948aab0af7060d",
       "outcome": {
         "imported": {
-          "submissionSha256": "4a6033f53c8e639db7eabfa360553ca3eaefbee23c72438028babf0a7f6564b6",
-          "sourceTextSha256": "f62695f034a8aa2d3bc66c1037211719d261d6d75aac0b0b272be4ba2273b2ed",
-          "reportSha256": "099d6658feb7d40704a9e52a39188b210cbf07baf6ad92f76b42d058f2722308"
+          "submissionSha256": "6cdaa0467bf7da94b4bec2590379ff1ba0da9fdb74fc2a81708d9c31270a8477",
+          "sourceTextSha256": "66c055d6243e35777d11d4d091b456ec6e38ac664584218f4829b53674c280e0",
+          "reportSha256": "0e259553e589a7f8d4e8a9181c5a4d896c5c673bba30263709f69b04194f707d"
         }
       }
     },
@@ -42,74 +42,74 @@
     },
     {
       "name": "pl",
-      "resultSha256": "fdf9c2f32de610c279cb5917da612335cc5f291692efb2c89c2380048c938d6a",
+      "resultSha256": "4a2ef4728cb31a295ca7c45af8fbad933d1edc28756690dbbfab10a159645c36",
       "outcome": {
         "imported": {
-          "submissionSha256": "9aa0b6fbb0c20d2b5cd2b1ebec1119c85cdd74215853bda1861d4934c51be3aa",
-          "sourceTextSha256": "f6563f32dc2f7a18ca78b33e6f8d48446b4289c9356fb08f5fb5193d33d8517a",
-          "reportSha256": "f49b96cf8837ee0d76e499dccd455092153d3e0a889bcd53d18d96ed66be9213"
+          "submissionSha256": "fc1673e89e754e2be5cdae34b7326cc7ecbd0be8aac95b54e2285f5dc4307996",
+          "sourceTextSha256": "eb62844f8d36eafd61aa4f3bbc7cd0462112133dfb1dc7f317a2f0bce6777391",
+          "reportSha256": "18c654aa972848870e4957c13928cdaf18301a0777c01d47af431deb29c1fe19"
         }
       }
     },
     {
       "name": "smpc-other-versions",
-      "resultSha256": "b75b6b5f5b0884f1daa5479428f1ad5cd64f82a0ea9aba3ba732a37f760ed2a4",
+      "resultSha256": "0d1572dcc3f80ec19de653e519906fafdcd1ef37f4c310bf6d9c638eae70bf2b",
       "outcome": {
         "refused": "binding: other-versions"
       }
     },
     {
       "name": "smpc-sections-swapped",
-      "resultSha256": "42c7e4da8a4fcc2254b8274ab1783de1f82c7d47e3ea7b58174bdf58a20d5ae7",
+      "resultSha256": "844c1551af3697d0a09c009cbae502563b4d8af8f9328b9377396f3fbc1a3856",
       "outcome": {
         "refused": "tree: section-tree-differs"
       }
     },
     {
       "name": "smpc-title-of-two-lines",
-      "resultSha256": "19a00c4c6fd8ec6538f2300dd5f25846b308ffc383163ea8f39d22987838a158",
+      "resultSha256": "d096841690b19cda8f71b5da3619a1cb563c58d55955ed0ac9fb1afe05e6f3d5",
       "outcome": {
         "refused": "titles: title-not-one-line"
       }
     },
     {
       "name": "smpc-narrative-not-the-page",
-      "resultSha256": "83d15a28e1fc049730ec7fa61566cba56e9d5c4e0c9b347d23d720b6b2d7800f",
+      "resultSha256": "e32b9d4b1a520a3afa656797864992b997ba7ab480712d7a54d8a1a296a73c55",
       "outcome": {
         "refused": "narrative: narrative-differs-from-page"
       }
     },
     {
       "name": "smpc-name-retyped",
-      "resultSha256": "088e1f4aab14b9a19d8eb39d00f5ff8e5e1b41d2a6274793c2bb69ac12930989",
+      "resultSha256": "5f2f0c97659a6a4a621cd0bb569bebb30ffd8b8fcae06e3cf7179357674a1887",
       "outcome": {
         "refused": "product: name-not-in-section-1"
       }
     },
     {
       "name": "smpc-a-number-left-out",
-      "resultSha256": "088e1f4aab14b9a19d8eb39d00f5ff8e5e1b41d2a6274793c2bb69ac12930989",
+      "resultSha256": "5f2f0c97659a6a4a621cd0bb569bebb30ffd8b8fcae06e3cf7179357674a1887",
       "outcome": {
         "refused": "product: eu-numbers-differ"
       }
     },
     {
       "name": "pl-name-retyped",
-      "resultSha256": "fdf9c2f32de610c279cb5917da612335cc5f291692efb2c89c2380048c938d6a",
+      "resultSha256": "4a2ef4728cb31a295ca7c45af8fbad933d1edc28756690dbbfab10a159645c36",
       "outcome": {
         "refused": "product: name-not-in-section-1"
       }
     },
     {
       "name": "pl-holder-retyped",
-      "resultSha256": "fdf9c2f32de610c279cb5917da612335cc5f291692efb2c89c2380048c938d6a",
+      "resultSha256": "4a2ef4728cb31a295ca7c45af8fbad933d1edc28756690dbbfab10a159645c36",
       "outcome": {
         "refused": "product: holder-not-in-section-6"
       }
     },
     {
       "name": "pl-a-number-confirmed",
-      "resultSha256": "fdf9c2f32de610c279cb5917da612335cc5f291692efb2c89c2380048c938d6a",
+      "resultSha256": "4a2ef4728cb31a295ca7c45af8fbad933d1edc28756690dbbfab10a159645c36",
       "outcome": {
         "refused": "product: eu-numbers-not-in-leaflet"
       }

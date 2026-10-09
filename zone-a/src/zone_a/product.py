@@ -28,7 +28,7 @@ from typing import Any, Final
 
 from label_docx.reader import Paragraph
 
-PRODUCT_VERSION: Final = "product/1.0.11"
+PRODUCT_VERSION: Final = "product/1.0.12"
 
 # A number standing alone: after the start, whitespace or one of ",;:(", and before the end,
 # whitespace or one of ",;:.()". Anything else next to it (a dash, a letter, a slash) leaves it

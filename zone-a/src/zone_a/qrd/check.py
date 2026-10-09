@@ -108,7 +108,7 @@ from zone_a.underline import underline_changes
 # The version of the rules in this module and in headings.py, pattern.py and zone_a.underline.
 # A change to any of them changes its hash in versions.lock.json, and
 # tests/test_versions_lock.py then requires a new version here.
-CHECKER_VERSION = "qrd-check/1.6.2"
+CHECKER_VERSION = "qrd-check/1.6.3"
 SIMILARITY = 0.85
 MIN_LITERAL = 12
 FILL_LIMIT = 300
