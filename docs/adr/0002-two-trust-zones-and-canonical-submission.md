@@ -253,7 +253,7 @@ agent of its source files (each named by the authority's id and by hash), the re
 
 _Decided, not implemented: `NORMALIZATION_VERSION` is `fidelity-norm/3.7.0` (3.2.0 qualified a
 certified Word source, 3.3.0 carries its grey, 3.4.0 widens its typed labels and 3.5.0 its grids
-and tabs, ADR 0006, 3.6.0 the half-life's forms and 3.7.0 its pattern grey and nudges; this
+and tabs, ADR 0006, 3.6.0 the half-life's forms and 3.7.0 its pattern grey; this
 design takes the next minor, 3.8.0)
 and no contract has a withheld status. It lands with 3c-W, deferred until after the demo (`docs/roadmap.md`, 3a)._
 

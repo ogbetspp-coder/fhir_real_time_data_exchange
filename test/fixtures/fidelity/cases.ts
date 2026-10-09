@@ -560,13 +560,14 @@ const WORD_HALF_LIFE_NARRATIVE = div(
     "<p>(T<sub>½</sub>) as above.</p>",
 );
 
-// fidelity-norm/3.7.0's pattern grey and nudges: as zone_a.word_epi builds them (the vectors below).
-const WORD_NUDGE_PAGE =
-  "\nReport side effects via the national system.\nTake 2 tablets a day.\n﷐\n" +
-  "﷒\t﷓\tDose\t﷓\t10 mg\n﷑\n";
-const WORD_NUDGE_NARRATIVE = div(
+// fidelity-norm/3.7.0's 15% pattern grey: as zone_a.word_epi builds it (the vectors below).
+const WORD_PATTERN_PAGE =
+  "\nReport side effects via the national system.\nKeep out of the sight and reach of children.\n" +
+  "﷐\n﷒\t﷓\tDose\t﷓\t10 mg\n﷑\n";
+const WORD_PATTERN_NARRATIVE = div(
   '<p>Report side effects <span style="background-color: silver;">via the national system' +
-    "</span>.</p><p>Take 2 tablets a day.</p><table><tr><td><p>Dose</p></td><td><p>" +
+    '</span>.</p><p><span style="background-color: silver;">Keep out of the sight and reach of ' +
+    "children.</span></p><table><tr><td><p>Dose</p></td><td><p>" +
     '<span style="background-color: silver;">10 mg</span></p></td></tr></table>',
 );
 
@@ -3012,30 +3013,33 @@ export const verifyCases: VerifyCase[] = [
     expect: { status: "failed", sections: { "smpc.5.2": "mismatch" } },
   },
   // fidelity-norm/3.7.0: a 15% pattern of the automatic colour on an automatic or white fill is
-  // the template's grey, which Word draws as D9D9D9; a full-size run raised or lowered by at most
-  // a point is left out (ADR 0006, owner decision 13). The page as zone_a.word_epi writes it from
-  // a read with a pattern grey in a paragraph and a cell, the "2" raised a point and "a day" and
-  // "mg" lowered half a point, at their paragraph's size, and the narrative it builds from the
-  // same read. Reviewed by hand: the grey the silver span, no shift written on either side.
+  // the template's grey, which Word prints as D9D9D9. The page as zone_a.word_epi writes it from a
+  // read with the pattern over a run (on an automatic fill), over a whole paragraph and in a table
+  // cell (on a white fill), and the narrative it builds from the same read. Reviewed by hand: the
+  // grey the silver span, the page unmarked, every word in place.
   {
-    name: "certified-word-pattern-grey-and-nudges",
+    name: "certified-word-pattern-grey",
     input: (() => {
-      const source = wordSource(WORD_NUDGE_PAGE);
+      const source = wordSource(WORD_PATTERN_PAGE);
       return toInput(
         source,
-        single("smpc.4.8", WORD_NUDGE_NARRATIVE, [spanFor(source, 1, WORD_NUDGE_PAGE)]),
+        single("smpc.4.8", WORD_PATTERN_NARRATIVE, [spanFor(source, 1, WORD_PATTERN_PAGE)]),
       );
     })(),
     expect: { status: "passed", sections: { "smpc.4.8": "verified" } },
   },
-  // ... and against a narrative that draws the nudged "2" as a superscript: a nudge is no
-  // exponent, and it fails.
+  // ... and against a narrative that leaves the grey paragraph out, as a renderer that hides the
+  // template's "not printed" text would: grey text is text, and it fails.
   {
-    name: "certified-word-nudge-as-superscript",
+    name: "certified-word-pattern-grey-dropped",
     input: (() => {
-      const moved = WORD_NUDGE_NARRATIVE.replace("Take 2 tablets", "Take <sup>2</sup> tablets");
-      const source = wordSource(WORD_NUDGE_PAGE);
-      return toInput(source, single("smpc.4.8", moved, [spanFor(source, 1, WORD_NUDGE_PAGE)]));
+      const dropped = WORD_PATTERN_NARRATIVE.replace(
+        '<p><span style="background-color: silver;">Keep out of the sight and reach of children.' +
+          "</span></p>",
+        "",
+      );
+      const source = wordSource(WORD_PATTERN_PAGE);
+      return toInput(source, single("smpc.4.8", dropped, [spanFor(source, 1, WORD_PATTERN_PAGE)]));
     })(),
     expect: { status: "failed", sections: { "smpc.4.8": "mismatch" } },
   },

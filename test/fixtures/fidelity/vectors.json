@@ -17760,7 +17760,7 @@
       }
     },
     {
-      "name": "certified-word-pattern-grey-and-nudges",
+      "name": "certified-word-pattern-grey",
       "input": {
         "normalizationVersion": "fidelity-norm/3.7.0",
         "source": {
@@ -17768,9 +17768,9 @@
           "pages": [
             {
               "page": 1,
-              "text": "\nReport side effects via the national system.\nTake 2 tablets a day.\n﷐\n﷒\t﷓\tDose\t﷓\t10 mg\n﷑\n",
+              "text": "\nReport side effects via the national system.\nKeep out of the sight and reach of children.\n﷐\n﷒\t﷓\tDose\t﷓\t10 mg\n﷑\n",
               "bodyStart": 0,
-              "bodyEnd": 89
+              "bodyEnd": 112
             }
           ]
         },
@@ -17778,7 +17778,7 @@
           {
             "sourceKey": "smpc.4.8",
             "path": "Composition.section[0].section[0]",
-            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Report side effects <span style=\"background-color: silver;\">via the national system</span>.</p><p>Take 2 tablets a day.</p><table><tr><td><p>Dose</p></td><td><p><span style=\"background-color: silver;\">10 mg</span></p></td></tr></table></div>"
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Report side effects <span style=\"background-color: silver;\">via the national system</span>.</p><p><span style=\"background-color: silver;\">Keep out of the sight and reach of children.</span></p><table><tr><td><p>Dose</p></td><td><p><span style=\"background-color: silver;\">10 mg</span></p></td></tr></table></div>"
           }
         ],
         "provenance": [
@@ -17788,20 +17788,20 @@
               {
                 "page": 1,
                 "startOffset": 0,
-                "endOffset": 89,
-                "textSha256": "255f7654d03d11b69f3975ed876ea804438ee760aa92a8d63305afb4d867cb44"
+                "endOffset": 112,
+                "textSha256": "6c195305c616bcc097135c0d9b6407ed19cfa06bbd8e919c530dd59d03d9ec0b"
               }
             ],
-            "narrativeDivSha256": "9b8eae4b5c7a339ec790ac686cc79958a5197141f94510003ed3c7c0d732aef8",
-            "normalizedTextSha256": "5940f7922afcd83d36b72c67bd060038e9d657e76d4c8cc578efd7e68adefb0f"
+            "narrativeDivSha256": "ee7c7c4d0819c7f7865b5d6e5df534c2106ace36b02742787588c7001cb7116d",
+            "normalizedTextSha256": "2c31c669b41c02f7c63914dce421a2f9d78edb4d92be1cd8df9d80e6d19e56db"
           }
         ]
       },
       "expected": {
         "reportVersion": "1.0.0",
         "normalizationVersion": "fidelity-norm/3.7.0",
-        "extractedTextSha256": "29fd70ac018b437dd0ac53608fe1649eaafc27ebadb972027dacf8dd662491db",
-        "narrativeBindingSha256": "77854551ac8e209c9330daa0b6814766a28630a0f869ac6f9780e88a4b8fb59b",
+        "extractedTextSha256": "3914e5f4c25afaa868070c10733f0031c9fb92dd931a05dcde6927dbbcebe2f7",
+        "narrativeBindingSha256": "da8dcc665dc9c7260546f5a53773922d211fb252aeec8518b0a144cf5d83fe8f",
         "status": "passed",
         "sections": [
           {
@@ -17809,7 +17809,7 @@
             "path": "Composition.section[0].section[0]",
             "status": "verified",
             "spanCount": 1,
-            "normalizedTextSha256": "5940f7922afcd83d36b72c67bd060038e9d657e76d4c8cc578efd7e68adefb0f"
+            "normalizedTextSha256": "2c31c669b41c02f7c63914dce421a2f9d78edb4d92be1cd8df9d80e6d19e56db"
           }
         ],
         "issues": [],
@@ -17818,16 +17818,16 @@
           "verified": 1
         },
         "coverage": {
-          "pageCodePoints": 89,
-          "bodyCodePoints": 89,
-          "coveredCodePoints": 89,
+          "pageCodePoints": 112,
+          "bodyCodePoints": 112,
+          "coveredCodePoints": 112,
           "uncoveredGaps": 0
         },
-        "reportHash": "7c489b4b9b460d96154605f0ca3d78f4e6c63eb083f1476524c5c23a852d8904"
+        "reportHash": "09b2f5c5fcef305708c16933ca620d961d900d8c4fd1975a5bdede55ad7ecf43"
       }
     },
     {
-      "name": "certified-word-nudge-as-superscript",
+      "name": "certified-word-pattern-grey-dropped",
       "input": {
         "normalizationVersion": "fidelity-norm/3.7.0",
         "source": {
@@ -17835,9 +17835,9 @@
           "pages": [
             {
               "page": 1,
-              "text": "\nReport side effects via the national system.\nTake 2 tablets a day.\n﷐\n﷒\t﷓\tDose\t﷓\t10 mg\n﷑\n",
+              "text": "\nReport side effects via the national system.\nKeep out of the sight and reach of children.\n﷐\n﷒\t﷓\tDose\t﷓\t10 mg\n﷑\n",
               "bodyStart": 0,
-              "bodyEnd": 89
+              "bodyEnd": 112
             }
           ]
         },
@@ -17845,7 +17845,7 @@
           {
             "sourceKey": "smpc.4.8",
             "path": "Composition.section[0].section[0]",
-            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Report side effects <span style=\"background-color: silver;\">via the national system</span>.</p><p>Take <sup>2</sup> tablets a day.</p><table><tr><td><p>Dose</p></td><td><p><span style=\"background-color: silver;\">10 mg</span></p></td></tr></table></div>"
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Report side effects <span style=\"background-color: silver;\">via the national system</span>.</p><table><tr><td><p>Dose</p></td><td><p><span style=\"background-color: silver;\">10 mg</span></p></td></tr></table></div>"
           }
         ],
         "provenance": [
@@ -17855,20 +17855,20 @@
               {
                 "page": 1,
                 "startOffset": 0,
-                "endOffset": 89,
-                "textSha256": "255f7654d03d11b69f3975ed876ea804438ee760aa92a8d63305afb4d867cb44"
+                "endOffset": 112,
+                "textSha256": "6c195305c616bcc097135c0d9b6407ed19cfa06bbd8e919c530dd59d03d9ec0b"
               }
             ],
-            "narrativeDivSha256": "b883538efaef9b98cd777e3ef95f3856bcf6f3ff662e6280fd372bfe612c239a",
-            "normalizedTextSha256": "b0dfbd65580320ca7fa671950a41de24065bf50eaae2dcb213cdd20be71ba646"
+            "narrativeDivSha256": "dbd6ac68cf988d7e0e39ce37f94fc5a455ae5de1f78be0ff7f8d228a850a04d3",
+            "normalizedTextSha256": "f4f7c3f0dcd1d090884bfdbef56898e6aab814c8bc9c1fdc035c81ecf29e4307"
           }
         ]
       },
       "expected": {
         "reportVersion": "1.0.0",
         "normalizationVersion": "fidelity-norm/3.7.0",
-        "extractedTextSha256": "29fd70ac018b437dd0ac53608fe1649eaafc27ebadb972027dacf8dd662491db",
-        "narrativeBindingSha256": "d68baac59d90ac9f9a55b79f8bd4219608332e5c0f49fd00f5d53a820b5af9bc",
+        "extractedTextSha256": "3914e5f4c25afaa868070c10733f0031c9fb92dd931a05dcde6927dbbcebe2f7",
+        "narrativeBindingSha256": "d56fb943a293245c99687c1f3927d5bc4dbb6e56fa3cfd4d34b0b3972b4f42f7",
         "status": "failed",
         "sections": [
           {
@@ -17877,16 +17877,16 @@
             "status": "mismatch",
             "spanCount": 1,
             "details": {
-              "expectedLength": 87,
-              "actualLength": 87,
-              "firstDifferingOffset": 50,
-              "commonSuffixLength": 36,
-              "expectedWordCount": 20,
-              "actualWordCount": 20,
-              "expectedSha256": "5940f7922afcd83d36b72c67bd060038e9d657e76d4c8cc578efd7e68adefb0f",
-              "actualSha256": "b0dfbd65580320ca7fa671950a41de24065bf50eaae2dcb213cdd20be71ba646"
+              "expectedLength": 110,
+              "actualLength": 65,
+              "firstDifferingOffset": 45,
+              "commonSuffixLength": 20,
+              "expectedWordCount": 24,
+              "actualWordCount": 15,
+              "expectedSha256": "2c31c669b41c02f7c63914dce421a2f9d78edb4d92be1cd8df9d80e6d19e56db",
+              "actualSha256": "f4f7c3f0dcd1d090884bfdbef56898e6aab814c8bc9c1fdc035c81ecf29e4307"
             },
-            "normalizedTextSha256": "b0dfbd65580320ca7fa671950a41de24065bf50eaae2dcb213cdd20be71ba646"
+            "normalizedTextSha256": "f4f7c3f0dcd1d090884bfdbef56898e6aab814c8bc9c1fdc035c81ecf29e4307"
           }
         ],
         "issues": [],
@@ -17895,12 +17895,12 @@
           "verified": 0
         },
         "coverage": {
-          "pageCodePoints": 89,
-          "bodyCodePoints": 89,
+          "pageCodePoints": 112,
+          "bodyCodePoints": 112,
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "1ee3e0733aa4f5fdcf6d90ec8d18fdd5161f791bde998b8b0a668f1474553a61"
+        "reportHash": "c24d1cc3bc725ce65322416a6ef95b00145b02a5ee9c6d99d614bafcbbccd0d3"
       }
     }
   ],

@@ -294,8 +294,8 @@ trailing spaces, against its narrative and against one with an empty cell on the
 `sub`, and their near misses, μ among them (35 XHTML vectors), and a certified Word page with
 half-lives against its narrative and against one with β where the label writes ß (2 verify
 vectors; `docs/validation/changes/2026-10-08-fidelity-norm-3-6-0.md`). The 2 added by
-`fidelity-norm/3.7.0` pin a certified Word page with a 15% pattern grey and full-size runs nudged
-a point at most, against its narrative and against one that draws a nudged digit as a superscript
+`fidelity-norm/3.7.0` pin a certified Word page with a 15% pattern grey over a run, a paragraph
+and a table cell, against its narrative and against one that leaves the grey paragraph out
 (`docs/validation/changes/2026-10-09-fidelity-norm-3-7-0.md`).
 They are defined in
 `test/fixtures/fidelity/cases.ts` on the Zone B side, where the TypeScript defines the expected

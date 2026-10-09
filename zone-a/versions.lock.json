@@ -155,7 +155,7 @@
     "word-drawing/1.2.3": "6414f91a74072cdf75fc9a364828fb917599addb3068ebf9df0852f9e3fcea0f",
     "word-drawing/1.2.4": "4e4c1f3cd21772d3f801369dd1d533e64350ef72be1aee42abdc8e2c70a7abb6",
     "word-drawing/1.2.5": "58970d3705ab88f1dbc5f76c750880377b6d93b33c10a519131dd8bd69400f86",
-    "word-drawing/1.3.0": "e5ccbf40f8f81b64264a402a6dc5f8a7960740abc17e1abb17587ae3dcd94c96"
+    "word-drawing/1.2.6": "861c9e9a37ee26eedbd397b4364520fb268140df9211da658650384ceaae2192"
   },
   "word-epi": {
     "word-epi/1.0.0": "be254f42d394d190be7bb080cf4497db17fa3fe64569bf4d37633c96b7859b19",
@@ -172,6 +172,6 @@
     "word-epi/1.5.0": "82074dee7254ebd08b4a1bdd44c49dc8cd691e723a187dce5b0b535c40905269",
     "word-epi/1.5.1": "8d632b5e11ada011d931bafdf41a96c01fda427df273dff49f3a310660979c76",
     "word-epi/1.6.0": "af48940f8ba86302fb997eb8d3409cdd6603a261cccd3efae83edc4d3616fbed",
-    "word-epi/1.7.0": "591a10828efafe09eb3f9889e0574dc5f4fc8f6033a2e2abb80d76aad6446c1a"
+    "word-epi/1.7.0": "e775a8a55492b49ac13ae28ea230350adc56c4b56d7891cf081aa546e84f7782"
   }
 }

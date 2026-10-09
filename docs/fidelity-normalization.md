@@ -933,11 +933,15 @@ An extractor must:
   mark; from 3.4.0 so too C0C0C0 shading, which Word draws in the light grey highlight's colour
   by its own print (a solid fill is opaque; a theme fill is another reader mark). From 3.7.0 so
   too a 15% pattern of the automatic colour on an automatic or white fill
-  (`shading-pct15-AUTO-AUTO`, `shading-pct15-AUTO-FFFFFF`), which Word prints as exactly D9D9D9
-  on a white page, over a yellow cell and over a D9D9D9 paragraph alike (its own print,
-  2026-10-07: the automatic fill is opaque white), so as `shading-D9D9D9`; the reader spells a
-  pattern's theme colour or theme fill (`shading-pct15-THEME-...`, from `docx-reader/1.34.0`), so
-  an automatic colour is the automatic one. Any other
+  (`shading-pct15-AUTO-AUTO`, `shading-pct15-AUTO-FFFFFF`), a run's or a paragraph's, which Word
+  prints as exactly D9D9D9, so as `shading-D9D9D9`, wherever it was printed (its own print,
+  2026-10-07 and 2026-10-09: with the colour or the fill absent or auto, on a white page, over a
+  cell shaded FFFF00 or 000000, over a paragraph shaded D9D9D9, and on a page coloured FFFF00,
+  which Word does not print; the automatic fill is opaque white). The reader reports none of
+  those grounds on the text, so each is read as on a white page; what Word shows on screen over a
+  page colour is not measured. The reader spells a pattern's theme colour or theme fill
+  (`shading-pct15-THEME-...`, from `docx-reader/1.34.0`), so an automatic colour is the automatic
+  one. Any other
   highlight or shading refuses the section, a pattern included: another percentage, colour or
   fill, a theme's, and `shading-pct15-AUTO-D9D9D9`. From 3.5.0 a strike, a highlight of one of Word's sixteen colours (the reader marks
   `highlight-black` to `highlight-lightGray`, ST_HighlightColor but `none`) or a solid shading
@@ -947,13 +951,8 @@ An extractor must:
   over ten trailing U+0020, and a paragraph or a table cell of only such spaces, drew exactly the
   unmarked text; over spaces between words, or over trailing U+00A0, each drew). Any other such
   mark still refuses the section, a pattern's or a theme's shading over trailing spaces
-  included, which no print has shown (but the template's grey, carried wherever it stands). From
-  3.7.0 a run raised or lowered by `w:position` (the reader's `position<shift>-size<run>-in<paragraph>`,
-  in half-points) is left out, in a heading too, where the shift is at most 2 half-points (a
-  point) either way, the run's size is its paragraph's, and no code point of it is superscript
-  or subscript (ADR 0006, owner decision 13): the same characters, at the same size, on the same
-  line. Any other shift refuses the section: a larger one, a run smaller or larger than its
-  paragraph's text (a superscript typed by hand), or one with `vertAlign`. A list whose labels an HTML list without `start` or `type` cannot draw as Word does
+  included, which no print has shown (but the template's grey, carried wherever it stands). Text
+  raised or lowered by `w:position` still refuses the section, by any amount. A list whose labels an HTML list without `start` or `type` cannot draw as Word does
   (other than all "•", or "1.", "2.", ... from one) is written in the narrative as Word draws it,
   from 3.3.0: each item a `p` of its label, U+0020 and its text, which is the line the page already
   writes for it; in a table cell, where the page leaves a step 4 bullet glyph's label out, such
@@ -965,8 +964,8 @@ An extractor must:
   The extractor refuses the section where the read holds anything ADR 0006 decision 3's closed
   lists do not carry (`zone_a.word_epi` names each refusal): a mark other than bold, italic,
   superscript, subscript and the template's grey, except an underline that cannot change the text,
-  capitals over text they draw the same, from 3.5.0 a strike, a highlight or a solid shading
-  over trailing spaces and, from 3.7.0, a full-size shift of at most a point; a list label not followed by a tab or a space, or two
+  capitals over text they draw the same and, from 3.5.0, a strike, a highlight or a solid shading
+  over trailing spaces; a list label not followed by a tab or a space, or two
   list levels in the section; a picture the reader does not vouch for, over 1 MiB, or drawn by Word larger than its
   own size or out of its own proportions by more than 2%; a tab (but those written as U+0020
   above), a soft hyphen, U+2028 or U+2029,
@@ -1032,13 +1031,15 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
 ## 9. Version history
 
 - `fidelity-norm/3.7.0` (minor) — section 7's certified Word rule carries as the template's grey
-  the 15% pattern of the automatic colour on an automatic or white fill, which Word prints as
-  exactly D9D9D9 on any background (no new reading, by its own print; the reader spells a
-  pattern's theme colour from `docx-reader/1.34.0`), and leaves out a run raised or lowered by at
-  most a point at its paragraph's size, neither superscript nor subscript (ADR 0006, owner
-  decision 13). Every other pattern and shift still refuses the section. Two verify vectors are
-  added, reviewed by hand: a page with both against its narrative (passed), and the same page
-  against a narrative that draws the nudged digit as a superscript (failed). Sections 1 to 6 and
+  the 15% pattern of the automatic colour on an automatic or white fill, a run's or a
+  paragraph's, which Word prints as exactly D9D9D9 on every ground it was printed on (section 7;
+  no new reading, by its own print; the reader spells a pattern's theme colour from
+  `docx-reader/1.34.0`). Every other pattern still refuses the section. A rule leaving out a run
+  raised or lowered by a point, proposed with this version, was withdrawn: the reader names the
+  paragraph's size from its style, not the neighbouring text's (the change record). Two verify
+  vectors are added, reviewed by hand: a page with the pattern grey over a run, a paragraph and a
+  table cell against its narrative (passed), and the same page against a narrative that leaves the
+  grey paragraph out (failed). Sections 1 to 6 and
   the code point table do not change. The withheld section of an authority import
   (`docs/design/authority-import-withheld.md`, not built) moves to 3.8.0. The change record is
   `docs/validation/changes/2026-10-09-fidelity-norm-3-7-0.md`.

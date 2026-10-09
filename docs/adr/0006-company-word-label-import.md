@@ -428,29 +428,17 @@ Not owner decisions, each the same drawing (2026-10-08, the same change):
   in the body (SmPC) and 4 in cells (leaflets); black shading over whitespace in cells 6 times
   (SmPC) and 7 (leaflets).
 
-## Owner decision (2026-10-09)
+## The 15% pattern greys (2026-10-09)
 
-Taken as recommended under the owner's authorisation of 2026-10-08; **for the owner's review**.
-Section 7, `fidelity-norm/3.7.0`, `word-epi/1.7.0`; the change record is
-`docs/validation/changes/2026-10-09-fidelity-norm-3-7-0.md`.
-
-13. **A nudge is layout:** a run raised or lowered by `w:position` is left out, as an underline
-    that changes nothing is (in the narrative, the page and the drawing check, in a heading
-    too), where all of these hold: the shift is at most 2 half-points (a point) up or down; the
-    run's size is its paragraph's (the reader's `position±N-size<run>-in<paragraph>`,
-    `docx-reader/1.34.0`); and no code point of it is superscript or subscript. Every other
-    shift is still refused (`formatting`): a larger one, a run smaller or larger than its
-    paragraph's text (a superscript typed by hand is raised and smaller), or a shift with
-    `vertAlign`. Rationale: a full-size run moved up or down by at most a point reads as the
-    same characters on the same line; it cannot become an exponent, an index or a footnote mark,
-    which are smaller or moved further. Evidence (EMA's English Word PI cuts, internal, counts
-    only): shifts of -1 (1 941 uses), +2 (635) and +1 (197) dominate, and `formatting` on a
-    position blocks 21 SmPC files.
-
-Not an owner decision, the same change: **the 15% pattern greys** (`shading-pct15-AUTO-AUTO`,
-`shading-pct15-AUTO-FFFFFF`) are the template's grey, by decision 9's print: Word draws each as
-exactly #D9D9D9, `shading-D9D9D9`'s colour, on a white page, over a cell shaded FFFF00 and over a
-paragraph shaded D9D9D9 (Word for Mac to PDF, 2026-10-07; an automatic fill is opaque white). What
+Not an owner decision: **the 15% pattern greys** (`shading-pct15-AUTO-AUTO`,
+`shading-pct15-AUTO-FFFFFF`), a run's or a paragraph's, are the template's grey (section 7,
+`fidelity-norm/3.7.0`), by decision 9's print and its follow-up: Word prints each as exactly
+#D9D9D9, `shading-D9D9D9`'s colour, with the colour or the fill absent or auto, on a white page,
+over a cell shaded FFFF00 or 000000, over a paragraph shaded D9D9D9, and on a page coloured
+FFFF00, which it does not print (Word for Mac to PDF, 2026-10-07 and 2026-10-09,
+`zone-a/tests/fixtures/word-oracle/claude-edges-*`; an automatic fill is opaque white). The
+reader reports none of those grounds on the text; what Word shows on screen over a page colour
+is not measured, and no English EMA cut has a page colour. What
 held them back in 3.4.0 is gone: from `docx-reader/1.34.0` the reader spells a pattern's theme
 colour and theme fill (`shading-pct15-THEME-accent2-AUTO`, which Word draws #FCEBE0), so an
 automatic colour is the automatic one. Every other pattern stays refused: 10% or 20%, another

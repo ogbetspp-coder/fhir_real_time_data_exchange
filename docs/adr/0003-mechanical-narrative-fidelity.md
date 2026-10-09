@@ -187,7 +187,7 @@ reader sees without the check seeing it._
 
 _Decided, not implemented (ADR 0002's amendment of the same date): `NORMALIZATION_VERSION` is
 `fidelity-norm/3.7.0`: a certified Word source took 3.2.0, its grey 3.3.0, its typed labels
-3.4.0, its grids and tabs 3.5.0 and its pattern grey and nudges 3.7.0 (ADR 0006), and the
+3.4.0, its grids and tabs 3.5.0 and its pattern grey 3.7.0 (ADR 0006), and the
 half-life's forms 3.6.0; this design takes 3.8.0._
 
 The fidelity check covers "every section that carries the code and a `text.div`" except a
