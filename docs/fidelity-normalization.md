@@ -1,6 +1,6 @@
 # Narrative fidelity normalisation specification
 
-Version: `fidelity-norm/3.6.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
+Version: `fidelity-norm/3.7.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
 in section 9)
 
 This document is the language-neutral specification of the text normalisation and XHTML
@@ -931,11 +931,19 @@ An extractor must:
   The narrative carries the QRD template's grey (a light grey highlight or D9D9D9 shading) as a
   `span` styled `background-color: silver;` (section 5, from 3.3.0), which the page does not
   mark; from 3.4.0 so too C0C0C0 shading, which Word draws in the light grey highlight's colour
-  by its own print (a solid fill is opaque; a theme fill is another reader mark). Any other
-  highlight or shading refuses the section, a pattern included: Word prints 15% of the automatic
-  colour on an automatic or white fill as D9D9D9, but the reader does not yet spell a pattern's
-  theme colour, and what Word draws for an automatic fill over a painted cell or paragraph is not
-  on record. From 3.5.0 a strike, a highlight of one of Word's sixteen colours (the reader marks
+  by its own print (a solid fill is opaque; a theme fill is another reader mark). From 3.7.0 so
+  too a 15% pattern of the automatic colour on an automatic or white fill
+  (`shading-pct15-AUTO-AUTO`, `shading-pct15-AUTO-FFFFFF`), a run's or a paragraph's, which Word
+  prints as exactly D9D9D9, so as `shading-D9D9D9`, wherever it was printed (its own print,
+  2026-10-07 and 2026-10-09: with the colour or the fill absent or auto, on a white page, over a
+  cell shaded FFFF00 or 000000, over a paragraph shaded D9D9D9, and on a page coloured FFFF00,
+  which Word does not print; the automatic fill is opaque white). The reader reports none of
+  those grounds on the text, so each is read as on a white page; what Word shows on screen over a
+  page colour is not measured. The reader spells a pattern's theme colour or theme fill
+  (`shading-pct15-THEME-...`, from `docx-reader/1.34.0`), so an automatic colour is the automatic
+  one. Any other
+  highlight or shading refuses the section, a pattern included: another percentage, colour or
+  fill, a theme's, and `shading-pct15-AUTO-D9D9D9`. From 3.5.0 a strike, a highlight of one of Word's sixteen colours (the reader marks
   `highlight-black` to `highlight-lightGray`, ST_HighlightColor but `none`) or a solid shading
   (`shading-` and six hex digits, a clear pattern's fill) is left out where every code point from
   its start to the paragraph's end is U+0020: Word paints nothing over trailing spaces, by its
@@ -943,7 +951,8 @@ An extractor must:
   over ten trailing U+0020, and a paragraph or a table cell of only such spaces, drew exactly the
   unmarked text; over spaces between words, or over trailing U+00A0, each drew). Any other such
   mark still refuses the section, a pattern's or a theme's shading over trailing spaces
-  included, which no print has shown. A list whose labels an HTML list without `start` or `type` cannot draw as Word does
+  included, which no print has shown (but the template's grey, carried wherever it stands). Text
+  raised or lowered by `w:position` still refuses the section, by any amount. A list whose labels an HTML list without `start` or `type` cannot draw as Word does
   (other than all "•", or "1.", "2.", ... from one) is written in the narrative as Word draws it,
   from 3.3.0: each item a `p` of its label, U+0020 and its text, which is the line the page already
   writes for it; in a table cell, where the page leaves a step 4 bullet glyph's label out, such
@@ -1021,6 +1030,19 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
 
 ## 9. Version history
 
+- `fidelity-norm/3.7.0` (minor) — section 7's certified Word rule carries as the template's grey
+  the 15% pattern of the automatic colour on an automatic or white fill, a run's or a
+  paragraph's, which Word prints as exactly D9D9D9 on every ground it was printed on (section 7;
+  no new reading, by its own print; the reader spells a pattern's theme colour from
+  `docx-reader/1.34.0`). Every other pattern still refuses the section. A rule leaving out a run
+  raised or lowered by a point, proposed with this version, was withdrawn: the reader names the
+  paragraph's size from its style, not the neighbouring text's (the change record). Two verify
+  vectors are added, reviewed by hand: a page with the pattern grey over a run, a paragraph and a
+  table cell against its narrative (passed), and the same page against a narrative that leaves the
+  grey paragraph out (failed). Sections 1 to 6 and
+  the code point table do not change. The withheld section of an authority import
+  (`docs/design/authority-import-withheld.md`, not built) moves to 3.8.0. The change record is
+  `docs/validation/changes/2026-10-09-fidelity-norm-3-7-0.md`.
 - `fidelity-norm/3.6.0` (minor) — section 5's lowered-half rule also keeps `T<sub>½</sub>` (a
   `T` that starts a word, as a `t` does) and ½ followed in the `sub` by one of a phase's letters,
   α, β, γ or δ, or by ß, which labels write for β; none is read as part of a number or a unit. μ,
@@ -1032,7 +1054,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   with this version for tables a renderer draws with a column of no width, were withdrawn: Chrome
   still draws such a column at no width in a narrow container (the change record). The withheld
   section of an authority import (`docs/design/authority-import-withheld.md`, not built) moves to
-  3.7.0. The change record is `docs/validation/changes/2026-10-08-fidelity-norm-3-6-0.md`.
+  3.7.0 (and with 3.7.0 to 3.8.0). The change record is `docs/validation/changes/2026-10-08-fidelity-norm-3-6-0.md`.
 - `fidelity-norm/3.5.0` (minor) — section 7's certified Word rule lays a table's grid as the
   narrative does: the grid columns a row leaves out at its start or end are an empty cell (ADR
   0006, owner decision 10), and a grid column at which no cell starts is dropped (the HTML table
@@ -1055,7 +1077,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   narrative (passed), and the same page against a narrative with an empty cell on the wrong side
   of its value (failed). Sections 1 to 6 and the code point table do not change. The withheld
   section of an authority import (`docs/design/authority-import-withheld.md`, not built) moves
-  to 3.6.0 (and with 3.6.0 to 3.7.0). The change record is
+  to 3.6.0 (and with 3.6.0 to 3.7.0, with 3.7.0 to 3.8.0). The change record is
   `docs/validation/changes/2026-10-08-fidelity-norm-3-5-0.md`.
 - `fidelity-norm/3.4.0` (minor) — section 7's certified Word rule writes as U+0020 the tab after
   a typed label in a table cell as well as outside one, and a typed label is also U+2011, a
@@ -1068,7 +1090,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   typed labels, in table cells and outside them, against its narrative (passed). Sections 1 to 6
   and the code point table do not change. The withheld section of an authority import
   (`docs/design/authority-import-withheld.md`, not built) moves to 3.5.0 (and with 3.5.0 to
-  3.6.0, with 3.6.0 to 3.7.0). The same rule carries as
+  3.6.0, with 3.6.0 to 3.7.0, with 3.7.0 to 3.8.0). The same rule carries as
   the template's grey C0C0C0 shading, which Word draws as the light grey highlight (no new
   reading, by Word's own print); a pattern's grey waits for the reader to spell a pattern's theme
   colour and for Word's answer over painted backgrounds. The change record is
@@ -1085,7 +1107,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   (passed), and the same dashes drawn as an HTML list (failed). Sections 1 to 4 and 6 and the code
   point table do not change. The withheld section of an authority import
   (`docs/design/authority-import-withheld.md`, not built) moves to 3.4.0 (and with 3.4.0 to
-  3.5.0, with 3.5.0 to 3.6.0, with 3.6.0 to 3.7.0). The change record is `docs/validation/changes/2026-10-06-fidelity-norm-3-3-0.md`.
+  3.5.0, with 3.5.0 to 3.6.0, with 3.6.0 to 3.7.0, with 3.7.0 to 3.8.0). The change record is `docs/validation/changes/2026-10-06-fidelity-norm-3-3-0.md`.
 - `fidelity-norm/3.2.0` (minor) — section 7 qualifies a third kind of source, a certified Word
   source (ADR 0006): a Word SmPC the pinned label reader read exactly, whose conservation check
   accounted for every character, structured by the QRD template's own headings, with one page
@@ -1099,7 +1121,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   list numbered from one later, and a page that writes a bullet after a line break as content
   against a narrative that draws it after a `br` (each failed). 3.2.0 was first reserved for the withheld section of
   an authority import (`docs/design/authority-import-withheld.md`, not built), which then took
-  3.3.0, then 3.4.0, then 3.5.0, then 3.6.0, and now takes 3.7.0.
+  3.3.0, then 3.4.0, then 3.5.0, then 3.6.0, then 3.7.0, and now takes 3.8.0.
   The change record is `docs/validation/changes/2026-10-05-fidelity-norm-3-2-0.md`.
 - `fidelity-norm/3.1.0` (minor) — inside `sub`, U+221E INFINITY is kept unchanged instead of
   rejecting (`unmappable-script`), and U+00BD VULGAR FRACTION ONE HALF is kept under the

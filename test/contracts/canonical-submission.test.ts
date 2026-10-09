@@ -233,7 +233,7 @@ describe("canonical submission contract", () => {
     const submission = clone();
     submission.provenance.fidelity.normalizationVersion = "fidelity-norm/0.9.0";
 
-    rejectedByParse(seal(submission), "fidelity.normalizationVersion must be fidelity-norm/3.6.0");
+    rejectedByParse(seal(submission), "fidelity.normalizationVersion must be fidelity-norm/3.7.0");
   });
 
   // Audit 2026-09-27 (F-1): the spans the gate re-executes are bounded, per section and in all.
