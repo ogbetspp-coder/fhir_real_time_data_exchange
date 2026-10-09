@@ -209,6 +209,17 @@ def stop_cases(stops: str, body: str = TABBED) -> list[tuple[str, str | None, st
             None,
         ),
         (
+            p(body),
+            f'<w:style w:type="paragraph" w:default="1" w:styleId="N"><w:pPr>{stops}</w:pPr>'
+            "</w:style>",
+            None,
+        ),
+        (
+            _in_table(p(body)).replace('<w:tblStyle w:val="T"/>', ""),
+            f'<w:style w:type="table" w:default="1" w:styleId="T"><w:pPr>{stops}</w:pPr></w:style>',
+            None,
+        ),
+        (
             _in_table(p(body)),
             f'<w:style w:type="table" w:styleId="T"><w:pPr>{stops}</w:pPr></w:style>',
             None,
@@ -3475,6 +3486,12 @@ PLACED_CASES: list[tuple[str, str, str | None, str | None]] = [
         "effects",
     ),
     ("no-extent-in-a-frame", p(r(picture()), FRAME), None, None),
+    (
+        "extent-in-a-frame-by-default-style",
+        p(r(SPACED)),
+        f'<w:style w:type="paragraph" w:default="1" w:styleId="F"><w:pPr>{FRAME}</w:pPr></w:style>',
+        "effects",
+    ),
     ("extent-beside-a-frame", p(r("<w:t>x</w:t>"), FRAME) + p(r(SPACED)), None, None),
     (
         "extent-after-a-table",

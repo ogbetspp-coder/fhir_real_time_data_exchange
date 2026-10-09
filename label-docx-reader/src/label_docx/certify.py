@@ -245,8 +245,10 @@ class _Segment:
 
 @dataclass
 class _Paragraph:
-    # Whether a row of exact height holds it.
+    # Whether a row of exact height holds it, and whether anything but white is painted under its
+    # runs (``_Story.paragraph``).
     in_exact_row: bool
+    ground: bool
     segments: list[_Segment] = field(default_factory=list)
     table: tuple[int, int, int] | None = None
     # What the list and note numbering need: the paragraph's properties, its style, its
@@ -257,10 +259,8 @@ class _Paragraph:
     # The run properties of the table style's parts Word applies to its cell, nearest first.
     conditional: tuple[ET.Element, ...] = ()
     section: int = 0
-    # Its shading's mark, over every character, and whether anything but white is painted under
-    # its runs (``_Story.paragraph``).
+    # Its shading's mark, over every character (``_Story.paragraph``).
     shading: str | None = None
-    ground: bool = False
     # What the result must say of the paragraph beyond its text: whether Word hides its mark,
     # and its list label.
     mark_hidden: bool = False
@@ -323,7 +323,12 @@ class _Fonts:
     """
 
     def __init__(
-        self, styles: ET.Element | None, theme: ET.Element | None, font_table: ET.Element | None
+        self,
+        styles: ET.Element | None,
+        theme: ET.Element | None,
+        font_table: ET.Element | None,
+        white: bool,
+        page_ground: bool,
     ) -> None:
         self.kind: dict[str, str] = {}
         self.based: dict[str, str | None] = {}
@@ -342,9 +347,9 @@ class _Fonts:
         # Per table style, every shading of its table and cells, its parts' too.
         self.cell_shadings: dict[str, list[ET.Element]] = {}
         # Whether background1 is white as Word was asked to draw it (``_white``), and whether the
-        # page has a colour other than white (``w:background``): set by ``DocxSource``.
-        self.white = False
-        self.page_ground = False
+        # page has a colour other than white, or one this check does not resolve.
+        self.white = white
+        self.page_ground = page_ground
         if styles is not None:
             for style in styles.findall(_w("style")):
                 style_id = style.get(_w("styleId"))
@@ -1017,23 +1022,13 @@ class _Story:
         ):
             raise CertificationError("a paragraph inside a paragraph")
         properties = element.find(_w("pPr"))
-        style = None if properties is None else properties.find(_w("pStyle"))
-        here = _Paragraph(
-            in_exact_row=self.fixed > 0,
-            table=table,
-            properties=properties,
-            style=None if style is None else style.get(_w("val")),
-            table_style=table_style,
-            conditional=self.conditional,
-            section=self.section,
-        )
-        if properties is not None and properties.find(_w("sectPr")) is not None:
-            self.section += 1
+        named = None if properties is None else properties.find(_w("pStyle"))
+        style = None if named is None else named.get(_w("val"))
         # The paragraph's shading, from its nearest properties that set one (its own, its style's,
         # its table style's, the defaults'); white only where something is painted under it.
         sources = [
             properties,
-            *(self.fonts.ppr.get(i) for i in self.fonts.style_ids(here.style, "paragraph")),
+            *(self.fonts.ppr.get(i) for i in self.fonts.style_ids(style, "paragraph")),
             *(
                 self.fonts.ppr.get(i)
                 for i in (self.fonts.style_ids(table_style, "table") if table is not None else [])
@@ -1045,8 +1040,19 @@ class _Story:
             None,
         )
         kind = _shade(shading, self.fonts.white)
-        here.shading = None if kind == "shading-FFFFFF" and not self.ground else kind
-        here.ground = self.ground or _ground(shading, self.fonts.white)
+        here = _Paragraph(
+            in_exact_row=self.fixed > 0,
+            ground=self.ground or _ground(shading, self.fonts.white),
+            table=table,
+            properties=properties,
+            style=style,
+            table_style=table_style,
+            conditional=self.conditional,
+            section=self.section,
+            shading=None if kind == "shading-FFFFFF" and not self.ground else kind,
+        )
+        if properties is not None and properties.find(_w("sectPr")) is not None:
+            self.section += 1
         # The paragraph mark: hidden (vanish, or specVanish) runs the paragraph on into the next.
         # The cautious reading and Word's toggle rule must agree, else it is not certain.
         own = None if properties is None else properties.find(_w("rPr"))
@@ -3290,19 +3296,19 @@ class DocxSource:
                         and any(_local(c.tag) == "AlternateContent" for c in node)
                     ):
                         raise CertificationError(f"alternate content in the {kind}")
+            settings_root = parse.get(related.get("settings", ""))
+            background = parse[main].find(_w("background"))
             self.fonts = _Fonts(
                 parse.get(related.get("styles", "")),
                 parse.get(related.get("theme", "")),
                 parse.get(related.get("fontTable", "")),
-            )
-            settings_root = parse.get(related.get("settings", ""))
-            self.fonts.white = _white(settings_root, parse.get(related.get("theme", "")))
-            # A page colour other than white, or one this check does not resolve.
-            background = parse[main].find(_w("background"))
-            self.fonts.page_ground = background is not None and (
-                len(background) > 0
-                or not _keys(background) <= {"w:color"}
-                or background.get(_w("color"), "auto").upper() not in ("AUTO", "FFFFFF")
+                _white(settings_root, parse.get(related.get("theme", ""))),
+                background is not None
+                and (
+                    len(background) > 0
+                    or not _keys(background) <= {"w:color"}
+                    or background.get(_w("color"), "auto").upper() not in ("AUTO", "FFFFFF")
+                ),
             )
             self.variables = [
                 (v.get(_w("name")), v.get(_w("val")))
@@ -3515,7 +3521,7 @@ class DocxSource:
         return _Part(walk.paragraphs, ledger, tables=walk.met)
 
     def _picture(
-        self, drawing: ET.Element, source: str, around: set[str], boxed: bool = False
+        self, drawing: ET.Element, source: str, around: set[str], boxed: bool
     ) -> dict[str, Json]:
         """What one U+FFFC stands for, read from the source by this check's own rules.
 

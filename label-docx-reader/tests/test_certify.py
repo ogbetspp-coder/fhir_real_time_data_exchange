@@ -15,11 +15,13 @@ from __future__ import annotations
 import copy
 import functools
 import hashlib
+import io
 import json
 import pickle
 import random
 import re
 import unicodedata
+import zipfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -81,7 +83,6 @@ from test_reader import (
     W,
     _alternate,
     _declaring,
-    _paged,
     anchored,
     chunk,
     colour_theme,
@@ -1235,15 +1236,74 @@ def test_a_tab_under_a_leader_or_a_bar_stop_is_never_certified(leader: str) -> N
         DocxSource(docx(_p(f"<w:r>{PTAB.format('')}</w:r>")))
 
 
+def test_a_theme_tint_or_shade_of_no_colour_is_never_certified() -> None:
+    # The reader refuses these; the check, reading each shading for its mark, refuses them too.
+    for shading in (
+        '<w:shd w:val="clear" w:fill="D9D9D9" w:themeFillShade="BF"/>',
+        '<w:shd w:val="clear" w:fill="D9D9D9" w:themeFillTint="33"/>',
+        '<w:shd w:val="pct15" w:fill="auto" w:themeShade="BF"/>',
+        '<w:shd w:val="pct15" w:fill="auto" w:themeTint="33"/>',
+    ):
+        with pytest.raises(CertificationError, match="a theme tint or shade of no colour"):
+            DocxSource(_coloured(_run(shading)))
+
+
+def test_a_word_6_label_under_a_leader_is_never_certified() -> None:
+    # A Word 6 label the reader calls legacy is followed by a tab Word writes: under a leader the
+    # reader refuses it, and the check, on its own, never certifies it.
+    stops = '<w:tabs><w:tab w:val="center" w:leader="dot" w:pos="567"/></w:tabs>'
+    with pytest.raises(CertificationError, match="a tab under a stop with a leader"):
+        DocxSource(_word6_docx({"props": stops}))
+
+
+def test_a_grids_widths_are_certified_at_each_end() -> None:
+    for widths in (("1", "31680"), ("01000",)):
+        columns = "".join(f'<w:gridCol w:w="{w}"/>' for w in widths)
+        span = f'<w:tcPr><w:gridSpan w:val="{len(widths)}"/></w:tcPr>'
+        cell = f"<w:tr><w:tc>{span}{_p('')}</w:tc></w:tr>"
+        table = f"<w:tbl><w:tblGrid>{columns}</w:tblGrid>{cell}</w:tbl>"
+        data = docx(table + _p(""))
+        value = _docx_value(data)
+        assert value["tables"][0]["grid"]["widths"] == [int(w) for w in widths]
+        DocxSource(data).certify(value)
+
+
 def test_a_tab_with_no_leader_is_certified_as_read() -> None:
     for body, styles, numbering in LEADER_FREE_CASES:
         data = docx(body, styles, numbering=numbering)
         DocxSource(data).certify(_docx_value(data))
 
 
-def _coloured(body: str, styles: str | None = None, page: str | None = None) -> bytes:
-    data = docx(body, styles, settings=MAPPED, theme=colour_theme())
-    return data if page is None else _paged(data, page)
+def _coloured(
+    body: str, styles: str | None = None, page: str | None = None, theme: str | None = None
+) -> bytes:
+    data = docx(body, styles, settings=MAPPED, theme=colour_theme() if theme is None else theme)
+    return data if page is None else _backed(data, page)
+
+
+def _backed(data: bytes, page: str) -> bytes:
+    """``data`` with a page colour: ``page`` a colour, or a whole ``w:background`` element."""
+    background = page if page.startswith("<") else f'<w:background w:color="{page}"/>'
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(out, "w") as target:
+        for info in source.infolist():
+            content = source.read(info)
+            if info.filename == "word/document.xml":
+                content = content.replace(b"<w:body>", background.encode() + b"<w:body>")
+            target.writestr(info, content)
+    return out.getvalue()
+
+
+def _run(shading: str, more: str = "") -> str:
+    return _p(f"<w:r><w:rPr>{more}{shading}</w:rPr><w:t>ab</w:t></w:r>")
+
+
+def _grid(table: str) -> str:
+    """A table of one cell holding a white run, its ``tblPr`` as given."""
+    return (
+        f'<w:tbl>{table}<w:tblGrid><w:gridCol w:w="1000"/></w:tblGrid><w:tr><w:tc>'
+        f"{_run(_WHITE)}</w:tc></w:tr></w:tbl>"
+    )
 
 
 _WHITE = '<w:shd w:val="clear" w:color="auto" w:fill="FFFFFF"/>'
@@ -1254,7 +1314,104 @@ _CELL = (
     "</w:tbl>"
 )
 # Shadings whose marks the check works out itself, and the marks the reader gives them.
+_DEFAULT_GREY = (
+    f'<w:style w:type="paragraph" w:default="1" w:styleId="N"><w:pPr>{_GREY}</w:pPr></w:style>'
+)
+_TABLE_STYLE = '<w:style w:type="table" w:styleId="T">{}</w:style>'
+_DEFAULT_TABLE = '<w:style w:type="table" w:default="1" w:styleId="T">{}</w:style>'
 SHADED: list[tuple[bytes, list[str]]] = [
+    # Nothing painted, the pattern spelt as Word stores it.
+    (_coloured(_run('<w:shd w:val="clear"/>')), []),
+    (_coloured(_run('<w:shd w:val="pct15"/>')), ["shading-pct15-AUTO-AUTO"]),
+    (_coloured(_run('<w:shd w:val="pct15" w:color="000000"/>')), ["shading-pct15-000000-AUTO"]),
+    (
+        _coloured(_run('<w:shd w:val="pct15" w:themeColor="accent2" w:themeTint="33"/>')),
+        ["shading-pct15-THEME-accent2-tint33-AUTO"],
+    ),
+    (
+        _coloured(
+            _run(
+                "<w:shd "
+                + BACKGROUND.format("D9D9D9").replace("auto", "FF0000")
+                + ' w:themeFillShade="D9"/>'
+            )
+        ),
+        ["shading-THEME-background1-shadeD9"],
+    ),
+    (_coloured(_run(_WHITE, '<w:highlight w:val="none"/>')), []),
+    # Paint under a white run: a page colour, a table's, a row's, its style's, the default
+    # paragraph or table style's.
+    (_coloured(_grid(""), page="FFFF00"), ["shading-FFFFFF"]),
+    (_coloured(_run(_WHITE), page="auto"), []),
+    (_coloured(_run(_WHITE), page="ffffff"), []),
+    (_coloured(_run(_WHITE), page="<w:background/>"), []),
+    (_coloured(_run(_WHITE), page='<w:background w:themeColor="accent2"/>'), ["shading-FFFFFF"]),
+    (
+        _coloured(_run(_WHITE), page='<w:background w:color="FFFFFF"><w:x/></w:background>'),
+        ["shading-FFFFFF"],
+    ),
+    (_coloured(_grid(f"<w:tblPr>{_GREY}</w:tblPr>")), ["shading-FFFFFF"]),
+    (
+        _coloured(
+            '<w:tbl><w:tblGrid><w:gridCol w:w="1000"/></w:tblGrid><w:tr><w:tblPrEx>'
+            f"{_GREY}</w:tblPrEx><w:tc>{_run(_WHITE)}</w:tc></w:tr></w:tbl>"
+        ),
+        ["shading-FFFFFF"],
+    ),
+    (
+        _coloured(
+            _grid('<w:tblPr><w:tblStyle w:val="T"/></w:tblPr>'),
+            _TABLE_STYLE.format(f"<w:tcPr>{_GREY}</w:tcPr>"),
+        ),
+        ["shading-FFFFFF"],
+    ),
+    (
+        _coloured(
+            _grid('<w:tblPr><w:tblStyle w:val="T"/></w:tblPr>'),
+            _TABLE_STYLE.format(f"<w:tblPr>{_GREY}</w:tblPr>"),
+        ),
+        ["shading-FFFFFF"],
+    ),
+    (
+        _coloured(
+            _grid('<w:tblPr><w:tblStyle w:val="T"/></w:tblPr>'),
+            _TABLE_STYLE.format(
+                f'<w:tblStylePr w:type="firstRow"><w:tcPr>{_GREY}</w:tcPr></w:tblStylePr>'
+            ),
+        ),
+        ["shading-FFFFFF"],
+    ),
+    (
+        _coloured(
+            _grid('<w:tblPr><w:tblStyle w:val="T"/></w:tblPr>'),
+            _TABLE_STYLE.format(
+                f'<w:tblStylePr w:type="firstRow"><w:tblPr>{_GREY}</w:tblPr></w:tblStylePr>'
+            ),
+        ),
+        ["shading-FFFFFF"],
+    ),
+    (_coloured(_grid(""), _DEFAULT_TABLE.format(f"<w:tcPr>{_GREY}</w:tcPr>")), ["shading-FFFFFF"]),
+    (_coloured(_run(_WHITE), _DEFAULT_GREY), ["shading-D9D9D9", "shading-FFFFFF"]),
+    (
+        _coloured(_grid(""), _DEFAULT_TABLE.format(f"<w:pPr>{_GREY}</w:pPr>")),
+        ["shading-D9D9D9", "shading-FFFFFF"],
+    ),
+    # A theme whose lt1 is not white as asked: never resolved.
+    *(
+        (
+            _coloured(
+                _run(f'<w:shd {BACKGROUND.format("D9D9D9")} w:themeFillShade="D9"/>'), theme=theme
+            ),
+            ["shading-THEME-background1-shadeD9"],
+        )
+        for theme in (
+            colour_theme('<a:srgbClr val="FFFFFF"/><a:srgbClr val="FFFFFF"/>'),
+            colour_theme('<a:srgbClr val="FFFFFF"><a:lumMod val="50000"/></a:srgbClr>'),
+            colour_theme().replace("<a:lt1>", "<a:lt1><a:x/></a:lt1><a:lt1>"),
+            colour_theme().replace("a:theme ", "a:other ").replace("</a:theme>", "</a:other>"),
+            colour_theme('<a:srgbClr val="FF0000"/>'),
+        )
+    ),
     (_coloured(_p(f"<w:r><w:rPr>{_WHITE}</w:rPr><w:t>ab</w:t></w:r>")), []),
     (_coloured(_p(f"<w:r><w:rPr>{_BG1}</w:rPr><w:t>ab</w:t></w:r>")), []),
     (
