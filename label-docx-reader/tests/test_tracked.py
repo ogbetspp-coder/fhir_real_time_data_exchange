@@ -249,6 +249,28 @@ def test_each_view_of_a_changed_grid_carries_its_own_columns_widths() -> None:
         )
 
 
+def test_a_grid_change_of_no_one_former_grid_is_never_certified() -> None:
+    # The original view's grid is the change's former one: with none, or two changes, there is
+    # no one grid to hold it to.
+    good = (
+        '<w:tblGrid><w:gridCol w:w="2000"/><w:tblGridChange w:id="6"><w:tblGrid>'
+        '<w:gridCol w:w="1500"/></w:tblGrid></w:tblGridChange></w:tblGrid>'
+    )
+    bad = [
+        good.replace('<w:tblGrid><w:gridCol w:w="1500"/></w:tblGrid>', ""),
+        good.replace(
+            "</w:tblGridChange></w:tblGrid>",
+            '</w:tblGridChange><w:tblGridChange w:id="7"><w:tblGrid><w:gridCol w:w="1500"/>'
+            "</w:tblGrid></w:tblGridChange></w:tblGrid>",
+        ),
+    ]
+    body = "<w:tbl>{}<w:tr><w:tc>" + p(t("a")) + "</w:tc></w:tr></w:tbl>" + p(t("b"))
+    _, original, _ = tracked(docx(body.format(good)))
+    for grid in bad:
+        with pytest.raises(CertificationError, match="a grid change of no one former grid"):
+            certify_tracked(docx(body.format(grid)), {"original": original})
+
+
 def _with_grid(view: bytes, columns: str) -> bytes:
     """``view`` with its grid's two columns made ``<w:gridCol {columns}/>``."""
     out = io.BytesIO()

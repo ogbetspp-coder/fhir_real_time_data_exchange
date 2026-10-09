@@ -3103,7 +3103,7 @@ def _shading(element: ET.Element | None, styles: _Styles) -> str | None:
     named = _theme_name(element, "themeFill", "themeFillTint", "themeFillShade")
     if named is not None:
         fill = _theme_fill(element, styles) or named
-    if pattern not in (None, "clear", "nil"):
+    if pattern not in (None, "clear"):
         colour = _theme_name(element, "themeColor", "themeTint", "themeShade")
         return f"shading-{pattern}-{colour or (element.get(_w('color')) or 'auto').upper()}-{fill}"
     return None if fill == "AUTO" else f"shading-{fill}"

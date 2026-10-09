@@ -854,7 +854,7 @@ def _shade(shading: ET.Element | None, white: bool) -> str | None:
             fill = shade + shade + shade
         else:
             fill = named
-    if pattern not in ("clear", "nil"):
+    if pattern != "clear":
         colour = _named(shading, "themeColor", "themeTint", "themeShade")
         return f"shading-{pattern}-{colour or (shading.get(_w('color')) or 'auto').upper()}-{fill}"
     return None if fill == "AUTO" else f"shading-{fill}"
