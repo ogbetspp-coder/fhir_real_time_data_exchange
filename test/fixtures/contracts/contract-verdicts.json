@@ -390,49 +390,49 @@
       "contract": "canonical-submission",
       "definition": "NormalizationVersion",
       "variant": "example",
-      "value": "fidelity-norm/3.6.0",
+      "value": "fidelity-norm/3.7.0",
       "accepted": true
     },
     {
       "contract": "canonical-submission",
       "definition": "NormalizationVersion",
       "variant": "trailing-newline",
-      "value": "fidelity-norm/3.6.0\n",
+      "value": "fidelity-norm/3.7.0\n",
       "accepted": false
     },
     {
       "contract": "canonical-submission",
       "definition": "NormalizationVersion",
       "variant": "trailing-crlf",
-      "value": "fidelity-norm/3.6.0\r\n",
+      "value": "fidelity-norm/3.7.0\r\n",
       "accepted": false
     },
     {
       "contract": "canonical-submission",
       "definition": "NormalizationVersion",
       "variant": "leading-newline",
-      "value": "\nfidelity-norm/3.6.0",
+      "value": "\nfidelity-norm/3.7.0",
       "accepted": false
     },
     {
       "contract": "canonical-submission",
       "definition": "NormalizationVersion",
       "variant": "trailing-space",
-      "value": "fidelity-norm/3.6.0 ",
+      "value": "fidelity-norm/3.7.0 ",
       "accepted": false
     },
     {
       "contract": "canonical-submission",
       "definition": "NormalizationVersion",
       "variant": "trailing-line-separator",
-      "value": "fidelity-norm/3.6.0 ",
+      "value": "fidelity-norm/3.7.0 ",
       "accepted": false
     },
     {
       "contract": "canonical-submission",
       "definition": "NormalizationVersion",
       "variant": "trailing-latin-letter",
-      "value": "fidelity-norm/3.6.0é",
+      "value": "fidelity-norm/3.7.0é",
       "accepted": false
     },
     {
@@ -467,21 +467,21 @@
       "contract": "canonical-submission",
       "definition": "NormalizationVersion",
       "variant": "arabic-indic-digits",
-      "value": "fidelity-norm/٣.٦.٠",
+      "value": "fidelity-norm/٣.٧.٠",
       "accepted": false
     },
     {
       "contract": "canonical-submission",
       "definition": "NormalizationVersion",
       "variant": "fullwidth-digits",
-      "value": "fidelity-norm/３.６.０",
+      "value": "fidelity-norm/３.７.０",
       "accepted": false
     },
     {
       "contract": "canonical-submission",
       "definition": "NormalizationVersion",
       "variant": "upper-case",
-      "value": "FIDELITY-NORM/3.6.0",
+      "value": "FIDELITY-NORM/3.7.0",
       "accepted": false
     },
     {
@@ -1790,49 +1790,49 @@
       "contract": "ingestion-provenance",
       "definition": "NormalizationVersion",
       "variant": "example",
-      "value": "fidelity-norm/3.6.0",
+      "value": "fidelity-norm/3.7.0",
       "accepted": true
     },
     {
       "contract": "ingestion-provenance",
       "definition": "NormalizationVersion",
       "variant": "trailing-newline",
-      "value": "fidelity-norm/3.6.0\n",
+      "value": "fidelity-norm/3.7.0\n",
       "accepted": false
     },
     {
       "contract": "ingestion-provenance",
       "definition": "NormalizationVersion",
       "variant": "trailing-crlf",
-      "value": "fidelity-norm/3.6.0\r\n",
+      "value": "fidelity-norm/3.7.0\r\n",
       "accepted": false
     },
     {
       "contract": "ingestion-provenance",
       "definition": "NormalizationVersion",
       "variant": "leading-newline",
-      "value": "\nfidelity-norm/3.6.0",
+      "value": "\nfidelity-norm/3.7.0",
       "accepted": false
     },
     {
       "contract": "ingestion-provenance",
       "definition": "NormalizationVersion",
       "variant": "trailing-space",
-      "value": "fidelity-norm/3.6.0 ",
+      "value": "fidelity-norm/3.7.0 ",
       "accepted": false
     },
     {
       "contract": "ingestion-provenance",
       "definition": "NormalizationVersion",
       "variant": "trailing-line-separator",
-      "value": "fidelity-norm/3.6.0 ",
+      "value": "fidelity-norm/3.7.0 ",
       "accepted": false
     },
     {
       "contract": "ingestion-provenance",
       "definition": "NormalizationVersion",
       "variant": "trailing-latin-letter",
-      "value": "fidelity-norm/3.6.0é",
+      "value": "fidelity-norm/3.7.0é",
       "accepted": false
     },
     {
@@ -1867,21 +1867,21 @@
       "contract": "ingestion-provenance",
       "definition": "NormalizationVersion",
       "variant": "arabic-indic-digits",
-      "value": "fidelity-norm/٣.٦.٠",
+      "value": "fidelity-norm/٣.٧.٠",
       "accepted": false
     },
     {
       "contract": "ingestion-provenance",
       "definition": "NormalizationVersion",
       "variant": "fullwidth-digits",
-      "value": "fidelity-norm/３.６.０",
+      "value": "fidelity-norm/３.７.０",
       "accepted": false
     },
     {
       "contract": "ingestion-provenance",
       "definition": "NormalizationVersion",
       "variant": "upper-case",
-      "value": "FIDELITY-NORM/3.6.0",
+      "value": "FIDELITY-NORM/3.7.0",
       "accepted": false
     },
     {
@@ -2791,49 +2791,49 @@
       "contract": "fidelity-report",
       "definition": "NormalizationVersion",
       "variant": "example",
-      "value": "fidelity-norm/3.6.0",
+      "value": "fidelity-norm/3.7.0",
       "accepted": true
     },
     {
       "contract": "fidelity-report",
       "definition": "NormalizationVersion",
       "variant": "trailing-newline",
-      "value": "fidelity-norm/3.6.0\n",
+      "value": "fidelity-norm/3.7.0\n",
       "accepted": false
     },
     {
       "contract": "fidelity-report",
       "definition": "NormalizationVersion",
       "variant": "trailing-crlf",
-      "value": "fidelity-norm/3.6.0\r\n",
+      "value": "fidelity-norm/3.7.0\r\n",
       "accepted": false
     },
     {
       "contract": "fidelity-report",
       "definition": "NormalizationVersion",
       "variant": "leading-newline",
-      "value": "\nfidelity-norm/3.6.0",
+      "value": "\nfidelity-norm/3.7.0",
       "accepted": false
     },
     {
       "contract": "fidelity-report",
       "definition": "NormalizationVersion",
       "variant": "trailing-space",
-      "value": "fidelity-norm/3.6.0 ",
+      "value": "fidelity-norm/3.7.0 ",
       "accepted": false
     },
     {
       "contract": "fidelity-report",
       "definition": "NormalizationVersion",
       "variant": "trailing-line-separator",
-      "value": "fidelity-norm/3.6.0 ",
+      "value": "fidelity-norm/3.7.0 ",
       "accepted": false
     },
     {
       "contract": "fidelity-report",
       "definition": "NormalizationVersion",
       "variant": "trailing-latin-letter",
-      "value": "fidelity-norm/3.6.0é",
+      "value": "fidelity-norm/3.7.0é",
       "accepted": false
     },
     {
@@ -2868,21 +2868,21 @@
       "contract": "fidelity-report",
       "definition": "NormalizationVersion",
       "variant": "arabic-indic-digits",
-      "value": "fidelity-norm/٣.٦.٠",
+      "value": "fidelity-norm/٣.٧.٠",
       "accepted": false
     },
     {
       "contract": "fidelity-report",
       "definition": "NormalizationVersion",
       "variant": "fullwidth-digits",
-      "value": "fidelity-norm/３.６.０",
+      "value": "fidelity-norm/３.７.０",
       "accepted": false
     },
     {
       "contract": "fidelity-report",
       "definition": "NormalizationVersion",
       "variant": "upper-case",
-      "value": "FIDELITY-NORM/3.6.0",
+      "value": "FIDELITY-NORM/3.7.0",
       "accepted": false
     },
     {
@@ -4135,49 +4135,49 @@
       "contract": "query-tools",
       "definition": "NormalizationVersion",
       "variant": "example",
-      "value": "fidelity-norm/3.6.0",
+      "value": "fidelity-norm/3.7.0",
       "accepted": true
     },
     {
       "contract": "query-tools",
       "definition": "NormalizationVersion",
       "variant": "trailing-newline",
-      "value": "fidelity-norm/3.6.0\n",
+      "value": "fidelity-norm/3.7.0\n",
       "accepted": false
     },
     {
       "contract": "query-tools",
       "definition": "NormalizationVersion",
       "variant": "trailing-crlf",
-      "value": "fidelity-norm/3.6.0\r\n",
+      "value": "fidelity-norm/3.7.0\r\n",
       "accepted": false
     },
     {
       "contract": "query-tools",
       "definition": "NormalizationVersion",
       "variant": "leading-newline",
-      "value": "\nfidelity-norm/3.6.0",
+      "value": "\nfidelity-norm/3.7.0",
       "accepted": false
     },
     {
       "contract": "query-tools",
       "definition": "NormalizationVersion",
       "variant": "trailing-space",
-      "value": "fidelity-norm/3.6.0 ",
+      "value": "fidelity-norm/3.7.0 ",
       "accepted": false
     },
     {
       "contract": "query-tools",
       "definition": "NormalizationVersion",
       "variant": "trailing-line-separator",
-      "value": "fidelity-norm/3.6.0 ",
+      "value": "fidelity-norm/3.7.0 ",
       "accepted": false
     },
     {
       "contract": "query-tools",
       "definition": "NormalizationVersion",
       "variant": "trailing-latin-letter",
-      "value": "fidelity-norm/3.6.0é",
+      "value": "fidelity-norm/3.7.0é",
       "accepted": false
     },
     {
@@ -4212,21 +4212,21 @@
       "contract": "query-tools",
       "definition": "NormalizationVersion",
       "variant": "arabic-indic-digits",
-      "value": "fidelity-norm/٣.٦.٠",
+      "value": "fidelity-norm/٣.٧.٠",
       "accepted": false
     },
     {
       "contract": "query-tools",
       "definition": "NormalizationVersion",
       "variant": "fullwidth-digits",
-      "value": "fidelity-norm/３.６.０",
+      "value": "fidelity-norm/３.７.０",
       "accepted": false
     },
     {
       "contract": "query-tools",
       "definition": "NormalizationVersion",
       "variant": "upper-case",
-      "value": "FIDELITY-NORM/3.6.0",
+      "value": "FIDELITY-NORM/3.7.0",
       "accepted": false
     },
     {
@@ -5997,49 +5997,49 @@
       "contract": "run-manifest",
       "definition": "NormalizationVersion",
       "variant": "example",
-      "value": "fidelity-norm/3.6.0",
+      "value": "fidelity-norm/3.7.0",
       "accepted": true
     },
     {
       "contract": "run-manifest",
       "definition": "NormalizationVersion",
       "variant": "trailing-newline",
-      "value": "fidelity-norm/3.6.0\n",
+      "value": "fidelity-norm/3.7.0\n",
       "accepted": false
     },
     {
       "contract": "run-manifest",
       "definition": "NormalizationVersion",
       "variant": "trailing-crlf",
-      "value": "fidelity-norm/3.6.0\r\n",
+      "value": "fidelity-norm/3.7.0\r\n",
       "accepted": false
     },
     {
       "contract": "run-manifest",
       "definition": "NormalizationVersion",
       "variant": "leading-newline",
-      "value": "\nfidelity-norm/3.6.0",
+      "value": "\nfidelity-norm/3.7.0",
       "accepted": false
     },
     {
       "contract": "run-manifest",
       "definition": "NormalizationVersion",
       "variant": "trailing-space",
-      "value": "fidelity-norm/3.6.0 ",
+      "value": "fidelity-norm/3.7.0 ",
       "accepted": false
     },
     {
       "contract": "run-manifest",
       "definition": "NormalizationVersion",
       "variant": "trailing-line-separator",
-      "value": "fidelity-norm/3.6.0 ",
+      "value": "fidelity-norm/3.7.0 ",
       "accepted": false
     },
     {
       "contract": "run-manifest",
       "definition": "NormalizationVersion",
       "variant": "trailing-latin-letter",
-      "value": "fidelity-norm/3.6.0é",
+      "value": "fidelity-norm/3.7.0é",
       "accepted": false
     },
     {
@@ -6074,21 +6074,21 @@
       "contract": "run-manifest",
       "definition": "NormalizationVersion",
       "variant": "arabic-indic-digits",
-      "value": "fidelity-norm/٣.٦.٠",
+      "value": "fidelity-norm/٣.٧.٠",
       "accepted": false
     },
     {
       "contract": "run-manifest",
       "definition": "NormalizationVersion",
       "variant": "fullwidth-digits",
-      "value": "fidelity-norm/３.６.０",
+      "value": "fidelity-norm/３.７.０",
       "accepted": false
     },
     {
       "contract": "run-manifest",
       "definition": "NormalizationVersion",
       "variant": "upper-case",
-      "value": "FIDELITY-NORM/3.6.0",
+      "value": "FIDELITY-NORM/3.7.0",
       "accepted": false
     },
     {
@@ -7635,49 +7635,49 @@
       "contract": "review-record",
       "definition": "NormalizationVersion",
       "variant": "example",
-      "value": "fidelity-norm/3.6.0",
+      "value": "fidelity-norm/3.7.0",
       "accepted": true
     },
     {
       "contract": "review-record",
       "definition": "NormalizationVersion",
       "variant": "trailing-newline",
-      "value": "fidelity-norm/3.6.0\n",
+      "value": "fidelity-norm/3.7.0\n",
       "accepted": false
     },
     {
       "contract": "review-record",
       "definition": "NormalizationVersion",
       "variant": "trailing-crlf",
-      "value": "fidelity-norm/3.6.0\r\n",
+      "value": "fidelity-norm/3.7.0\r\n",
       "accepted": false
     },
     {
       "contract": "review-record",
       "definition": "NormalizationVersion",
       "variant": "leading-newline",
-      "value": "\nfidelity-norm/3.6.0",
+      "value": "\nfidelity-norm/3.7.0",
       "accepted": false
     },
     {
       "contract": "review-record",
       "definition": "NormalizationVersion",
       "variant": "trailing-space",
-      "value": "fidelity-norm/3.6.0 ",
+      "value": "fidelity-norm/3.7.0 ",
       "accepted": false
     },
     {
       "contract": "review-record",
       "definition": "NormalizationVersion",
       "variant": "trailing-line-separator",
-      "value": "fidelity-norm/3.6.0 ",
+      "value": "fidelity-norm/3.7.0 ",
       "accepted": false
     },
     {
       "contract": "review-record",
       "definition": "NormalizationVersion",
       "variant": "trailing-latin-letter",
-      "value": "fidelity-norm/3.6.0é",
+      "value": "fidelity-norm/3.7.0é",
       "accepted": false
     },
     {
@@ -7712,21 +7712,21 @@
       "contract": "review-record",
       "definition": "NormalizationVersion",
       "variant": "arabic-indic-digits",
-      "value": "fidelity-norm/٣.٦.٠",
+      "value": "fidelity-norm/٣.٧.٠",
       "accepted": false
     },
     {
       "contract": "review-record",
       "definition": "NormalizationVersion",
       "variant": "fullwidth-digits",
-      "value": "fidelity-norm/３.６.０",
+      "value": "fidelity-norm/３.７.０",
       "accepted": false
     },
     {
       "contract": "review-record",
       "definition": "NormalizationVersion",
       "variant": "upper-case",
-      "value": "FIDELITY-NORM/3.6.0",
+      "value": "FIDELITY-NORM/3.7.0",
       "accepted": false
     },
     {
@@ -8085,7 +8085,7 @@
       "base": "contracts/canonical-submission.json",
       "mutation": "normalizationVersion fullwidth digits",
       "path": ["provenance", "fidelity", "normalizationVersion"],
-      "value": "fidelity-norm/３.６.０",
+      "value": "fidelity-norm/３.７.０",
       "accepted": false
     },
     {
@@ -8218,7 +8218,7 @@
       "base": "contracts/fidelity-report.json",
       "mutation": "normalizationVersion Arabic-Indic digits",
       "path": ["normalizationVersion"],
-      "value": "fidelity-norm/٣.٦.٠",
+      "value": "fidelity-norm/٣.٧.٠",
       "accepted": false
     },
     {
@@ -8320,7 +8320,7 @@
       "base": "contracts/run-request.json",
       "mutation": "sha256 newline",
       "path": ["submissionRef", "sha256"],
-      "value": "6d8117f58ef3266e26763b97c957aa07535aa0269d86ffb0f71db976a73539c4\n",
+      "value": "9db8c0ab5884307e7066592e6f51dd4dff9d9a17d5e14673e2bf2727ef53fc1d\n",
       "accepted": false
     },
     {

@@ -44,7 +44,9 @@ else, with the code in parentheses:
 
 - marks: bold, italic, superscript and subscript (not both at once: ``script``), and the QRD
   template's grey, a light grey highlight or D9D9D9 shading, or C0C0C0 shading, which Word draws
-  as the highlight (``GREY``; owner decisions of 2026-10-06 and 2026-10-07).
+  as the highlight, or a 15% pattern of the automatic colour on an automatic or white fill, which
+  Word draws as D9D9D9 (``GREY``; owner decisions of 2026-10-06 and 2026-10-07, and Word's print
+  for fidelity-norm/3.7.0).
   An underline is left out where it cannot change what the text says (``zone_a.underline``, a
   hyphen inside an underlined word included), else (``underline``); so are capitals and small
   capitals over text that capitals draw the same ("4."), and a strike, a highlight or a solid
@@ -81,9 +83,10 @@ else, with the code in parentheses:
   2026-10-08): the tabs before the text starts (an indent); the one after a label typed at the
   start of the text (a bullet glyph or dash, a footnote mark, "1.", "a)", "(iv)", a caption's
   "Table 1:" or "Figure 3.", or a raised footnote key of one to three code points;
-  ``typed_tab``); else the one tab past the indent, where there is one, that is not raised or
-  lowered and stands in no right-to-left text; none where, as a space, it would join a number to
-  a number or a dash or minus before it (``joins``).
+  ``typed_tab``); else, where the text past the indent holds exactly one tab, that tab, unless it
+  is inside a superscript or subscript mark or the paragraph's text holds a right-to-left code
+  point or an explicit bidi control (``REORDERING``); none where, as a space, it would join a
+  number to a number or a dash or minus before it (``joins``).
   No line or paragraph separator (``line-separator``), or
   line that starts with a bullet glyph after a line break (``bullet-after-break``: section 3 step
   4 would read it as a list bullet);
@@ -130,7 +133,7 @@ from zone_a.structure import line
 from zone_a.underline import underline_changes
 
 # The narrative builder's and the page serialiser's version: one, as they are one closed list.
-WORD_EPI_VERSION: Final = "word-epi/1.6.0"
+WORD_EPI_VERSION: Final = "word-epi/1.7.0"
 
 CARRIED: Final = {"bold": "strong", "italic": "em", "superscript": "sup", "subscript": "sub"}
 # Section 3 step 4's bullet glyphs: a list bullet in page text, removed at a line start.
@@ -145,9 +148,20 @@ WHITESPACE: Final = frozenset(
 # and C0C0C0 shading, which Word draws in the highlight's colour (owner decision 2026-10-07, ADR
 # 0006 decision 9, by Word's own print). A solid fill is opaque; a theme fill the reader resolves
 # is its colour's (``shading-D9D9D9``, docx-reader/1.34.0), one it does not another kind
-# (``shading-THEME-...``). The pattern greys (``shading-pct15-AUTO-AUTO``...) wait for a fidelity
-# norm: the reader spells a theme pattern colour apart from docx-reader/1.34.0.
-GREY: Final = frozenset({"highlight-lightGray", "shading-D9D9D9", "shading-C0C0C0"})
+# (``shading-THEME-...``). And a 15% pattern of the automatic colour on an automatic or white
+# fill (fidelity-norm/3.7.0), which Word prints as exactly D9D9D9, its automatic fill opaque
+# white, wherever it was printed (2026-10-07 and 2026-10-09; label-docx-reader-scratch/
+# grey-shading/RESULTS.md): a run's or a paragraph's, with the colour or the fill absent or auto,
+# on a white page, over a cell shaded FFFF00 or 000000, over a paragraph shaded D9D9D9, and on a
+# page coloured FFFF00, which Word does not print (on screen not measured). The reader reports
+# none of those grounds on the text, so each reads as the white page's. From docx-reader/1.34.0
+# it spells a pattern's theme colour or fill (``shading-pct15-THEME-...``), so AUTO is automatic.
+GREY: Final = frozenset(
+    {
+        *("highlight-lightGray", "shading-D9D9D9", "shading-C0C0C0"),
+        *("shading-pct15-AUTO-AUTO", "shading-pct15-AUTO-FFFFFF"),
+    }
+)
 # How the narrative draws it: the EMA ePI style guide's form for QRD "not printed" text.
 GREY_SPAN: Final = '<span style="background-color: silver;">'
 

@@ -560,6 +560,17 @@ const WORD_HALF_LIFE_NARRATIVE = div(
     "<p>(T<sub>½</sub>) as above.</p>",
 );
 
+// fidelity-norm/3.7.0's 15% pattern grey: as zone_a.word_epi builds it (the vectors below).
+const WORD_PATTERN_PAGE =
+  "\nReport side effects via the national system.\nKeep out of the sight and reach of children.\n" +
+  "﷐\n﷒\t﷓\tDose\t﷓\t10 mg\n﷑\n";
+const WORD_PATTERN_NARRATIVE = div(
+  '<p>Report side effects <span style="background-color: silver;">via the national system' +
+    '</span>.</p><p><span style="background-color: silver;">Keep out of the sight and reach of ' +
+    "children.</span></p><table><tr><td><p>Dose</p></td><td><p>" +
+    '<span style="background-color: silver;">10 mg</span></p></td></tr></table>',
+);
+
 export const verifyCases: VerifyCase[] = [
   // A body boundary inside a line, or a body that excludes more than a header/footer could hold,
   // invalidates the page: the extractor-declared range is bounded, not trusted.
@@ -3000,6 +3011,37 @@ export const verifyCases: VerifyCase[] = [
       return toInput(source, single("smpc.5.2", moved, [spanFor(source, 1, WORD_HALF_LIFE_PAGE)]));
     })(),
     expect: { status: "failed", sections: { "smpc.5.2": "mismatch" } },
+  },
+  // fidelity-norm/3.7.0: a 15% pattern of the automatic colour on an automatic or white fill is
+  // the template's grey, which Word prints as D9D9D9. The page as zone_a.word_epi writes it from a
+  // read with the pattern over a run (on an automatic fill), over a whole paragraph and in a table
+  // cell (on a white fill), and the narrative it builds from the same read. Reviewed by hand: the
+  // grey the silver span, the page unmarked, every word in place.
+  {
+    name: "certified-word-pattern-grey",
+    input: (() => {
+      const source = wordSource(WORD_PATTERN_PAGE);
+      return toInput(
+        source,
+        single("smpc.4.8", WORD_PATTERN_NARRATIVE, [spanFor(source, 1, WORD_PATTERN_PAGE)]),
+      );
+    })(),
+    expect: { status: "passed", sections: { "smpc.4.8": "verified" } },
+  },
+  // ... and against a narrative that leaves the grey paragraph out, as a renderer that hides the
+  // template's "not printed" text would: grey text is text, and it fails.
+  {
+    name: "certified-word-pattern-grey-dropped",
+    input: (() => {
+      const dropped = WORD_PATTERN_NARRATIVE.replace(
+        '<p><span style="background-color: silver;">Keep out of the sight and reach of children.' +
+          "</span></p>",
+        "",
+      );
+      const source = wordSource(WORD_PATTERN_PAGE);
+      return toInput(source, single("smpc.4.8", dropped, [spanFor(source, 1, WORD_PATTERN_PAGE)]));
+    })(),
+    expect: { status: "failed", sections: { "smpc.4.8": "mismatch" } },
   },
 ];
 

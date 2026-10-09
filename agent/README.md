@@ -154,7 +154,7 @@ checked. It is not a comment; it is the shape of the code.
   its last with nothing between them but the spaces the cuts dropped (`coverage-gap`); and any
   hash that disagrees — a match naming another text hash than the section's, an answer whose
   `quoteSha256` is not the chunk's, a block whose text or XHTML does not hash to what its
-  citation shows, or an answer under another normalisation version than `fidelity-norm/3.6.0`
+  citation shows, or an answer under another normalisation version than `fidelity-norm/3.7.0`
   (`checksum-mismatch`). A match that does not say where, or over no section, is refused by
   the contract since query-tools 4.0.0 and by the post-check too.
 
@@ -439,12 +439,12 @@ no more chunks than the full one is used, so a block just over 2,000 units is tw
 full chunk and a sliver of a few words.
 
 **A normalisation-version bump needs this agent redeployed with it.** The post-check accepts
-answers under `fidelity-norm/3.6.0` only (`quote_edge.NORMALIZATION_VERSION`, held to the service's
+answers under `fidelity-norm/3.7.0` only (`quote_edge.NORMALIZATION_VERSION`, held to the service's
 own export by a test). When Zone B moves to a new normalisation version, port the quote-edge rule
 to it in the same change. Since the agent accepts exactly one version, either order leaves a
 window in which the two differ and every block is flagged `checksum-mismatch` and shown
 unverified, never wrong. The query service redeploys on the merge (`deploy.yml`), so redeploy the
-agent from the merged commit right after it, as for 3.3.0 (#188), 3.4.0 (#209) and 3.5.0 (#211).
+agent from the merged commit right after it, as for 3.3.0 (#188), 3.4.0 (#209), 3.5.0 (#211) and 3.6.0 (#213).
 
 **Tables and pictures cannot be checked yet.** A section's text carries the scanner's grid
 markers (U+FDD0–U+FDEF) and a picture's U+FFFC, and `verify_quote` refuses any quote holding
