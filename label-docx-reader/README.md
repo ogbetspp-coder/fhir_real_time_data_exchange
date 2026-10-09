@@ -190,6 +190,7 @@ confidential documents without writing or printing their text:
 
 ```bash
 uv run --frozen python scripts/survey.py FOLDER              # read or refused, and why
+uv run --frozen python scripts/survey.py --causes FOLDER     # every reason, ranked (a measurement)
 uv run --frozen python scripts/word_oracle.py compare *.docx  # against Word (macOS)
 ```
 
