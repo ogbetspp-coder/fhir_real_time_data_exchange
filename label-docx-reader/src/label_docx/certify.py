@@ -67,10 +67,13 @@ cell's vertical merge as stored; or, where Word's is not on record, no grid and 
 for it. So must what each U+FFFC stands for (``DocxSource._picture``): the image part through
 the story part's own relationships, its bytes' SHA-256, PNG or JPEG by signature, its pixels from
 its chunks or segments, the drawing's extent and crop, and the first reason (``_NOT_AS_IS``) its
-bytes may not be what Word draws, by a closed list of what a drawing may hold. An ePI's other
-marks are
-held to Chrome (``tests/test_browser_oracle.py``); a .docx's (highlight, shading, faint, raised
-text, right-to-left) to nothing but the reader's tests. A table style's conditional parts it
+bytes may not be what Word draws, by a closed list of what a drawing may hold. So must each
+character's shading marks (``_shade``): its run's and its paragraph's, a theme's fill resolved,
+a pattern's theme colour named and white kept only over paint (``_Story.ground``), by its own
+reading of the settings and the theme, held to Word's drawing (corpus/drawing-cases). An ePI's
+other marks are held to Chrome (``tests/test_browser_oracle.py``); a .docx's (highlight, faint,
+raised text, right-to-left) to nothing but the reader's tests, the form of a position's kind
+aside. A table style's conditional parts it
 applies on its own (``_Applied``), as Word's answers have them (corpus/numbering-cases,
 table-style-*). Where Word's key marks are not on record the check refuses on its own, as the
 reader does: a table style's part over text where Word was not asked how it applies, or setting
@@ -271,9 +274,10 @@ class _Paragraph:
     pictures: list[dict[str, Json]] = field(default_factory=list)
 
 
-# The marks the check works out itself and holds every result to. The others (highlight,
-# shading, faint, raised text, right-to-left) are held by nothing but the reader's own tests:
-# the Word oracle reads bold, italic, capitals and strike only (tests/test_word_oracle.py).
+# The marks the check works out itself and holds every result to, and shading (``_shade``),
+# held to Word's drawing (corpus/drawing-cases). The others (highlight, faint, raised text,
+# right-to-left) are held by nothing but the reader's own tests, a position's form aside: the
+# Word oracle reads bold, italic, capitals and strike only (tests/test_word_oracle.py).
 _CHECKED_TOGGLES = {
     "b": "bold",
     "i": "italic",
@@ -828,6 +832,8 @@ def _shade(shading: ET.Element | None, white: bool) -> str | None:
     pattern = shading.get(_w("val"))
     if pattern is None:
         raise CertificationError("a shading with no pattern")
+    if pattern == "nil":
+        return None  # no shading, whatever its fill: Word paints none
     fill = (shading.get(_w("fill")) or "auto").upper()
     named = _named(shading, "themeFill", "themeFillTint", "themeFillShade")
     if named is not None:
@@ -1704,8 +1710,8 @@ def _grid_laid(
         if child.tag != _w("gridCol"):
             continue
         twips = child.get(_w("w"), "")
-        # A column's width as Word stores it: digits, at least 1, at most a 22-inch page's.
-        if not re.fullmatch("[0-9]{1,5}", twips) or not 1 <= int(twips) <= 31680:
+        # A column's width as Word stores it: digits, no leading zero, at most a 22-inch page's.
+        if not re.fullmatch("[1-9][0-9]{0,4}", twips) or int(twips) > 31680:
             raise _NoGridError("bad-width")
         widths.append(int(twips))
     width = len(widths)
@@ -3872,11 +3878,20 @@ def _canon(element: ET.Element, drops: tuple[str, ...], outside: bool = False) -
     Content in a change the view drops goes; in a change it keeps, it stays where it is; a kept
     change that marks a paragraph mark or a row goes, and so do the move ranges; a deleted text
     is a text. Properties holding a change of themselves are, in the accepted view, the current
-    ones without it; in the original they are the former ones, held to Word (``_ANY``). With
+    ones without it; in the original they are the former ones, held to Word (``_ANY``), but a
+    table's grid, the former one exactly (Word's verdict leaves its widths out). With
     ``outside``, paragraphs are left out, and the rows the view drops, and a table whose every
     row it drops: what stands outside paragraphs.
     """
     dropping = {_w(name) for name in drops}
+    if "del" not in drops and element.tag == _w("tblGrid"):
+        # The original view's grid is the one its change records, exactly (its widths too).
+        changes = [c for c in element if c.tag == _w("tblGridChange")]
+        if changes:
+            former = [c for c in changes[0] if c.tag == _w("tblGrid")]
+            if len(changes) != 1 or len(former) != 1:
+                raise CertificationError("a grid change of no one former grid")
+            return _canon(former[0], drops, outside)
     if "del" not in drops and any(
         c.tag in _REVISIONS and _local(c.tag).endswith("Change") for c in element
     ):

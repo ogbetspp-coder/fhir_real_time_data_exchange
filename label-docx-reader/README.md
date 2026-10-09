@@ -115,8 +115,9 @@ from another web page.
   lists around the item). `table` is `[table, row, cell]`, counted from 0, `cell` among the
   row's cells.
 - `tables` lists each body table, in document order, a nested table as its own entry with its
-  `parent` cell, and its `grid`: `columns` (`gridCol`), their `widths` (each `w:w` in twips; a
-  column without digits from 1 to 31,680 there is no grid, `bad-width`), and each row's `before` and `after`
+  `parent` cell, and its `grid`: `columns` (`gridCol`), their `widths` (each `w:w` in twips as
+  stored, which Word lays out again for an autofit table: never drawn widths; a column without
+  digits from 1 to 31,680, or with a leading zero, gives no grid, `bad-width`), and each row's `before` and `after`
   (grid columns left out) and `cells`, each with its first grid `column`, its `span`
   (`gridSpan`) and its `merge` (`vMerge` as stored: null, `restart` or `continue`), and whether
   the row's height may be exact (`exactHeight`: its own `trHeight` of rule `exact`, or one its

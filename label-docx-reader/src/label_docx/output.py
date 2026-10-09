@@ -49,8 +49,11 @@ A read::
 document order, a nested table as its own entry after the table holding it: ``parent`` (the
 ``[table, row, cell]`` a nested table stands in, else null), ``grid`` and ``reason``. ``grid`` is
 ``columns`` (its ``gridCol`` count), ``widths`` (from label-docx-json/1.20.0: each ``gridCol``'s
-``w:w`` in twips, one positive whole number a column, in grid order; the original view of a tracked
-grid change has its former grid's) and ``rows``, each with ``before`` and ``after`` (grid columns
+``w:w`` in twips as stored, one positive whole number a column without a leading zero, in grid
+order; the original view of a tracked grid change has its former grid's. They are what the
+file stores, not what Word draws: Word lays an autofit table out again, a one-column table stored
+4,000 twips wide saved 398 to 526 wide in corpus/tracked-cases, so no consumer may take them for
+drawn widths) and ``rows``, each with ``before`` and ``after`` (grid columns
 left out, ``gridBefore`` and ``gridAfter``) and ``cells``, each with ``column`` (the first grid
 column it covers, from 0), ``span`` (``gridSpan``) and ``merge`` (``vMerge`` as stored: null,
 ``restart`` or ``continue``), and ``exactHeight`` (whether the row's height may be exact: its own

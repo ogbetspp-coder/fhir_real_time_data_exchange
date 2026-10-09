@@ -83,17 +83,29 @@ widths.
   - a shift or size that is not a whole number of half-points;
   - shifted complex script, which Word draws at `szCs`.
 
-- **Grid widths** (for `fidelity-norm/3.6.0`). A table's grid carries `widths`: each `gridCol`'s
-  `w:w` in twips, in grid order, as the view read stores it. The original view of a tracked grid
-  change carries its former grid. A column whose width is not digits from 1 to 31,680 leaves no grid
-  on record, with the new reason `bad-width`.
+- **`nil` shading** is no shading, whatever its fill, colour or theme fill. Word paints nothing
+  for it (the `bg1-nil` and `nil-*` rows, under a white and a red theme). Both copies had read a
+  `nil` with a fill as that fill's paint, which Zone A could have carried as grey; this bug
+  predates this release.
+- **Grid widths** (asked for `fidelity-norm/3.6.0`). A table's grid carries `widths`: each
+  `gridCol`'s `w:w` in twips as stored, in grid order, as the view read stores it. The original
+  view of a tracked grid change carries its former grid. A column whose width is not digits
+  without a leading zero, from 1 to 31,680, leaves no grid on record, with the new reason
+  `bad-width`.
+
+  The widths are what the file stores, not what Word draws. Word lays an autofit table out again
+  when it opens or saves it: a one-column table stored 4,000 twips wide was saved 398 to 526 wide
+  (`corpus/tracked-cases`). No consumer may take them for drawn widths. `fidelity-norm/3.6.0` no
+  longer uses them: its column-width rule was withdrawn after Chrome drew a column at 0 px.
 
 **The independent check** (`certify.py`, `conservation-check/1.21.0`) has its own code for every
-rule above, shares none with the reader, and uses its own literal bounds:
+rule above but the position's (of which it holds only the kind's form), shares none with the
+reader, and uses its own literal bounds:
 
 - the picture whitelist and the extent's place;
 - the tab stops that apply, bar stops and positional tabs;
-- the grid widths;
+- the grid widths, and in the original view of a tracked grid change, the former grid exactly,
+  its widths too (Word's verdict on the views leaves widths out);
 - each run's and paragraph's shading mark. This is worked out character by character, including:
   - its own reading of the settings' mapping and the theme;
   - the pattern colour;
@@ -122,6 +134,10 @@ rule above, shares none with the reader, and uses its own literal bounds:
 - A positional tab with leader `none` is refused in a paragraph that also holds a leader stop.
 - An effect extent in a wide cell is not carried, though Word drew it alike there.
 
+Not counted, and not drawn: for a nested table with no style of its own, the stops of the outer
+table's style and its parts (the nested table takes the default table style, as Word applies a
+table's own style to its cells).
+
 **Why.** The brief for 1.34.0 came from the coverage work:
 
 - Pictures refused only for markup that draws nothing, and the template's own `background1`
@@ -145,8 +161,8 @@ synthetic cases written by `scripts/drawing_cases.py`. Word saved each as PDF th
 
 Every case is drawn twice:
 
-- as written, with no compatibility options, which Word opens in its Compatibility Mode (Word's
-  own window says so, asked through the oracle);
+- as written, with no compatibility options (asked once through the oracle, Word captioned such a
+  file's window "Compatibility Mode"; that answer is not kept in the record);
 - under the QRD template's options (`compatibilityMode` 15 and the four others EMA's labels
   carry), which open as Word's current mode.
 
@@ -273,6 +289,4 @@ change:
 - `shading-FFFFFF` over paint, drawn as white or refused.
 - A nudge (`position±1` or `±2` at the paragraph's size) as an owner decision. A smaller raised run
   stays a superscript and is never dropped.
-- The grid `widths`, for `fidelity-norm/3.6.0`'s column widths. These are the stored widths. Word
-  lays an autofit table out again when it opens it, so for a file not last saved by Word they may
-  not be what Word draws.
+- Nothing, for now, from the grid `widths`: they are stored, not drawn (above).

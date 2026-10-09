@@ -134,7 +134,6 @@ def test_a_theme_shading_is_resolved_only_where_word_paints_what_it_is_resolved_
         "bg1-shade-lower",
         "bg1-tint",
         "bg1-tint-shade",
-        "bg1-nil",
         "light1",
         "accent1",
         "text1",
@@ -143,7 +142,9 @@ def test_a_theme_shading_is_resolved_only_where_word_paints_what_it_is_resolved_
         "pct15-text1",
         "pct15-fill-bg1",
     }
-    themed = {name for name, shd in drawing_cases.SHADINGS if "themeFill" in shd}
+    themed = {
+        name for name, shd in drawing_cases.SHADINGS if "themeFill" in shd and "nil" not in shd
+    }
     assert {"bg1", "bg1-stale", "bg1-shade-D9", "para-bg1-shade-D9"} <= themed & resolved
     # The same rows under a red lt1 or no mapping: never resolved, and Word paints the theme.
     for name in (f"shading-red{mode}", f"shading-unmapped{mode}"):
@@ -157,6 +158,9 @@ def test_a_theme_shading_is_resolved_only_where_word_paints_what_it_is_resolved_
     # A pattern's theme colour is not the automatic one: 15% of accent2, not grey.
     assert rows["pct15-accent2"][0] not in ("D9D9D9", "FFFFFF")
     assert rows["pct15-accent2"][1] == ["shading-pct15-THEME-accent2-AUTO"]
+    # nil is no shading, as Word paints none, whatever its fill or theme.
+    for row in ("bg1-nil", "nil-fill", "nil-fill-colour"):
+        assert rows[row] == ("FFFFFF", []), row
     # A tint, and a tint with a shade, are named as such.
     assert rows["bg1-tint"][1] == ["shading-THEME-background1-tint80"]
     assert rows["bg1-tint-shade"][1] == ["shading-THEME-background1-tint80-shadeD9"]

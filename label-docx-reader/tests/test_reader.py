@@ -1008,6 +1008,7 @@ _NO_GRID = {
     "plus-width": ("bad-width", _wide("+5")),
     "too-wide": ("bad-width", _wide("31681")),
     "six-digits": ("bad-width", _wide("010000")),
+    "leading-zero": ("bad-width", _wide("04000")),
     "width-first": ("bad-width", _wide("0", row=_AFTER.format("x"))),
     "two-grids": ("two-grids", tbl(1, f"{GRID1}<w:tr>{tc('a')}</w:tr>")),
     "not-a-number": ("bad-number", tbl(1, f"<w:tr>{tc('a', _span('one'))}</w:tr>")),
@@ -1029,7 +1030,7 @@ _NO_GRID = {
 
 
 def test_a_tables_grid_carries_each_columns_width_in_twips() -> None:
-    for widths in (("1", "31680"), ("01000", "2000", "3"), ("1440",)):
+    for widths in (("1", "31680"), ("1000", "2000", "3"), ("1440",)):
         (table,) = read_document(docx(_wide(*widths))).tables
         assert table.grid is not None
         assert table.grid.widths == tuple(int(w) for w in widths)
@@ -1346,7 +1347,6 @@ def test_a_theme_fill_word_was_not_asked_to_draw_keeps_its_theme_name() -> None:
             "THEME-background1-shadeD9",
         ),
         (shade.format("D9") + ' w:themeColor="text1"', "THEME-background1-shadeD9"),
-        (shade.format("D9").replace('w:val="clear"', 'w:val="nil"'), "THEME-background1-shadeD9"),
     ):
         assert _shading_kinds(attributes) == [f"shading-{kind}"], attributes
     assert _shading_kinds(BACKGROUND.format("FFFFFF").replace("clear", "solid")) == [
@@ -1422,6 +1422,19 @@ def _paged(data: bytes, colour: str) -> bytes:
                 content = content.replace(b"<w:body>", page)
             target.writestr(info, content)
     return out.getvalue()
+
+
+def test_a_nil_shading_is_none_whatever_its_fill() -> None:
+    # Word paints nothing for nil, over its fill, its colour or a theme's (drawing-cases
+    # shading, bg1-nil and nil-*).
+    for attributes in (
+        'w:val="nil" w:fill="D9D9D9"',
+        'w:val="nil" w:color="FF0000" w:fill="FF0000"',
+        BACKGROUND.format("D9D9D9").replace("clear", "nil") + ' w:themeFillShade="D9"',
+        'w:val="nil" w:fill="D9D9D9" w:themeFillShade="D9"',
+    ):
+        assert _shading_kinds(attributes) == [], attributes
+        assert _shading_kinds(attributes, paragraph=True) == [], attributes
 
 
 def test_a_white_shading_is_a_mark_only_where_something_is_painted_under_it() -> None:

@@ -1257,7 +1257,7 @@ def test_a_word_6_label_under_a_leader_is_never_certified() -> None:
 
 
 def test_a_grids_widths_are_certified_at_each_end() -> None:
-    for widths in (("1", "31680"), ("01000",)):
+    for widths in (("1", "31680"), ("1000",)):
         columns = "".join(f'<w:gridCol w:w="{w}"/>' for w in widths)
         span = f'<w:tcPr><w:gridSpan w:val="{len(widths)}"/></w:tcPr>'
         cell = f"<w:tr><w:tc>{span}{_p('')}</w:tc></w:tr>"
@@ -1322,6 +1322,8 @@ _DEFAULT_TABLE = '<w:style w:type="table" w:default="1" w:styleId="T">{}</w:styl
 SHADED: list[tuple[bytes, list[str]]] = [
     # Nothing painted, the pattern spelt as Word stores it.
     (_coloured(_run('<w:shd w:val="clear"/>')), []),
+    (_coloured(_run('<w:shd w:val="nil" w:fill="D9D9D9"/>')), []),
+    (_coloured(_run(_WHITE), _DEFAULT_GREY.replace('w:val="clear"', 'w:val="nil"')), []),
     (_coloured(_run('<w:shd w:val="pct15"/>')), ["shading-pct15-AUTO-AUTO"]),
     (_coloured(_run('<w:shd w:val="pct15" w:color="000000"/>')), ["shading-pct15-000000-AUTO"]),
     (

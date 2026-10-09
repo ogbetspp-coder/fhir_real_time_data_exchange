@@ -235,6 +235,34 @@ def test_each_view_of_a_changed_grid_carries_its_own_columns_widths() -> None:
         for view in ("accepted", "original")
     }
     assert widths == {"accepted": [[2000, 2000]], "original": [[1500, 2500]]}
+    # The check holds each view's grid on its own: the original's is the former one, exactly.
+    data = docx(body)
+    accepted, original, _ = tracked(data)
+    certify_tracked(data, {"accepted": accepted, "original": original})
+    for wrong in ('w:w="2000"/><w:gridCol w:w="2000"', 'w:w="1500"/><w:gridCol w:w="9999"'):
+        tampered = _with_grid(original, wrong)
+        with pytest.raises(CertificationError):
+            certify_tracked(data, {"accepted": accepted, "original": tampered})
+    with pytest.raises(CertificationError):
+        certify_tracked(
+            data, {"accepted": _with_grid(accepted, 'w:w="2000"/><w:gridCol w:w="2001"')}
+        )
+
+
+def _with_grid(view: bytes, columns: str) -> bytes:
+    """``view`` with its grid's two columns made ``<w:gridCol {columns}/>``."""
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(view)) as source, zipfile.ZipFile(out, "w") as target:
+        for info in source.infolist():
+            content = source.read(info)
+            if info.filename == "word/document.xml":
+                xml = content.decode()
+                start = xml.index("<ns0:tblGrid>") + len("<ns0:tblGrid>")
+                end = xml.index("</ns0:tblGrid>")
+                grid = f"<ns0:gridCol {columns}/>".replace("w:", "ns0:")
+                content = (xml[:start] + grid + xml[end:]).encode()
+            target.writestr(info, content)
+    return out.getvalue()
 
 
 def test_what_the_reader_cannot_undo_exactly_is_refused() -> None:

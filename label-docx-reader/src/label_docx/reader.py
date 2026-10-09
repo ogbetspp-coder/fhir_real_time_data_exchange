@@ -91,28 +91,28 @@ shading a style may paint is taken as possibly under every cell, for faint text,
 text under a part's fonts is refused.
 
 Tables. ``read_document`` reports each body table (``Document.tables``), one ``Table`` per
-``<w:tbl>`` in document order, a nested table after the table holding it and as its own entry,
-with ``parent`` the (table, row, cell) it stands in, and its ``grid``: ``columns``, the number of
-``gridCol`` in its ``tblGrid``, their ``widths`` (each one's ``w:w`` in twips, in grid order, as
-the view read stores it: the original view of a tracked grid change its former grid), and its
-rows, each with the grid columns it leaves out before and
-after its cells (``gridBefore``, ``gridAfter``; 0 when absent) and its ``<w:tc>`` cells in order,
-each with the first grid column it covers (from 0: ``before`` plus the spans before it), its
-``span`` (``gridSpan``, 1 when absent) and its ``merge`` as stored (``vMerge``: None, ``restart``,
-or ``continue``, which is also what a ``vMerge`` with no value means). Nothing is inferred: where
-Word's grid is not on record the grid is None and ``reason`` says why (``REASONS``, the first
-found): no ``tblGrid`` (Word builds one by rules of its own) or more than one, a column whose width
-is not digits from 1 to 31,680 twips (``bad-width``: Word works it out), a count that is not
-digits, a legacy horizontal merge (``hMerge``: Word shows the merged-away cell's text as its own
+``<w:tbl>`` in document order, a nested table after the table holding it and as its own entry, with
+``parent`` the (table, row, cell) it stands in, and its ``grid``: ``columns``, the number of
+``gridCol`` in its ``tblGrid``, their ``widths`` (each one's ``w:w`` in twips, in grid order, as the
+view read stores it: the original view of a tracked grid change its former grid; stored, not drawn,
+as Word lays an autofit table out again), and its rows, each with the grid columns it leaves out
+before and after its cells (``gridBefore``, ``gridAfter``; 0 when absent) and its ``<w:tc>`` cells
+in order, each with the first grid column it covers (from 0: ``before`` plus the spans before it),
+its ``span`` (``gridSpan``, 1 when absent) and its ``merge`` as stored (``vMerge``: None,
+``restart``, or ``continue``, which is also what a ``vMerge`` with no value means). Nothing is
+inferred: where Word's grid is not on record the grid is None and ``reason`` says why (``REASONS``,
+the first found): no ``tblGrid`` (Word builds one by rules of its own) or more than one, a column
+whose width is not digits from 1 to 31,680 twips (``bad-width``: Word works it out), a count that is
+not digits, a legacy horizontal merge (``hMerge``: Word shows the merged-away cell's text as its own
 cell's, but where it draws it is not on record), a ``vMerge`` of another value, a span of 0, or a
-row whose ``before`` + spans + ``after`` is not ``columns``. The text is read all the same: no
-grid refuses a document. Each row says whether its height may be ``exact`` (Word clips what does
-not fit): its own ``trHeight`` of rule ``exact``, or one its table's style sets in its own or a
-conditional part's row properties, which is taken as possibly any row's (how Word applies a
-style's row height is not on record). A vertical merge is reported as stored, the cells it
-continues not checked: which cells Word joins is a layout question for whoever draws the table.
-Widths (``tcW``, ``wBefore``...) are not reported. Tables in notes, headers, footers and
-comments are not reported (their paragraphs' ``table`` is as above).
+row whose ``before`` + spans + ``after`` is not ``columns``. The text is read all the same: no grid
+refuses a document. Each row says whether its height may be ``exact`` (Word clips what does not
+fit): its own ``trHeight`` of rule ``exact``, or one its table's style sets in its own or a
+conditional part's row properties, which is taken as possibly any row's (how Word applies a style's
+row height is not on record). A vertical merge is reported as stored, the cells it continues not
+checked: which cells Word joins is a layout question for whoever draws the table. Widths (``tcW``,
+``wBefore``...) are not reported. Tables in notes, headers, footers and comments are not reported
+(their paragraphs' ``table`` is as above).
 
 Pictures. Each U+FFFC in a paragraph's ``text``, in the body, a note, a header, a footer or a
 comment, has a ``Picture`` in its ``pictures``, in order, with its ``offset``: its ``kind``,
@@ -925,7 +925,8 @@ class TableGrid:
 
 
 # Why a table's grid is not reported, the first found in this order: no ``tblGrid`` or more than
-# one; a ``gridCol`` whose width is not digits from 1 to ``_WIDEST`` twips; then row by row, a
+# one; a ``gridCol`` whose width is not digits, without a leading zero, from 1 to ``_WIDEST``
+# twips; then row by row, a
 # ``gridBefore`` or ``gridAfter`` that is not a count; cell by cell, a horizontal merge
 # (``hMerge``), a ``vMerge`` other than restart or continue, a ``gridSpan`` that is not a count or
 # is 0; and the row not filling the grid exactly.
@@ -3090,11 +3091,14 @@ def _shading(element: ET.Element | None, styles: _Styles) -> str | None:
     theme's fill is resolved where Word's drawing of it is on record (``_theme_fill``), else named
     (``_theme_name``); a pattern's theme colour is named, so it never reads as the automatic one.
     White is ``shading-FFFFFF``, which a caller leaves out only where nothing is painted under it
-    (Word paints it over a grey paragraph or cell, drawing-cases shading-white).
+    (Word paints it over a grey paragraph or cell, drawing-cases shading-white). ``nil`` is no
+    shading, whatever its fill and colour: Word paints none (drawing-cases shading, nil-*).
     """
     if element is None:
         return None
     pattern = element.get(_w("val"))
+    if pattern == "nil":
+        return None
     fill = (element.get(_w("fill")) or "auto").upper()
     named = _theme_name(element, "themeFill", "themeFillTint", "themeFillShade")
     if named is not None:
@@ -5530,7 +5534,7 @@ def _laid(
     if len(grids) != 1:
         return None, "two-grids" if grids else "no-grid"
     stated = [column.get(_w("w"), "") for column in grids[0].findall(_w("gridCol"))]
-    if not all(re.fullmatch("[0-9]{1,5}", w) and 0 < int(w) <= _WIDEST for w in stated):
+    if not all(re.fullmatch("[1-9][0-9]{0,4}", w) and int(w) <= _WIDEST for w in stated):
         # A column whose width Word works out by rules of its own.
         return None, "bad-width"
     columns = len(stated)

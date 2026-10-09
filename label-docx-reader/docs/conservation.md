@@ -173,8 +173,10 @@ Word is asked about emphasis per body paragraph: whether all its letters are bol
 capitals or struck through, white space's formatting aside, so Word's "no" agrees with a
 paragraph partly so; a paragraph with a note reference, a page number or a hidden paragraph mark
 is not held to it (`word.emphasis_verdict`). Superscript, subscript, underline, highlight, shading, faint, raised or
-lowered and right-to-left text are not asked of Word: they are held by unit tests, and the
-first three, with the toggles, by the check's own copy of Word's rules (R-35). Word's text shows
+lowered and right-to-left text are not asked of Word's text: they are held by unit tests, and the
+first three, with the toggles, by the check's own copy of Word's rules (R-35); shading by the
+check's own reading too, a theme's fill, a pattern's colour and white over paint as Word drew
+them (`corpus/drawing-cases`, R-46). Word's text shows
 every Symbol character (`w:sym`) as "(", so Word cannot tell them apart: there the reader's
 character is held to be one of the Symbol table's (R-38), and this check holds which one.
 

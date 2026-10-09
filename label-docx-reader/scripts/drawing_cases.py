@@ -275,6 +275,8 @@ SHADINGS: list[tuple[str, str]] = [
     ("bg1-tint", f'{BG1} w:fill="FFFFFF" w:themeFillTint="80"'),
     ("bg1-tint-shade", f'{BG1} w:fill="D9D9D9" w:themeFillTint="80" w:themeFillShade="D9"'),
     ("bg1-nil", 'w:val="nil" w:themeFill="background1" w:fill="FFFFFF"'),
+    ("nil-fill", 'w:val="nil" w:fill="D9D9D9"'),
+    ("nil-fill-colour", 'w:val="nil" w:color="FF0000" w:fill="FF0000"'),
     ("light1", 'w:val="clear" w:color="auto" w:themeFill="light1" w:fill="FFFFFF"'),
     ("accent1", 'w:val="clear" w:color="auto" w:themeFill="accent1" w:fill="4F81BD"'),
     ("text1", 'w:val="clear" w:color="auto" w:themeFill="text1" w:fill="000000"'),
