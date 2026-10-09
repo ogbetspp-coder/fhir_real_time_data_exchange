@@ -25,7 +25,15 @@ from typing import Any
 
 import pytest
 from label_docx import browser
-from label_docx.reader import Anchored, CommentReference, Mark, Numbering, Paragraph, Picture
+from label_docx.reader import (
+    Anchored,
+    CommentReference,
+    DocxRefusedError,
+    Mark,
+    Numbering,
+    Paragraph,
+    Picture,
+)
 
 from zone_a import certified, drawing, word_epi
 from zone_a.certified import Body, read_body
@@ -1072,14 +1080,21 @@ def test_the_grey_span_holds_the_other_marks() -> None:
         *("highlight-darkGray", "shading-D9D9D8", "highlight-yellow"),
         # Word draws these in other colours than the template's two (its own print, 2026-10-07).
         *("shading-BFBFBF", "shading-E6E6E6"),
-        # Word prints 15% auto on auto or white as D9D9D9 (its fill opaque white); the reader spells
-        # a theme pattern colour from docx-reader/1.34.0, and these wait for a fidelity norm.
-        *("shading-pct15-AUTO-AUTO", "shading-pct15-AUTO-FFFFFF", "shading-pct15-AUTO-E6E6E6"),
+        # A theme's pattern colour or fill, which the reader spells from docx-reader/1.34.0: Word
+        # draws an accent at 15% in its own colour.
         *("shading-pct15-THEME-accent2-AUTO", "shading-pct15-THEME-text1-AUTO"),
-        # Nothing on record says how Word draws these.
+        *("shading-pct15-THEME-text1-FFFFFF", "shading-pct15-AUTO-THEME-background1"),
+        *("shading-pct15-THEME-text1-tint99-AUTO", "shading-pct15-AUTO-THEME-background1-shadeD9"),
+        # Nothing on record says how Word draws these: another pattern, colour or fill.
         *("shading-pct10-AUTO-AUTO", "shading-pct20-AUTO-AUTO", "shading-pct15-AUTO-D9D9D9"),
+        *("shading-pct12-AUTO-AUTO", "shading-pct25-AUTO-FFFFFF", "shading-solid-AUTO-AUTO"),
+        *("shading-pct15-AUTO-E6E6E6", "shading-pct15-AUTO-FFFFFE", "shading-pct15-FFFFFF-AUTO"),
         *("shading-pct15-000000-AUTO", "shading-pct15-AUTO-C0C0C0", "shading-C0C0C1"),
-        *("shading-THEME-background1", "shading-clear-AUTO-C0C0C0"),
+        *("shading-pct15-000000-FFFFFF", "shading-horzStripe-AUTO-AUTO", "shading-AUTO"),
+        *("shading-THEME-background1", "shading-clear-AUTO-C0C0C0", "shading-FFFFFF"),
+        # Not the reader's spelling: lower case, or a part more or less.
+        *("shading-pct15-auto-auto", "shading-pct15-AUTO", "shading-pct15-AUTO-AUTO-AUTO"),
+        *("shading-pct15-AUTO-ffffff", "shading-Pct15-AUTO-AUTO", "shading-pct15-AUTO-AUTO "),
     ],
 )
 def test_another_grey_or_colour_is_refused(kind: str) -> None:
@@ -1088,13 +1103,37 @@ def test_another_grey_or_colour_is_refused(kind: str) -> None:
     assert refused.value.code == "formatting"
 
 
-def test_the_greys_are_the_templates_two_and_the_shading_word_draws_as_its_highlight() -> None:
-    """Decision 5's two marks, and C0C0C0 shading (decision 9, by Word's own print)."""
-    assert frozenset({"highlight-lightGray", "shading-D9D9D9", "shading-C0C0C0"}) == word_epi.GREY
+def test_the_greys_are_the_templates_two_and_the_shadings_word_draws_as_one_of_them() -> None:
+    """Decision 5's two marks; C0C0C0 shading (decision 9, by Word's own print); and from
+    fidelity-norm/3.7.0 the 15% pattern of the automatic colour on an automatic or white fill,
+    which Word draws exactly as D9D9D9 on any background (its own print, 2026-10-07)."""
+    assert (
+        frozenset(
+            {
+                *("highlight-lightGray", "shading-D9D9D9", "shading-C0C0C0"),
+                *("shading-pct15-AUTO-AUTO", "shading-pct15-AUTO-FFFFFF"),
+            }
+        )
+        == word_epi.GREY
+    )
 
 
-def _shaded_docx(shading: str) -> bytes:
-    """A minimal .docx of one paragraph whose second word's run carries ``shading``."""
+# A theme's colour scheme (Office's), for a theme colour the reader resolves and names.
+THEME = (
+    '<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="t">'
+    '<a:themeElements><a:clrScheme name="Office">'
+    '<a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1>'
+    '<a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1>'
+    '<a:dk2><a:srgbClr val="44546A"/></a:dk2><a:lt2><a:srgbClr val="E7E6E6"/></a:lt2>'
+    '<a:accent1><a:srgbClr val="4472C4"/></a:accent1>'
+    '<a:accent2><a:srgbClr val="ED7D31"/></a:accent2>'
+    "</a:clrScheme></a:themeElements></a:theme>"
+)
+
+
+def _shaded_docx(shading: str, theme: bool = False) -> bytes:
+    """A minimal .docx of one paragraph whose second word's run carries ``shading`` (run
+    properties), with ``THEME`` as its theme where ``theme``."""
     run = '<w:r><w:t xml:space="preserve">{}</w:t></w:r>'
     body = (
         "<w:p>"
@@ -1116,7 +1155,19 @@ def _shaded_docx(shading: str) -> bytes:
             'openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
             'Target="word/document.xml"/></Relationships>',
         )
-        package.writestr("word/_rels/document.xml.rels", f'<Relationships xmlns="{rels}"/>')
+        package.writestr(
+            "word/_rels/document.xml.rels",
+            f'<Relationships xmlns="{rels}">'
+            + (
+                '<Relationship Id="t1" Type="http://schemas.openxmlformats.org/officeDocument/'
+                '2006/relationships/theme" Target="theme/theme1.xml"/>'
+                if theme
+                else ""
+            )
+            + "</Relationships>",
+        )
+        if theme:
+            package.writestr("word/theme/theme1.xml", THEME)
         package.writestr(
             "word/document.xml", f'<w:document xmlns:w="{W}"><w:body>{body}</w:body></w:document>'
         )
@@ -1139,6 +1190,217 @@ def test_a_solid_c0c0c0_run_read_by_the_reader_is_the_silver_span_and_a_themed_o
     with pytest.raises(RefusedError) as refused:
         _section(range(len(body.paragraphs)), body)
     assert refused.value.code == "formatting"
+
+
+@pytest.mark.parametrize(
+    ("shading", "kind"),
+    [
+        ('<w:shd w:val="pct15" w:color="auto" w:fill="auto"/>', "shading-pct15-AUTO-AUTO"),
+        ('<w:shd w:val="pct15" w:fill="auto"/>', "shading-pct15-AUTO-AUTO"),
+        ('<w:shd w:val="pct15" w:color="auto"/>', "shading-pct15-AUTO-AUTO"),
+        ('<w:shd w:val="pct15" w:color="auto" w:fill="FFFFFF"/>', "shading-pct15-AUTO-FFFFFF"),
+        ('<w:shd w:val="pct15" w:color="auto" w:fill="ffffff"/>', "shading-pct15-AUTO-FFFFFF"),
+    ],
+)
+def test_a_15_percent_pattern_of_the_automatic_colour_read_by_the_reader_is_the_grey(
+    shading: str, kind: str
+) -> None:
+    """fidelity-norm/3.7.0, through the label reader's certified read: Word draws 15% of the
+    automatic colour on an automatic or white fill as exactly D9D9D9, on a white page, a yellow
+    cell or a grey paragraph alike (its own print, 2026-10-07: the automatic fill is opaque
+    white), which is ``shading-D9D9D9``'s colour."""
+    body = read_body(_shaded_docx(shading))
+    assert [(m.start, m.end, m.kind) for m in body.paragraphs[0].marks] == [(7, 14, kind)]
+    div, text = _section(range(len(body.paragraphs)), body)
+    assert _inner(div or "") == f"<p>Report {GREY_SPAN}it here</span></p>"
+    assert text == "\nReport it here\n"
+
+
+@pytest.mark.parametrize(
+    ("shading", "kind"),
+    [
+        # The review's blocker of 3.4.0: a theme's pattern colour, which Word draws in that colour
+        # (accent2 at 15% as #FCEBE0), read as auto before docx-reader/1.34.0. Now spelt, refused.
+        (
+            '<w:shd w:val="pct15" w:color="auto" w:themeColor="accent2" w:fill="auto"/>',
+            "shading-pct15-THEME-accent2-AUTO",
+        ),
+        (
+            '<w:shd w:val="pct15" w:themeColor="text1" w:fill="FFFFFF"/>',
+            "shading-pct15-THEME-text1-FFFFFF",
+        ),
+        (
+            '<w:shd w:val="pct15" w:color="auto" w:themeColor="text1" w:themeShade="80"'
+            ' w:fill="auto"/>',
+            "shading-pct15-THEME-text1-shade80-AUTO",
+        ),
+        (
+            '<w:shd w:val="pct15" w:color="auto" w:fill="FFFFFF" w:themeFill="background1"/>',
+            "shading-pct15-AUTO-THEME-background1",
+        ),
+        ('<w:shd w:val="pct15" w:color="000000" w:fill="auto"/>', "shading-pct15-000000-AUTO"),
+        ('<w:shd w:val="pct15" w:color="auto" w:fill="D9D9D9"/>', "shading-pct15-AUTO-D9D9D9"),
+        ('<w:shd w:val="pct10" w:color="auto" w:fill="auto"/>', "shading-pct10-AUTO-AUTO"),
+        ('<w:shd w:val="pct20" w:color="auto" w:fill="auto"/>', "shading-pct20-AUTO-AUTO"),
+    ],
+)
+def test_a_pattern_in_a_theme_or_another_colour_read_by_the_reader_is_refused(
+    shading: str, kind: str
+) -> None:
+    """With a theme, the reader names a theme's pattern colour or fill (never AUTO), and the
+    builder refuses it; with none, the reader refuses a theme colour it cannot resolve."""
+    if "accent" in shading:  # text1 and background1 resolve to the system's colours
+        with pytest.raises(DocxRefusedError) as unread:
+            read_body(_shaded_docx(shading))
+        assert unread.value.code == "unsupported-formatting"
+    body = read_body(_shaded_docx(shading, theme=True))
+    assert [(m.start, m.end, m.kind) for m in body.paragraphs[0].marks] == [(7, 14, kind)]
+    with pytest.raises(RefusedError) as refused:
+        _section(range(len(body.paragraphs)), body)
+    assert (refused.value.code, refused.value.detail) == ("formatting", kind)
+
+
+# ADR 0006 owner decision 13 (2026-10-09): a full-size run moved by at most a point.
+NUDGES = (
+    *("position-1-size22-in22", "position+1-size22-in22", "position-2-size22-in22"),
+    *("position+2-size22-in22", "position-1-size20-in20", "position+2-size24-in24"),
+    *("position-2-size16-in16", "position+1-size7-in7"),
+)
+
+
+@pytest.mark.parametrize("kind", NUDGES)
+def test_a_full_size_run_moved_by_at_most_a_point_is_left_out(kind: str) -> None:
+    """Owner decision 13 (2026-10-09): the same characters on the same line, a point up or down
+    at most and at the paragraph's size, are layout, left out as an underline that changes
+    nothing is; in a table cell as outside one, with the marks it holds kept."""
+    div, page = _build(
+        _p("Take 2 tablets daily", (5, 6, kind), (15, 20, kind), (0, 4, "bold")),
+        _p("m2 dose", (0, 1, kind), (1, 2, "superscript"), (3, 7, kind)),
+        _p("10 mg", (0, 5, kind), table=(0, 0, 0)),
+        tables=CELL,
+    )
+    assert _inner(div) == (
+        "<p><strong>Take</strong> 2 tablets daily</p><p>m<sup>2</sup> dose</p>"
+        "<table><tr><td><p>10 mg</p></td></tr></table>"
+    )
+    assert page == "\nTake 2 tablets daily\nm² dose\n﷐\n﷒\t﷓\t10 mg\n﷑\n"
+    assert _same(div, page)
+    assert word_epi.nudged(_p("Take 2", (5, 6, kind)), Mark(5, 6, kind))
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        # Moved further: more than a point.
+        *("position-3-size22-in22", "position+3-size22-in22", "position+4-size22-in22"),
+        *("position-6-size22-in22", "position+10-size22-in22", "position-12-size22-in22"),
+        *("position+21-size22-in22", "position-11-size22-in22", "position+99999-size22-in22"),
+        # Smaller or larger than the paragraph's text: a superscript or index typed by hand.
+        *("position-1-size20-in22", "position+1-size24-in22", "position+2-size16-in22"),
+        *("position+8-size14-in22", "position-4-size14-in22", "position+2-size22-in24"),
+        *("position+1-size2-in22", "position-2-size220-in22", "position+1-size22-in2"),
+        # Not the reader's spelling of a shift: no sign, zero, a leading zero, a part missing.
+        *("position1-size22-in22", "position+0-size22-in22", "position-0-size22-in22"),
+        *("position-01-size22-in22", "position-1-size022-in22", "position-1-size22-in022"),
+        *("position-1-size22", "position-1", "position--1-size22-in22", "position-1-size-in"),
+        *("position-1-size22-in22 ", "position-1-size22-in22-", "Position-1-size22-in22"),
+        "position-1-size\u0662\u0662-in\u0662\u0662",
+        "position-1-size22-in\u0662\u0662",
+    ],
+)
+def test_another_raised_or_lowered_position_is_refused(kind: str) -> None:
+    for tables, where in (((), None), (CELL, (0, 0, 0))):
+        with pytest.raises(RefusedError) as refused:
+            _build(_p("Take 2 tablets", (5, 6, kind), table=where), tables=tables)
+        assert (refused.value.code, refused.value.detail) == ("formatting", kind), where
+        assert not word_epi.nudged(_p("Take 2"), Mark(5, 6, kind))
+
+
+@pytest.mark.parametrize("script", ["superscript", "subscript"])
+@pytest.mark.parametrize(("start", "end"), [(0, 2), (1, 2), (0, 1), (1, 4), (0, 7)])
+def test_a_nudge_with_superscript_or_subscript_is_refused(
+    script: str, start: int, end: int
+) -> None:
+    """A shift with ``vertAlign`` on any of its characters: refused, as Word draws it otherwise
+    than either alone."""
+    for kind in NUDGES:
+        paragraph = _p("m2 dose", (0, 2, kind), (start, end, script))
+        with pytest.raises(RefusedError) as refused:
+            _build(paragraph)
+        assert (refused.value.code, refused.value.detail) == ("formatting", kind)
+        assert not word_epi.nudged(paragraph, Mark(0, 2, kind))
+    # Beside it, not on it: the shift is left out.
+    div, _ = _build(_p("m2 dose", (0, 2, "position-1-size22-in22"), (3, 4, script)))
+    assert _inner(div) == f"<p>m2 <{script[:3]}>d</{script[:3]}>ose</p>"
+
+
+def test_a_heading_may_hold_a_nudge_and_no_other_shift() -> None:
+    for kind in NUDGES:
+        body = Body((_p("4.1 Y", (4, 5, kind)), _p("text"), _p("4.2 Z")), ())
+        built = sections(body, _structured({"smpc.4.1": 0, "smpc.4.2": 2}), REGISTRY)
+        assert built["refused"] == 0, kind
+    for kind in ("position-3-size22-in22", "position+2-size16-in22"):
+        body = Body((_p("4.1 Y", (4, 5, kind)), _p("text"), _p("4.2 Z")), ())
+        built = sections(body, _structured({"smpc.4.1": 0, "smpc.4.2": 2}), REGISTRY)
+        assert built["sections"][0]["refusal"]["code"] == "heading-formatting", kind
+    body = Body((_p("4.1 Y", (4, 5, NUDGES[0]), (4, 5, "superscript")), _p("t"), _p("4.2 Z")), ())
+    built = sections(body, _structured({"smpc.4.1": 0, "smpc.4.2": 2}), REGISTRY)
+    assert built["sections"][0]["refusal"]["code"] == "heading-formatting"
+
+
+@pytest.mark.parametrize(
+    ("properties", "kinds", "carried"),
+    [
+        ('<w:position w:val="-2"/>', ["position-2-size20-in20"], True),
+        ('<w:position w:val="1"/>', ["position+1-size20-in20"], True),
+        ('<w:position w:val="2"/><w:sz w:val="20"/>', ["position+2-size20-in20"], True),
+        ('<w:position w:val="3"/>', ["position+3-size20-in20"], False),
+        ('<w:position w:val="-2"/><w:sz w:val="16"/>', ["position-2-size16-in20"], False),
+        ('<w:position w:val="6"/><w:sz w:val="14"/>', ["position+6-size14-in20"], False),
+        (
+            '<w:vertAlign w:val="superscript"/><w:position w:val="2"/>',
+            ["superscript", "position+2-size20-in20"],
+            False,
+        ),
+    ],
+)
+def test_a_position_read_by_the_reader(properties: str, kinds: list[str], carried: bool) -> None:
+    """Through the label reader's certified read (docx-reader/1.34.0's kind: the signed shift,
+    the run's size and the paragraph's, in half-points)."""
+    body = read_body(_shaded_docx(properties))
+    assert sorted(m.kind for m in body.paragraphs[0].marks) == sorted(kinds)
+    if carried:
+        div, text = _section(range(len(body.paragraphs)), body)
+        assert _inner(div or "") == "<p>Report it here</p>"
+        assert text == "\nReport it here\n"
+    else:
+        with pytest.raises(RefusedError) as refused:
+            _section(range(len(body.paragraphs)), body)
+        assert refused.value.code == "formatting"
+
+
+def test_the_drawing_check_leaves_a_nudge_out_and_no_other_shift() -> None:
+    """``zone_a.drawing`` reads the paragraphs as the narrative draws them: a nudge is no mark,
+    any other shift is one (and differs from what Chrome draws)."""
+    plain = (frozenset[str](),) * 2
+    for kind in NUDGES:
+        assert drawing.read_lines([_p("ab", (0, 2, kind))]) == [("ab", plain)]
+    for kind in ("position-3-size22-in22", "position-1-size20-in22"):
+        assert drawing.read_lines([_p("ab", (0, 2, kind))]) == [("ab", (frozenset({kind}),) * 2)]
+    raised = drawing.read_lines([_p("ab", (0, 2, NUDGES[0]), (0, 2, "superscript"))])
+    assert raised == [("ab", (frozenset({NUDGES[0], "superscript"}),) * 2)]
+
+
+@pytest.mark.skipif(browser.find_chrome() is None, reason="Chrome is not installed")
+def test_chrome_draws_a_nudged_run_as_the_read_without_it() -> None:
+    paragraphs = (
+        _p("Take 2 tablets", (5, 6, "position+2-size22-in22"), (7, 14, "shading-pct15-AUTO-AUTO")),
+        _p("10 mg", (0, 2, "position-1-size22-in22"), table=(0, 0, 0)),
+    )
+    body = Body(paragraphs, CELL)
+    div, _ = _section(range(len(paragraphs)), body)
+    section = {"key": "s", "refusal": None, "narrative": div, "paragraphs": [0, len(paragraphs)]}
+    assert drawing.check(body, {"sections": [section]})["sections"][0]["agrees"]
 
 
 @pytest.mark.skipif(browser.find_chrome() is None, reason="Chrome is not installed")
@@ -1214,8 +1476,8 @@ def test_a_mark_over_spaces_word_paints_is_refused(
     "kind",
     [
         "dstrike",
-        # A pattern's or a theme's shading: not yet probed in Word.
-        *("shading-pct15-AUTO-AUTO", "shading-solid-000000-AUTO", "shading-pct50-FF0000-FFFF00"),
+        # A pattern's or a theme's shading: not yet probed in Word (a 15% grey is the template's).
+        *("shading-pct20-AUTO-AUTO", "shading-solid-000000-AUTO", "shading-pct50-FF0000-FFFF00"),
         *("shading-THEME-background1", "shading-THEME-accent1"),
         # Not a solid fill of six hex digits, or not one of Word's highlight colours.
         *("shading-00000", "shading-0000000", "shading-00000g", "highlight-orange", "highlight-"),
@@ -1280,7 +1542,7 @@ def test_a_heading_may_end_in_spaces_word_paints_over_nothing() -> None:
         (_p("struck", (0, 6, "strike")), "formatting"),
         (_p("Caps", (0, 4, "caps")), "formatting"),
         (_p("faint", (0, 5, "faint")), "formatting"),
-        (_p("raised", (0, 6, "position-1-size22-in22")), "formatting"),
+        (_p("raised", (0, 6, "position-3-size22-in22")), "formatting"),
         (_p("raised", (0, 6, "position+8-size14-in22")), "formatting"),
         (_p("x", (0, 1, "highlight-yellow")), "formatting"),
         (_p("\u00a0", (0, 1, "shading-FFFF00")), "formatting"),
@@ -2102,6 +2364,35 @@ def test_the_verify_vectors_of_3_6_0_are_what_the_builder_writes() -> None:
     by_name = {vector["name"]: vector for vector in VECTORS["verify"]}
     passed = by_name["certified-word-half-lives"]["input"]
     failed = by_name["certified-word-half-life-sharp-s-as-beta"]["input"]
+    for vector in (passed, failed):
+        assert [p["text"] for p in vector["source"]["pages"]] == [page]
+    inner = passed["sections"][0]["div"].removeprefix('<div xmlns="http://www.w3.org/1999/xhtml">')
+    assert _inner(div) == inner.removesuffix("</div>")
+
+
+def test_the_verify_vectors_of_3_7_0_are_what_the_builder_writes() -> None:
+    """The page and the narrative of fidelity-norm/3.7.0's two certified Word vectors
+    (``test/fixtures/fidelity/cases.ts``) are what ``zone_a.word_epi`` writes for their read: a
+    15% pattern grey in a paragraph and a cell, and full-size runs nudged up and down."""
+    first = "Report side effects via the national system."
+    second = "Take 2 tablets a day."
+    grey = first.index("via")
+    cells = _in_cells(["Dose", "10 mg"])
+    cells[1] = _p(
+        "10 mg",
+        (0, 5, "shading-pct15-AUTO-FFFFFF"),
+        (3, 5, "position-1-size20-in20"),
+        table=(0, 0, 1),
+    )
+    div, page = _build(
+        _p(first, (grey, len(first) - 1, "shading-pct15-AUTO-AUTO")),
+        _p(second, (5, 6, "position+2-size22-in22"), (15, 20, "position-1-size22-in22")),
+        *cells,
+        tables=(_grid(2, [(0, 1, None), (1, 1, None)]),),
+    )
+    by_name = {vector["name"]: vector for vector in VECTORS["verify"]}
+    passed = by_name["certified-word-pattern-grey-and-nudges"]["input"]
+    failed = by_name["certified-word-nudge-as-superscript"]["input"]
     for vector in (passed, failed):
         assert [p["text"] for p in vector["source"]["pages"]] == [page]
     inner = passed["sections"][0]["div"].removeprefix('<div xmlns="http://www.w3.org/1999/xhtml">')

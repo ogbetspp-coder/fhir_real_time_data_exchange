@@ -44,13 +44,15 @@ else, with the code in parentheses:
 
 - marks: bold, italic, superscript and subscript (not both at once: ``script``), and the QRD
   template's grey, a light grey highlight or D9D9D9 shading, or C0C0C0 shading, which Word draws
-  as the highlight (``GREY``; owner decisions of 2026-10-06 and 2026-10-07).
+  as the highlight, or a 15% pattern of the automatic colour on an automatic or white fill, which
+  Word draws as D9D9D9 (``GREY``; owner decisions of 2026-10-06 and 2026-10-07; 3.7.0's print).
   An underline is left out where it cannot change what the text says (``zone_a.underline``, a
   hyphen inside an underlined word included), else (``underline``); so are capitals and small
-  capitals over text that capitals draw the same ("4."), and a strike, a highlight or a solid
-  shading over U+0020 that end the paragraph's text, which Word does not paint (``unpainted``).
-  Any other mark, capitals elsewhere,
-  strike-through, another highlight or shading, faint, raised or lowered by position, or
+  capitals over text that capitals draw the same ("4."), a strike, a highlight or a solid
+  shading over U+0020 that end the paragraph's text, which Word does not paint (``unpainted``),
+  and a full-size run raised or lowered by at most a point, neither superscript nor subscript
+  (``nudged``; owner decision 13, 2026-10-09). Any other mark, capitals elsewhere,
+  strike-through, another highlight or shading, faint, another raise or lowering by position, or
   right-to-left text, is refused (``formatting``);
 - raised or lowered text: letters, the digits and signs of the specification's fold tables, and
   other punctuation and symbols that no rule there reads as a number or a sign (categories Po,
@@ -93,8 +95,8 @@ else, with the code in parentheses:
 A paragraph of only whitespace with no label is drawn as nothing and left out of both; a section
 of such paragraphs has no narrative and the empty page. The heading itself is held to the text
 rules above and may carry only bold, italic, capitals (its title is its line as Word draws it,
-capitals applied), an underline that cannot change it and small capitals over text they draw the
-same (``heading-formatting``).
+capitals applied), an underline that cannot change it, small capitals over text they draw the
+same and a nudge (``heading-formatting``).
 
 A section is refused whose heading or paragraphs anchor a floating object (``anchored-object``,
 the detail its kind: ``picture``, ``shape``, ``text-box`` or ``shapes``): Word draws it apart from
@@ -130,7 +132,7 @@ from zone_a.structure import line
 from zone_a.underline import underline_changes
 
 # The narrative builder's and the page serialiser's version: one, as they are one closed list.
-WORD_EPI_VERSION: Final = "word-epi/1.6.0"
+WORD_EPI_VERSION: Final = "word-epi/1.7.0"
 
 CARRIED: Final = {"bold": "strong", "italic": "em", "superscript": "sup", "subscript": "sub"}
 # Section 3 step 4's bullet glyphs: a list bullet in page text, removed at a line start.
@@ -145,9 +147,16 @@ WHITESPACE: Final = frozenset(
 # and C0C0C0 shading, which Word draws in the highlight's colour (owner decision 2026-10-07, ADR
 # 0006 decision 9, by Word's own print). A solid fill is opaque; a theme fill the reader resolves
 # is its colour's (``shading-D9D9D9``, docx-reader/1.34.0), one it does not another kind
-# (``shading-THEME-...``). The pattern greys (``shading-pct15-AUTO-AUTO``...) wait for a fidelity
-# norm: the reader spells a theme pattern colour apart from docx-reader/1.34.0.
-GREY: Final = frozenset({"highlight-lightGray", "shading-D9D9D9", "shading-C0C0C0"})
+# (``shading-THEME-...``). And a 15% pattern of the automatic colour on an automatic or white
+# fill, which Word draws as exactly D9D9D9 on any background, its automatic fill opaque white
+# (its own print, 2026-10-07; fidelity-norm/3.7.0): from docx-reader/1.34.0 the reader spells a
+# pattern's theme colour or fill (``shading-pct15-THEME-...``), so AUTO is the automatic colour.
+GREY: Final = frozenset(
+    {
+        *("highlight-lightGray", "shading-D9D9D9", "shading-C0C0C0"),
+        *("shading-pct15-AUTO-AUTO", "shading-pct15-AUTO-FFFFFF"),
+    }
+)
 # How the narrative draws it: the EMA ePI style guide's form for QRD "not printed" text.
 GREY_SPAN: Final = '<span style="background-color: silver;">'
 
@@ -445,13 +454,33 @@ def unpainted(paragraph: Paragraph, mark: Mark) -> bool:
     ) and set(paragraph.text[mark.start :]) <= {" "}
 
 
+# A shift by ``w:position`` of one or two half-points, either way, of a run at its paragraph's
+# size, as the reader spells it (docx-reader/1.34.0: no zero, no leading zero, ASCII digits).
+NUDGE: Final = re.compile(r"position[+-][12]-size([1-9][0-9]*)-in\1")
+
+
+def nudged(paragraph: Paragraph, mark: Mark) -> bool:
+    """A raise or lowering Word draws as layout: it is left out (owner decision 13, 2026-10-09).
+
+    A shift of at most a point (``NUDGE``), of a run at its paragraph's size, none of whose code
+    points is superscript or subscript: the same characters on the same line, which cannot become
+    an exponent, an index or a footnote mark (smaller, or moved further). Any other shift is
+    refused: a larger one, a smaller or larger run (a superscript typed by hand), or one with
+    ``vertAlign``.
+    """
+    return NUDGE.fullmatch(mark.kind) is not None and not any(
+        m.kind in ("superscript", "subscript") and m.start < mark.end and mark.start < m.end
+        for m in paragraph.marks
+    )
+
+
 def _marks(index: int, paragraph: Paragraph) -> list[Mark]:
     """The paragraph's carried marks; refuses one that is neither carried nor left out."""
     out: list[Mark] = []
     for mark in paragraph.marks:
         if mark.kind in CARRIED or mark.kind in GREY:
             out.append(mark)
-        elif unpainted(paragraph, mark):
+        elif unpainted(paragraph, mark) or nudged(paragraph, mark):
             continue
         elif mark.kind == "underline":
             if underline_changes(paragraph.text, mark.start, mark.end, hyphens_in_words=True):
@@ -929,8 +958,9 @@ def _heading(index: int, paragraph: Paragraph) -> None:
 
     A tab is a gap the title reads as a space; capitals are taken as Word draws them in the title
     (``zone_a.structure.line``); any other mark but bold, italic, an underline that cannot change
-    the text, small capitals over text they draw the same and one Word paints over nothing
-    (``unpainted``), and a label run into the text, would draw the title otherwise.
+    the text, small capitals over text they draw the same, one Word paints over nothing
+    (``unpainted``) and a nudge (``nudged``), and a label run into the text, would draw the title
+    otherwise.
     """
     _check(index, dataclasses.replace(paragraph, text=paragraph.text.replace("\t", " ")))
     for mark in paragraph.marks:
@@ -938,6 +968,7 @@ def _heading(index: int, paragraph: Paragraph) -> None:
         if not (
             mark.kind in ("bold", "italic", "caps")
             or unpainted(paragraph, mark)
+            or nudged(paragraph, mark)
             or (mark.kind == "smallCaps" and unchanged_by_capitals(text))
             or (
                 mark.kind == "underline"

@@ -194,8 +194,9 @@ evidence comes from 4.1, 4.5, 4.8 and 5.2, all carried.
 ### W5. The fidelity contract recognises a withheld section (a minor version)
 
 Today the verifier collects every coded section with `text` (`collectNarrativeSections`), so a
-notice would be refused as narrative without provenance. `fidelity-norm/3.7.0` (3.2.0, 3.3.0,
-3.4.0 and 3.5.0 went to a certified Word source, ADR 0006, and 3.6.0 to the half-life's forms):
+notice would be refused as narrative without provenance. `fidelity-norm/3.8.0` (3.2.0, 3.3.0,
+3.4.0, 3.5.0 and 3.7.0 went to a certified Word source, ADR 0006, and 3.6.0 to the half-life's
+forms):
 
 - **Who decides.** The document gate's section walk (`canonical-submission.ts`) decides which
   sections are withheld, from the recomputed provenance of an `authority-publication` source, and
@@ -290,7 +291,7 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.7.0` (
 - The mapping's `mappingVersion` and StructureMap move a minor version, since the crosswalk now carries
   a withheld section's `emptyReason` and notice and checks `Composition.status` (its precedent: 1.2.0
   to 1.3.0).
-- `fidelity-norm/3.7.0` and the fidelity report's next major (W5: `SectionStatus` `withheld`,
+- `fidelity-norm/3.8.0` and the fidelity report's next major (W5: `SectionStatus` `withheld`,
   `summary.withheld`, `sectionsWithheld`); the run manifest's next major after 6.0.0 (the renderer
   note's R10: the version it replaces frozen in `AnyRunManifestSchema`, with deep copies of its
   `AuthorityFetch`, `IngestionFidelity` and `Approval` schemas, read in a test with an authority
@@ -343,7 +344,7 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.7.0` (
 - The gate's recomputation reproduces the withheld list, the defects and the status.
 - Item 2's signer (its build steps 2 and 3) refuses a tampered capture, index or attestation, and one of
   another environment.
-- `fidelity-norm/3.7.0`'s vectors and differential cases; the verifier refuses the notice, an
+- `fidelity-norm/3.8.0`'s vectors and differential cases; the verifier refuses the notice, an
   `emptyReason` or a `generated` narrative on any other source or section.
 - The EMA output passes official validation (`cmp-1`, `cmp-2`, `partial`) with a withheld section.
 - The Imatinib Teva tablets SmPC imports in dry run with 5.1 withheld on `cells-run-together`

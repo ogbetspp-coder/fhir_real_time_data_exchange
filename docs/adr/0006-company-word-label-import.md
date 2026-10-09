@@ -309,15 +309,15 @@ Taken as recommended, under the owner's authorisation of 2026-10-06 (decision 8'
    light grey highlight's colour. No new reading: Word's own print of a synthetic probe, one
    paragraph per mark, counted by colour at 144 dpi (2026-10-07):
 
-   | reader mark                 | Word draws | as                    |
-   | --------------------------- | ---------- | --------------------- |
-   | `shading-D9D9D9`            | #D9D9D9    | (decision 5)          |
-   | `shading-pct15-AUTO-AUTO`   | #D9D9D9    | refused, for now      |
-   | `shading-pct15-AUTO-FFFFFF` | #D9D9D9    | refused, for now      |
-   | `highlight-lightGray`       | #C0C0C0    | (decision 5)          |
-   | `shading-C0C0C0`            | #C0C0C0    | `highlight-lightGray` |
-   | `shading-BFBFBF`            | #BFBFBF    | refused               |
-   | `shading-E6E6E6`            | #E6E6E6    | refused               |
+   | reader mark                 | Word draws | as                       |
+   | --------------------------- | ---------- | ------------------------ |
+   | `shading-D9D9D9`            | #D9D9D9    | (decision 5)             |
+   | `shading-pct15-AUTO-AUTO`   | #D9D9D9    | `shading-D9D9D9` (3.7.0) |
+   | `shading-pct15-AUTO-FFFFFF` | #D9D9D9    | `shading-D9D9D9` (3.7.0) |
+   | `highlight-lightGray`       | #C0C0C0    | (decision 5)             |
+   | `shading-C0C0C0`            | #C0C0C0    | `highlight-lightGray`    |
+   | `shading-BFBFBF`            | #BFBFBF    | refused                  |
+   | `shading-E6E6E6`            | #E6E6E6    | refused                  |
 
    A solid fill is opaque, and a theme fill is another reader mark (`shading-THEME-...`), so
    C0C0C0 is that colour wherever it stands. It is the same silver span, which the drawing check
@@ -326,7 +326,8 @@ Taken as recommended, under the owner's authorisation of 2026-10-06 (decision 8'
    `shading-pct15-AUTO-AUTO` too), and what Word draws for an automatic fill over a painted cell or
    paragraph is not on record; both are the reader's to say, planned for `docx-reader/1.34.0`.
    Any other shading is still refused. In the built but blocked files of the same cuts, C0C0C0
-   stands in 3 leaflet files.
+   stands in 3 leaflet files. (Both questions were settled on 2026-10-09, `fidelity-norm/3.7.0`,
+   below: the pattern greys are carried.)
 
 ## Owner decisions (2026-10-08)
 
@@ -426,6 +427,36 @@ Not owner decisions, each the same drawing (2026-10-08, the same change):
   paragraph's end and 5 between words; a yellow highlight over whitespace 4 times in cells and 3
   in the body (SmPC) and 4 in cells (leaflets); black shading over whitespace in cells 6 times
   (SmPC) and 7 (leaflets).
+
+## Owner decision (2026-10-09)
+
+Taken as recommended under the owner's authorisation of 2026-10-08; **for the owner's review**.
+Section 7, `fidelity-norm/3.7.0`, `word-epi/1.7.0`; the change record is
+`docs/validation/changes/2026-10-09-fidelity-norm-3-7-0.md`.
+
+13. **A nudge is layout:** a run raised or lowered by `w:position` is left out, as an underline
+    that changes nothing is (in the narrative, the page and the drawing check, in a heading
+    too), where all of these hold: the shift is at most 2 half-points (a point) up or down; the
+    run's size is its paragraph's (the reader's `position±N-size<run>-in<paragraph>`,
+    `docx-reader/1.34.0`); and no code point of it is superscript or subscript. Every other
+    shift is still refused (`formatting`): a larger one, a run smaller or larger than its
+    paragraph's text (a superscript typed by hand is raised and smaller), or a shift with
+    `vertAlign`. Rationale: a full-size run moved up or down by at most a point reads as the
+    same characters on the same line; it cannot become an exponent, an index or a footnote mark,
+    which are smaller or moved further. Evidence (EMA's English Word PI cuts, internal, counts
+    only): shifts of -1 (1 941 uses), +2 (635) and +1 (197) dominate, and `formatting` on a
+    position blocks 21 SmPC files.
+
+Not an owner decision, the same change: **the 15% pattern greys** (`shading-pct15-AUTO-AUTO`,
+`shading-pct15-AUTO-FFFFFF`) are the template's grey, by decision 9's print: Word draws each as
+exactly #D9D9D9, `shading-D9D9D9`'s colour, on a white page, over a cell shaded FFFF00 and over a
+paragraph shaded D9D9D9 (Word for Mac to PDF, 2026-10-07; an automatic fill is opaque white). What
+held them back in 3.4.0 is gone: from `docx-reader/1.34.0` the reader spells a pattern's theme
+colour and theme fill (`shading-pct15-THEME-accent2-AUTO`, which Word draws #FCEBE0), so an
+automatic colour is the automatic one. Every other pattern stays refused: 10% or 20%, another
+colour or fill, `shading-pct15-AUTO-D9D9D9`, a theme's. Evidence: in the built but blocked files,
+`shading-pct15-AUTO-AUTO` stands in 10 SmPC files and `shading-pct15-AUTO-FFFFFF` in 2 (and in
+leaflets).
 
 ## Progress
 

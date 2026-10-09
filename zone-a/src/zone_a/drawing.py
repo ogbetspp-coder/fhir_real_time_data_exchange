@@ -13,10 +13,11 @@ Both sides are compared as a reader of the page sees them. Spaces, tabs and line
 to one space and lines are trimmed, as a browser lays out text and as Word's extra spaces read;
 empty lines are none. Marks are compared on the characters that are not whitespace. On the
 read's side, the marks the narrative leaves out by its closed list (an underline, capitals over
-what they draw the same) are left out here too, so this check is no second guard of those rules;
-any other mark the narrative did not carry differs. The template's grey is read as the silver
-background the narrative draws it with (``DRAWN_GREY``), so a grey character Chrome draws on any
-other background, or a character drawn grey that Word does not shade, differs. A list label the
+what they draw the same, a nudge, ``zone_a.word_epi.nudged``) are left out here too, so this
+check is no second guard of those rules; any other mark the narrative did not carry differs.
+The template's grey is read as the silver background the narrative draws it with
+(``DRAWN_GREY``), so a grey character Chrome draws on any other background, or a character drawn
+grey that Word does not shade, differs. A list label the
 narrative writes as text (``zone_a.word_epi.text_labels``) is read as the start of its line, not
 as a marker.
 
@@ -64,9 +65,17 @@ from label_docx.reader import Paragraph
 from zone_a import recompute
 from zone_a.canonical_json import CanonicalJsonError, canonical_json, sha256_utf8
 from zone_a.certified import Body
-from zone_a.word_epi import CAPITALS, GREY, WHITESPACE, blank, text_labels, unchanged_by_capitals
+from zone_a.word_epi import (
+    CAPITALS,
+    GREY,
+    WHITESPACE,
+    blank,
+    nudged,
+    text_labels,
+    unchanged_by_capitals,
+)
 
-DRAWING_VERSION: Final = "word-drawing/1.2.5"
+DRAWING_VERSION: Final = "word-drawing/1.3.0"
 RECORD_VERSION: Final = "word-drawing-record/1.0.0"
 LEFT_OUT: Final = frozenset({"underline"})
 # The template's grey as Chrome reports the narrative's silver span (``label_docx.browser``).
@@ -117,7 +126,7 @@ def read_lines(paragraphs: Sequence[Paragraph], heads: Sequence[str] = ()) -> li
     for paragraph, head in zip(paragraphs, heads or [""] * len(paragraphs), strict=True):
         kinds: list[set[str]] = [set() for _ in paragraph.text]
         for mark in paragraph.marks:
-            if mark.kind not in LEFT_OUT:
+            if mark.kind not in LEFT_OUT and not nudged(paragraph, mark):
                 for at in range(mark.start, mark.end):
                     # Capitals over a character they draw the same are no mark on it.
                     if not (mark.kind in CAPITALS and unchanged_by_capitals(paragraph.text[at])):

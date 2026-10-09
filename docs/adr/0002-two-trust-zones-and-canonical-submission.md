@@ -251,9 +251,10 @@ agent of its source files (each named by the authority's id and by hash), the re
 
 ## Amendment (2026-09-25, a withheld section)
 
-_Decided, not implemented: `NORMALIZATION_VERSION` is `fidelity-norm/3.6.0` (3.2.0 qualified a
+_Decided, not implemented: `NORMALIZATION_VERSION` is `fidelity-norm/3.7.0` (3.2.0 qualified a
 certified Word source, 3.3.0 carries its grey, 3.4.0 widens its typed labels and 3.5.0 its grids
-and tabs, ADR 0006, and 3.6.0 the half-life's forms; this design takes the next minor, 3.7.0)
+and tabs, ADR 0006, 3.6.0 the half-life's forms and 3.7.0 its pattern grey and nudges; this
+design takes the next minor, 3.8.0)
 and no contract has a withheld status. It lands with 3c-W, deferred until after the demo (`docs/roadmap.md`, 3a)._
 
 `docs/design/authority-import-withheld.md` (roadmap 3a, PR 3c; owner decisions of 2026-09-25)
@@ -269,7 +270,7 @@ and a fixed notice, `Composition.status` `partial`. Invariants 3, 4, 6 and 10 ch
   byte for byte the constant; anywhere else, on any source, it refuses, as does any `emptyReason`,
   and on an `authority-publication` source any `generated` narrative.
 - **3.** The binding recomputed from the Bundle takes the recomputed withheld list as its second
-  input; a withheld section's entry uses the sentinel fidelity §7 defines (`fidelity-norm/3.7.0`).
+  input; a withheld section's entry uses the sentinel fidelity §7 defines (`fidelity-norm/3.8.0`).
 - **10.** The notice is not narrative, so the rule that every synthetic narrative carrying text says
   "not for clinical use" does not apply to it; it applies to every other narrative as before.
 

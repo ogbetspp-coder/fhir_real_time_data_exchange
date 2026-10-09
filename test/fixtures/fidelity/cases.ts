@@ -560,6 +560,16 @@ const WORD_HALF_LIFE_NARRATIVE = div(
     "<p>(T<sub>½</sub>) as above.</p>",
 );
 
+// fidelity-norm/3.7.0's pattern grey and nudges: as zone_a.word_epi builds them (the vectors below).
+const WORD_NUDGE_PAGE =
+  "\nReport side effects via the national system.\nTake 2 tablets a day.\n﷐\n" +
+  "﷒\t﷓\tDose\t﷓\t10 mg\n﷑\n";
+const WORD_NUDGE_NARRATIVE = div(
+  '<p>Report side effects <span style="background-color: silver;">via the national system' +
+    "</span>.</p><p>Take 2 tablets a day.</p><table><tr><td><p>Dose</p></td><td><p>" +
+    '<span style="background-color: silver;">10 mg</span></p></td></tr></table>',
+);
+
 export const verifyCases: VerifyCase[] = [
   // A body boundary inside a line, or a body that excludes more than a header/footer could hold,
   // invalidates the page: the extractor-declared range is bounded, not trusted.
@@ -3000,6 +3010,34 @@ export const verifyCases: VerifyCase[] = [
       return toInput(source, single("smpc.5.2", moved, [spanFor(source, 1, WORD_HALF_LIFE_PAGE)]));
     })(),
     expect: { status: "failed", sections: { "smpc.5.2": "mismatch" } },
+  },
+  // fidelity-norm/3.7.0: a 15% pattern of the automatic colour on an automatic or white fill is
+  // the template's grey, which Word draws as D9D9D9; a full-size run raised or lowered by at most
+  // a point is left out (ADR 0006, owner decision 13). The page as zone_a.word_epi writes it from
+  // a read with a pattern grey in a paragraph and a cell, the "2" raised a point and "a day" and
+  // "mg" lowered half a point, at their paragraph's size, and the narrative it builds from the
+  // same read. Reviewed by hand: the grey the silver span, no shift written on either side.
+  {
+    name: "certified-word-pattern-grey-and-nudges",
+    input: (() => {
+      const source = wordSource(WORD_NUDGE_PAGE);
+      return toInput(
+        source,
+        single("smpc.4.8", WORD_NUDGE_NARRATIVE, [spanFor(source, 1, WORD_NUDGE_PAGE)]),
+      );
+    })(),
+    expect: { status: "passed", sections: { "smpc.4.8": "verified" } },
+  },
+  // ... and against a narrative that draws the nudged "2" as a superscript: a nudge is no
+  // exponent, and it fails.
+  {
+    name: "certified-word-nudge-as-superscript",
+    input: (() => {
+      const moved = WORD_NUDGE_NARRATIVE.replace("Take 2 tablets", "Take <sup>2</sup> tablets");
+      const source = wordSource(WORD_NUDGE_PAGE);
+      return toInput(source, single("smpc.4.8", moved, [spanFor(source, 1, WORD_NUDGE_PAGE)]));
+    })(),
+    expect: { status: "failed", sections: { "smpc.4.8": "mismatch" } },
   },
 ];
 

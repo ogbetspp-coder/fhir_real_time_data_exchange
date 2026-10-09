@@ -47,7 +47,7 @@ __all__ = [
     "number_from",
 ]
 
-NORMALIZATION_VERSION: Final = "fidelity-norm/3.6.0"
+NORMALIZATION_VERSION: Final = "fidelity-norm/3.7.0"
 """The normalisation version this port was made against, and the one the post-check accepts.
 
 ``verify_quote`` names the version its answer was computed under. An answer under any other
