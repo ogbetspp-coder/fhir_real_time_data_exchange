@@ -2072,6 +2072,70 @@ def test_the_verify_vectors_of_3_5_0_are_what_the_builder_writes() -> None:
     assert _inner(div) == inner.removesuffix("</div>")
 
 
+def _half_lives(text: str, *lowered: str) -> list[tuple[int, int, str]]:
+    """Subscript marks over each of ``lowered``, found in ``text`` in order."""
+    marks, at = [], 0
+    for part in lowered:
+        at = text.index(part, at)
+        marks.append((at, at + len(part), "subscript"))
+        at += len(part)
+    return marks
+
+
+def test_the_verify_vectors_of_3_6_0_are_what_the_builder_writes() -> None:
+    """The page and the narrative of fidelity-norm/3.6.0's two certified Word vectors
+    (``test/fixtures/fidelity/cases.ts``) are what ``zone_a.word_epi`` writes for their read: the
+    half-lives T½, t½ with a phase's letter and t½ß, in a paragraph, a cell and brackets."""
+    text = (
+        "Half-lives: T\u00bd 12 h, t\u00bd\u03b1 1.5 h, t\u00bd\u03b4 4 h and t\u00bd\u00df 30 h."
+    )
+    lowered = ("\u00bd", "\u00bd\u03b1", "\u00bd\u03b4", "\u00bd\u00df")
+    table = _grid(2, [(0, 1, None), (1, 1, None)], [(0, 1, None), (1, 1, None)])
+    cells = _in_cells(["Phase", "Half-life"], ["Elimination", ""])
+    cells[3] = _p("t\u00bd\u03b2 4 h", (1, 3, "subscript"), table=(0, 1, 1))
+    div, page = _build(
+        _p(text, *_half_lives(text, *lowered)),
+        *cells,
+        _p("(T\u00bd) as above.", (2, 3, "subscript")),
+        tables=(table,),
+    )
+    by_name = {vector["name"]: vector for vector in VECTORS["verify"]}
+    passed = by_name["certified-word-half-lives"]["input"]
+    failed = by_name["certified-word-half-life-sharp-s-as-beta"]["input"]
+    for vector in (passed, failed):
+        assert [p["text"] for p in vector["source"]["pages"]] == [page]
+    inner = passed["sections"][0]["div"].removeprefix('<div xmlns="http://www.w3.org/1999/xhtml">')
+    assert _inner(div) == inner.removesuffix("</div>")
+
+
+@pytest.mark.parametrize(
+    ("text", "lowered", "carried"),
+    [
+        ("the T\u00bd was 4 h", ("\u00bd",), True),
+        ("t\u00bd\u03b3 6 h", ("\u00bd\u03b3",), True),
+        ("t\u00bd\u00df 30 h", ("\u00bd\u00df",), True),
+        # Not μ, the micro prefix; nor another Greek letter; nor T inside a word.
+        ("T\u00bd\u03bc g", ("\u00bd\u03bc",), False),
+        ("t\u00bd\u03c9 2 h", ("\u00bd\u03c9",), False),
+        ("AT\u00bd 4 h", ("\u00bd",), False),
+        ("t\u00bd\u03b1\u03b2 2 h", ("\u00bd\u03b1\u03b2",), False),
+    ],
+)
+def test_a_lowered_half_carries_as_section_5_keeps_it(
+    text: str, lowered: tuple[str, ...], carried: bool
+) -> None:
+    """fidelity-norm/3.6.0: a half-life Word lowers is carried where section 5 keeps it, and the
+    section refused where it does not (``narrative``, ``unmappable-script``)."""
+    paragraph = _p(text, *_half_lives(text, *lowered))
+    if carried:
+        div, page = _build(paragraph)
+        assert _same(div, page)
+        return
+    with pytest.raises(RefusedError) as refused:
+        _build(paragraph)
+    assert (refused.value.code, refused.value.detail) == ("narrative", "unmappable-script")
+
+
 # ---- pictures -----------------------------------------------------------------------------------
 
 

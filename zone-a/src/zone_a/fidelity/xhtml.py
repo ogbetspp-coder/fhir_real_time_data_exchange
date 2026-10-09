@@ -226,6 +226,14 @@ class _LoweredHalf:
 # The neighbours of a kept lowered ½ (section 5): the half-life, ``t<sub>½</sub>``, as a word.
 _BEFORE_HALF_LIFE: Final = frozenset({"\n", "\t", " ", "("})
 _AFTER_HALF: Final = frozenset({"\n", "\t", " ", ")", ".", ",", ";", ":"})
+# From 3.6.0, the letter before it may be ``T``, and ½ may be followed in the ``sub`` by a phase's
+# letter: alpha, beta, gamma or delta (U+03B1-U+03B4), or sharp s (U+00DF), which labels write
+# for beta. Not mu, the micro prefix ("T½μ g"), nor any other: none of these is part of a number
+# or a unit.
+_HALF_LIFE_LETTERS: Final = frozenset({"t", "T"})
+_HALF_LIFE_CONTENTS: Final = frozenset(
+    {"\u00bd", "\u00bd\u03b1", "\u00bd\u03b2", "\u00bd\u03b3", "\u00bd\u03b4", "\u00bd\u00df"}
+)
 
 
 def _check_lowered_halves(
@@ -233,12 +241,12 @@ def _check_lowered_halves(
 ) -> None:
     """Keep a lowered ½ only as the half-life, ``t<sub>½</sub>`` with ``t`` starting a word.
 
-    The ``sub``'s whole content is ½, right after a ``t`` that follows a break, a space, ``(`` or
-    nothing, and right before a break, a space, ``) . , ; :`` or nothing, every neighbour drawn on
-    the line (section 5). Anywhere else it can join a number or an index, and the text cannot say
-    which: ``log<sub>2½</sub>`` and ``log<sub>2</sub>½`` both read ``log₂½``, and a letter before
-    it can be a number or an operator (``VIII<sub>½</sub>``, ``log<sub>½</sub>``). Nothing is read
-    past: each neighbour is the adjacent emitted code point.
+    The ``sub``'s whole content is ½, or ½ and a phase's letter, right after a ``t`` or ``T`` that
+    follows a break, a space, ``(`` or nothing, and right before a break, a space, ``) . , ; :`` or
+    nothing, every neighbour drawn on the line (section 5). Anywhere else it can join a number or
+    an index, and the text cannot say which: ``log<sub>2½</sub>`` and ``log<sub>2</sub>½`` both
+    read ``log₂½``, and a letter before it can be a number or an operator (``VIII<sub>½</sub>``,
+    ``log<sub>½</sub>``). Nothing is read past: each neighbour is the adjacent emitted code point.
     """
     # A code point of the text as (piece, index in the piece), found by stepping over the pieces
     # that emit nothing; a piece emitted inside ``sup`` or ``sub`` holds one code point. The steps
@@ -270,9 +278,9 @@ def _check_lowered_halves(
     for half in halves:
         letter = last(half.start - 1)
         if (
-            "".join(output[half.start : half.end]) != chr(HALF)
+            "".join(output[half.start : half.end]) not in _HALF_LIFE_CONTENTS
             or letter is None
-            or letter[0] != "t"
+            or letter[0] not in _HALF_LIFE_LETTERS
             or letter[1] in script_pieces
             or not on_line(previous(letter), _BEFORE_HALF_LIFE)
             or not on_line(following(half.end), _AFTER_HALF)

@@ -243,13 +243,19 @@ type LoweredHalf = { start: number; end: number; offset: number };
 // The neighbours of a kept lowered ½ (section 5): the half-life, `t<sub>½</sub>`, as a word.
 const BEFORE_HALF_LIFE = new Set(["\n", "\t", " ", "("]);
 const AFTER_HALF = new Set(["\n", "\t", " ", ")", ".", ",", ";", ":"]);
+// From 3.6.0, the letter before it may be `T`, and ½ may be followed in the `sub` by a phase's
+// letter: α, β, γ or δ, or ß, which labels write for β. Not μ, the micro prefix ("T½μ g"), nor
+// any other: none of these is part of a number or a unit.
+const HALF_LIFE_LETTERS = new Set(["t", "T"]);
+const HALF_LIFE_CONTENTS = new Set(["½", "½α", "½β", "½γ", "½δ", "½ß"]);
 
-// A lowered ½ is kept only as the half-life: a `sub`'s whole content, right after a `t` that
-// starts a word (after a break, a space, `(` or nothing), and right before a break, a space,
-// `) . , ; :` or nothing, every neighbour drawn on the line (section 5). Anywhere else it can join
-// a number or an index, and the text cannot say which: `log<sub>2½</sub>` and `log<sub>2</sub>½`
-// both read `log₂½`, and a letter before it can be a number or an operator (`VIII<sub>½</sub>`,
-// `log<sub>½</sub>`). Nothing is read past: each neighbour is the adjacent emitted code point.
+// A lowered ½ is kept only as the half-life: a `sub`'s whole content, ½ or ½ and a phase's letter,
+// right after a `t` or `T` that starts a word (after a break, a space, `(` or nothing), and right
+// before a break, a space, `) . , ; :` or nothing, every neighbour drawn on the line (section 5).
+// Anywhere else it can join a number or an index, and the text cannot say which:
+// `log<sub>2½</sub>` and `log<sub>2</sub>½` both read `log₂½`, and a letter before it can be a
+// number or an operator (`VIII<sub>½</sub>`, `log<sub>½</sub>`). Nothing is read past: each
+// neighbour is the adjacent emitted code point.
 function checkLoweredHalves(
   output: readonly string[],
   halves: readonly LoweredHalf[],
@@ -286,8 +292,9 @@ function checkLoweredHalves(
   for (const { start, end, offset } of halves) {
     const letter = last(start - 1);
     if (
-      output.slice(start, end).join("") !== String.fromCodePoint(HALF) ||
-      letter?.point !== "t" ||
+      !HALF_LIFE_CONTENTS.has(output.slice(start, end).join("")) ||
+      letter === undefined ||
+      !HALF_LIFE_LETTERS.has(letter.point) ||
       scriptPieces.has(letter.piece) ||
       !onLine(previous(letter), BEFORE_HALF_LIFE) ||
       !onLine(next(end), AFTER_HALF)

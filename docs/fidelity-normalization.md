@@ -1,6 +1,6 @@
 # Narrative fidelity normalisation specification
 
-Version: `fidelity-norm/3.5.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
+Version: `fidelity-norm/3.6.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
 in section 9)
 
 This document is the language-neutral specification of the text normalisation and XHTML
@@ -381,16 +381,22 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   accepted only when all four hold, and otherwise rejects (`unmappable-script`; its offset is
   that of the first U+00BD in the `sub`, as the character or its reference, in the div, like
   every other `unmappable-script`):
-  - its emitted content is exactly the one code point U+00BD (so `<sub>½ </sub>`,
-    `<sub>2½</sub>` and `<sub>-½</sub>` reject);
-  - the code point emitted immediately before that content is `t` (U+0074), emitted outside `sup`
-    and `sub`;
-  - the code point emitted immediately before that `t`, if there is one, is U+000A, U+0009,
-    U+0020 or `(`, emitted outside `sup` and `sub` (so the `t` starts a word: `the t<sub>½</sub>`,
-    `(t<sub>½</sub>)`, `<em>t</em><sub>½</sub>` at a line start and `t<sub>½</sub>` in a cell are
-    accepted, and `1<sub>½</sub>`, `at<sub>½</sub>`, `log<sub>½</sub>`, `VIII<sub>½</sub>`,
-    `log<sub>2</sub>t<sub>½</sub>`, `<sub>t</sub><sub>½</sub>` and a word joiner before the `sub`
-    reject); and
+  - its emitted content is exactly the one code point U+00BD, or, from 3.6.0, U+00BD followed by
+    exactly one of a phase's letters, α, β, γ or δ (U+03B1–U+03B4: `t<sub>½α</sub>`,
+    `t<sub>½β</sub>`), or ß (U+00DF), which labels write for β (`t<sub>½ß</sub>`) (so
+    `<sub>½ </sub>`, `<sub>2½</sub>`, `<sub>-½</sub>`, `<sub>½1</sub>`, `<sub>½ α</sub>`,
+    `<sub>½αβ</sub>`, `<sub>α½</sub>`, `<sub>½b</sub>`, and ½ followed by μ U+03BC or µ U+00B5, the
+    micro prefix (`T<sub>½μ</sub> g`), ε, λ, π, ς, ω, ΰ U+03B0, ϊ U+03CA, a capital Β, ϐ U+03D0,
+    ᵦ U+1D66 or ẞ U+1E9E, reject);
+  - the code point emitted immediately before that content is `t` (U+0074) or, from 3.6.0, `T`
+    (U+0054), emitted outside `sup` and `sub`;
+  - the code point emitted immediately before that `t` or `T`, if there is one, is U+000A,
+    U+0009, U+0020 or `(`, emitted outside `sup` and `sub` (so the letter starts a word:
+    `the t<sub>½</sub>`, `(t<sub>½</sub>)`, `the T<sub>½</sub>`, `<em>t</em><sub>½</sub>` at a
+    line start and `t<sub>½</sub>` in a cell are accepted, and `1<sub>½</sub>`, `at<sub>½</sub>`,
+    `AT<sub>½</sub>`, `2T<sub>½</sub>`, `log<sub>½</sub>`, `VIII<sub>½</sub>`, `V<sub>½</sub>`,
+    `Ｔ<sub>½</sub>`, `log<sub>2</sub>t<sub>½</sub>`, `<sub>t</sub><sub>½</sub>` and a word joiner
+    before the `sub` reject); and
   - the code point emitted immediately after the `sub`'s content, if there is one, is U+000A,
     U+0009, U+0020, `)`, `.`, `,`, `;` or `:`, emitted outside `sup` and `sub` (so
     `t<sub>½</sub> was` and `(t<sub>½</sub>)` are accepted, and `t<sub>½</sub>2`,
@@ -402,7 +408,14 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   Nothing is read past: the neighbours are the adjacent code points. The rule is checked after
   the scan, `sub` by `sub` in document order (the error order below). Every lowered ½ in the
   EMA's published English labels (six, surveyed 2026-09-24) is `the t<sub>½</sub> was` or
-  `(t<sub>½</sub>)`.
+  `(t<sub>½</sub>)`. From 3.6.0 the letter may be `T` and a phase's letter may follow ½: neither
+  `T` nor α, β, γ, δ or ß is read as part of a number or a unit (no numeral, Roman ones
+  included, is written with them; μ is the micro prefix, and stays refused), so none can join the
+  ½ to a number, and the neighbours outside the `sub` are held as before (`t<sub>½β</sub>2`,
+  `t<sub>½β</sub>x`, `t<sub>½</sub>β` and `t<sub>½</sub><sub>β</sub>` reject; `sup` still
+  rejects ½, `T<sup>½</sup>` and `t<sup>½β</sup>` included). The EMA's English Word SmPC cuts
+  refuse 8 sections for a lowered ½ under 3.5.0 and 2 under 3.6.0, each for a letter right after
+  the `sub` (counts only; the change record).
 
 - A combining mark or a composition across inline markup rejects (`combining-across-markup`,
   from 3.0.0): at each start or end tag of `span`, `b`, `i`, `em`, `strong`, `sup`, `sub`,
@@ -1008,6 +1021,18 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
 
 ## 9. Version history
 
+- `fidelity-norm/3.6.0` (minor) — section 5's lowered-half rule also keeps `T<sub>½</sub>` (a
+  `T` that starts a word, as a `t` does) and ½ followed in the `sub` by one of a phase's letters,
+  α, β, γ or δ, or by ß, which labels write for β; none is read as part of a number or a unit. μ,
+  the micro prefix, and every other letter still reject, and so does everything else the rule
+  refused. 35 XHTML vectors pin it and its near misses, and two verify vectors are added,
+  reviewed by hand: a certified Word page with half-lives against its narrative (passed), and the
+  same page against a narrative with β where the label writes ß (failed). Sections 1 to 4, 6 and
+  7 and the code point table do not change. A table's column widths (a `colgroup`), proposed
+  with this version for tables a renderer draws with a column of no width, were withdrawn: Chrome
+  still draws such a column at no width in a narrow container (the change record). The withheld
+  section of an authority import (`docs/design/authority-import-withheld.md`, not built) moves to
+  3.7.0. The change record is `docs/validation/changes/2026-10-08-fidelity-norm-3-6-0.md`.
 - `fidelity-norm/3.5.0` (minor) — section 7's certified Word rule lays a table's grid as the
   narrative does: the grid columns a row leaves out at its start or end are an empty cell (ADR
   0006, owner decision 10), and a grid column at which no cell starts is dropped (the HTML table
@@ -1030,7 +1055,8 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   narrative (passed), and the same page against a narrative with an empty cell on the wrong side
   of its value (failed). Sections 1 to 6 and the code point table do not change. The withheld
   section of an authority import (`docs/design/authority-import-withheld.md`, not built) moves
-  to 3.6.0. The change record is `docs/validation/changes/2026-10-08-fidelity-norm-3-5-0.md`.
+  to 3.6.0 (and with 3.6.0 to 3.7.0). The change record is
+  `docs/validation/changes/2026-10-08-fidelity-norm-3-5-0.md`.
 - `fidelity-norm/3.4.0` (minor) — section 7's certified Word rule writes as U+0020 the tab after
   a typed label in a table cell as well as outside one, and a typed label is also U+2011, a
   caption's number ("Table 1:", "Table 12a:", "Figure 3.") and a raised footnote key of one to
@@ -1042,7 +1068,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   typed labels, in table cells and outside them, against its narrative (passed). Sections 1 to 6
   and the code point table do not change. The withheld section of an authority import
   (`docs/design/authority-import-withheld.md`, not built) moves to 3.5.0 (and with 3.5.0 to
-  3.6.0). The same rule carries as
+  3.6.0, with 3.6.0 to 3.7.0). The same rule carries as
   the template's grey C0C0C0 shading, which Word draws as the light grey highlight (no new
   reading, by Word's own print); a pattern's grey waits for the reader to spell a pattern's theme
   colour and for Word's answer over painted backgrounds. The change record is
@@ -1059,7 +1085,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   (passed), and the same dashes drawn as an HTML list (failed). Sections 1 to 4 and 6 and the code
   point table do not change. The withheld section of an authority import
   (`docs/design/authority-import-withheld.md`, not built) moves to 3.4.0 (and with 3.4.0 to
-  3.5.0, with 3.5.0 to 3.6.0). The change record is `docs/validation/changes/2026-10-06-fidelity-norm-3-3-0.md`.
+  3.5.0, with 3.5.0 to 3.6.0, with 3.6.0 to 3.7.0). The change record is `docs/validation/changes/2026-10-06-fidelity-norm-3-3-0.md`.
 - `fidelity-norm/3.2.0` (minor) — section 7 qualifies a third kind of source, a certified Word
   source (ADR 0006): a Word SmPC the pinned label reader read exactly, whose conservation check
   accounted for every character, structured by the QRD template's own headings, with one page
@@ -1073,7 +1099,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   list numbered from one later, and a page that writes a bullet after a line break as content
   against a narrative that draws it after a `br` (each failed). 3.2.0 was first reserved for the withheld section of
   an authority import (`docs/design/authority-import-withheld.md`, not built), which then took
-  3.3.0, then 3.4.0, then 3.5.0, and now takes 3.6.0.
+  3.3.0, then 3.4.0, then 3.5.0, then 3.6.0, and now takes 3.7.0.
   The change record is `docs/validation/changes/2026-10-05-fidelity-norm-3-2-0.md`.
 - `fidelity-norm/3.1.0` (minor) — inside `sub`, U+221E INFINITY is kept unchanged instead of
   rejecting (`unmappable-script`), and U+00BD VULGAR FRACTION ONE HALF is kept under the

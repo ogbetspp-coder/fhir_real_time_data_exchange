@@ -6,10 +6,10 @@
   "reader": "epi-reader/1.3.10",
   "format": "label-epi-json/1.11.16",
   "inputs": {
-    "registrySha256": "65988074f9767841c98ab7703466e06d08388f7107801560d64df71617738ce0",
+    "registrySha256": "38d16e6d6d80ac1ae2e11a07017cb8c8817cab98d88e434016b215f7e3e4a7ca",
     "mappingSha256": "9ba09319770c6f363b25baa78c37e72d5a2ebb05e5c16b8693b2fa38e2d286da"
   },
-  "checker": "qrd-check/1.6.2",
+  "checker": "qrd-check/1.6.3",
   "template": {
     "family": "EMA QRD product-information template, centralised procedure",
     "version": "10.4",
@@ -18,7 +18,7 @@
     "document": "Summary of product characteristics",
     "language": "en"
   },
-  "registryVersion": "1.3.2",
+  "registryVersion": "1.3.3",
   "mappingVersion": "1.5.0",
   "document": {
     "title": "Brukinsa",
