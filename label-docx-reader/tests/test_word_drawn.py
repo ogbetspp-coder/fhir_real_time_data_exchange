@@ -158,8 +158,16 @@ def test_a_theme_shading_is_resolved_only_where_word_paints_what_it_is_resolved_
     # A pattern's theme colour is not the automatic one: 15% of accent2, not grey.
     assert rows["pct15-accent2"][0] not in ("D9D9D9", "FFFFFF")
     assert rows["pct15-accent2"][1] == ["shading-pct15-THEME-accent2-AUTO"]
-    # nil is no shading, as Word paints none, whatever its fill or theme.
-    for row in ("bg1-nil", "nil-fill", "nil-fill-colour"):
+    # nil is no shading, as Word paints none, whatever its fill, theme or stray shade, on a run
+    # or a paragraph.
+    for row in (
+        "bg1-nil",
+        "nil-fill",
+        "nil-fill-colour",
+        "nil-shade",
+        "para-nil-fill",
+        "para-nil-shade",
+    ):
         assert rows[row] == ("FFFFFF", []), row
     # A tint, and a tint with a shade, are named as such.
     assert rows["bg1-tint"][1] == ["shading-THEME-background1-tint80"]

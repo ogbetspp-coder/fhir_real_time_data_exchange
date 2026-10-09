@@ -1437,6 +1437,21 @@ def test_a_nil_shading_is_none_whatever_its_fill() -> None:
         assert _shading_kinds(attributes, paragraph=True) == [], attributes
 
 
+def test_text_over_a_nil_shading_is_faint_as_over_the_page() -> None:
+    # nil paints nothing, so near-white text over it is faint on white; over a clear grey of the
+    # same fill it is not.
+    near_white = '<w:color w:val="FAFAFA"/>'
+    for shd, faint in (
+        ('w:val="nil" w:fill="D9D9D9"', True),
+        ('w:val="clear" w:fill="D9D9D9"', False),
+    ):
+        on_run = p(r("<w:t>ab</w:t>", f"{near_white}<w:shd {shd}/>"))
+        in_paragraph = p(r("<w:t>ab</w:t>", near_white), f"<w:shd {shd}/>")
+        for body in (on_run, in_paragraph):
+            kinds = [m.kind for m in read_docx(docx(body))[0].marks]
+            assert ("faint" in kinds) is faint, (shd, kinds)
+
+
 def test_a_white_shading_is_a_mark_only_where_something_is_painted_under_it() -> None:
     # Word paints white over a grey paragraph or cell (drawing-cases shading-white); over the
     # white page it paints nothing to see.

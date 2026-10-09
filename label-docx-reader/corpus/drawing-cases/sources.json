@@ -167,26 +167,26 @@
     {
       "name": "Theme and pattern shadings, the theme's lt1 <a:sysClr val=\"window\" lastClr=\"FFFFFF\"/>.",
       "file": "shading.docx",
-      "sha256": "407ae07f1cfeb6d1c01afa3cb923c20bce974a33a38bf687598c46b6b890ebc1",
-      "bytes": 17732
+      "sha256": "4d94131adf6a7e36ef8a459522c94c22ad0f51c13182c56dab7b4c40ac563ce6",
+      "bytes": 18493
     },
     {
       "name": "Theme and pattern shadings, the theme's lt1 <a:srgbClr val=\"FFFFFF\"/>.",
       "file": "shading-srgb-white.docx",
-      "sha256": "5d9715093dbc95106ddabe7f34cf3a963f8071dec5f660d7a684be65dcc571b0",
-      "bytes": 17716
+      "sha256": "6ff1520fdf64e2b18e4767aeb390e8e431d5229109fc7771fb78f45892e51ff1",
+      "bytes": 18477
     },
     {
       "name": "Theme and pattern shadings, the theme's lt1 <a:srgbClr val=\"FF0000\"/>.",
       "file": "shading-red.docx",
-      "sha256": "4a3a45e24c4eee2bc389742f02793c0ee5ae5e7e0c989f57b64365bd4441224c",
-      "bytes": 17716
+      "sha256": "e7fa1138c44d562fca2b84857f0a33a181411c17d4a1a98f1452168efe48b59a",
+      "bytes": 18477
     },
     {
       "name": "Theme and pattern shadings, the theme's lt1 <a:sysClr val=\"window\" lastClr=\"FFFFFF\"/>.",
       "file": "shading-unmapped.docx",
-      "sha256": "da86a8de521e19eebf6ee52c4e45e2c34ce3f8d3e23197ac39e5c082e63fad63",
-      "bytes": 17471
+      "sha256": "a46eea15f12c55f3f9fd8230c2cd90a1ca53ce08482d1c4797262ef947fad59a",
+      "bytes": 18232
     },
     {
       "name": "Theme and pattern shadings, the theme's lt1 <a:sysClr val=\"window\" lastClr=\"FFFFFF\"/>.",
@@ -395,26 +395,26 @@
     {
       "name": "Theme and pattern shadings, the theme's lt1 <a:sysClr val=\"window\" lastClr=\"FFFFFF\"/>, in the QRD template's compatibility mode.",
       "file": "shading-compat.docx",
-      "sha256": "331d1bf85d810c4c99458b966c07061b149e1e98352b003c932c333ad223572c",
-      "bytes": 18445
+      "sha256": "7d31760b91e777d3c03fb92a3286add710ec87b0261b1070c33ce9ff0a5aa417",
+      "bytes": 19206
     },
     {
       "name": "Theme and pattern shadings, the theme's lt1 <a:srgbClr val=\"FFFFFF\"/>, in the QRD template's compatibility mode.",
       "file": "shading-srgb-white-compat.docx",
-      "sha256": "ba796ae4e1784e78bcee6c70e33c7e54bf2ec715ecf6ab2079903703df775eb9",
-      "bytes": 18429
+      "sha256": "4254c18e6ca34d03d6bdff5b985dce86ab3d5aa663afd58118d0e36ab3332832",
+      "bytes": 19190
     },
     {
       "name": "Theme and pattern shadings, the theme's lt1 <a:srgbClr val=\"FF0000\"/>, in the QRD template's compatibility mode.",
       "file": "shading-red-compat.docx",
-      "sha256": "e807f20c7c63841bfab3f12ce2beb1a218063816bddb747489c5321892c7f84b",
-      "bytes": 18429
+      "sha256": "0d93b34310354cababbd40fbb7b24ec12cdb1c0b44b8fe0de5bb210a78b53b36",
+      "bytes": 19190
     },
     {
       "name": "Theme and pattern shadings, the theme's lt1 <a:sysClr val=\"window\" lastClr=\"FFFFFF\"/>, in the QRD template's compatibility mode.",
       "file": "shading-unmapped-compat.docx",
-      "sha256": "cbaa55edace2fcbbd2d954c0eb2e489ada0032106969c7e28bfece55d2b90cb4",
-      "bytes": 18184
+      "sha256": "91906a7a6783432315ba618e02bd3b20d060d49d30e1af2e99f48d17edc64384",
+      "bytes": 18945
     },
     {
       "name": "Theme and pattern shadings, the theme's lt1 <a:sysClr val=\"window\" lastClr=\"FFFFFF\"/>, in the QRD template's compatibility mode.",

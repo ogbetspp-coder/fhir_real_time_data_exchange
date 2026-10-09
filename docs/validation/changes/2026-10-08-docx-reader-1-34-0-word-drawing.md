@@ -84,9 +84,10 @@ widths.
   - shifted complex script, which Word draws at `szCs`.
 
 - **`nil` shading** is no shading, whatever its fill, colour or theme fill. Word paints nothing
-  for it (the `bg1-nil` and `nil-*` rows, under a white and a red theme). Both copies had read a
-  `nil` with a fill as that fill's paint, which Zone A could have carried as grey; this bug
-  predates this release.
+  for it (the `bg1-nil`, `nil-*` and `para-nil-*` rows, on a run and on a paragraph, with a
+  stray theme shade too, under a white and a red theme). Both copies had read a `nil` with a fill
+  as that fill's paint, which Zone A could have carried as grey; the reader's faint test also took
+  it for paint, so near-white text over it was not `faint`. These bugs predate this release.
 - **Grid widths** (asked for `fidelity-norm/3.6.0`). A table's grid carries `widths`: each
   `gridCol`'s `w:w` in twips as stored, in grid order, as the view read stores it. The original
   view of a tracked grid change carries its former grid. A column whose width is not digits

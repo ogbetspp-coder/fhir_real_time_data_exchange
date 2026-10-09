@@ -507,6 +507,30 @@
      -1.0,
      -1.0,
      -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
      "4F81BD:30550 B1C7E2:94"
     ],
     [
@@ -574,7 +598,7 @@
      "D9D9D9:30550 EEEEEE:94"
     ]
    ],
-   "sha256": "407ae07f1cfeb6d1c01afa3cb923c20bce974a33a38bf687598c46b6b890ebc1"
+   "sha256": "4d94131adf6a7e36ef8a459522c94c22ad0f51c13182c56dab7b4c40ac563ce6"
   },
   "shading-srgb-white": {
    "drawn": [
@@ -704,6 +728,30 @@
      -1.0,
      -1.0,
      -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
      "4F81BD:30550 B1C7E2:94"
     ],
     [
@@ -771,7 +819,7 @@
      "D9D9D9:30550 EEEEEE:94"
     ]
    ],
-   "sha256": "5d9715093dbc95106ddabe7f34cf3a963f8071dec5f660d7a684be65dcc571b0"
+   "sha256": "6ff1520fdf64e2b18e4767aeb390e8e431d5229109fc7771fb78f45892e51ff1"
   },
   "shading-red": {
    "drawn": [
@@ -888,6 +936,30 @@
      ""
     ],
     [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
      36.0,
      117.5,
      -1.0,
@@ -968,7 +1040,7 @@
      "D90000:30550 EE8F8F:94"
     ]
    ],
-   "sha256": "4a3a45e24c4eee2bc389742f02793c0ee5ae5e7e0c989f57b64365bd4441224c"
+   "sha256": "e7fa1138c44d562fca2b84857f0a33a181411c17d4a1a98f1452168efe48b59a"
   },
   "shading-unmapped": {
    "drawn": [
@@ -1098,6 +1170,30 @@
      -1.0,
      -1.0,
      -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
      "4F81BD:30550 B1C7E2:94"
     ],
     [
@@ -1165,7 +1261,7 @@
      "D9D9D9:30550 EEEEEE:94"
     ]
    ],
-   "sha256": "da86a8de521e19eebf6ee52c4e45e2c34ce3f8d3e23197ac39e5c082e63fad63"
+   "sha256": "a46eea15f12c55f3f9fd8230c2cd90a1ca53ce08482d1c4797262ef947fad59a"
   },
   "shading-shades": {
    "drawn": [
@@ -4052,6 +4148,30 @@
      -1.0,
      -1.0,
      -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
      "4F81BD:30550 B1C7E2:94"
     ],
     [
@@ -4119,7 +4239,7 @@
      "D9D9D9:30550 EEEEEE:94"
     ]
    ],
-   "sha256": "331d1bf85d810c4c99458b966c07061b149e1e98352b003c932c333ad223572c"
+   "sha256": "7d31760b91e777d3c03fb92a3286add710ec87b0261b1070c33ce9ff0a5aa417"
   },
   "shading-srgb-white-compat": {
    "drawn": [
@@ -4249,6 +4369,30 @@
      -1.0,
      -1.0,
      -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
      "4F81BD:30550 B1C7E2:94"
     ],
     [
@@ -4316,7 +4460,7 @@
      "D9D9D9:30550 EEEEEE:94"
     ]
    ],
-   "sha256": "ba796ae4e1784e78bcee6c70e33c7e54bf2ec715ecf6ab2079903703df775eb9"
+   "sha256": "4254c18e6ca34d03d6bdff5b985dce86ab3d5aa663afd58118d0e36ab3332832"
   },
   "shading-red-compat": {
    "drawn": [
@@ -4433,6 +4577,30 @@
      ""
     ],
     [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
      36.0,
      117.5,
      -1.0,
@@ -4513,7 +4681,7 @@
      "D90000:30550 EE8F8F:94"
     ]
    ],
-   "sha256": "e807f20c7c63841bfab3f12ce2beb1a218063816bddb747489c5321892c7f84b"
+   "sha256": "0d93b34310354cababbd40fbb7b24ec12cdb1c0b44b8fe0de5bb210a78b53b36"
   },
   "shading-unmapped-compat": {
    "drawn": [
@@ -4643,6 +4811,30 @@
      -1.0,
      -1.0,
      -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
+     ""
+    ],
+    [
+     -1.0,
+     -1.0,
+     -1.0,
+     -1.0,
+     -1,
      "4F81BD:30550 B1C7E2:94"
     ],
     [
@@ -4710,7 +4902,7 @@
      "D9D9D9:30550 EEEEEE:94"
     ]
    ],
-   "sha256": "cbaa55edace2fcbbd2d954c0eb2e489ada0032106969c7e28bfece55d2b90cb4"
+   "sha256": "91906a7a6783432315ba618e02bd3b20d060d49d30e1af2e99f48d17edc64384"
   },
   "shading-shades-compat": {
    "drawn": [
@@ -7093,6 +7285,6 @@
   }
  },
  "method": "Word saved the case as PDF; each page drawn at the scale's pixels a point. A picture case: the box of the clearly red or blue pixels (left, top, width, height in pixels), the first 16 hex digits of the SHA-256 of its pixels, the pixels not white within 12 of it and the coloured pixels elsewhere. A row case, each row's band (its exact line): where the red and the blue ink start and end (points from the page's left edge, -1 for none), the pixels not white between them (-1 where either is missing), and the band's three commonest colours but white (RRGGBB:pixels)",
- "recorded": "2026-10-08",
+ "recorded": "2026-10-09",
  "scale": 4
 }

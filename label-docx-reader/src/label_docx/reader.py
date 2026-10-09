@@ -1322,9 +1322,11 @@ class _Styles:
         return [_rgb(stated)]
 
     def painted(self, shading: ET.Element | None) -> list[_Rgb]:
-        """What a shading element paints; none where it is clear.
+        """What a shading element paints; none where it is clear, or nil.
 
         One colour, or more where the reader cannot say which is under a character (stripes).
+        ``nil`` paints nothing, whatever its fill (drawing-cases shading, nil rows), as
+        ``_shading`` has it.
         """
         if shading is None:
             return []
@@ -1332,8 +1334,10 @@ class _Styles:
         if pattern is None:
             # Required (ECMA-376 17.3.5): what Word paints without it is not on record.
             raise DocxRefusedError("unsupported-formatting", "w:shd without w:val")
+        if pattern == "nil":
+            return []
         fill = self.colours(shading, "fill", "themeFill", "themeFillTint", "themeFillShade")
-        if pattern in (None, "clear", "nil"):
+        if pattern == "clear":
             return fill
         # A pattern's automatic colour is black over a fill that is otherwise the page.
         colour = self.colours(shading, "color", "themeColor", "themeTint", "themeShade")
