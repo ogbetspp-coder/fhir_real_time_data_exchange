@@ -221,7 +221,7 @@ Word drew every case alike in both modes. The cases:
   - it works out each shading mark, and every dropped, respelt or added one is refused;
   - grid widths changed, dropped or added are refused.
 - `tests/test_tracked.py` covers each tracked view's widths.
-- The check's mutation record: 4,592 of 4,700 faults killed, 108 recorded as unable to change a result, none unexplained. A first run over the review's fixes found 47 unheld, each now held by a case.
+- The check's mutation record: 4,609 of 4,717 faults killed, 108 recorded as unable to change a result, none unexplained. A first run over the review's fixes found 47 unheld, each now held by a case.
 
 **Impact assessment.**
 

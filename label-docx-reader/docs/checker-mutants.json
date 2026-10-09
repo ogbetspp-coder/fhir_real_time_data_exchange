@@ -1,6 +1,6 @@
 {
-  "killed": 4607,
-  "mutants": 4718,
+  "killed": 4609,
+  "mutants": 4717,
   "survivors": [
     {
       "code": "return False",
@@ -275,14 +275,6 @@
       "occurrence": 0
     },
     {
-      "code": "if pattern not in (\"clear\", \"nil\"):",
-      "equivalent": null,
-      "function": "_shade",
-      "kind": "str:'nil'",
-      "line": 857,
-      "occurrence": 0
-    },
-    {
       "code": "self.unsure: tuple[bool, bool] = (False, False)",
       "equivalent": "read only in flush_run, which only run calls, after setting it for the run",
       "function": "_Story.__init__",
@@ -344,22 +336,6 @@
       "function": "_refused",
       "kind": "str:' paragraph'",
       "line": 3780,
-      "occurrence": 0
-    },
-    {
-      "code": "if len(changes) != 1 or len(former) != 1:",
-      "equivalent": null,
-      "function": "_canon",
-      "kind": "boolop",
-      "line": 3892,
-      "occurrence": 0
-    },
-    {
-      "code": "raise CertificationError(\"a grid change of no one former grid\")",
-      "equivalent": null,
-      "function": "_canon",
-      "kind": "statement",
-      "line": 3893,
       "occurrence": 0
     },
     {
@@ -892,7 +868,7 @@
     }
   ],
   "target": "src/label_docx/certify.py",
-  "targetSha256": "98db922ce4e6c571befa96a2356f6d9f75f0e1c1185d47a4de05b1ad42dc63f9",
+  "targetSha256": "9653094468a765be5c187a7394e61ebb81807cd497821edbbd98725a47da5e18",
   "tests": [
     "tests/test_certify.py",
     "tests/test_headers_comments.py",
@@ -901,5 +877,5 @@
     "tests/test_robustness.py",
     "tests/test_output.py"
   ],
-  "testsSha256": "1e4acad53f0340f4893b464517c2650727b1550b4c41db6971b0093aa36faf75"
+  "testsSha256": "79d31aa7c5c0539363a732c53136bfd9a889de1eedb0dd1820a9874af9e812ac"
 }
