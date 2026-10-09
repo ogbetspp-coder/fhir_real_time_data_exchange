@@ -1,13 +1,13 @@
 {
-  "killed": 4549,
-  "mutants": 4704,
+  "killed": 4592,
+  "mutants": 4700,
   "survivors": [
     {
       "code": "return False",
       "equivalent": "its one caller reads it as true or false, and None is as false as False",
       "function": "_in_line",
       "kind": "statement",
-      "line": 662,
+      "line": 667,
       "occurrence": 0
     },
     {
@@ -15,7 +15,7 @@
       "equivalent": "its callers read it with not, and None is as false as False",
       "function": "_typed",
       "kind": "statement",
-      "line": 2385,
+      "line": 2391,
       "occurrence": 0
     },
     {
@@ -23,7 +23,7 @@
       "equivalent": "without it the function returns None, and its one caller reads it only under not, where None is False",
       "function": "_symbol_named",
       "kind": "statement",
-      "line": 2890,
+      "line": 2896,
       "occurrence": 0
     },
     {
@@ -31,7 +31,7 @@
       "equivalent": "a function that ends without a return gives None, which is as false as False here",
       "function": "_refused",
       "kind": "statement",
-      "line": 3769,
+      "line": 3775,
       "occurrence": 0
     },
     {
@@ -47,15 +47,7 @@
       "equivalent": "the one place a paragraph is made sets its section",
       "function": "<module>",
       "kind": "int:0",
-      "line": 259,
-      "occurrence": 0
-    },
-    {
-      "code": "ground: bool = False",
-      "equivalent": null,
-      "function": "<module>",
-      "kind": "bool",
-      "line": 263,
+      "line": 261,
       "occurrence": 0
     },
     {
@@ -71,7 +63,7 @@
       "equivalent": "the function returns None at its end anyway",
       "function": "_Fonts.font",
       "kind": "statement",
-      "line": 529,
+      "line": 534,
       "occurrence": 0
     },
     {
@@ -79,31 +71,15 @@
       "equivalent": "kind is None there: what follows returns kind, None, or None for a style it refuses",
       "function": "_unread_kind",
       "kind": "statement",
-      "line": 721,
+      "line": 726,
       "occurrence": 4
-    },
-    {
-      "code": "if len(light) != 1 or len(light[0]) != 1 or len(light[0][0]):",
-      "equivalent": null,
-      "function": "_white",
-      "kind": "boolop",
-      "line": 788,
-      "occurrence": 0
-    },
-    {
-      "code": "return False",
-      "equivalent": null,
-      "function": "_white",
-      "kind": "statement",
-      "line": 789,
-      "occurrence": 2
     },
     {
       "code": "\"thead\",",
       "equivalent": "a row group is always met beside a table or a row, which end the paragraph; text directly in one is refused by the reader",
       "function": "<module>",
       "kind": "str:'thead'",
-      "line": 4190,
+      "line": 4196,
       "occurrence": 0
     },
     {
@@ -111,23 +87,7 @@
       "equivalent": "a row group is always met beside a table or a row, which end the paragraph; text directly in one is refused by the reader",
       "function": "<module>",
       "kind": "str:'tbody'",
-      "line": 4191,
-      "occurrence": 0
-    },
-    {
-      "code": "self.white = False",
-      "equivalent": null,
-      "function": "_Fonts.__init__",
-      "kind": "bool",
-      "line": 346,
-      "occurrence": 0
-    },
-    {
-      "code": "self.page_ground = False",
-      "equivalent": null,
-      "function": "_Fonts.__init__",
-      "kind": "bool",
-      "line": 347,
+      "line": 4197,
       "occurrence": 0
     },
     {
@@ -135,7 +95,7 @@
       "equivalent": "the function returns None at its end anyway",
       "function": "_Fonts.marks.nearest",
       "kind": "statement",
-      "line": 505,
+      "line": 510,
       "occurrence": 0
     },
     {
@@ -143,39 +103,7 @@
       "equivalent": "no code point is above U+10FFFF, and U+10FFFF is a noncharacter never certified (Cn)",
       "function": "<module>",
       "kind": "int:1114111",
-      "line": 592,
-      "occurrence": 0
-    },
-    {
-      "code": "return False",
-      "equivalent": null,
-      "function": "_white",
-      "kind": "bool",
-      "line": 784,
-      "occurrence": 1
-    },
-    {
-      "code": "return False",
-      "equivalent": null,
-      "function": "_white",
-      "kind": "bool",
-      "line": 789,
-      "occurrence": 2
-    },
-    {
-      "code": "if shading.get(_w(tint)) is not None or shading.get(_w(shade)) is not None:",
-      "equivalent": null,
-      "function": "_named",
-      "kind": "boolop",
-      "line": 801,
-      "occurrence": 0
-    },
-    {
-      "code": "raise CertificationError(\"a theme tint or shade of no colour\")",
-      "equivalent": null,
-      "function": "_named",
-      "kind": "statement",
-      "line": 802,
+      "line": 597,
       "occurrence": 0
     },
     {
@@ -183,15 +111,7 @@
       "equivalent": "every run sets it before its tokens are read (run), and only a run's tokens read it",
       "function": "_Story.__init__",
       "kind": "bool",
-      "line": 914,
-      "occurrence": 0
-    },
-    {
-      "code": "table_ground = self.ground or any(",
-      "equivalent": null,
-      "function": "_Story.table",
-      "kind": "boolop",
-      "line": 949,
+      "line": 919,
       "occurrence": 0
     },
     {
@@ -199,7 +119,7 @@
       "equivalent": "the custom flag is read only on a body's note reference, which always passes it",
       "function": "_Story.mark",
       "kind": "bool",
-      "line": 1106,
+      "line": 1112,
       "occurrence": 0
     },
     {
@@ -207,7 +127,7 @@
       "equivalent": "an empty run then adds an empty segment, or no hidden characters: nothing either way",
       "function": "_Story.flush_run",
       "kind": "statement",
-      "line": 1371,
+      "line": 1377,
       "occurrence": 0
     },
     {
@@ -215,7 +135,7 @@
       "equivalent": "a {namespace}local name holds one '}' (XML names cannot hold one): split at two or at one, the parts are the same",
       "function": "_short",
       "kind": "int:1",
-      "line": 1829,
+      "line": 1835,
       "occurrence": 1
     },
     {
@@ -223,7 +143,7 @@
       "equivalent": "IHDR is the first chunk or the image is broken, so colour is set from it before any IDAT reads it",
       "function": "_png_facts",
       "kind": "int:1",
-      "line": 2017,
+      "line": 2023,
       "occurrence": 0
     },
     {
@@ -231,7 +151,7 @@
       "equivalent": "a frame of six bytes holds no component: it is refused just after, as naming none or too short for those it names",
       "function": "_jpeg_facts",
       "kind": "compare:0",
-      "line": 2111,
+      "line": 2117,
       "occurrence": 2
     },
     {
@@ -239,7 +159,7 @@
       "equivalent": "no label the checks before it take (at most four characters, two in Symbol, of the widths table; 16 to 56 half-points; legacySpace to 340, legacyIndent to 1500) is ever exactly a space and the margin from its text: neither (advance + 569) x size x 10 + 8192 nor 5690 x size + 8192 is then a multiple of 2048, so >= and > agree",
       "function": "_Numbering._word6_spaced",
       "kind": "compare:0",
-      "line": 2826,
+      "line": 2832,
       "occurrence": 0
     },
     {
@@ -247,15 +167,7 @@
       "equivalent": "the depth is set whenever a capture begins, before it is read",
       "function": "_raw_texts",
       "kind": "int:1",
-      "line": 3160,
-      "occurrence": 0
-    },
-    {
-      "code": "self, drawing: ET.Element, source: str, around: set[str], boxed: bool = False",
-      "equivalent": null,
-      "function": "DocxSource._picture",
-      "kind": "bool",
-      "line": 3518,
+      "line": 3166,
       "occurrence": 0
     },
     {
@@ -263,7 +175,7 @@
       "equivalent": "the counts follow from the sequences, which are equal by then: the ledger is a second statement of the same fact, stated in the certificate",
       "function": "DocxSource.certify",
       "kind": "statement",
-      "line": 3699,
+      "line": 3705,
       "occurrence": 0
     },
     {
@@ -271,7 +183,7 @@
       "equivalent": "a bookmark's end that opens its parent opens it in the view too, nothing being joined before it: left out of both alike, the two still agree",
       "function": "_canon.add",
       "kind": "bool",
-      "line": 3881,
+      "line": 3887,
       "occurrence": 0
     },
     {
@@ -279,7 +191,7 @@
       "equivalent": "the parser starts at the div, a block, which ends the (empty) paragraph and clears it",
       "function": "_Div.__init__",
       "kind": "bool",
-      "line": 4214,
+      "line": 4220,
       "occurrence": 0
     },
     {
@@ -287,7 +199,7 @@
       "equivalent": "the div ends with its own end tag, so nothing is left buffered",
       "function": "EpiSource._section",
       "kind": "call",
-      "line": 4309,
+      "line": 4315,
       "occurrence": 0
     },
     {
@@ -295,7 +207,7 @@
       "equivalent": "the div's end tag, a block's, has ended the last paragraph",
       "function": "EpiSource._section",
       "kind": "call",
-      "line": 4310,
+      "line": 4316,
       "occurrence": 0
     },
     {
@@ -303,7 +215,7 @@
       "equivalent": "the counts follow from the sequences, which are equal by then: the ledger is a second statement of the same fact, stated in the certificate",
       "function": "EpiSource.certify",
       "kind": "statement",
-      "line": 4380,
+      "line": 4386,
       "occurrence": 0
     },
     {
@@ -319,7 +231,7 @@
       "equivalent": "0x0E00, one past the first range, is the start of the second: ending the first there adds no character",
       "function": "_drawn_complex",
       "kind": "int:3583",
-      "line": 599,
+      "line": 604,
       "occurrence": 0
     },
     {
@@ -327,7 +239,7 @@
       "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
       "function": "_symbol_reading",
       "kind": "compare:0",
-      "line": 625,
+      "line": 630,
       "occurrence": 0
     },
     {
@@ -335,7 +247,7 @@
       "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
       "function": "_symbol_reading",
       "kind": "compare:1",
-      "line": 625,
+      "line": 630,
       "occurrence": 0
     },
     {
@@ -343,7 +255,7 @@
       "equivalent": "the drawing itself passes every test after it: its tag is drawing or pict, or not WordprocessingML's (alternate content), and none of those is a revision or referred to",
       "function": "_unread_kind",
       "kind": "statement",
-      "line": 728,
+      "line": 733,
       "occurrence": 0
     },
     {
@@ -351,7 +263,7 @@
       "equivalent": "every content control of the part, a text box's too, is held to _control before the walk (DocxSource._part), so none met here refuses",
       "function": "_unread_kind",
       "kind": "compare:0",
-      "line": 737,
+      "line": 742,
       "occurrence": 0
     },
     {
@@ -359,23 +271,7 @@
       "equivalent": "every content control of the part, a text box's too, is held to _control before the walk (DocxSource._part), so none met here refuses",
       "function": "_unread_kind",
       "kind": "call",
-      "line": 738,
-      "occurrence": 0
-    },
-    {
-      "code": "colour = _named(shading, \"themeColor\", \"themeTint\", \"themeShade\")",
-      "equivalent": null,
-      "function": "_shade",
-      "kind": "str:'themeTint'",
-      "line": 847,
-      "occurrence": 0
-    },
-    {
-      "code": "for i in fonts.style_ids(paragraph.table_style, \"table\"):",
-      "equivalent": null,
-      "function": "_stops",
-      "kind": "str:'table'",
-      "line": 871,
+      "line": 743,
       "occurrence": 0
     },
     {
@@ -383,7 +279,7 @@
       "equivalent": "read only in flush_run, which only run calls, after setting it for the run",
       "function": "_Story.__init__",
       "kind": "bool",
-      "line": 912,
+      "line": 917,
       "occurrence": 0
     },
     {
@@ -391,7 +287,7 @@
       "equivalent": "read only in flush_run, which only run calls, after setting it for the run",
       "function": "_Story.__init__",
       "kind": "bool",
-      "line": 912,
+      "line": 917,
       "occurrence": 1
     },
     {
@@ -399,7 +295,7 @@
       "equivalent": "cells is made one list per row of rows, so zip(strict=True) never raises",
       "function": "_grid_laid",
       "kind": "bool",
-      "line": 1707,
+      "line": 1713,
       "occurrence": 0
     },
     {
@@ -407,7 +303,7 @@
       "equivalent": "a frame of six bytes holds no component: it is refused just after, as naming none or too short for those it names",
       "function": "_jpeg_facts",
       "kind": "int:6",
-      "line": 2111,
+      "line": 2117,
       "occurrence": 0
     },
     {
@@ -415,7 +311,7 @@
       "equivalent": "the xml prefix can never name Word's namespace, the only one the tokenizer looks for",
       "function": "_raw_texts",
       "kind": "str:'xml'",
-      "line": 3157,
+      "line": 3163,
       "occurrence": 0
     },
     {
@@ -423,7 +319,7 @@
       "equivalent": "a '<' at the very start finds no capture open, so the chunk is never used there",
       "function": "_raw_texts",
       "kind": "compare:0",
-      "line": 3164,
+      "line": 3170,
       "occurrence": 0
     },
     {
@@ -431,7 +327,7 @@
       "equivalent": "the word only names the place in a refusal's detail",
       "function": "DocxSource.certify",
       "kind": "str:'paragraph'",
-      "line": 3638,
+      "line": 3644,
       "occurrence": 0
     },
     {
@@ -439,7 +335,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "_refused",
       "kind": "str:' paragraph'",
-      "line": 3768,
+      "line": 3774,
       "occurrence": 0
     },
     {
@@ -447,7 +343,7 @@
       "equivalent": "a change (ins, del, moveFrom, moveTo) is a revision outside _SAME_AS and no cell change: the test after it passes over it too",
       "function": "_canon.add",
       "kind": "statement",
-      "line": 3898,
+      "line": 3904,
       "occurrence": 3
     },
     {
@@ -455,7 +351,7 @@
       "equivalent": "the table count is compared only between two walks that both make it: any step but zero numbers the same tables apart, so a table added or lost shows either way",
       "function": "_run_tokens.table",
       "kind": "binop",
-      "line": 3951,
+      "line": 3957,
       "occurrence": 0
     },
     {
@@ -463,7 +359,7 @@
       "equivalent": "a paragraph holds no paragraph and run content no run the walk reads: walking either again only adds to a list outside any paragraph, which is never read",
       "function": "_run_tokens.walk",
       "kind": "statement",
-      "line": 3984,
+      "line": 3990,
       "occurrence": 0
     },
     {
@@ -471,7 +367,7 @@
       "equivalent": "a bookmark's end has no children: walking it once carried reads nothing",
       "function": "_run_tokens.walk",
       "kind": "statement",
-      "line": 3991,
+      "line": 3997,
       "occurrence": 2
     },
     {
@@ -479,7 +375,7 @@
       "equivalent": "the element has no children: walking it reads nothing",
       "function": "_run_tokens.walk",
       "kind": "statement",
-      "line": 4012,
+      "line": 4018,
       "occurrence": 4
     },
     {
@@ -487,7 +383,7 @@
       "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
       "function": "_symbol_reading",
       "kind": "int:61440",
-      "line": 625,
+      "line": 630,
       "occurrence": 1
     },
     {
@@ -495,15 +391,7 @@
       "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
       "function": "_symbol_reading",
       "kind": "int:61695",
-      "line": 625,
-      "occurrence": 0
-    },
-    {
-      "code": "fill = (shading.get(_w(\"fill\")) or \"auto\").upper()",
-      "equivalent": null,
-      "function": "_shade",
-      "kind": "str:'auto'",
-      "line": 826,
+      "line": 630,
       "occurrence": 0
     },
     {
@@ -511,7 +399,7 @@
       "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
       "function": "_Story.token",
       "kind": "compare:0",
-      "line": 1304,
+      "line": 1310,
       "occurrence": 0
     },
     {
@@ -519,23 +407,7 @@
       "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
       "function": "_Story.token",
       "kind": "compare:1",
-      "line": 1304,
-      "occurrence": 0
-    },
-    {
-      "code": "if not re.fullmatch(\"[0-9]{1,5}\", twips) or not 1 <= int(twips) <= 31680:",
-      "equivalent": null,
-      "function": "_grid_laid",
-      "kind": "compare:0",
-      "line": 1702,
-      "occurrence": 0
-    },
-    {
-      "code": "if not re.fullmatch(\"[0-9]{1,5}\", twips) or not 1 <= int(twips) <= 31680:",
-      "equivalent": null,
-      "function": "_grid_laid",
-      "kind": "compare:1",
-      "line": 1702,
+      "line": 1310,
       "occurrence": 0
     },
     {
@@ -543,7 +415,7 @@
       "equivalent": "four names and the four sides _whole reads for them, so zip(strict=True) never raises",
       "function": "_blip_fill",
       "kind": "bool",
-      "line": 1907,
+      "line": 1913,
       "occurrence": 0
     },
     {
@@ -551,7 +423,7 @@
       "equivalent": "splitting once more leaves the last segment, the type's name, the same",
       "function": "_typed",
       "kind": "int:1",
-      "line": 2383,
+      "line": 2389,
       "occurrence": 0
     },
     {
@@ -559,7 +431,7 @@
       "equivalent": "a tenth place is never used: list levels are 0 to 8",
       "function": "_Numbering.label",
       "kind": "int:9",
-      "line": 2633,
+      "line": 2639,
       "occurrence": 0
     },
     {
@@ -567,7 +439,7 @@
       "equivalent": "a tenth place is never used: list levels are 0 to 8",
       "function": "_Numbering.label",
       "kind": "int:9",
-      "line": 2635,
+      "line": 2641,
       "occurrence": 0
     },
     {
@@ -575,7 +447,7 @@
       "equivalent": "a tenth place is never used: list levels are 0 to 8",
       "function": "_Numbering.label",
       "kind": "int:9",
-      "line": 2636,
+      "line": 2642,
       "occurrence": 0
     },
     {
@@ -583,7 +455,7 @@
       "equivalent": "a reference to character 0 is refused by the XML parser first (_parse); any other keeps a digit",
       "function": "_unescape.one",
       "kind": "str:'0'",
-      "line": 3134,
+      "line": 3140,
       "occurrence": 1
     },
     {
@@ -591,7 +463,7 @@
       "equivalent": "a '<' at the very start finds no capture open, so the chunk is never used there",
       "function": "_raw_texts",
       "kind": "int:0",
-      "line": 3164,
+      "line": 3170,
       "occurrence": 0
     },
     {
@@ -599,7 +471,7 @@
       "equivalent": "the comments' metadata lists are compared just before, so the lengths are equal",
       "function": "DocxSource.certify",
       "kind": "bool",
-      "line": 3687,
+      "line": 3693,
       "occurrence": 0
     },
     {
@@ -607,7 +479,7 @@
       "equivalent": "called only after certify has compared the lengths",
       "function": "DocxSource._pairs",
       "kind": "bool",
-      "line": 3736,
+      "line": 3742,
       "occurrence": 0
     },
     {
@@ -615,7 +487,7 @@
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "_paragraphs",
       "kind": "bool",
-      "line": 3756,
+      "line": 3762,
       "occurrence": 0
     },
     {
@@ -623,7 +495,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "_paragraphs",
       "kind": "str:' '",
-      "line": 3757,
+      "line": 3763,
       "occurrence": 0
     },
     {
@@ -631,7 +503,7 @@
       "equivalent": "the table count is compared only between two walks that both make it: any step but zero numbers the same tables apart, so a table added or lost shows either way",
       "function": "_run_tokens.table",
       "kind": "int:1",
-      "line": 3951,
+      "line": 3957,
       "occurrence": 0
     },
     {
@@ -639,7 +511,7 @@
       "equivalent": "what stands before a begin in found is the run holding it, which the view drops with it",
       "function": "_field_runs",
       "kind": "binop",
-      "line": 4062,
+      "line": 4068,
       "occurrence": 0
     },
     {
@@ -663,15 +535,7 @@
       "equivalent": "every content control of the part, a text box's too, is held to _control before the walk (DocxSource._part), so none met here refuses",
       "function": "_unread_kind",
       "kind": "str:'sdt'",
-      "line": 737,
-      "occurrence": 0
-    },
-    {
-      "code": "lit = highlight is not None and highlight.get(_w(\"val\")) not in (None, \"none\")",
-      "equivalent": null,
-      "function": "_Story.run",
-      "kind": "str:'none'",
-      "line": 1139,
+      "line": 742,
       "occurrence": 0
     },
     {
@@ -679,7 +543,7 @@
       "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
       "function": "_Story.token",
       "kind": "int:61440",
-      "line": 1304,
+      "line": 1310,
       "occurrence": 1
     },
     {
@@ -687,15 +551,7 @@
       "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
       "function": "_Story.token",
       "kind": "int:61695",
-      "line": 1304,
-      "occurrence": 0
-    },
-    {
-      "code": "if not re.fullmatch(\"[0-9]{1,5}\", twips) or not 1 <= int(twips) <= 31680:",
-      "equivalent": null,
-      "function": "_grid_laid",
-      "kind": "int:1",
-      "line": 1702,
+      "line": 1310,
       "occurrence": 0
     },
     {
@@ -703,7 +559,7 @@
       "equivalent": "a blip with r:link is linked, which comes before effects: taken as an effect too, the reason is the same",
       "function": "_blip_fill",
       "kind": "str:'r:link'",
-      "line": 1883,
+      "line": 1889,
       "occurrence": 0
     },
     {
@@ -711,7 +567,7 @@
       "equivalent": "two Exif blocks are refused as more than one: keeping a third as well changes nothing",
       "function": "_png_facts",
       "kind": "compare:0",
-      "line": 2052,
+      "line": 2058,
       "occurrence": 1
     },
     {
@@ -719,23 +575,7 @@
       "equivalent": "a paragraph's section is at most the number of sections closed before the last, len(sections) - 1, so the bound never takes",
       "function": "_note_marks",
       "kind": "binop",
-      "line": 3088,
-      "occurrence": 0
-    },
-    {
-      "code": "len(background) > 0",
-      "equivalent": null,
-      "function": "DocxSource.__init__",
-      "kind": "compare:0",
-      "line": 3303,
-      "occurrence": 0
-    },
-    {
-      "code": "or not _keys(background) <= {\"w:color\"}",
-      "equivalent": null,
-      "function": "DocxSource.__init__",
-      "kind": "drop-not",
-      "line": 3304,
+      "line": 3094,
       "occurrence": 0
     },
     {
@@ -743,7 +583,7 @@
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "DocxSource.certify",
       "kind": "bool",
-      "line": 3644,
+      "line": 3650,
       "occurrence": 0
     },
     {
@@ -751,7 +591,7 @@
       "equivalent": "the parts and their uses are compared just before, so the lengths are equal",
       "function": "DocxSource.certify",
       "kind": "bool",
-      "line": 3670,
+      "line": 3676,
       "occurrence": 0
     },
     {
@@ -759,7 +599,7 @@
       "equivalent": "called only after certify has compared the lengths",
       "function": "DocxSource._pairs",
       "kind": "bool",
-      "line": 3733,
+      "line": 3739,
       "occurrence": 0
     },
     {
@@ -767,7 +607,7 @@
       "equivalent": "a refused comment is served with no paragraphs (certify holds it to that): counting it adds nothing to the output",
       "function": "DocxSource._pairs",
       "kind": "str:'#'",
-      "line": 3737,
+      "line": 3743,
       "occurrence": 0
     },
     {
@@ -775,7 +615,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "_paragraphs",
       "kind": "binop",
-      "line": 3757,
+      "line": 3763,
       "occurrence": 0
     },
     {
@@ -783,7 +623,7 @@
       "equivalent": "places in found are distinct: no other field ends where this one begins",
       "function": "_field_runs",
       "kind": "compare:1",
-      "line": 4071,
+      "line": 4077,
       "occurrence": 0
     },
     {
@@ -791,7 +631,7 @@
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "EpiSource.certify",
       "kind": "bool",
-      "line": 4371,
+      "line": 4377,
       "occurrence": 0
     },
     {
@@ -799,23 +639,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "EpiSource.certify",
       "kind": "str:'section '",
-      "line": 4372,
-      "occurrence": 0
-    },
-    {
-      "code": "and shading.get(_w(\"color\"), \"auto\") in (\"auto\", \"000000\")",
-      "equivalent": null,
-      "function": "_shade",
-      "kind": "str:'color'",
-      "line": 837,
-      "occurrence": 0
-    },
-    {
-      "code": "*(fonts.ppr.get(i) for i in fonts.style_ids(paragraph.style, \"paragraph\")),",
-      "equivalent": null,
-      "function": "_stops",
-      "kind": "str:'paragraph'",
-      "line": 866,
+      "line": 4378,
       "occurrence": 0
     },
     {
@@ -823,7 +647,7 @@
       "equivalent": "the header rows at the top end at the first unmarked row, so row top is never marked",
       "function": "_Applied.at",
       "kind": "compare:0",
-      "line": 1611,
+      "line": 1617,
       "occurrence": 0
     },
     {
@@ -831,7 +655,7 @@
       "equivalent": "two Exif blocks are refused as more than one: keeping a third as well changes nothing",
       "function": "_png_facts",
       "kind": "int:2",
-      "line": 2052,
+      "line": 2058,
       "occurrence": 0
     },
     {
@@ -839,23 +663,7 @@
       "equivalent": "two Exif blocks are refused as more than one: keeping a third as well changes nothing",
       "function": "_jpeg_facts",
       "kind": "int:2",
-      "line": 2106,
-      "occurrence": 0
-    },
-    {
-      "code": "len(background) > 0",
-      "equivalent": null,
-      "function": "DocxSource.__init__",
-      "kind": "int:0",
-      "line": 3303,
-      "occurrence": 0
-    },
-    {
-      "code": "or not _keys(background) <= {\"w:color\"}",
-      "equivalent": null,
-      "function": "DocxSource.__init__",
-      "kind": "compare:0",
-      "line": 3304,
+      "line": 2112,
       "occurrence": 0
     },
     {
@@ -863,7 +671,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "DocxSource.certify",
       "kind": "str:' '",
-      "line": 3663,
+      "line": 3669,
       "occurrence": 0
     },
     {
@@ -871,7 +679,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "DocxSource.certify",
       "kind": "str:' paragraph'",
-      "line": 3663,
+      "line": 3669,
       "occurrence": 0
     },
     {
@@ -879,7 +687,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "_paragraphs",
       "kind": "int:1",
-      "line": 3757,
+      "line": 3763,
       "occurrence": 0
     },
     {
@@ -887,7 +695,7 @@
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "EpiSource.certify.section",
       "kind": "bool",
-      "line": 4356,
+      "line": 4362,
       "occurrence": 0
     },
     {
@@ -895,7 +703,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "EpiSource.certify.section",
       "kind": "str:'.'",
-      "line": 4358,
+      "line": 4364,
       "occurrence": 0
     },
     {
@@ -903,47 +711,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "EpiSource.certify",
       "kind": "binop",
-      "line": 4372,
-      "occurrence": 0
-    },
-    {
-      "code": "for name in (\"tblPr\", \"tcPr\")",
-      "equivalent": null,
-      "function": "_Fonts.__init__",
-      "kind": "str:'tblPr'",
-      "line": 366,
-      "occurrence": 0
-    },
-    {
-      "code": "for name in (\"tblPr\", \"tcPr\")",
-      "equivalent": null,
-      "function": "_Fonts.__init__",
-      "kind": "str:'tcPr'",
-      "line": 366,
-      "occurrence": 0
-    },
-    {
-      "code": "return f\"shading-{pattern}-{colour or (shading.get(_w('color')) or 'auto').upper()}-{fill}\"",
-      "equivalent": null,
-      "function": "_shade",
-      "kind": "boolop",
-      "line": 848,
-      "occurrence": 1
-    },
-    {
-      "code": "*(self.fonts.ppr.get(i) for i in self.fonts.style_ids(here.style, \"paragraph\")),",
-      "equivalent": null,
-      "function": "_Story.paragraph",
-      "kind": "str:'paragraph'",
-      "line": 1036,
-      "occurrence": 0
-    },
-    {
-      "code": "for i in (self.fonts.style_ids(table_style, \"table\") if table is not None else [])",
-      "equivalent": null,
-      "function": "_Story.paragraph",
-      "kind": "compare:0",
-      "line": 1039,
+      "line": 4378,
       "occurrence": 0
     },
     {
@@ -951,7 +719,7 @@
       "equivalent": "self.styles is made from style_ids one for one, so zip(strict=True) never raises",
       "function": "_Applied.__init__",
       "kind": "bool",
-      "line": 1479,
+      "line": 1485,
       "occurrence": 0
     },
     {
@@ -959,7 +727,7 @@
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "_match",
       "kind": "bool",
-      "line": 2267,
+      "line": 2273,
       "occurrence": 0
     },
     {
@@ -967,23 +735,7 @@
       "equivalent": "the default is only compared with 'eachSect', which 'Xontinuous' is not either",
       "function": "_note_marks",
       "kind": "str:'continuous'",
-      "line": 3111,
-      "occurrence": 0
-    },
-    {
-      "code": "or background.get(_w(\"color\"), \"auto\").upper() not in (\"AUTO\", \"FFFFFF\")",
-      "equivalent": null,
-      "function": "DocxSource.__init__",
-      "kind": "str:'AUTO'",
-      "line": 3305,
-      "occurrence": 0
-    },
-    {
-      "code": "or background.get(_w(\"color\"), \"auto\").upper() not in (\"AUTO\", \"FFFFFF\")",
-      "equivalent": null,
-      "function": "DocxSource.__init__",
-      "kind": "str:'FFFFFF'",
-      "line": 3305,
+      "line": 3117,
       "occurrence": 0
     },
     {
@@ -991,7 +743,7 @@
       "equivalent": "the default only has to be outside the layout types, as 'Xormal' is",
       "function": "DocxSource.__init__",
       "kind": "str:'normal'",
-      "line": 3348,
+      "line": 3354,
       "occurrence": 0
     },
     {
@@ -999,7 +751,7 @@
       "equivalent": "a paragraph mark's change markers are empty: dropping one drops no content",
       "function": "_run_tokens.walk",
       "kind": "str:'rPr'",
-      "line": 4015,
+      "line": 4021,
       "occurrence": 0
     },
     {
@@ -1007,7 +759,7 @@
       "equivalent": "a paragraph mark's change markers are empty: dropping one drops no content",
       "function": "_field_runs.collect",
       "kind": "str:'rPr'",
-      "line": 4039,
+      "line": 4045,
       "occurrence": 0
     },
     {
@@ -1015,7 +767,7 @@
       "equivalent": "the cell count starts again at each row; only the row count's start matters, and its mutant is caught",
       "function": "_Div.handle_starttag",
       "kind": "int:1",
-      "line": 4241,
+      "line": 4247,
       "occurrence": 1
     },
     {
@@ -1023,7 +775,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "EpiSource.certify.section",
       "kind": "binop",
-      "line": 4358,
+      "line": 4364,
       "occurrence": 0
     },
     {
@@ -1031,31 +783,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "EpiSource.certify",
       "kind": "int:1",
-      "line": 4372,
-      "occurrence": 0
-    },
-    {
-      "code": "for shading in holder.findall(f\"{_w(name)}/{_w('shd')}\")",
-      "equivalent": null,
-      "function": "_Fonts.__init__",
-      "kind": "str:'/'",
-      "line": 367,
-      "occurrence": 0
-    },
-    {
-      "code": "return f\"shading-{pattern}-{colour or (shading.get(_w('color')) or 'auto').upper()}-{fill}\"",
-      "equivalent": null,
-      "function": "_shade",
-      "kind": "str:'auto'",
-      "line": 848,
-      "occurrence": 0
-    },
-    {
-      "code": "for i in (self.fonts.style_ids(table_style, \"table\") if table is not None else [])",
-      "equivalent": null,
-      "function": "_Story.paragraph",
-      "kind": "str:'table'",
-      "line": 1039,
+      "line": 4378,
       "occurrence": 0
     },
     {
@@ -1063,7 +791,7 @@
       "equivalent": "both lists have one entry per character of the text, which was compared just before",
       "function": "_match",
       "kind": "bool",
-      "line": 2289,
+      "line": 2295,
       "occurrence": 0
     },
     {
@@ -1071,7 +799,7 @@
       "equivalent": "a tag's first character is its name's, never '>' or a quote, so matching from one character later finds the same end",
       "function": "_raw_texts",
       "kind": "int:1",
-      "line": 3181,
+      "line": 3187,
       "occurrence": 0
     },
     {
@@ -1079,23 +807,15 @@
       "equivalent": "outside a namespace declaration an attribute is read only for its references, which the XML parser has checked first (_parse)",
       "function": "_raw_texts",
       "kind": "compare:0",
-      "line": 3200,
+      "line": 3206,
       "occurrence": 1
-    },
-    {
-      "code": "or not _keys(background) <= {\"w:color\"}",
-      "equivalent": null,
-      "function": "DocxSource.__init__",
-      "kind": "str:'w:color'",
-      "line": 3304,
-      "occurrence": 0
     },
     {
       "code": "and all(_agree(a, b) for a, b in zip(expected, found, strict=True))",
       "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
       "function": "_agree",
       "kind": "bool",
-      "line": 3853,
+      "line": 3859,
       "occurrence": 0
     },
     {
@@ -1103,7 +823,7 @@
       "equivalent": "where a difference is found only words the refusal",
       "function": "EpiSource.certify.section",
       "kind": "compare:0",
-      "line": 4338,
+      "line": 4344,
       "occurrence": 0
     },
     {
@@ -1111,15 +831,7 @@
       "equivalent": "the words only name the place in a refusal's detail",
       "function": "EpiSource.certify.section",
       "kind": "int:1",
-      "line": 4358,
-      "occurrence": 0
-    },
-    {
-      "code": "element.find(f\"{_w('tblPr')}/{_w('shd')}\"),",
-      "equivalent": null,
-      "function": "_Story.table",
-      "kind": "str:'/'",
-      "line": 952,
+      "line": 4364,
       "occurrence": 0
     },
     {
@@ -1127,7 +839,7 @@
       "equivalent": "the Symbol table maps one character to one, so the two are the same length",
       "function": "_Story.token",
       "kind": "bool",
-      "line": 1271,
+      "line": 1277,
       "occurrence": 0
     },
     {
@@ -1135,7 +847,7 @@
       "equivalent": "splitting once more leaves the first word, the name, the same",
       "function": "_raw_texts",
       "kind": "int:1",
-      "line": 3195,
+      "line": 3201,
       "occurrence": 0
     },
     {
@@ -1143,71 +855,7 @@
       "equivalent": "outside a namespace declaration an attribute is read only for its references, which the XML parser has checked first (_parse)",
       "function": "_raw_texts",
       "kind": "str:'&'",
-      "line": 3200,
-      "occurrence": 0
-    },
-    {
-      "code": "or background.get(_w(\"color\"), \"auto\").upper() not in (\"AUTO\", \"FFFFFF\")",
-      "equivalent": null,
-      "function": "DocxSource.__init__",
-      "kind": "str:'auto'",
-      "line": 3305,
-      "occurrence": 0
-    },
-    {
-      "code": "numbered[\"suffix\"] in (\"tab\", \"legacy\")",
-      "equivalent": null,
-      "function": "DocxSource.__init__",
-      "kind": "str:'legacy'",
-      "line": 3331,
-      "occurrence": 0
-    },
-    {
-      "code": "for shading in holder.findall(f\"{_w(name)}/{_w('shd')}\")",
-      "equivalent": null,
-      "function": "_Fonts.__init__",
-      "kind": "str:'shd'",
-      "line": 367,
-      "occurrence": 0
-    },
-    {
-      "code": "return f\"shading-{pattern}-{colour or (shading.get(_w('color')) or 'auto').upper()}-{fill}\"",
-      "equivalent": null,
-      "function": "_shade",
-      "kind": "str:'color'",
-      "line": 848,
-      "occurrence": 0
-    },
-    {
-      "code": "element.find(f\"{_w('tblPr')}/{_w('shd')}\"),",
-      "equivalent": null,
-      "function": "_Story.table",
-      "kind": "str:'tblPr'",
-      "line": 952,
-      "occurrence": 0
-    },
-    {
-      "code": "element.find(f\"{_w('tblPr')}/{_w('shd')}\"),",
-      "equivalent": null,
-      "function": "_Story.table",
-      "kind": "str:'shd'",
-      "line": 952,
-      "occurrence": 0
-    },
-    {
-      "code": "*(row.find(f\"{_w('tblPrEx')}/{_w('shd')}\") for row in rows),",
-      "equivalent": null,
-      "function": "_Story.table",
-      "kind": "str:'/'",
-      "line": 953,
-      "occurrence": 0
-    },
-    {
-      "code": "for i in self.fonts.style_ids(own, \"table\")",
-      "equivalent": null,
-      "function": "_Story.table",
-      "kind": "str:'table'",
-      "line": 956,
+      "line": 3206,
       "occurrence": 0
     },
     {
@@ -1215,36 +863,12 @@
       "equivalent": "for Horz both names are firstRow; for Vert the test of way is false whichever is looked for",
       "function": "_Applied.at",
       "kind": "int:0",
-      "line": 1583,
-      "occurrence": 0
-    },
-    {
-      "code": "for i in self.fonts.style_ids(paragraph.style, \"paragraph\")",
-      "equivalent": null,
-      "function": "DocxSource._part",
-      "kind": "str:'paragraph'",
-      "line": 3506,
-      "occurrence": 0
-    },
-    {
-      "code": "*(row.find(f\"{_w('tblPrEx')}/{_w('shd')}\") for row in rows),",
-      "equivalent": null,
-      "function": "_Story.table",
-      "kind": "str:'tblPrEx'",
-      "line": 953,
-      "occurrence": 0
-    },
-    {
-      "code": "*(row.find(f\"{_w('tblPrEx')}/{_w('shd')}\") for row in rows),",
-      "equivalent": null,
-      "function": "_Story.table",
-      "kind": "str:'shd'",
-      "line": 953,
+      "line": 1589,
       "occurrence": 0
     }
   ],
   "target": "src/label_docx/certify.py",
-  "targetSha256": "b5d209f05a484e2ba7d96dd87b479217fc56f615e63fd12d5ee68893d7a43ca9",
+  "targetSha256": "f6f7ca46b9f285e691d007e0cc07715e8307999509d3ee8bca9a033c814aefcc",
   "tests": [
     "tests/test_certify.py",
     "tests/test_headers_comments.py",
@@ -1253,5 +877,5 @@
     "tests/test_robustness.py",
     "tests/test_output.py"
   ],
-  "testsSha256": "184fb31a155783992683f1421bb5d4b4c25df440c22fbdfd1c9b80080c6dcdad"
+  "testsSha256": "bfa91de86f0e402e1ef859265d4607d1ce29c5580ce19747bc49c38d8b8b4f30"
 }
