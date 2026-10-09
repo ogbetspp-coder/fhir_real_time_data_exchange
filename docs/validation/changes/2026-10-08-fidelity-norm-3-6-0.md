@@ -46,13 +46,13 @@ widths), and that is a future owner decision.
 
 **Why.** Evidence, on EMA's published English Word PI cuts (internal corpus,
 `label-docx-reader-scratch/ema-pi-tc`, counts only): under 3.5.0, 8 SmPC sections are refused
-`narrative`/`unmappable-script` for a lowered ½. Measured on the same cuts with `docx-reader/1.33.0`
-(`baseline.py`, 296 SmPC and 286 leaflet cuts, before on main e3085bf, after on this branch): of
-4 194 SmPC sections built, 263 were refused before and 257 after: `narrative`/`unmappable-script`
+`narrative`/`unmappable-script` for a lowered ½. Measured on the same cuts with `docx-reader/1.34.0`
+(`baseline.py`, 296 SmPC and 286 leaflet cuts, before on main 0b57c85, after on this branch): of
+4 194 SmPC sections built, 248 were refused before and 242 after: `narrative`/`unmappable-script`
 8 → 2, every other count the same (the 2 left hold a lowered ½ with a small letter right after
-the `sub`, which stays refused). The leaflets' 155 refused of 1 870 are unchanged, and so is every
-file's outcome (SmPC: 18 whole, 83 built with a section refused, 142 refused by the reader, 33
-needing a person, 12 refused whole, 8 parts unclear; leaflets: 14 whole, 55 with a section
+the `sub`, which stays refused). The leaflets' 147 refused of 1 870 are unchanged, and so is every
+file's outcome (SmPC: 20 whole, 81 built with a section refused, 143 refused by the reader, 33
+needing a person, 11 refused whole, 8 parts unclear; leaflets: 16 whole, 53 with a section
 refused, 125 needing a person, 91 refused by the reader, 1 refused whole), since each file the
 half-lives touch has another refused section. The 19 SmPC sections refused for a staggered table
 (`narrative`/`table-shape`) stay refused (above).
