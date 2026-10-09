@@ -68,7 +68,7 @@ def numbered(level: int = 0, key: int = 1) -> str:
 
 def table(*rows: str, props: str = "") -> str:
     """A one-column table of ``rows`` (each a row's ``w:tr`` content after its properties)."""
-    grid = "<w:tblGrid><w:gridCol/></w:tblGrid>"
+    grid = "<w:tblGrid><w:gridCol w:w='4000'/></w:tblGrid>"
     return f"<w:tbl><w:tblPr>{props}</w:tblPr>{grid}{''.join(rows)}</w:tbl>"
 
 
@@ -256,7 +256,7 @@ CASES: dict[str, Case] = {
     "mark-deleted-before-table": case(
         "A deleted paragraph mark before a table: the text joins the first cell.",
         para(words("before"), props=mark("del"))
-        + "<w:tbl><w:tblGrid><w:gridCol/></w:tblGrid><w:tr><w:tc><w:p>"
+        + "<w:tbl><w:tblGrid><w:gridCol w:w='4000'/></w:tblGrid><w:tr><w:tc><w:p>"
         + words("cell")
         + "</w:p></w:tc></w:tr></w:tbl>"
         + para(words("after")),
@@ -414,7 +414,7 @@ CASES: dict[str, Case] = {
     ),
     "row-inserted": case(
         "A table row inserted: the original has no such row.",
-        "<w:tbl><w:tblGrid><w:gridCol/></w:tblGrid><w:tr><w:tc><w:p>"
+        "<w:tbl><w:tblGrid><w:gridCol w:w='4000'/></w:tblGrid><w:tr><w:tc><w:p>"
         + words("kept")
         + "</w:p></w:tc></w:tr><w:tr><w:trPr>"
         + f'<w:ins w:id="4" {WHO}/></w:trPr><w:tc><w:p>'

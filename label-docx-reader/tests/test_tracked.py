@@ -218,6 +218,75 @@ def test_table_and_section_formatting_is_former_in_the_original() -> None:
     }
 
 
+def test_each_view_of_a_changed_grid_carries_its_own_columns_widths() -> None:
+    # The accepted view the grid as it is, the original the one its change records.
+    grid = (
+        '<w:tblGrid><w:gridCol w:w="2000"/><w:gridCol w:w="2000"/><w:tblGridChange w:id="6">'
+        '<w:tblGrid><w:gridCol w:w="1500"/><w:gridCol w:w="2500"/></w:tblGrid></w:tblGridChange>'
+        "</w:tblGrid>"
+    )
+    body = (
+        f"<w:tbl>{grid}<w:tr><w:tc>{p(t('a'))}</w:tc><w:tc>{p(t('b'))}</w:tc></w:tr></w:tbl>"
+        + p(t("c"))
+    )
+    value = result(docx(body))
+    widths = {
+        view: [table["grid"]["widths"] for table in value["tracked"][view]["tables"]]
+        for view in ("accepted", "original")
+    }
+    assert widths == {"accepted": [[2000, 2000]], "original": [[1500, 2500]]}
+    # The check holds each view's grid on its own: the original's is the former one, exactly.
+    data = docx(body)
+    accepted, original, _ = tracked(data)
+    certify_tracked(data, {"accepted": accepted, "original": original})
+    for wrong in ('w:w="2000"/><w:gridCol w:w="2000"', 'w:w="1500"/><w:gridCol w:w="9999"'):
+        tampered = _with_grid(original, wrong)
+        with pytest.raises(CertificationError):
+            certify_tracked(data, {"accepted": accepted, "original": tampered})
+    with pytest.raises(CertificationError):
+        certify_tracked(
+            data, {"accepted": _with_grid(accepted, 'w:w="2000"/><w:gridCol w:w="2001"')}
+        )
+
+
+def test_a_grid_change_of_no_one_former_grid_is_never_certified() -> None:
+    # The original view's grid is the change's former one: with none, or two changes, there is
+    # no one grid to hold it to.
+    good = (
+        '<w:tblGrid><w:gridCol w:w="2000"/><w:tblGridChange w:id="6"><w:tblGrid>'
+        '<w:gridCol w:w="1500"/></w:tblGrid></w:tblGridChange></w:tblGrid>'
+    )
+    bad = [
+        good.replace('<w:tblGrid><w:gridCol w:w="1500"/></w:tblGrid>', ""),
+        good.replace(
+            "</w:tblGridChange></w:tblGrid>",
+            '</w:tblGridChange><w:tblGridChange w:id="7"><w:tblGrid><w:gridCol w:w="1500"/>'
+            "</w:tblGrid></w:tblGridChange></w:tblGrid>",
+        ),
+    ]
+    body = "<w:tbl>{}<w:tr><w:tc>" + p(t("a")) + "</w:tc></w:tr></w:tbl>" + p(t("b"))
+    _, original, _ = tracked(docx(body.format(good)))
+    for grid in bad:
+        with pytest.raises(CertificationError, match="a grid change of no one former grid"):
+            certify_tracked(docx(body.format(grid)), {"original": original})
+
+
+def _with_grid(view: bytes, columns: str) -> bytes:
+    """``view`` with its grid's two columns made ``<w:gridCol {columns}/>``."""
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(view)) as source, zipfile.ZipFile(out, "w") as target:
+        for info in source.infolist():
+            content = source.read(info)
+            if info.filename == "word/document.xml":
+                xml = content.decode()
+                start = xml.index("<ns0:tblGrid>") + len("<ns0:tblGrid>")
+                end = xml.index("</ns0:tblGrid>")
+                grid = f"<ns0:gridCol {columns}/>".replace("w:", "ns0:")
+                content = (xml[:start] + grid + xml[end:]).encode()
+            target.writestr(info, content)
+    return out.getvalue()
+
+
 def test_what_the_reader_cannot_undo_exactly_is_refused() -> None:
     headed = with_parts(
         docx(
@@ -304,7 +373,7 @@ def test_the_check_holds_each_view_to_the_source_on_its_own() -> None:
     source = docx(p(t("a"), mark("ins")) + p(t("b") + dele("c") + ins(t("d"))))
     accepted, original, _ = tracked(source)
     assert certify_tracked(source, {"accepted": accepted, "original": original}) == {
-        "checker": "conservation-check/1.20.0",
+        "checker": "conservation-check/1.21.0",
         "accepted": {"characters": 3, "elements": 0, "paragraphsJoined": 0},
         "original": {"characters": 3, "elements": 0, "paragraphsJoined": 1},
     }
@@ -618,7 +687,7 @@ def test_the_check_counts_what_each_view_holds_and_only_the_revised_parts() -> N
     source = _with_part(docx(body, footnotes=note), "word/media/image1.png", b"\x89PNG\r\n")
     accepted, original, _ = tracked(source)
     assert certify_tracked(source, {"accepted": accepted, "original": original}) == {
-        "checker": "conservation-check/1.20.0",
+        "checker": "conservation-check/1.21.0",
         "accepted": {"characters": 5, "elements": 2, "paragraphsJoined": 0},
         "original": {"characters": 4, "elements": 1, "paragraphsJoined": 0},
     }

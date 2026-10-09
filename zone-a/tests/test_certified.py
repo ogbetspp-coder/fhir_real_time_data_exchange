@@ -5,6 +5,8 @@ A failing comparison names a file, never the text: each is computed before it is
 
 from __future__ import annotations
 
+import io
+import zipfile
 from pathlib import Path
 
 import label_docx.epi_output
@@ -81,11 +83,25 @@ def test_a_body_that_refers_to_a_note_is_refused() -> None:
     assert refused.value.code == "note-reference"
 
 
+def _without_leaders(data: bytes) -> bytes:
+    """``data`` with the dot leaders of its body's tab stops taken out, each part as stored."""
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(out, "w") as target:
+        for info in source.infolist():
+            content = source.read(info)
+            if info.filename == "word/document.xml":
+                content = content.replace(b' w:leader="dot"', b"")
+            target.writestr(info, content)
+    return out.getvalue()
+
+
 def test_a_body_with_a_page_number_is_refused() -> None:
-    # A table of contents: its page numbers are places in the reader's text, not digits.
-    data = (
-        ROOT / "label-docx-reader" / "corpus" / "word-authored" / "table-of-contents.docx"
-    ).read_bytes()
+    # A table of contents: its page numbers are places in the reader's text, not digits. Word
+    # draws its entries' dot leaders, which the reader refuses (docx-reader/1.34.0): without them.
+    toc = ROOT / "label-docx-reader" / "corpus" / "word-authored" / "table-of-contents.docx"
+    with pytest.raises(DocxRefusedError, match="a tab with a leader"):
+        reader_read_docx(toc.read_bytes())
+    data = _without_leaders(toc.read_bytes())
     assert any(paragraph.pages for paragraph in reader_read_docx(data))
     with pytest.raises(DocxRefusedError) as refused:
         certified.read_docx(data)

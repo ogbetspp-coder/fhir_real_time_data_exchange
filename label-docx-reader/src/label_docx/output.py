@@ -48,18 +48,23 @@ A read::
 ``tables`` lists each body table (``reader.Table``; "Tables" in the reader's docstring), in
 document order, a nested table as its own entry after the table holding it: ``parent`` (the
 ``[table, row, cell]`` a nested table stands in, else null), ``grid`` and ``reason``. ``grid`` is
-``columns`` (its ``gridCol`` count) and ``rows``, each with ``before`` and ``after`` (grid columns
+``columns`` (its ``gridCol`` count), ``widths`` (from label-docx-json/1.20.0: each ``gridCol``'s
+``w:w`` in twips as stored, one positive whole number a column without a leading zero, in grid
+order; the original view of a tracked grid change has its former grid's. They are what the
+file stores, not what Word draws: Word lays an autofit table out again, a one-column table stored
+4,000 twips wide saved 398 to 526 wide in corpus/tracked-cases, so no consumer may take them for
+drawn widths) and ``rows``, each with ``before`` and ``after`` (grid columns
 left out, ``gridBefore`` and ``gridAfter``) and ``cells``, each with ``column`` (the first grid
 column it covers, from 0), ``span`` (``gridSpan``) and ``merge`` (``vMerge`` as stored: null,
 ``restart`` or ``continue``), and ``exactHeight`` (whether the row's height may be exact: its own
 ``trHeight`` ``hRule="exact"``, or one its table's style sets); ``reason`` is then null. Where
 Word's grid is not on record, ``grid`` is null and ``reason`` one of ``reader.REASONS``:
-``no-grid``, ``two-grids``, ``bad-number``,
-``h-merge``, ``bad-merge``, ``bad-span``, ``row-off-grid``. The text is read either way. A body
-paragraph's ``table`` is ``[table, row, cell]`` of its own table (a nested table's, not the
-outermost's), ``cell`` counting the row's ``<w:tc>`` cells, not grid columns. Tables in notes,
-headers, footers and comments are not listed; their paragraphs' ``table`` is the outermost
-table's cell, tables counted in that story.
+``no-grid``, ``two-grids``, ``bad-width`` (a column whose width is not digits from 1 to 31,680),
+``bad-number``, ``h-merge``, ``bad-merge``, ``bad-span``, ``row-off-grid``. The text is read either
+way. A body paragraph's ``table`` is ``[table, row, cell]`` of its own table (a nested table's, not
+the outermost's), ``cell`` counting the row's ``<w:tc>`` cells, not grid columns. Tables in notes,
+headers, footers and comments are not listed; their paragraphs' ``table`` is the outermost table's
+cell, tables counted in that story.
 
 ``headers`` and ``footers`` list each header or footer part the sections refer to, once, in the
 order referred to: its ``part`` name, its ``uses`` (each ``section``, counted from 0, and the
@@ -136,7 +141,7 @@ from label_docx.reader import (
 
 # The version of the shape above, and of the check that certifies it: versions.lock.json ties
 # it to both files (tests/test_locks.py).
-FORMAT_VERSION = "label-docx-json/1.19.0"
+FORMAT_VERSION = "label-docx-json/1.20.0"
 
 type Json = str | int | bool | list[Json] | dict[str, Json] | None
 
@@ -288,6 +293,7 @@ def tables(items: tuple[Table, ...]) -> list[Json]:
             if t.grid is None
             else {
                 "columns": t.grid.columns,
+                "widths": list(t.grid.widths),
                 "rows": [
                     {
                         "after": r.after,

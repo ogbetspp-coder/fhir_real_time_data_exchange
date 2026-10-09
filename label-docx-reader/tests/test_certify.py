@@ -15,11 +15,13 @@ from __future__ import annotations
 import copy
 import functools
 import hashlib
+import io
 import json
 import pickle
 import random
 import re
 import unicodedata
+import zipfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -54,6 +56,8 @@ from test_reader import (
     _SOURCES,
     ALL_LOOKS,
     APPLIED,
+    BACKGROUND,
+    BAR_CASES,
     COUNTED_INSIDE,
     DOCVARIABLE_READS,
     DOCVARIABLE_REFUSALS,
@@ -62,14 +66,17 @@ from test_reader import (
     IMAGE,
     IN_BOX,
     LAST_LEFT_OUT,
+    LEADER_FREE_CASES,
     LINE,
     LIST_STYLE,
+    MAPPED,
     MEDIA,
     NO_LOOKS,
     NOT_ASKED,
     NOT_SET_ASIDE,
     PICTURE_CASES,
     PLACED_CASES,
+    PTAB,
     SHAPE,
     SIZE_ONE,
     WP,
@@ -78,10 +85,12 @@ from test_reader import (
     _declaring,
     anchored,
     chunk,
+    colour_theme,
     document_xml,
     docx,
     exif,
     jpeg,
+    leader_cases,
     p,
     picture,
     png,
@@ -692,6 +701,10 @@ _GRID_BODY = tbl(
         lambda t: t.append(t[1]),
         lambda t: t.reverse(),
         lambda t: t[0]["grid"]["rows"][0].update(exactHeight=True),
+        lambda t: t[0]["grid"]["widths"].__setitem__(0, t[0]["grid"]["widths"][0] + 1),
+        lambda t: t[0]["grid"]["widths"].pop(),
+        lambda t: t[0]["grid"]["widths"].append(1000),
+        lambda t: t[0]["grid"].pop("widths"),
     ],
     ids=[
         "columns",
@@ -711,6 +724,10 @@ _GRID_BODY = tbl(
         "table-added",
         "order",
         "exact-height",
+        "width",
+        "width-dropped",
+        "width-added",
+        "no-widths",
     ],
 )
 def test_a_tables_grid_is_the_one_the_document_stores_and_only_that(
@@ -737,12 +754,20 @@ def test_the_check_names_why_a_grid_is_not_reported_by_its_own_rules(
     source, value = DocxSource(data), _docx_value(data)
     source.certify(value)
     assert value["tables"] == [_no_grid(reason=reason)]
-    for other in ("no-grid", "two-grids", "bad-number", "h-merge", "bad-merge", "bad-span"):
+    for other in (
+        "no-grid",
+        "two-grids",
+        "bad-width",
+        "bad-number",
+        "h-merge",
+        "bad-merge",
+        "bad-span",
+    ):
         if other != reason:
             with pytest.raises(CertificationError, match="table 1"):
                 source.certify(_value_with(value, reason=other))
     # A grid where the check finds it is not on record, whatever grid.
-    grid = {"columns": 1, "rows": []}
+    grid = {"columns": 1, "rows": [], "widths": [1000]}
     with pytest.raises(CertificationError, match="table 1"):
         source.certify(_value_with(value, grid=grid, reason=None))
 
@@ -1200,6 +1225,304 @@ def test_each_page_number_field_is_set_aside_and_placed(code: str) -> None:
         DocxSource(data).certify(_value("p12"))
 
 
+@pytest.mark.parametrize("leader", ["dot", "underscore", "x"])
+def test_a_tab_under_a_leader_or_a_bar_stop_is_never_certified(leader: str) -> None:
+    # The check's own reading of the stops that apply (drawing-cases tabs*): the reader refuses
+    # these, and a result of them, whatever it says, is not certified.
+    for body, styles, numbering in [*leader_cases(leader), *BAR_CASES]:
+        with pytest.raises(CertificationError, match=r"leader|bar"):
+            DocxSource(docx(body, styles, numbering=numbering))
+    with pytest.raises(CertificationError, match="a positional tab with a leader"):
+        DocxSource(docx(_p(f"<w:r>{PTAB.format('')}</w:r>")))
+
+
+def test_a_theme_tint_or_shade_of_no_colour_is_never_certified() -> None:
+    # The reader refuses these; the check, reading each shading for its mark, refuses them too.
+    for shading in (
+        '<w:shd w:val="clear" w:fill="D9D9D9" w:themeFillShade="BF"/>',
+        '<w:shd w:val="clear" w:fill="D9D9D9" w:themeFillTint="33"/>',
+        '<w:shd w:val="pct15" w:fill="auto" w:themeShade="BF"/>',
+        '<w:shd w:val="pct15" w:fill="auto" w:themeTint="33"/>',
+    ):
+        with pytest.raises(CertificationError, match="a theme tint or shade of no colour"):
+            DocxSource(_coloured(_run(shading)))
+
+
+def test_a_word_6_label_under_a_leader_is_never_certified() -> None:
+    # A Word 6 label the reader calls legacy is followed by a tab Word writes: under a leader the
+    # reader refuses it, and the check, on its own, never certifies it.
+    stops = '<w:tabs><w:tab w:val="center" w:leader="dot" w:pos="567"/></w:tabs>'
+    with pytest.raises(CertificationError, match="a tab under a stop with a leader"):
+        DocxSource(_word6_docx({"props": stops}))
+
+
+def test_a_grids_widths_are_certified_at_each_end() -> None:
+    for widths in (("1", "31680"), ("1000",)):
+        columns = "".join(f'<w:gridCol w:w="{w}"/>' for w in widths)
+        span = f'<w:tcPr><w:gridSpan w:val="{len(widths)}"/></w:tcPr>'
+        cell = f"<w:tr><w:tc>{span}{_p('')}</w:tc></w:tr>"
+        table = f"<w:tbl><w:tblGrid>{columns}</w:tblGrid>{cell}</w:tbl>"
+        data = docx(table + _p(""))
+        value = _docx_value(data)
+        assert value["tables"][0]["grid"]["widths"] == [int(w) for w in widths]
+        DocxSource(data).certify(value)
+
+
+def test_a_tab_with_no_leader_is_certified_as_read() -> None:
+    for body, styles, numbering in LEADER_FREE_CASES:
+        data = docx(body, styles, numbering=numbering)
+        DocxSource(data).certify(_docx_value(data))
+
+
+def _coloured(
+    body: str, styles: str | None = None, page: str | None = None, theme: str | None = None
+) -> bytes:
+    data = docx(body, styles, settings=MAPPED, theme=colour_theme() if theme is None else theme)
+    return data if page is None else _backed(data, page)
+
+
+def _backed(data: bytes, page: str) -> bytes:
+    """``data`` with a page colour: ``page`` a colour, or a whole ``w:background`` element."""
+    background = page if page.startswith("<") else f'<w:background w:color="{page}"/>'
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(out, "w") as target:
+        for info in source.infolist():
+            content = source.read(info)
+            if info.filename == "word/document.xml":
+                content = content.replace(b"<w:body>", background.encode() + b"<w:body>")
+            target.writestr(info, content)
+    return out.getvalue()
+
+
+def _run(shading: str, more: str = "") -> str:
+    return _p(f"<w:r><w:rPr>{more}{shading}</w:rPr><w:t>ab</w:t></w:r>")
+
+
+def _grid(table: str) -> str:
+    """A table of one cell holding a white run, its ``tblPr`` as given."""
+    return (
+        f'<w:tbl>{table}<w:tblGrid><w:gridCol w:w="1000"/></w:tblGrid><w:tr><w:tc>'
+        f"{_run(_WHITE)}</w:tc></w:tr></w:tbl>"
+    )
+
+
+_WHITE = '<w:shd w:val="clear" w:color="auto" w:fill="FFFFFF"/>'
+_GREY = '<w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>'
+_BG1 = f"<w:shd {BACKGROUND.format('FFFFFF')}/>"
+_CELL = (
+    "<w:tbl><w:tblGrid><w:gridCol/></w:tblGrid><w:tr><w:tc><w:tcPr>{}</w:tcPr>{}</w:tc></w:tr>"
+    "</w:tbl>"
+)
+# Shadings whose marks the check works out itself, and the marks the reader gives them.
+_DEFAULT_GREY = (
+    f'<w:style w:type="paragraph" w:default="1" w:styleId="N"><w:pPr>{_GREY}</w:pPr></w:style>'
+)
+_TABLE_STYLE = '<w:style w:type="table" w:styleId="T">{}</w:style>'
+_DEFAULT_TABLE = '<w:style w:type="table" w:default="1" w:styleId="T">{}</w:style>'
+SHADED: list[tuple[bytes, list[str]]] = [
+    # Nothing painted, the pattern spelt as Word stores it.
+    (_coloured(_run('<w:shd w:val="clear"/>')), []),
+    (_coloured(_run('<w:shd w:val="nil" w:fill="D9D9D9"/>')), []),
+    (_coloured(_run(_WHITE), _DEFAULT_GREY.replace('w:val="clear"', 'w:val="nil"')), []),
+    (_coloured(_run('<w:shd w:val="pct15"/>')), ["shading-pct15-AUTO-AUTO"]),
+    (_coloured(_run('<w:shd w:val="pct15" w:color="000000"/>')), ["shading-pct15-000000-AUTO"]),
+    (
+        _coloured(_run('<w:shd w:val="pct15" w:themeColor="accent2" w:themeTint="33"/>')),
+        ["shading-pct15-THEME-accent2-tint33-AUTO"],
+    ),
+    (
+        _coloured(
+            _run(
+                "<w:shd "
+                + BACKGROUND.format("D9D9D9").replace("auto", "FF0000")
+                + ' w:themeFillShade="D9"/>'
+            )
+        ),
+        ["shading-THEME-background1-shadeD9"],
+    ),
+    (_coloured(_run(_WHITE, '<w:highlight w:val="none"/>')), []),
+    # Paint under a white run: a page colour, a table's, a row's, its style's, the default
+    # paragraph or table style's.
+    (_coloured(_grid(""), page="FFFF00"), ["shading-FFFFFF"]),
+    (_coloured(_run(_WHITE), page="auto"), []),
+    (_coloured(_run(_WHITE), page="ffffff"), []),
+    (_coloured(_run(_WHITE), page="<w:background/>"), []),
+    (_coloured(_run(_WHITE), page='<w:background w:themeColor="accent2"/>'), ["shading-FFFFFF"]),
+    (
+        _coloured(_run(_WHITE), page='<w:background w:color="FFFFFF"><w:x/></w:background>'),
+        ["shading-FFFFFF"],
+    ),
+    (_coloured(_grid(f"<w:tblPr>{_GREY}</w:tblPr>")), ["shading-FFFFFF"]),
+    (
+        _coloured(
+            '<w:tbl><w:tblGrid><w:gridCol w:w="1000"/></w:tblGrid><w:tr><w:tblPrEx>'
+            f"{_GREY}</w:tblPrEx><w:tc>{_run(_WHITE)}</w:tc></w:tr></w:tbl>"
+        ),
+        ["shading-FFFFFF"],
+    ),
+    (
+        _coloured(
+            _grid('<w:tblPr><w:tblStyle w:val="T"/></w:tblPr>'),
+            _TABLE_STYLE.format(f"<w:tcPr>{_GREY}</w:tcPr>"),
+        ),
+        ["shading-FFFFFF"],
+    ),
+    (
+        _coloured(
+            _grid('<w:tblPr><w:tblStyle w:val="T"/></w:tblPr>'),
+            _TABLE_STYLE.format(f"<w:tblPr>{_GREY}</w:tblPr>"),
+        ),
+        ["shading-FFFFFF"],
+    ),
+    (
+        _coloured(
+            _grid('<w:tblPr><w:tblStyle w:val="T"/></w:tblPr>'),
+            _TABLE_STYLE.format(
+                f'<w:tblStylePr w:type="firstRow"><w:tcPr>{_GREY}</w:tcPr></w:tblStylePr>'
+            ),
+        ),
+        ["shading-FFFFFF"],
+    ),
+    (
+        _coloured(
+            _grid('<w:tblPr><w:tblStyle w:val="T"/></w:tblPr>'),
+            _TABLE_STYLE.format(
+                f'<w:tblStylePr w:type="firstRow"><w:tblPr>{_GREY}</w:tblPr></w:tblStylePr>'
+            ),
+        ),
+        ["shading-FFFFFF"],
+    ),
+    (_coloured(_grid(""), _DEFAULT_TABLE.format(f"<w:tcPr>{_GREY}</w:tcPr>")), ["shading-FFFFFF"]),
+    (_coloured(_run(_WHITE), _DEFAULT_GREY), ["shading-D9D9D9", "shading-FFFFFF"]),
+    (
+        _coloured(_grid(""), _DEFAULT_TABLE.format(f"<w:pPr>{_GREY}</w:pPr>")),
+        ["shading-D9D9D9", "shading-FFFFFF"],
+    ),
+    # A theme whose lt1 is not white as asked: never resolved.
+    *(
+        (
+            _coloured(
+                _run(f'<w:shd {BACKGROUND.format("D9D9D9")} w:themeFillShade="D9"/>'), theme=theme
+            ),
+            ["shading-THEME-background1-shadeD9"],
+        )
+        for theme in (
+            colour_theme('<a:srgbClr val="FFFFFF"/><a:srgbClr val="FFFFFF"/>'),
+            colour_theme('<a:srgbClr val="FFFFFF"><a:lumMod val="50000"/></a:srgbClr>'),
+            colour_theme().replace("<a:lt1>", "<a:lt1><a:x/></a:lt1><a:lt1>"),
+            colour_theme().replace("a:theme ", "a:other ").replace("</a:theme>", "</a:other>"),
+            colour_theme('<a:srgbClr val="FF0000"/>'),
+        )
+    ),
+    (_coloured(_p(f"<w:r><w:rPr>{_WHITE}</w:rPr><w:t>ab</w:t></w:r>")), []),
+    (_coloured(_p(f"<w:r><w:rPr>{_BG1}</w:rPr><w:t>ab</w:t></w:r>")), []),
+    (
+        _coloured(
+            f"<w:p><w:pPr>{_GREY}</w:pPr><w:r><w:rPr>{_WHITE}</w:rPr><w:t>ab</w:t></w:r></w:p>"
+        ),
+        ["shading-D9D9D9", "shading-FFFFFF"],
+    ),
+    (
+        _coloured(_CELL.format(_GREY, _p(f"<w:r><w:rPr>{_BG1}</w:rPr><w:t>ab</w:t></w:r>"))),
+        ["shading-FFFFFF"],
+    ),
+    (_coloured(_CELL.format(_WHITE, _p(f"<w:r><w:rPr>{_BG1}</w:rPr><w:t>ab</w:t></w:r>"))), []),
+    (
+        _coloured(_p(f"<w:r><w:rPr>{_WHITE}</w:rPr><w:t>ab</w:t></w:r>"), page="FFFF00"),
+        ["shading-FFFFFF"],
+    ),
+    (
+        _coloured(
+            _p(f'<w:r><w:rPr><w:highlight w:val="yellow"/>{_WHITE}</w:rPr><w:t>ab</w:t></w:r>')
+        ),
+        ["highlight-yellow", "shading-FFFFFF"],
+    ),
+    (
+        _coloured(
+            _p(
+                "<w:r><w:rPr><w:shd "
+                + BACKGROUND.format("D9D9D9")
+                + ' w:themeFillShade="BF"/></w:rPr><w:t>ab</w:t></w:r>'
+            )
+        ),
+        ["shading-BFBFBF"],
+    ),
+    (
+        _coloured(
+            _p(
+                "<w:r><w:rPr><w:shd "
+                + BACKGROUND.format("D9D9D9")
+                + ' w:themeFillTint="80"/></w:rPr><w:t>ab</w:t></w:r>'
+            )
+        ),
+        ["shading-THEME-background1-tint80"],
+    ),
+    (
+        _coloured(
+            _p(
+                '<w:r><w:rPr><w:shd w:val="pct15" w:color="auto" w:themeColor="accent2" '
+                'w:themeShade="BF" w:fill="auto"/></w:rPr><w:t>ab</w:t></w:r>'
+            )
+        ),
+        ["shading-pct15-THEME-accent2-shadeBF-AUTO"],
+    ),
+    (
+        _coloured(
+            '<w:p><w:pPr><w:pStyle w:val="G"/></w:pPr><w:r><w:t>ab</w:t></w:r></w:p>',
+            f'<w:style w:type="paragraph" w:styleId="G"><w:pPr>{_GREY}</w:pPr></w:style>',
+        ),
+        ["shading-D9D9D9"],
+    ),
+]
+
+
+@pytest.mark.parametrize(("data", "kinds"), SHADED)
+def test_the_check_works_out_each_shading_mark_on_its_own(data: bytes, kinds: list[str]) -> None:
+    value = _docx_value(data)
+    paragraph = value["paragraphs"][-1]
+    assert sorted(m["kind"] for m in paragraph["marks"]) == kinds
+    source = DocxSource(data)
+    source.certify(value)
+    # Each shading mark dropped, or spelt otherwise, is never certified; nor one added.
+    spans = [m for m in paragraph["marks"] if m["kind"].startswith("shading-")]
+    for mark in spans:
+        for other in (None, "shading-D9D9D9", "shading-FFFFFF", "shading-pct15-AUTO-AUTO"):
+            if other == mark["kind"]:
+                continue
+            changed = copy.deepcopy(value)
+            marks = changed["paragraphs"][-1]["marks"]
+            at = marks.index(mark)
+            if other is None:
+                del marks[at]
+            else:
+                marks[at] = {**mark, "kind": other}
+            with pytest.raises(CertificationError, match="marks"):
+                source.certify(changed)
+    added = copy.deepcopy(value)
+    added["paragraphs"][-1]["marks"].append({"start": 0, "end": 1, "kind": "shading-FFFFFF"})
+    if "shading-FFFFFF" not in kinds:
+        with pytest.raises(CertificationError, match="marks"):
+            source.certify(added)
+
+
+def test_a_page_number_in_another_fields_result_is_set_aside_and_placed() -> None:
+    # As a table of contents holds each entry's PAGEREF in its own field's result (Word's own,
+    # corpus/word-authored, refused since docx-reader 1.34.0 for its dot leaders).
+    outer = (
+        '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+        '<w:r><w:instrText xml:space="preserve"> DOCPROPERTY Title </w:instrText></w:r>'
+        '<w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+        "<w:r><w:t>p</w:t></w:r>"
+        + _field("PAGE", "12")
+        + '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
+    )
+    data = docx(_p(outer))
+    certificate = DocxSource(data).certify(_value({"text": "p", "pages": [1]}))
+    assert certificate["setAside"]["pageNumbers"] == 2
+    with pytest.raises(CertificationError):
+        DocxSource(data).certify(_value("p12"))
+
+
 @pytest.mark.parametrize(
     ("code", "placed"),
     [
@@ -1321,7 +1644,8 @@ def test_text_before_a_mark_in_the_same_run_stands_before_it() -> None:
 
 def test_every_character_element_stands_for_its_character() -> None:
     body = _p(
-        "<w:r><w:t>a</w:t><w:ptab/><w:tab/><w:noBreakHyphen/><w:softHyphen/>"
+        "<w:r><w:t>a</w:t><w:ptab w:relativeTo='margin' w:alignment='left' w:leader='none'/>"
+        "<w:tab/><w:noBreakHyphen/><w:softHyphen/>"
         '<w:br w:type="column"/><w:br w:type="page"/><w:br/><w:cr/>'
         "<w:lastRenderedPageBreak/>"
         '<w:sym w:font="Symbol" w:char="F0B3"/><w:t>b</w:t></w:r>'
@@ -2665,7 +2989,8 @@ _WORD6: dict[str, tuple[dict[str, Any], str]] = {
     "bidi-level": ({"level": "<w:bidi/>"}, "legacy"),
     "frame": ({"props": '<w:framePr w:w="2000"/>'}, "legacy"),
     **{f"tab-{kind}": ({"props": _tab(kind)}, "tab") for kind in ("left", "clear", "num", "right")},
-    **{f"tab-{kind}": ({"props": _tab(kind)}, "legacy") for kind in ("center", "decimal", "bar")},
+    # (A bar stop the reader and the check refuse outright: test_a_tab_under_a_leader_or_a_bar...)
+    **{f"tab-{kind}": ({"props": _tab(kind)}, "legacy") for kind in ("center", "decimal")},
     "tab-least": ({"props": _tab(place="-1985")}, "tab"),
     "tab-under": ({"props": _tab(place="-1986")}, "legacy"),
     "tab-most": ({"props": _tab(place="1440")}, "tab"),
@@ -2897,15 +3222,26 @@ def test_a_word_6_label_is_followed_by_a_tab_only_as_far_as_words_drawing_goes(n
 
 
 @pytest.mark.parametrize(
+    "shading",
+    [
+        '<w:shd w:fill="FFFFFF"/>',
+        # Its w:val in no namespace: the reader refuses it (w:shd without w:val).
+        '<w:shd val="clear" w:color="auto" w:fill="FFFFFF"/>',
+    ],
+)
+def test_a_shading_with_no_pattern_is_never_certified(shading: str) -> None:
+    # The reader refuses it; the check, reading every shading for its marks, refuses it first.
+    with pytest.raises(CertificationError, match="a shading with no pattern"):
+        DocxSource(_word6_docx({"props": shading}))
+
+
+@pytest.mark.parametrize(
     "parts",
     [
         {"props": '<w:ind w:left="1e3"/>'},
         {"props": '<w:tabs><w:tab w:val="left" w:pos="5e2"/></w:tabs>'},
         {"rpr": _TIMES_11 + '<x:numSpacing xmlns:x="urn:x" x:val="tabular"/>'},
         {"props": '<x:kinsoku xmlns:x="urn:x"/>'},
-        {"props": '<w:shd w:fill="FFFFFF"/>'},
-        # Shading whose w:val is in no namespace: the reader refuses it (w:shd without w:val).
-        {"props": '<w:shd val="clear" w:color="auto" w:fill="FFFFFF"/>'},
         {"props": '<x:keepNext xmlns:x="urn:x"/>'},
         # An exact line under 10 pt clips the paragraph's 10 pt text, which the reader refuses.
         {"props": '<w:spacing w:line="199" w:lineRule="exact"/>'},
@@ -3084,8 +3420,10 @@ def test_a_mark_must_be_a_span_of_the_text_of_a_kind_the_format_names() -> None:
         spans = [{"kind": k, "start": s, "end": e} for k, s, e in marks]
         return _value({"text": "ab", "marks": spans})
 
-    kinds = ["position", "rtl", "faint", "highlight-yellow", "shading-D9D9D9"]
+    # (Shading the check works out itself: test_the_check_works_out_each_shading_mark_on_its_own.)
+    kinds = ["position-1-size22-in22", "rtl", "faint", "highlight-yellow"]
     source.certify(marked(*((kind, 0, 2) for kind in kinds), ("faint", 1, 2)))
+    source.certify(marked(("position+99999-size0-in9999", 0, 2), ("position-1-size9999-in1", 0, 1)))
     wrong = [
         ("faint", -1, 1),  # text[-1:1] is empty
         ("faint", 1, 1),  # empty
@@ -3098,6 +3436,18 @@ def test_a_mark_must_be_a_span_of_the_text_of_a_kind_the_format_names() -> None:
         ("highlight-", 0, 2),
         ("shading", 0, 2),
         (None, 0, 2),
+        # Raised text with its shift and sizes, in whole half-points.
+        ("position", 0, 2),
+        ("position+0-size22-in22", 0, 2),
+        ("position2-size22-in22", 0, 2),
+        ("position+02-size22-in22", 0, 2),
+        ("position+123456-size22-in22", 0, 2),
+        ("position+2-size-in22", 0, 2),
+        ("position+2-size22-in", 0, 2),
+        ("position+2-size12345-in22", 0, 2),
+        ("position+2-size22-in12345", 0, 2),
+        ("position+2-size22", 0, 2),
+        ("position+2-size22-in22\n", 0, 2),
     ]
     for mark in wrong:
         with pytest.raises(CertificationError, match="a mark"):
@@ -3485,7 +3835,8 @@ def test_text_not_read_is_sized_by_every_character_it_holds() -> None:
     # A run's characters, a drawing once whichever branch draws it, and a chart's values; in
     # a part of any name that is XML, and none in one that is not.
     shown = (
-        "<w:r><w:br/><w:cr/><w:ptab/><w:noBreakHyphen/><w:softHyphen/><w:drawing/><w:pict/></w:r>"
+        "<w:r><w:br/><w:cr/><w:ptab w:relativeTo='margin' w:alignment='left' w:leader='none'/>"
+        "<w:noBreakHyphen/><w:softHyphen/><w:drawing/><w:pict/></w:r>"
     )
     alternate = f"<w:r>{_alternate('<w:drawing/>', '<w:pict/>')}</w:r>"
     unread = (

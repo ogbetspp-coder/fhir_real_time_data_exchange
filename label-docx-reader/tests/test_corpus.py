@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from drawing_cases import wanted as drawing_wanted
 from lock import MANIFESTS
 from numbering_cases import wanted
 from tracked_cases import wanted as tracked_wanted
@@ -17,6 +18,11 @@ def test_the_numbering_cases_are_what_their_script_writes() -> None:
     # Byte for byte: the files are stored, with fixed timestamps (scripts/numbering_cases.py).
     for path, data in wanted().items():
         assert path.read_bytes() == data, f"{path.name}: run scripts/numbering_cases.py"
+
+
+def test_the_drawing_cases_are_what_their_script_writes() -> None:
+    for path, data in drawing_wanted().items():
+        assert path.read_bytes() == data, f"{path.name}: run scripts/drawing_cases.py"
 
 
 def test_the_tracked_cases_are_what_their_script_writes() -> None:

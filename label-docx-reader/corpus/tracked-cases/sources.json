@@ -119,26 +119,26 @@
     {
       "name": "A deleted paragraph mark before a table: the text joins the first cell.",
       "file": "mark-deleted-before-table.docx",
-      "sha256": "ff1b7c394b8bce207d611fea41f13f93926b461fd04aa750051e1fe133c62803",
-      "bytes": 3622
+      "sha256": "95d860130b045782d89288c486a961e8c9f8875239095507247e54ff889999db",
+      "bytes": 3633
     },
     {
       "name": "A deleted paragraph mark before a table whose first cell starts with a table.",
       "file": "mark-deleted-before-nested-table.docx",
-      "sha256": "42b2cf83b177ebea8136e07b9b71d32060c474d0ebc1058d904823a88c7a6134",
-      "bytes": 3796
+      "sha256": "c0641e8c1ee9520d36a9183cd1a681e908993d4f77d95faa8ca4ff6e47133320",
+      "bytes": 3818
     },
     {
       "name": "A deleted mark before a table: whose properties the joined paragraph keeps.",
       "file": "mark-deleted-before-table-styled.docx",
-      "sha256": "c2ef9e498233563b81e1495ac6b2a4f9b41c20f49e7715df5a01e73e790580f5",
-      "bytes": 3719
+      "sha256": "e77217d4dd0297a0bb99d0357b91205712afd8af36f15bed65a7a3edd1150a93",
+      "bytes": 3730
     },
     {
       "name": "The mark of a cell's last paragraph deleted: a cell's end cannot be joined.",
       "file": "mark-deleted-last-in-cell.docx",
-      "sha256": "35b57d5e28223a3ea448d136dcbd77822aaeb13d6e69c6b12cd5633bdda6731f",
-      "bytes": 3736
+      "sha256": "2b6432f4882a1a201107d84085cde04506d785df889d561ab8d0855b4db82b22",
+      "bytes": 3747
     },
     {
       "name": "The body's last paragraph mark deleted.",
@@ -155,14 +155,14 @@
     {
       "name": "A table row deleted.",
       "file": "row-deleted.docx",
-      "sha256": "31791b4bc578fcdbecf27b66bbb996b4d410697a045bedcba736491900b42dbb",
-      "bytes": 3820
+      "sha256": "3e9203cd866c769fcf065e1adc7eb9c706f0769b639ab9c1a04ef26d33cb496c",
+      "bytes": 3831
     },
     {
       "name": "Table, row and cell properties changed: the original has the former ones.",
       "file": "format-table.docx",
-      "sha256": "70325cc7fb886924b9e30ba91c2df73b4bd305067ceaf57de787037054d30f45",
-      "bytes": 3882
+      "sha256": "704f94a62fc2604ff093a817bbfeb0b8602af65ea3ec91264819f6d1097728c3",
+      "bytes": 3893
     },
     {
       "name": "Section properties changed: the original has the former ones.",
@@ -173,20 +173,20 @@
     {
       "name": "Every row of a table deleted: whether the table goes, and how later tables count.",
       "file": "table-deleted-whole.docx",
-      "sha256": "8d4420dd6a9bffbfcf3084a56d8ad08ad5cfb1fc25215af618604b361300cd39",
-      "bytes": 3866
+      "sha256": "35b2cafac43d256b8d72eb6e12187a6b804b901a4aec432a7c93f3dd192d436f",
+      "bytes": 3888
     },
     {
       "name": "Every row of a table inserted: the original has no table there.",
       "file": "table-inserted-whole.docx",
-      "sha256": "5ce82e7808ad91ad345061af3b25001230c34f9eb42efa155233a009b337c4ac",
-      "bytes": 3853
+      "sha256": "80c2bf7630cd203824faf688e00ca489bd5a8c7d8cb685a0b0562e6cf002b939",
+      "bytes": 3875
     },
     {
       "name": "A deleted mark before a table whose first row is deleted: which paragraph it joins.",
       "file": "mark-deleted-before-table-first-row-deleted.docx",
-      "sha256": "4a302c2452b605baf3ca2bf85c4909b8eef96def7aae4b61de0988d109f39227",
-      "bytes": 3902
+      "sha256": "2fa74bf3f9a6cff6273093e0817a8b621918cca9b3b47494183137972c7be3fa",
+      "bytes": 3913
     },
     {
       "name": "A footnote's reference deleted: whether the note goes with it.",
@@ -233,8 +233,8 @@
     {
       "name": "A table row inserted: the original has no such row.",
       "file": "row-inserted.docx",
-      "sha256": "7c2045d0b39df4bdc9d817007f7014697cf827050d123756412696744e40f1a0",
-      "bytes": 3708
+      "sha256": "0d32674e4c9f2d7d2c85cf75047bfb1ab5bd143a28dce4c1666fb71020bce7bb",
+      "bytes": 3719
     },
     {
       "name": "A field inserted in pieces, each its own change: whether the original has none of it.",
@@ -269,20 +269,20 @@
     {
       "name": "An empty paragraph and the table after it deleted: which paragraph the mark joins.",
       "file": "mark-deleted-before-table-deleted-whole.docx",
-      "sha256": "f521ec274c50c7bbabf65077f7d8ea2906ffce3fe8e8201f2eb1afc2bc92d807",
-      "bytes": 3758
+      "sha256": "29ac6f75160d58c09c292d23b47ca685ed5cb9a54e2dd83c979ab630085a6841",
+      "bytes": 3769
     },
     {
       "name": "A paragraph's text and mark and the table after it deleted: what the next keeps.",
       "file": "mark-and-text-deleted-before-table-deleted-whole.docx",
-      "sha256": "bfb55e1d63c9e0aff56f3b5b2bdb77e735011336315a4e756f5c3db2615a4a3f",
-      "bytes": 3962
+      "sha256": "db50a6b42b08c8754a89e17847918b1143f3578d2f82d709fa03298f61896676",
+      "bytes": 3973
     },
     {
       "name": "A mark inserted after text, then a table inserted: what the original joins.",
       "file": "mark-inserted-before-table-inserted-whole.docx",
-      "sha256": "b49c0dfd98e9541c9d41372341a4cde41f358d765c3ab51cf38b4a3cded29386",
-      "bytes": 3861
+      "sha256": "0b2eeb9ffd4b9f0f56e169d4340a368f440920449d043b86916bf04c1379fff6",
+      "bytes": 3872
     },
     {
       "name": "A deleted mark before a bookmark's end between paragraphs: where the end stands, joined.",
@@ -299,8 +299,8 @@
     {
       "name": "An empty paragraph and a table after it inserted: the original has neither.",
       "file": "mark-inserted-empty-before-table-inserted-whole.docx",
-      "sha256": "28f66837ecf90cf434c100393b3ab7fd2cbdbe39e2fb8418bc1b0f8b080d39df",
-      "bytes": 3805
+      "sha256": "9dcf58125bff1581776a85c4593dea6462fa5562ce2f5de0af34d5669f7a03b1",
+      "bytes": 3816
     }
   ]
 }

@@ -89,7 +89,7 @@ from another web page.
 
 ```json
 {"certificate": {…}, "comments": [], "endnotes": [], "footers": [], "footnotes": [],
- "format": "label-docx-json/1.19.0", "headers": [],
+ "format": "label-docx-json/1.20.0", "headers": [],
  "paragraphs": [{"anchored": [{"kind": "text-box", "offset": 2, "read": false}],
    "comments": [], "markHidden": false,
    "marks": [{"end": 5, "kind": "superscript", "start": 4}], "notes": [], "numbering": null,
@@ -97,12 +97,12 @@ from another web page.
      "offset": 8, "part": "word/media/image1.png", "pixels": [8, 8], "reason": null,
      "sha256": "…", "type": "png"}],
    "style": "Heading2", "table": [0, 1, 0], "text": "x 109/l \ufffc"}],
- "reader": "docx-reader/1.33.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
+ "reader": "docx-reader/1.34.0", "refusedParts": 0, "source": {"bytes": 1083, "sha256": "…"},
  "tables": [{"grid": {"columns": 2, "rows": [
    {"after": 0, "before": 0, "cells": [{"column": 0, "merge": null, "span": 2}],
     "exactHeight": false},
    {"after": 1, "before": 0, "cells": [{"column": 0, "merge": null, "span": 1}],
-    "exactHeight": false}]},
+    "exactHeight": false}], "widths": [4513, 4513]},
    "parent": null, "reason": null}]}
 ```
 
@@ -115,12 +115,14 @@ from another web page.
   lists around the item). `table` is `[table, row, cell]`, counted from 0, `cell` among the
   row's cells.
 - `tables` lists each body table, in document order, a nested table as its own entry with its
-  `parent` cell, and its `grid`: `columns` (`gridCol`), and each row's `before` and `after`
+  `parent` cell, and its `grid`: `columns` (`gridCol`), their `widths` (each `w:w` in twips as
+  stored, which Word lays out again for an autofit table: never drawn widths; a column without
+  digits from 1 to 31,680, or with a leading zero, gives no grid, `bad-width`), and each row's `before` and `after`
   (grid columns left out) and `cells`, each with its first grid `column`, its `span`
   (`gridSpan`) and its `merge` (`vMerge` as stored: null, `restart` or `continue`), and whether
   the row's height may be exact (`exactHeight`: its own `trHeight` of rule `exact`, or one its
   table's style sets), where Word clips what does not fit. Where Word's grid is not on record, `grid` is null and `reason` says why: `no-grid`, `two-grids`,
-  `bad-number`, `h-merge` (a legacy horizontal merge), `bad-merge`, `bad-span` or `row-off-grid`
+  `bad-width`, `bad-number`, `h-merge` (a legacy horizontal merge), `bad-merge`, `bad-span` or `row-off-grid`
   (a row that does not fill the grid exactly). The text is read either way. A body paragraph's
   `table` indexes `tables` (its own table, nested or not). Tables in notes, headers, footers and
   comments are not listed; there `table` is the outermost table's cell.
@@ -135,7 +137,9 @@ from another web page.
   `orientation` (Exif turns it), `bad-number`, `cropped`, `rotated`, `flipped`, `line-height`
   and `row-height` (Word clips it to an exact line or row), `border` (on its run) and `effects`
   (anything else on a closed list: recolouring, transparency, SVG, an outline, a shape other than
-  a rectangle, a shadow...). Null means only that nothing on those closed lists was found: the
+  a rectangle, a shadow, an effect extent under 0...; what Word draws nothing of, an effect
+  extent's space, a fill turning with an unturned shape, a hidden shadow, an unfilled line's join
+  and ends, is not, as Word's drawing of `corpus/drawing-cases` has it). Null means only that nothing on those closed lists was found: the
   lists rest on what is known of Word, not on Word's drawing, and the ePI builder and the browser
   hold the rest. Whether Word draws it larger than its pixels is the caller's to judge (9525 EMU
   a pixel at 96 dpi). No picture refuses a read; the lists: "Pictures" in
@@ -163,10 +167,11 @@ Every key: the docstrings of [`output.py`](src/label_docx/output.py) and
 | ------------------------------------------------------------- | ------------------------------------------ |
 | Each rule reads exactly or refuses                            | `test_reader.py`, `test_epi.py`, `test_tracked.py` |
 | Labels, notes, fields, text, headers, footers, bold, italic, caps and strike are what Word shows | Word's recorded answers (`test_word_oracle.py`) |
+| A picture carried as its pixels, a theme's shading resolved, a pattern's theme colour and a tab's leader are as Word draws them | Word's recorded drawing (`test_word_drawn.py`) |
 | Tracked views are Word's Accept All / Reject All (42 of 50 cases; 8 refused) | Word's own files (`test_tracked.py`) |
 | ePI sections are what Chrome shows                            | Chrome's recorded answers (`test_browser_oracle.py`) |
 | Every result read is certified; seeded changes to each corpus result read are caught | `test_certify.py` |
-| Each fault put into the checker is caught by its tests, or recorded as unable to change a result | the mutation record (`test_checker_mutants.py`): 4,253 of 4,361 faults killed, 108 recorded as unable to change a result, none unexplained |
+| Each fault put into the checker is caught by its tests, or recorded as unable to change a result | the mutation record (`test_checker_mutants.py`): 4,609 of 4,717 faults killed, 108 recorded as unable to change a result, none unexplained |
 | Up to two seeded edits of each kind in `scripts/mutate.py` to the `document.xml` of each corpus .docx not refused: one to what the reader reports changes the result or is refused; others (font size, bookkeeping) change nothing | `test_mutations.py` |
 | Same bytes across processes, hash seeds, locales and zip layouts; seeded damage to four corpus files never crashes it | `test_determinism.py`, `test_robustness.py` |
 
@@ -191,13 +196,16 @@ uv run --frozen python scripts/word_oracle.py compare *.docx  # against Word (ma
 ## Corpus
 
 Public or synthetic documents only, each set with its `sources.json`; `expected.json` locks what
-each document reads to, `word.json` and `browser.json` hold Word's and Chrome's answers.
+each document reads to, `word.json` and `browser.json` hold Word's and Chrome's answers, and
+`word-gaps.json` and `word-drawn.json` what Word drew (`scripts/word_gaps.py`,
+`scripts/word_drawn.py record`, macOS with Word).
 
 | Set               | Documents | What                                                              |
 | ----------------- | --------: | ----------------------------------------------------------------- |
 | `ema-qrd`         |         4 | EMA QRD files the rules were first written from                   |
 | `ema-templates`   |        18 | EMA product-information templates                                 |
 | `numbering-cases` |       155 | one Word rule each, synthetic                                     |
+| `drawing-cases`   |        76 | what Word draws for pictures, theme shading and tab leaders, synthetic |
 | `fda-templates`   |         3 | FDA prescribing information, medication guide and patient insert templates |
 | `word-authored`   |         2 | written by Word itself (a table of contents)                      |
 | `tracked-cases`   |        39 | tracked changes, with Word's Accept All and Reject All files      |

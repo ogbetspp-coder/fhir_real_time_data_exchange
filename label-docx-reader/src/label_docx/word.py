@@ -75,7 +75,7 @@ from label_docx.reader import (
 WORD = Path("/Applications/Microsoft Word.app")
 # What Word is asked and how its answers are judged: a change to this file changes it
 # (``scripts/lock.py``). A kept verdict or recorded answer of another version is not reused.
-VERIFIER = "word-verifier/1.0.7"
+VERIFIER = "word-verifier/1.0.8"
 
 
 class WordError(Exception):
@@ -509,8 +509,11 @@ def tracked_verdict(path: Path, word: dict[str, bytes]) -> str:
     """Whether the reader reads each view of ``path`` as it reads Word's (``word_views``).
 
     The reader's view is held to Word's file whole: every paragraph, note, header, footer and
-    comment, with its text, marks, list labels and note marks, all but the names of the header
-    and footer parts, which Word gives its own when it saves. A view the reader refuses is
+    comment, with its text, marks, list labels and note marks, and every table's grid, all but
+    the names of the header and footer parts, which Word gives its own when it saves, and the
+    grid columns' widths, which Word works out again when it lays a table out to save it (a
+    one-column table stored 4000 twips wide, its text short, Word saved 398 to 526 wide,
+    corpus/tracked-cases). A view the reader refuses is
     ``reader refuses``; the reader may refuse where Word goes on, never read otherwise.
     """
     try:
@@ -535,11 +538,25 @@ def tracked_verdict(path: Path, word: dict[str, bytes]) -> str:
 
 
 def _unnamed(value: dict[str, Any]) -> dict[str, Any]:
-    """A document's text with its header and footer parts' names left out."""
-    return value | {
-        kind: [{k: v for k, v in story.items() if k != "part"} for story in value[kind]]
-        for kind in ("headers", "footers")
-    }
+    """A document's text with its header and footer parts' names and its grids' widths left out."""
+    return (
+        value
+        | {
+            kind: [{k: v for k, v in story.items() if k != "part"} for story in value[kind]]
+            for kind in ("headers", "footers")
+        }
+        | {
+            "tables": [
+                table
+                | (
+                    {}
+                    if table["grid"] is None
+                    else {"grid": {k: v for k, v in table["grid"].items() if k != "widths"}}
+                )
+                for table in value["tables"]
+            ]
+        }
+    )
 
 
 def judge_tracked(path: Path) -> str:
