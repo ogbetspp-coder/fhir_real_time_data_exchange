@@ -63,3 +63,6 @@ test/fixtures/authority/style-cases.json
 # What zone_a.recompute wrote for the synthetic Word labels (zone-a/scripts/certified_word_fixtures.py),
 # compared byte for byte, and the certified Word importer's vectors over them.
 test/fixtures/certified-word/
+# Coverage summaries written by zone-a/scripts/scoreboard.py as canonical JSON, kept byte for byte
+# (docs/validation/coverage-scoreboard.md).
+docs/validation/coverage/
