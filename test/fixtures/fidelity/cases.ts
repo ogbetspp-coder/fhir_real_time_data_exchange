@@ -571,6 +571,17 @@ const WORD_PATTERN_NARRATIVE = div(
     '<span style="background-color: silver;">10 mg</span></p></td></tr></table>',
 );
 
+// fidelity-norm/3.8.0's lists at two levels (ADR 0006 decision 14): as zone_a.word_epi builds
+// them (the vectors below), every item a paragraph of its Word label, a space and its text.
+const WORD_NESTED_PAGE =
+  "\nDo not take this medicine if you have:\n\u2022 liver disease\no severe (Child-Pugh C)\n" +
+  "\u2022 kidney disease\no on dialysis\n\u2013 three times a week\n";
+const WORD_NESTED_NARRATIVE = div(
+  "<p>Do not take this medicine if you have:</p><p>\u2022 liver disease</p>" +
+    "<p>o severe (Child-Pugh C)</p><p>\u2022 kidney disease</p><p>o on dialysis</p>" +
+    "<p>\u2013 three times a week</p>",
+);
+
 export const verifyCases: VerifyCase[] = [
   // A body boundary inside a line, or a body that excludes more than a header/footer could hold,
   // invalidates the page: the extractor-declared range is bounded, not trusted.
@@ -3042,6 +3053,37 @@ export const verifyCases: VerifyCase[] = [
       return toInput(source, single("smpc.4.8", dropped, [spanFor(source, 1, WORD_PATTERN_PAGE)]));
     })(),
     expect: { status: "failed", sections: { "smpc.4.8": "mismatch" } },
+  },
+  // fidelity-norm/3.8.0: a section whose list stands at three levels, each label family (the
+  // disc, the circle "o", the dash) at one level, is written as its labels' text. The page as
+  // zone_a.word_epi writes it from a read of bullets at level 0, "o" items at level 1 and an en
+  // dash item at level 2, and the narrative it builds from the same read. Reviewed by hand: every label and
+  // word in place, each line a paragraph.
+  {
+    name: "certified-word-two-levels-as-labels",
+    input: (() => {
+      const source = wordSource(WORD_NESTED_PAGE);
+      return toInput(
+        source,
+        single("smpc.4.3", WORD_NESTED_NARRATIVE, [spanFor(source, 1, WORD_NESTED_PAGE)]),
+      );
+    })(),
+    expect: { status: "passed", sections: { "smpc.4.3": "verified" } },
+  },
+  // ... and against the same run drawn as a nested HTML list, which draws its own markers (a
+  // browser's circle and square), not Word's "o" and dash: the labels are text, and it fails.
+  {
+    name: "certified-word-two-levels-as-nested-list",
+    input: (() => {
+      const nested = div(
+        "<p>Do not take this medicine if you have:</p><ul><li>liver disease<ul>" +
+          "<li>severe (Child-Pugh C)</li></ul></li><li>kidney disease<ul><li>on dialysis<ul>" +
+          "<li>three times a week</li></ul></li></ul></li></ul>",
+      );
+      const source = wordSource(WORD_NESTED_PAGE);
+      return toInput(source, single("smpc.4.3", nested, [spanFor(source, 1, WORD_NESTED_PAGE)]));
+    })(),
+    expect: { status: "failed", sections: { "smpc.4.3": "mismatch" } },
   },
 ];
 

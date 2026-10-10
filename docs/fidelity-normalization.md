@@ -1,6 +1,6 @@
 # Narrative fidelity normalisation specification
 
-Version: `fidelity-norm/3.7.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
+Version: `fidelity-norm/3.8.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
 in section 9)
 
 This document is the language-neutral specification of the text normalisation and XHTML
@@ -960,13 +960,27 @@ An extractor must:
   it and the space after it would join a number to it, by the rule for a U+0009 above: a label
   that ends in a number or is a dash or minus, before an item whose text begins with a number
   (the label "1" before "000 mg" would read "1 000 mg", and "–" before "2 to 8 °C" −2 °C).
+  From 3.8.0 (ADR 0006 decision 14) a section whose list labels stand at two or more Word levels
+  is carried where every label is of a closed family, no family stands at two levels of the
+  section and no level holds two families; each run of list paragraphs (no unlabelled paragraph between them) that holds two
+  levels is then written whole in that form, each item a `p` of its label, U+0020 and its text,
+  its "•" items too and across a change of list inside the run, so no item is drawn as an HTML
+  list's. The families, judged as a reader sees a label: disc (U+2022, U+25CF); circle (the
+  letter "o", U+25E6, U+25CB); square (U+25AA, U+25A0, U+25AB, U+25A1); dash (U+002D, U+2010 to
+  U+2014, U+2212); decimal (ASCII digits, alone, with "." or ")" after them, or in brackets); and
+  lower-case and upper-case ASCII letters, alphabetic and Roman together, with "." or ")" after
+  them or in brackets. Each item's level is then told by its label, as Word's indentation tells
+  it; the indentation itself is not kept, as no check compares it. A run of one level in such a
+  section is written as before. The page does not change: it writes every label so.
 
   The extractor refuses the section where the read holds anything ADR 0006 decision 3's closed
   lists do not carry (`zone_a.word_epi` names each refusal): a mark other than bold, italic,
   superscript, subscript and the template's grey, except an underline that cannot change the text,
   capitals over text they draw the same and, from 3.5.0, a strike, a highlight or a solid shading
-  over trailing spaces; a list label not followed by a tab or a space, or two
-  list levels in the section; a picture the reader does not vouch for, over 1 MiB, or drawn by Word larger than its
+  over trailing spaces; a list label not followed by a tab or a space, or, in a section with
+  list labels at two or more levels, a label of no family, one family at two levels or two
+  families at one level (until
+  3.8.0, any two list levels in the section); a picture the reader does not vouch for, over 1 MiB, or drawn by Word larger than its
   own size or out of its own proportions by more than 2%; a tab (but those written as U+0020
   above), a soft hyphen, U+2028 or U+2029,
   a bullet glyph starting a line after a line break, a comment or a hidden paragraph mark; a
@@ -1030,6 +1044,20 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
 
 ## 9. Version history
 
+- `fidelity-norm/3.8.0` (minor) — section 7's certified Word rule carries a section whose list
+  labels stand at two or more levels, as its labels' text, where every label is of a closed
+  family (disc, circle, square, dash, decimal, lower-case and upper-case letters), no family
+  stands at two levels of the section and no level holds two families (ADR 0006 decision 14,
+  amending decision 6): each run of
+  list paragraphs at two levels is written whole as the decision 6 form, each item a `p` of its
+  label, U+0020 and its text. A family at two levels, two at one level, or a label of no family, still refuses the
+  section (`list-level`), and the guards of a label written as text hold (a bullet glyph in a
+  table cell, a label that would join a number). Two verify vectors are added, reviewed by hand:
+  a page with bullets over "o" items over an en dash against its narrative (passed), and the same page
+  against the run drawn as a nested HTML list, which draws a browser's markers, not Word's labels
+  (failed). Sections 1 to 6 and the code point table do not change. The withheld section of an
+  authority import (`docs/design/authority-import-withheld.md`, not built) moves to 3.9.0. The
+  change record is `docs/validation/changes/2026-10-10-fidelity-norm-3-8-0.md`.
 - `fidelity-norm/3.7.0` (minor) — section 7's certified Word rule carries as the template's grey
   the 15% pattern of the automatic colour on an automatic or white fill, a run's or a
   paragraph's, which Word prints as exactly D9D9D9 on every ground it was printed on (section 7;
@@ -1041,7 +1069,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   table cell against its narrative (passed), and the same page against a narrative that leaves the
   grey paragraph out (failed). Sections 1 to 6 and
   the code point table do not change. The withheld section of an authority import
-  (`docs/design/authority-import-withheld.md`, not built) moves to 3.8.0. The change record is
+  (`docs/design/authority-import-withheld.md`, not built) moves to 3.8.0 (and with 3.8.0 to 3.9.0). The change record is
   `docs/validation/changes/2026-10-09-fidelity-norm-3-7-0.md`.
 - `fidelity-norm/3.6.0` (minor) — section 5's lowered-half rule also keeps `T<sub>½</sub>` (a
   `T` that starts a word, as a `t` does) and ½ followed in the `sub` by one of a phase's letters,
@@ -1054,7 +1082,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   with this version for tables a renderer draws with a column of no width, were withdrawn: Chrome
   still draws such a column at no width in a narrow container (the change record). The withheld
   section of an authority import (`docs/design/authority-import-withheld.md`, not built) moves to
-  3.7.0 (and with 3.7.0 to 3.8.0). The change record is `docs/validation/changes/2026-10-08-fidelity-norm-3-6-0.md`.
+  3.7.0 (and with 3.7.0 to 3.8.0, with 3.8.0 to 3.9.0). The change record is `docs/validation/changes/2026-10-08-fidelity-norm-3-6-0.md`.
 - `fidelity-norm/3.5.0` (minor) — section 7's certified Word rule lays a table's grid as the
   narrative does: the grid columns a row leaves out at its start or end are an empty cell (ADR
   0006, owner decision 10), and a grid column at which no cell starts is dropped (the HTML table
@@ -1077,7 +1105,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   narrative (passed), and the same page against a narrative with an empty cell on the wrong side
   of its value (failed). Sections 1 to 6 and the code point table do not change. The withheld
   section of an authority import (`docs/design/authority-import-withheld.md`, not built) moves
-  to 3.6.0 (and with 3.6.0 to 3.7.0, with 3.7.0 to 3.8.0). The change record is
+  to 3.6.0 (and with 3.6.0 to 3.7.0, with 3.7.0 to 3.8.0, with 3.8.0 to 3.9.0). The change record is
   `docs/validation/changes/2026-10-08-fidelity-norm-3-5-0.md`.
 - `fidelity-norm/3.4.0` (minor) — section 7's certified Word rule writes as U+0020 the tab after
   a typed label in a table cell as well as outside one, and a typed label is also U+2011, a
@@ -1090,7 +1118,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   typed labels, in table cells and outside them, against its narrative (passed). Sections 1 to 6
   and the code point table do not change. The withheld section of an authority import
   (`docs/design/authority-import-withheld.md`, not built) moves to 3.5.0 (and with 3.5.0 to
-  3.6.0, with 3.6.0 to 3.7.0, with 3.7.0 to 3.8.0). The same rule carries as
+  3.6.0, with 3.6.0 to 3.7.0, with 3.7.0 to 3.8.0, with 3.8.0 to 3.9.0). The same rule carries as
   the template's grey C0C0C0 shading, which Word draws as the light grey highlight (no new
   reading, by Word's own print); a pattern's grey waits for the reader to spell a pattern's theme
   colour and for Word's answer over painted backgrounds. The change record is
@@ -1107,7 +1135,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   (passed), and the same dashes drawn as an HTML list (failed). Sections 1 to 4 and 6 and the code
   point table do not change. The withheld section of an authority import
   (`docs/design/authority-import-withheld.md`, not built) moves to 3.4.0 (and with 3.4.0 to
-  3.5.0, with 3.5.0 to 3.6.0, with 3.6.0 to 3.7.0, with 3.7.0 to 3.8.0). The change record is `docs/validation/changes/2026-10-06-fidelity-norm-3-3-0.md`.
+  3.5.0, with 3.5.0 to 3.6.0, with 3.6.0 to 3.7.0, with 3.7.0 to 3.8.0, with 3.8.0 to 3.9.0). The change record is `docs/validation/changes/2026-10-06-fidelity-norm-3-3-0.md`.
 - `fidelity-norm/3.2.0` (minor) — section 7 qualifies a third kind of source, a certified Word
   source (ADR 0006): a Word SmPC the pinned label reader read exactly, whose conservation check
   accounted for every character, structured by the QRD template's own headings, with one page
@@ -1121,7 +1149,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   list numbered from one later, and a page that writes a bullet after a line break as content
   against a narrative that draws it after a `br` (each failed). 3.2.0 was first reserved for the withheld section of
   an authority import (`docs/design/authority-import-withheld.md`, not built), which then took
-  3.3.0, then 3.4.0, then 3.5.0, then 3.6.0, then 3.7.0, and now takes 3.8.0.
+  3.3.0, then 3.4.0, then 3.5.0, then 3.6.0, then 3.7.0, then 3.8.0, and now takes 3.9.0.
   The change record is `docs/validation/changes/2026-10-05-fidelity-norm-3-2-0.md`.
 - `fidelity-norm/3.1.0` (minor) — inside `sub`, U+221E INFINITY is kept unchanged instead of
   rejecting (`unmappable-script`), and U+00BD VULGAR FRACTION ONE HALF is kept under the

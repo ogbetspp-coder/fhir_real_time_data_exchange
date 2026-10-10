@@ -1069,6 +1069,14 @@ change: the 15% pattern greys join `GREY`, which the check already reads as the 
 silver span. The synthetic SmPC's request is to be
 published again after the deploy, as for 1.5.0.
 
+**`word-epi/1.8.0` (`fidelity-norm/3.8.0`, 2026-10-10).** The builder's version moves the
+request's path again, and the drawing's version (`word-drawing/1.2.7`) its drawing id, so this
+build finds the record for `word-epi/1.7.0` nowhere; the tests keep the test key, as above, and
+dev's image is unchanged (the code is mounted from the checkout). The drawing check's rules do not
+change: a run of list paragraphs at two levels (ADR 0006 decision 14) is written as its labels'
+text, which `text_labels` names, so the check reads each label as the start of its line, as for
+decision 6. The synthetic SmPC's request is to be published again after the deploy, as for 1.5.0.
+
 ## Build order, each change reviewed on its own
 
 1. **Measure first** (partly done 2026-10-07, above, in "Step 1": the corpus with the pinned

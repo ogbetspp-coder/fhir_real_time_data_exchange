@@ -94,7 +94,9 @@ The record does not admit this today, for reasons this ADR has to answer rather 
      FHIR's narrative rule txt-1 allows no `start` or `type` on `ol`, and the official validator
      with the EMA profiles refuses both). Any other list, "a)", "–" or "3." included, is written as
      Word draws it, each item a `p` of its label and its text (amended 2026-10-06, owner decision 6
-     below; until then it refused the section). An empty numbered paragraph refuses the section.
+     below; until then it refused the section). Lists at two or more levels in a section are
+     written so where each label's family tells its level (amended 2026-10-10, decision 14 below;
+     until then two levels refused the section). An empty numbered paragraph refuses the section.
    - **Pictures:** a picture is carried as a `data:` URI of its PNG or JPEG bytes (by signature)
      only if Word draws it uncropped and at no more than its own size. Any other picture, and any
      floating picture, shape, frame or floating table, refuses the section.
@@ -220,8 +222,9 @@ silver;">`, the one style `fidelity-norm/3.3.0` allows (§5, exactly that value,
    that does not start at one would be refused or drawn with another marker. Each such item is
    written as Word draws it, a `p` of its label, a space and its text, as a typed label is: the
    page already writes that line (§7), and the drawing check reads the label as the line's start.
-   Nesting is still refused (one list level in a section), and so is a non-disc bullet glyph in a
-   table cell, where the page leaves a bullet glyph out. (Narrowed 2026-10-08,
+   Nesting is still refused (one list level in a section; amended 2026-10-10 by decision 14,
+   which carries two levels as labels' text where no label family stands at two of them), and so
+   is a non-disc bullet glyph in a table cell, where the page leaves a bullet glyph out. (Narrowed 2026-10-08,
    `fidelity-norm/3.5.0`, a fix with no new decision: a label so written is refused,
    `list-label`, where it and its space would join a number to it, by decision 11's test below:
    a label that is a dash or minus, or ends in a number, before an item whose text begins with
@@ -445,6 +448,50 @@ automatic colour is the automatic one. Every other pattern stays refused: 10% or
 colour or fill, `shading-pct15-AUTO-D9D9D9`, a theme's. Evidence: in the built but blocked files,
 `shading-pct15-AUTO-AUTO` stands in 10 SmPC files and `shading-pct15-AUTO-FFFFFF` in 2 (and in
 leaflets).
+
+## Owner decision (2026-10-10)
+
+Taken as recommended under the owner's authorisation of 2026-10-10; for the owner's review
+(`docs/design/nested-lists.md`, recommendation R2; `fidelity-norm/3.8.0`, `word-epi/1.8.0`).
+
+14. **Lists at two levels, as their labels' text** (amends decision 6): a section whose list
+    labels stand at more than one Word level (`w:ilvl`) is carried where every label belongs to
+    a closed family and no family stands at two levels of the section, and (the implementation's
+    one addition, below) no level holds two families (`zone_a.word_epi.list_levels`). Each run of list paragraphs (no unlabelled paragraph between
+    them) that holds two or more levels is then written whole in decision 6's form, each item a
+    `p` of its label, a space and its text, its "•" items too and across a change of list
+    inside the run, so no sub-item is drawn as an HTML list's, left of its parent. A run of one
+    level is written as before. The families, judged as a reader sees a label, not by code
+    point:
+
+    | Family     | Labels                                                                                                    |
+    | ---------- | --------------------------------------------------------------------------------------------------------- |
+    | disc       | U+2022 •, U+25CF ●                                                                                        |
+    | circle     | the letter "o" (Word's default second-level bullet), U+25E6 ◦, U+25CB ○                                   |
+    | square     | U+25AA ▪, U+25A0 ■, U+25AB ▫, U+25A1 □                                                                    |
+    | dash       | U+002D -, U+2010 to U+2014, U+2212 −                                                                      |
+    | decimal    | ASCII digits, alone, with "." or ")" after them, or in brackets                                           |
+    | lower-case | ASCII letters, alphabetic and Roman together ("i." is either), with "." or ")" after them, or in brackets |
+    | upper-case | the same, in capitals                                                                                     |
+
+    The family list is part of the decision: "a reader can tell these apart" is a judgment, not
+    a measurement. Each item's level is then told by its label, as Word's indentation tells it
+    ("• A", "o B", "o C", "• D": B and C under A). Lost, as no check compares them: the
+    indentation itself, and a wrapped item's hanging indent (as with decision 6). Still refused
+    (`list-level`): one family at two levels ("•" over "•", "●" over "•", "−" over "-", "o" over
+    "◦", "▪" over "■", "1." over "1)", "i." over "a."), in one list or two apart, which only
+    indentation tells apart, and the remedy is a distinct bullet per level in the source; a
+    label of no family ("➢", "a" alone, "1.1."); and two families at one level ("•", then "o"
+    and "-" both at level 1, which a reader would take for three levels: the label alone must
+    tell the level, so families and levels pair one to one). This last refusal is the
+    implementation's, stricter than the note's rule; it costs nothing on the corpus (one section
+    holds such a level, refused for another cause too). Decision 6's guards hold: a bullet glyph written
+    as text in a table cell, and a label that would join the number its item begins with
+    (`list-label`). A run that starts deeper than it goes, or jumps a level, is carried: the label
+    carries the level, so no empty item is drawn. A paragraph between items of two levels stays a
+    `p` of its own, not attached to an item. Evidence (EMA English cuts, counts only, the design
+    note): no nested run in the corpus uses the markers an HTML list draws at depth (◦, ■), so no
+    nested HTML list draws one as Word does; 43 nested runs, none numbered.
 
 ## Progress
 

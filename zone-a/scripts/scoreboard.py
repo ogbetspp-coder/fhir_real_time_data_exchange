@@ -278,7 +278,9 @@ _KNOWN = re.compile(
     r"|cells and grid differ|a row of no cells that leaves columns out"
     r"|a row of exact height: Word clips its text|a merge under no cell of its columns"
     r"|text in a merged cell|a bullet no HTML list draws, in a cell"
-    r"|a label that joins the number after it|a table in two sections|lists at two levels"
+    r"|a label that joins the number after it|a table in two sections"
+    r"|a label of no family, lists at two levels|one label family at two levels"
+    r"|two label families at one level"
     r"|the narrative does not read as the page|Word draws it; the read does not yet say how"
     r"|a heading in a table)"
 )
@@ -330,7 +332,10 @@ def blockers(body: Body, section: Mapping[str, Any]) -> list[str]:
         found |= {cause("anchored-object", a.kind) for a in paragraphs[i].anchored}
     if paragraphs[heading].table is not None:
         found.add(cause("heading-in-table", "a heading in a table"))
-    checks: list[Callable[[], object]] = [partial(word_epi._heading, heading, paragraphs[heading])]
+    checks: list[Callable[[], object]] = [
+        partial(word_epi._heading, heading, paragraphs[heading]),
+        partial(word_epi.list_levels, range(start, stop), body),
+    ]
     for i in range(start, stop):
         p = paragraphs[i]
         checks += [partial(word_epi._check, i, p, body.images), partial(word_epi._marks, i, p)]
@@ -340,9 +345,6 @@ def blockers(body: Body, section: Mapping[str, Any]) -> list[str]:
             check()
         except word_epi.RefusedError as refused:
             found.add(cause(refused.code, refused.detail))
-    labelled = [paragraphs[i] for i in range(start, stop) if word_epi._label(paragraphs[i])]
-    if len({p.numbering.level for p in labelled if p.numbering}) > 1:
-        found.add(cause("list-level", "lists at two levels"))
     return sorted(found)
 
 
