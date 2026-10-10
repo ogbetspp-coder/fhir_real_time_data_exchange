@@ -263,18 +263,55 @@ def cause(code: str, detail: object) -> str:
     return f"{code}: {re.sub('[0-9]+', 'N', detail)}"[:80]
 
 
-def plain_chars(data: bytes) -> int:
-    """The characters of word/document.xml's ``w:t`` (not ``w:delText``: no deleted text); or 0.
+# The builder's detail forms (zone_a.word_epi), after ``cause``: a fixed phrase, or a reader's
+# kind (a mark's, an anchored object's, a picture's reason) as one token. Any other detail is
+# summarised as "other", so a free-text detail never reaches a summary.
+_TOKEN = "[a-z][A-Za-z]*(?:[-+][A-Za-z0-9]+)*"
+_KNOWN = re.compile(
+    rf"(?:formatting|heading-formatting|anchored-object|narrative): {_TOKEN}"
+    rf"|picture: a picture not carried: {_TOKEN}|list-label: a label followed by {_TOKEN}"
+    rf"|table-grid: no grid on record: {_TOKEN}|script: U\+N raised or lowered"
+    r"|[a-z-]+: (?:a comment|a hidden paragraph mark|a soft hyphen|a tab|U\+N or U\+N"
+    r"|a bullet glyph after a line break|a label with no text|a picture (?:without its bytes or"
+    r" its size|over N MiB|Word draws at no size|drawn larger or out of proportion)"
+    r"|an underline that can change the text|raised and lowered at once|a table in a table"
+    r"|cells and grid differ|a row of no cells that leaves columns out"
+    r"|a row of exact height: Word clips its text|a merge under no cell of its columns"
+    r"|text in a merged cell|a bullet no HTML list draws, in a cell"
+    r"|a label that joins the number after it|a table in two sections|lists at two levels"
+    r"|the narrative does not read as the page|Word draws it; the read does not yet say how"
+    r"|a heading in a table)"
+)
 
-    A file the reader refuses has no text as the reader reads it: this stands for it.
+
+def public(found: str) -> str:
+    """A cause as a summary may show it: a known form, else its code and "other"."""
+    return found if _KNOWN.fullmatch(found) else found.split(":", 1)[0] + ": other"
+
+
+_MC = "{http://schemas.openxmlformats.org/markup-compatibility/2006}"
+
+
+def plain_chars(data: bytes) -> int | None:
+    """The characters of word/document.xml as Word shows it; None where there is no such part.
+
+    Its ``w:t``: not ``w:delText`` (deleted text) nor ``w:instrText`` (a field's code, where the
+    result is ``w:t``), and of markup compatibility's choices only ``mc:Choice``, which Word
+    draws, not ``mc:Fallback``. A file the reader refuses has no text as the reader reads it:
+    this stands for it.
     """
-    # ponytail: text moved away (w:moveFrom) is counted, and fields' results; close enough for
-    # a denominator, a reader-side count when the reader can say one.
+    # ponytail: text moved away (w:moveFrom) is counted; close enough for a denominator.
+
+    def count(element: ET.Element) -> int:
+        if element.tag == f"{_MC}Fallback":
+            return 0
+        own = len(element.text or "") if element.tag == f"{_W}t" else 0
+        return own + sum(count(child) for child in element)
+
     try:
-        xml = zipfile.ZipFile(io.BytesIO(data)).read("word/document.xml")
-        return sum(len(t.text or "") for t in ET.fromstring(xml).iter(f"{_W}t"))
+        return count(ET.fromstring(zipfile.ZipFile(io.BytesIO(data)).read("word/document.xml")))
     except zipfile.BadZipFile, KeyError, ET.ParseError, ValueError:
-        return 0
+        return None
 
 
 def blockers(body: Body, section: Mapping[str, Any]) -> list[str]:
@@ -386,22 +423,23 @@ def _top(counter: Counter[str], n: int = 15) -> list[list[Any]]:
     return [[k, v] for k, v in sorted(counter.items(), key=lambda kv: (-kv[1], kv[0]))[:n]]
 
 
-def unlock(blocked: Sequence[Sequence[str]], steps: int = 20) -> list[list[Any]]:
-    """Greedy: the cause whose lifting makes the most files whole next, with the running total.
+def unlock(blocked: Sequence[Sequence[str]], steps: int = 20) -> list[dict[str, Any]]:
+    """Greedy: the cause whose lifting makes the most files whole next, step by step.
 
-    Ties go to the cause in the most files, then the first by name.
+    ``newlyWhole`` is how many of the files with a section refused the causes so far, together,
+    would make whole. Ties go to the cause in the most files, then the first by name.
     """
     sets = [set(b) for b in blocked]
     per = Counter(c for s in sets for c in s)
     lifted: set[str] = set()
-    order: list[list[Any]] = []
+    order: list[dict[str, Any]] = []
     for _ in range(min(steps, len(per))):
         best = max(
             sorted(set(per) - lifted),
             key=lambda c: (sum(1 for s in sets if c in s and s <= lifted | {c}), per[c]),
         )
         lifted.add(best)
-        order.append([best, sum(1 for s in sets if s <= lifted)])
+        order.append({"cause": best, "newlyWhole": sum(1 for s in sets if s <= lifted)})
     return order
 
 
@@ -410,7 +448,7 @@ def summarize(records: Sequence[Mapping[str, Any]], greedy: bool = True) -> dict
     files = [r for r in records if r["section"] is None]
     sections = [r for r in records if r["section"] is not None]
     outcomes = Counter(f["outcome"] for f in files)
-    chars = sum(f["chars"] for f in files)
+    chars = sum(f["chars"] for f in files if f["chars"] is not None)
     converted = sum(f["carriedChars"] for f in files)
     carried = sum(1 for s in sections if s["outcome"] == "carried")
     out: dict[str, Any] = {
@@ -425,6 +463,8 @@ def summarize(records: Sequence[Mapping[str, Any]], greedy: bool = True) -> dict
             "converted": converted,
             "total": chars,
             "coverage": round(converted / chars, 4) if chars else None,
+            # Reader-refused files with no document part to count: in no total.
+            "unmeasurable": sum(1 for f in files if f["chars"] is None),
         },
         "codes": {
             "reader": _top(Counter(f["code"] for f in files if f["outcome"] == "reader-refused")),
@@ -442,7 +482,7 @@ def summarize(records: Sequence[Mapping[str, Any]], greedy: bool = True) -> dict
         for s in sections:
             if s["outcome"] == "refused":
                 blocked.setdefault((s["sha256"], s["document"]), set()).update(s["blockers"])
-        out["unlock"] = unlock([sorted(v) for _, v in sorted(blocked.items())])
+        out["unlock"] = unlock([sorted({public(c) for c in v}) for _, v in sorted(blocked.items())])
     return out
 
 
@@ -464,18 +504,43 @@ def versions(root: Path) -> dict[str, str]:
     }
 
 
+def quietly(job: tuple[str, str, str]) -> list[dict[str, Any]] | None:
+    """``measure``, or None where it fails: nothing of the failure, not even its file's path."""
+    try:
+        return measure(job)
+    except Exception:  # noqa: BLE001 - a hold-out failure is counted, never shown
+        return None
+
+
+# A hold-out group of fewer files than this is reported as "<5" only: its aggregates would be
+# nearly a file's own results.
+MIN_CELL = 5
+
+
+def _cell(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    files = sum(1 for r in records if r["section"] is None)
+    return summarize(records, greedy=False) if files >= MIN_CELL else {"files": f"<{MIN_CELL}"}
+
+
 def coverage(arguments: argparse.Namespace) -> int:
     """Writes the coverage records and summary (the module docstring)."""
     root = arguments.root.resolve()
+    folders = (arguments.smpc, arguments.pl)
+    if arguments.holdout is None and any(
+        (f / "manifest.json").exists() or (f.parent / "manifest.json").exists() for f in folders
+    ):
+        raise SystemExit("a hold-out folder (a manifest.json beside it): measure it --holdout")
     jobs = [
         (str(path), document, str(root))
-        for document, folder in (("smpc", arguments.smpc), ("pl", arguments.pl))
+        for document, folder in zip(("smpc", "pl"), folders, strict=True)
         for path in sorted(folder.glob("*.docx"))
     ]
     with ProcessPoolExecutor(arguments.jobs) as pool:
-        measured = list(pool.map(measure, jobs))
-    order = sorted(range(len(jobs)), key=lambda n: (jobs[n][1], measured[n][0]["sha256"]))
-    records = [r for n in order for r in measured[n]]
+        got = list(pool.map(measure if arguments.holdout is None else quietly, jobs))
+    failed = sum(1 for m in got if m is None)
+    kept = [(job, m) for job, m in zip(jobs, got, strict=True) if m is not None]
+    kept.sort(key=lambda jm: (jm[0][1], jm[1][0]["sha256"]))
+    records = [r for _, m in kept for r in m]
     arguments.out.mkdir(parents=True, exist_ok=True)
     summary: dict[str, Any] = {"versions": versions(root)}
     if arguments.holdout is None:
@@ -486,16 +551,15 @@ def coverage(arguments: argparse.Namespace) -> int:
         (arguments.out / "sections.jsonl").write_text(lines, encoding="utf-8")
     else:
         manifest = {f["file"]: f["kind"] for f in _load(arguments.holdout)["files"]}
-        kinds: dict[str, str] = {}
-        for (path, _, _), (file, *_) in zip(jobs, measured, strict=True):
-            name = Path(path).name
-            if name not in manifest:
-                raise SystemExit("a hold-out file the manifest does not list")
-            kinds[file["sha256"]] = manifest[name]
+        if set(manifest.values()) - {"new", "update"}:
+            raise SystemExit("a hold-out manifest kind other than new or update")
+        if any(Path(path).name not in manifest for path, _, _ in jobs):
+            raise SystemExit("a hold-out file the manifest does not list")
+        kinds = {m[0]["sha256"]: manifest[Path(job[0]).name] for job, m in kept}
         summary["holdout"] = {
-            kind: summarize([r for r in records if kinds[r["sha256"]] == kind], greedy=False)
+            kind: _cell([r for r in records if kinds[r["sha256"]] == kind])
             for kind in ("new", "update")
-        } | {"all": summarize(records, greedy=False)}
+        } | {"all": _cell(records), "failed": failed}
     text = canonical_json(summary) + "\n"
     (arguments.out / "summary.json").write_text(text, encoding="utf-8")
     return 0
@@ -521,8 +585,9 @@ def regress(before: Path, after: Path) -> dict[str, Any]:
 
     old, new = _records(before), _records(after)
     worse = []
+    now_files = files(new)
     for key, was in sorted(files(old).items()):
-        now = files(new).get(key)
+        now = now_files.get(key)
         if now is None:
             worse.append(
                 {"sha256": key[0], "document": key[1], "before": was["outcome"], "after": None}
@@ -592,7 +657,12 @@ def main(argv: list[str] | None = None) -> int:
         parser.add_argument("before", type=Path)
         parser.add_argument("after", type=Path)
         arguments = parser.parse_args(argv[1:])
-        found = regress(arguments.before, arguments.after)
+        try:
+            found = regress(arguments.before, arguments.after)
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            # 2, not 1: 1 says only that something regressed.
+            sys.stderr.write(f"regress: unreadable input ({type(error).__name__}): {error}\n")
+            return 2
         sys.stdout.write(canonical_json(found) + "\n")
         return 1 if found["worseFiles"] or found["sections"] else 0
     parser = argparse.ArgumentParser(description=__doc__)

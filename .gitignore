@@ -1,8 +1,11 @@
 node_modules/
 dist/
 coverage/
-# The coverage scoreboard's committed summaries (docs/validation/coverage-scoreboard.md).
+# The coverage scoreboard's committed summaries (docs/validation/coverage-scoreboard.md): only
+# their .json, so nothing else written beside them is ever committed.
 !docs/validation/coverage/
+docs/validation/coverage/*
+!docs/validation/coverage/*.json
 .coverage
 .env
 .env.*

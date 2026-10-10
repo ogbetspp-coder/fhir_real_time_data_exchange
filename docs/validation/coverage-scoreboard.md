@@ -21,7 +21,9 @@ nice -n 10 uv run --frozen python scripts/scoreboard.py coverage \
 `CORPUS` is a folder outside the repository: the EMA's tracked-changes product information, in
 English, cut into SmPCs (`cut_smpc.py`, everything before `ANNEX II`) and leaflets (`cut_pl.py`,
 everything after `B. PACKAGE LEAFLET`). `--root` is the checkout whose registry, mapping and commit
-are recorded (default: this one). `regress` exits 1 when anything got worse. `OUT` is never
+are recorded (default: this one). `regress` exits 1 when anything got worse, and 2 when its input
+cannot be read. `coverage` refuses a folder with a `manifest.json` in it or beside it unless it is
+given `--holdout`. `OUT` is never
 committed. Only `summary.json` may be, under `docs/validation/coverage/` as
 `<date>-main-<sha>.json`. The first is `coverage/2026-10-10-main-e546c933.json`.
 
@@ -51,10 +53,13 @@ of its narrative and page.
     tracked file by its accepted view). Its converted characters are those of the headings and
     paragraphs of its carried sections, each paragraph once.
   - A reader-refused file counts 0 converted characters. Its total is a plain-text extraction
-    instead: the `w:t` text of `word/document.xml`, which leaves deletions out.
+    instead: the `w:t` text of `word/document.xml`, as Word shows it. Deleted text
+    (`w:delText`), a field's code (`w:instrText`) and the `mc:Fallback` of an alternative are
+    left out.
+  - A reader-refused file with no readable `word/document.xml` is in no total. It is counted
+    as `unmeasurable`.
   - The two counts agree: over the 348 files of the dev corpus the reader reads, the plain-text
-    extraction gives 0.999 of the reader's characters, both for SmPCs and for leaflets
-    (2026-10-10).
+    extraction gives 0.999 of the reader's characters for SmPCs and 0.998 for leaflets (2026-10-10).
   - Text before a document's first section heading is never converted, so even a `whole` file is
     a little under 100%.
 - `codes`: the most frequent codes.
@@ -63,8 +68,10 @@ of its narrative and page.
   - `needs`: template keys a person must settle.
   - `section`: section refusals.
 - `unlock`: a greedy order over the `built-section-refused` files. Each step names the cause
-  whose lifting next makes the most files whole, with the running number of whole files. Only
-  the builder's causes are counted. It is optimistic: when one check in a paragraph refuses, the
+  whose lifting next makes the most files whole. `newlyWhole` is the number of those files that
+  the causes so far, together, would make whole. Only the builder's causes are counted, and only
+  in the detail forms the builder is known to write. Any other detail is shown as `other`, so a
+  free-text detail never reaches a summary. It is optimistic: when one check in a paragraph refuses, the
   checks after it do not run. Neither do the narrative's and the table's checks unless they are
   the section's own refusal. `label-docx-reader/scripts/survey.py --causes` ranks the reader's
   causes the same way.
@@ -81,7 +88,8 @@ without `--no-drawing` does that).
   sections carried, or that is gone;
 - each section carried before that is now refused, changed (another `contentSha256`) or gone.
 
-A file whose bytes changed is a new file to it.
+A file whose bytes changed is a new file to it. Files with the same bytes are counted once each
+in the summary, but they share a key in `regress`, so they are compared as one.
 
 ## The dev corpus and the hold-out
 
@@ -100,9 +108,12 @@ Leak control:
 - A person writing or tuning rules sees only the hold-out's aggregates. `--holdout` writes no
   `sections.jsonl` and no unlock order, only the `summary.json` split into `new`, `update` and
   `all`.
+- A group of fewer than 5 files shows only `"files": "<5"`.
+- A file whose measurement fails is counted in `failed`. No message or traceback names it.
+- A manifest kind other than `new` or `update` is an error.
 - Nobody opens, cuts by hand or debugs a hold-out file. A failure on it is fixed by finding the
   same cause in the dev corpus.
-- With a few files, an aggregate is close to a per-file result. Read it as a trend, not as a
-  target.
+- Even at 5 files and over, an aggregate is close to a per-file result. Read it as a trend, not
+  as a target.
 - When the hold-out has been used to decide a rule, it is spent. Move its files into the dev
   corpus and set a new cut-off date.

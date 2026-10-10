@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +24,7 @@ def _script() -> Any:
 
 
 def _file(
-    sha: str, outcome: str, chars: int, carried_chars: int = 0, **more: Any
+    sha: str, outcome: str, chars: int | None, carried_chars: int = 0, **more: Any
 ) -> dict[str, Any]:
     return {"sha256": sha, "document": "smpc", "section": None, "outcome": outcome} | {
         "chars": chars,
@@ -44,12 +46,13 @@ RECORDS = [
     _section("a", "2"),
     _file("b", "built-section-refused", 100, 50, carried=1, sections=2),
     _section("b", "1"),
-    _section("b", "2", ["tab: a tab", "strike: x"]),
+    _section("b", "2", ["tab: a tab", "formatting: strike"]),
     _file("c", "built-section-refused", 100, 50, carried=1, sections=2),
     _section("c", "1"),
     _section("c", "2", ["tab: a tab"]),
     _file("d", "reader-refused", 200, code="tracked-change"),
     _file("e", "needs-a-person", 100, needs=["smpc.4.2"]),
+    _file("f", "reader-refused", None, code="invalid-package"),
 ]
 
 
@@ -62,25 +65,85 @@ def test_the_summary_is_counts_and_the_same_bytes_whatever_the_order() -> None:
         "document-refused": 0,
         "needs-a-person": 1,
         "parts-unclear": 0,
-        "reader-refused": 1,
+        "reader-refused": 2,
     }
-    # Sections only of built files; characters of every file, the reader-refused one's as 0.
+    # Sections only of built files; characters of every file, the reader-refused one's as 0
+    # converted, and one with no text to count apart.
     assert summary["sections"] == {"carried": 4, "total": 6, "share": 0.6667}
-    assert summary["characters"] == {"converted": 190, "total": 600, "coverage": 0.3167}
-    assert summary["codes"]["reader"] == [["tracked-change", 1]]
+    assert summary["characters"] == {
+        "converted": 190,
+        "total": 600,
+        "coverage": 0.3167,
+        "unmeasurable": 1,
+    }
+    assert summary["codes"]["reader"] == [["invalid-package", 1], ["tracked-change", 1]]
     assert summary["codes"]["needs"] == [["smpc.4.2", 1]]
     assert summary["codes"]["section"] == [["tab", 2]]
     # Lifting tabs makes c whole; strikes then make b whole.
-    assert summary["unlock"] == [["tab: a tab", 1], ["strike: x", 2]]
+    assert summary["unlock"] == [
+        {"cause": "tab: a tab", "newlyWhole": 1},
+        {"cause": "formatting: strike", "newlyWhole": 2},
+    ]
     assert canonical_json(script.summarize(list(reversed(RECORDS)))) == canonical_json(summary)
 
 
 def test_a_cause_keeps_no_quoted_text_code_point_or_number() -> None:
-    cause = _script().cause
-    assert cause("computed-field", "a field 'Ibuprofen 400 mg' at 12") == (
+    script = _script()
+    assert script.cause("computed-field", "a field 'Ibuprofen 400 mg' at 12") == (
         "computed-field: a field '…' at N"
     )
-    assert cause("script", "U+00B5 raised or lowered") == "script: U+N raised or lowered"
+    found = script.cause("script", "U+00B5 raised or lowered")
+    assert found == "script: U+N raised or lowered"
+    # A summary shows only the builder's known forms; any other detail is "other".
+    assert script.public(found) == found
+    assert script.public("formatting: position+N-sizeN-inN") == "formatting: position+N-sizeN-inN"
+    assert script.public("tab: Take one tablet daily") == "tab: other"
+    assert script.public("formatting: two words") == "formatting: other"
+
+
+def _docx(body: str | None) -> bytes:
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as package:
+        if body is not None:
+            package.writestr(
+                "word/document.xml", f"<w:document {NS}><w:body>{body}</w:body></w:document>"
+            )
+    return out.getvalue()
+
+
+NS = (
+    'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+    'xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"'
+)
+
+
+def test_plain_characters_are_those_word_shows() -> None:
+    plain_chars = _script().plain_chars
+    run = "<w:r><w:t>{}</w:t></w:r>"
+    # An insertion counts; a deletion's w:delText does not.
+    tracked = '<w:p><w:ins w:id="1">' + run.format("abc") + '</w:ins><w:del w:id="2">'
+    tracked += "<w:r><w:delText>xyz</w:delText></w:r></w:del></w:p>"
+    assert plain_chars(_docx(tracked)) == 3
+    # A field's result counts; its code does not.
+    field = '<w:p><w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+    field += "<w:r><w:instrText> PAGE </w:instrText></w:r>"
+    field += '<w:r><w:fldChar w:fldCharType="separate"/></w:r>' + run.format("12")
+    field += '<w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>'
+    assert plain_chars(_docx(field)) == 2
+    # Of markup compatibility's alternatives, the choice Word draws, not the fallback.
+    choice = '<w:p><mc:AlternateContent><mc:Choice Requires="w14">' + run.format("abcdef")
+    choice += "</mc:Choice><mc:Fallback>" + run.format("abc") + "</mc:Fallback>"
+    choice += "</mc:AlternateContent></w:p>"
+    assert plain_chars(_docx(choice)) == 6
+    # No document part, or no package: nothing to count, not 0.
+    assert plain_chars(_docx(None)) is None
+    assert plain_chars(b"not a zip") is None
+
+
+def test_a_small_hold_out_group_shows_no_aggregates() -> None:
+    script = _script()
+    assert script._cell(RECORDS[:3]) == {"files": "<5"}
+    assert script._cell(RECORDS)["files"] == 6
 
 
 def _board(folder: Path, records: list[dict[str, Any]]) -> Path:
@@ -97,7 +160,7 @@ def test_the_regression_diff_lists_what_got_worse(tmp_path: Path) -> None:
     after = [
         _file("a", "built-section-refused", 100, 40, carried=1, sections=2),
         _section("a", "1", content="other"),
-        _section("a", "2", ["strike: x"]),
+        _section("a", "2", ["formatting: strike"]),
         # b is whole now: better, so not listed.
         _file("b", "whole", 100, 100, carried=2, sections=2),
         _section("b", "1"),
@@ -107,6 +170,7 @@ def test_the_regression_diff_lists_what_got_worse(tmp_path: Path) -> None:
         _section("c", "2", ["tab: a tab"]),
         _file("d", "reader-refused", 200, code="tracked-change"),
         _file("e", "reader-refused", 100, code="tab"),
+        _file("f", "reader-refused", None, code="invalid-package"),
     ]
     found = script.regress(before, _board(tmp_path / "after", after))
     assert found["versions"] == {"before": {"builder": "before"}, "after": {"builder": "after"}}
@@ -116,6 +180,11 @@ def test_the_regression_diff_lists_what_got_worse(tmp_path: Path) -> None:
     ]
     assert [(s["sha256"], s["section"], s["change"]) for s in found["sections"]] == [
         ("a", "1", "changed"),
-        ("a", "2", "refused: strike"),
+        ("a", "2", "refused: formatting"),
     ]
+    # 1 says only that something regressed; unreadable input is 2.
     assert script.main(["regress", str(before), str(before)]) == 0
+    assert script.main(["regress", str(before), str(tmp_path / "after")]) == 1
+    assert script.main(["regress", str(before), str(tmp_path)]) == 2
+    (tmp_path / "after" / "sections.jsonl").write_text("{not json\n", encoding="utf-8")
+    assert script.main(["regress", str(before), str(tmp_path / "after")]) == 2
