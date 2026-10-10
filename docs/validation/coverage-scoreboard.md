@@ -23,7 +23,7 @@ English, cut into SmPCs (`cut_smpc.py`, everything before `ANNEX II`) and leafle
 everything after `B. PACKAGE LEAFLET`). `--root` is the checkout whose registry, mapping and commit
 are recorded (default: this one). `regress` exits 1 when anything got worse. `OUT` is never
 committed. Only `summary.json` may be, under `docs/validation/coverage/` as
-`<date>-main-<sha>.json`.
+`<date>-main-<sha>.json`. The first is `coverage/2026-10-10-main-e546c933.json`.
 
 ## What it writes
 
@@ -52,6 +52,9 @@ of its narrative and page.
     paragraphs of its carried sections, each paragraph once.
   - A reader-refused file counts 0 converted characters. Its total is a plain-text extraction
     instead: the `w:t` text of `word/document.xml`, which leaves deletions out.
+  - The two counts agree: over the 348 files of the dev corpus the reader reads, the plain-text
+    extraction gives 0.999 of the reader's characters, both for SmPCs and for leaflets
+    (2026-10-10).
   - Text before a document's first section heading is never converted, so even a `whole` file is
     a little under 100%.
 - `codes`: the most frequent codes.

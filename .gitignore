@@ -1,6 +1,8 @@
 node_modules/
 dist/
 coverage/
+# The coverage scoreboard's committed summaries (docs/validation/coverage-scoreboard.md).
+!docs/validation/coverage/
 .coverage
 .env
 .env.*
