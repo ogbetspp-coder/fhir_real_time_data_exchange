@@ -82,7 +82,7 @@ decide — applied to reading.
    every hash agrees: each match names the section's own `normalizedTextSha256`, each answer
    hashes the chunk that was sent, the block's text and XHTML hash to the values the reader is
    shown, and the answer was computed under the normalisation version the agent was built
-   against (`fidelity-norm/3.7.0`). Anything else is flagged on the block, and the audit record
+   against (`fidelity-norm/3.8.0`). Anything else is flagged on the block, and the audit record
    shows it. So a normalisation-version bump in Zone B needs the agent redeployed, ported to the
    new version, **before** the service answers under it; otherwise every block shows unverified
    (`checksum-mismatch`) until it is. Each block says which checksum is confirmed by what: the

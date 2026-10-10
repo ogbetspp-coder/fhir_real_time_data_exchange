@@ -11,8 +11,9 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 - Never generate, summarize, or infer regulated clinical narrative. Preserve supplied XHTML (a
   withheld section's fixed notice is the one generated div, under the exception below). The
   fidelity check proves its words, list numbers, table grids and embedded pictures; paragraph
-  breaks, headings, bullets, list nesting and emphasis are kept, not proved. Its contract
-  (`fidelity-norm/3.7.0`) qualifies structured sources (an FHIR ePI) and, from 3.2.0, a
+  breaks, headings, bullets, list nesting (a certified Word source's as its labels' text, ADR 0006
+  decision 14) and emphasis are kept, not proved. Its contract
+  (`fidelity-norm/3.8.0`) qualifies structured sources (an FHIR ePI) and, from 3.2.0, a
   certified Word source (ADR 0006: a Word SmPC the label reader read exactly, its pages written
   by `zone_a.word_epi`); over any other drawn document's text (PDF, Word otherwise read) a report
   proves agreement with that text, not with the document,

@@ -1519,10 +1519,11 @@ def test_what_the_closed_lists_leave_out_is_refused(paragraph: Paragraph, code: 
     assert refused.value.code == code
 
 
-def test_a_list_that_changes_level_or_misses_a_number_is_refused() -> None:
-    with pytest.raises(RefusedError) as refused:
-        _build(_p("a", label="1."), _p("b", label="\u2022", level=1))
-    assert refused.value.code == "list-level"
+def test_a_list_that_changes_level_in_one_family_or_misses_a_number_is_refused() -> None:
+    # Decision 14: "1." over a bullet is two families, each at one level, so carried as text.
+    div, text = _build(_p("a", label="1."), _p("b", label="\u2022", level=1))
+    assert _inner(div) == "<p>1. a</p><p>\u2022 b</p>"
+    assert _same(div, text)
     with pytest.raises(RefusedError) as refused:
         _build(_p("a", label="1."), _p("b", label="3."), _p("c", label="2", level=1))
     assert refused.value.code == "list-level"
@@ -2017,6 +2018,291 @@ def test_one_list_level_in_a_section() -> None:
         _build(_p("a", label="\u2022"), _p("between"), _p("b", label="\u2022", level=1))
 
 
+# ---- ADR 0006 decision 14: lists at two levels, written as their labels' text ----------------
+
+
+@pytest.mark.parametrize(
+    ("label", "name"),
+    [
+        ("\u2022", "disc"),
+        ("\u25cf", "disc"),
+        ("o", "circle"),
+        ("\u25e6", "circle"),
+        ("\u25cb", "circle"),
+        ("\u25aa", "square"),
+        ("\u25a0", "square"),
+        ("\u25ab", "square"),
+        ("\u25a1", "square"),
+        ("-", "dash"),
+        ("\u2010", "dash"),
+        ("\u2011", "dash"),
+        ("\u2013", "dash"),
+        ("\u2014", "dash"),
+        ("\u2212", "dash"),
+        ("1", "decimal"),
+        ("1.", "decimal"),
+        ("12)", "decimal"),
+        ("(3)", "decimal"),
+        ("01.", "decimal"),
+        ("a.", "lower"),
+        ("o.", "lower"),
+        ("b)", "lower"),
+        ("(c)", "lower"),
+        ("iv.", "lower"),
+        ("(ii)", "lower"),
+        ("A.", "upper"),
+        ("IV)", "upper"),
+        ("(B)", "upper"),
+        # Near misses: no family.
+        ("", None),
+        ("a", None),
+        ("O", None),
+        ("I", None),
+        ("oo", None),
+        ("o)", "lower"),
+        ("\u2022 ", None),
+        ("\u2022\u2022", None),
+        ("\u2015", None),
+        ("\u00b7", None),
+        ("\uf0b7", None),
+        ("\u27a2", None),
+        ("\u25ba", None),
+        ("*", None),
+        ("1.1", None),
+        ("1.1.", None),
+        ("(1", None),
+        ("1))", None),
+        ("1:", None),
+        ("a.b", None),
+        ("Aa.", None),
+        ("\u0661.", None),
+        ("\uff11.", None),
+        ("\u00e9.", None),
+        ("\u2160.", None),
+    ],
+)
+def test_the_label_families_are_a_closed_list(label: str, name: str | None) -> None:
+    assert word_epi.family(label) == name
+
+
+def _two_levels(*paragraphs: Paragraph, tables: tuple[dict[str, Any], ...] = ()) -> str:
+    """Build a section at two or more levels: every labelled item a ``p`` of its label, text."""
+    div, text = _build(*paragraphs, tables=tables)
+    assert _same(div, text)
+    assert "<ul>" not in div
+    assert "<ol>" not in div
+    body = Body(tuple(paragraphs), tables)
+    labelled = {i for i, p in enumerate(paragraphs) if p.numbering}
+    assert word_epi.text_labels(range(len(paragraphs)), body) == labelled
+    return _inner(div)
+
+
+@pytest.mark.parametrize(
+    "labels",
+    [
+        [("\u2022", 0), ("o", 1), ("o", 1), ("\u2022", 0)],
+        [("\u2022", 0), ("-", 1), ("\u2212", 1), ("\u2022", 0)],
+        [("-", 0), ("\u25aa", 1), ("-", 0)],
+        [("\u25aa", 0), ("o", 1)],
+        [("\u2022", 0), ("o", 1), ("\u25aa", 2), ("o", 1), ("\u2022", 0)],
+        # Starts deeper, then outdents; a jump of two levels: the label carries the level.
+        [("o", 1), ("o", 1), ("\u2022", 0)],
+        [("\u2022", 0), ("\u25aa", 2), ("\u2022", 0)],
+        [("\u2022", 0), ("o", 3)],
+        # Numbered: Word's own labels, so numbering run on across parents is exact.
+        [("1.", 0), ("a)", 1), ("b)", 1), ("2.", 0), ("c)", 1)],
+        [("A.", 0), ("1.", 1), ("i.", 2), ("B.", 0)],
+        [("\u2022", 0), ("(i)", 1), ("(ii)", 1)],
+    ],
+)
+def test_a_run_at_two_levels_of_distinct_families_is_written_as_its_labels(
+    labels: list[tuple[str, int]],
+) -> None:
+    paragraphs = [_p(f"item {n}", label=x, level=v) for n, (x, v) in enumerate(labels)]
+    assert _two_levels(*paragraphs) == "".join(
+        f"<p>{_escape(x)} item {n}</p>" for n, (x, _) in enumerate(labels)
+    )
+
+
+def _escape(text: str) -> str:
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def test_a_run_at_two_levels_is_one_block_across_its_lists() -> None:
+    """A change of list inside the run splits no ``ul`` off it: its bullets stay text, so a
+    sub-item is never drawn to the left of its parent, and the drawing check names every item."""
+    inner = _two_levels(
+        _p("hepatic impairment", label="\u2022", num=1),
+        _p("Child-Pugh C", label="o", num=2, level=1),
+        _p("renal impairment", label="\u2022", num=1),
+        _p("dialysis", label="\u2022", num=3),
+    )
+    assert inner == (
+        "<p>\u2022 hepatic impairment</p><p>o Child-Pugh C</p>"
+        "<p>\u2022 renal impairment</p><p>\u2022 dialysis</p>"
+    )
+
+
+def test_a_run_of_one_level_in_a_section_of_two_is_written_as_today() -> None:
+    paragraphs = (
+        _p("a", label="\u2022"),
+        _p("b", label="\u2022"),
+        _p("between"),
+        _p("c", label="o", level=1),
+        _p("again"),
+        _p("d", label="\u2022", num=2),
+        _p("e", label="\u2022", num=2),
+    )
+    div, text = _build(*paragraphs)
+    assert _inner(div) == (
+        "<ul><li>a</li><li>b</li></ul><p>between</p><p>o c</p><p>again</p>"
+        "<ul><li>d</li><li>e</li></ul>"
+    )
+    assert text == "\n\u2022 a\n\u2022 b\nbetween\no c\nagain\n\u2022 d\n\u2022 e\n"
+    assert _same(div, text)
+    body = Body(paragraphs, ())
+    assert word_epi.text_labels(range(len(paragraphs)), body) == {3}
+    # Numbered: "1.", "2." from one at level 0 are an ``ol`` in a run of their own.
+    div, text = _build(
+        _p("d", label="1."), _p("e", label="2."), _p("x"), _p("f", label="a)", num=2, level=1)
+    )
+    assert _inner(div) == "<ol><li>d</li><li>e</li></ol><p>x</p><p>a) f</p>"
+    assert _same(div, text)
+
+
+@pytest.mark.parametrize(
+    "paragraphs",
+    [
+        # One family at two levels: only indentation tells them apart.
+        [_p("a", label="\u2022"), _p("b", label="\u2022", level=1)],
+        [_p("a", label="\u2022"), _p("b", label="\u2022", level=1, num=2)],
+        [_p("a", label="\u25cf"), _p("b", label="\u2022", level=1)],
+        [_p("a", label="\u2212"), _p("b", label="-", level=1)],
+        [_p("a", label="o"), _p("b", label="\u25e6", level=1)],
+        [_p("a", label="\u25aa"), _p("b", label="\u25a0", level=1)],
+        [_p("a", label="-"), _p("b", label="\u2013", level=1)],
+        [_p("a", label="1."), _p("b", label="1)", level=1)],
+        [_p("a", label="1."), _p("b", label="1.", level=1)],
+        [_p("a", label="i."), _p("b", label="a.", level=1)],
+        [_p("a", label="A."), _p("b", label="I.", level=1)],
+        [_p("a", label="o", level=1), _p("b", label="\u2022"), _p("c", label="o", level=2)],
+        [_p("a", label="\u25aa"), _p("b", label="o", level=1), _p("c", label="\u25aa", level=1)],
+        # The same in two lists apart, in one section.
+        [_p("a", label="\u2022"), _p("between"), _p("b", label="\u2022", level=1, num=2)],
+        [
+            _p("a", label="-"),
+            _p("b", label="\u25aa", level=1),
+            _p("x"),
+            _p("c", label="-", level=1),
+        ],
+        # A label of no family, in a section at two levels.
+        [_p("a", label="\u27a2"), _p("b", label="\u25ba", level=1)],
+        [_p("a", label="\u2022"), _p("b", label="\u27a2", level=1)],
+        [_p("a", label="\u2022"), _p("b", label="a", level=1)],
+        [_p("a", label="1."), _p("b", label="1.1.", level=1)],
+        [_p("a", label="\u2022"), _p("x"), _p("b", label="*", num=2), _p("c", label="o", level=1)],
+        # Two families at one level: "o" and "-" both at level 1 would read as two levels.
+        [_p("a", label="\u2022"), _p("b", label="o", level=1), _p("c", label="-", level=1)],
+        [_p("a", label="1."), _p("x"), _p("b", label="\u2022", num=2), _p("c", label="o", level=1)],
+        [
+            _p("a", label="\u2022"),
+            _p("b", label="a)", level=1),
+            _p("c", label="i)", level=2),
+            _p("d", label="-", level=2),
+        ],
+    ],
+)
+def test_a_section_at_two_levels_its_labels_cannot_tell_apart_is_refused(
+    paragraphs: list[Paragraph],
+) -> None:
+    with pytest.raises(RefusedError) as refused:
+        _build(*paragraphs)
+    assert refused.value.code == "list-level"
+
+
+def test_a_section_of_one_level_keeps_any_label() -> None:
+    div, text = _build(_p("a", label="\u27a2"), _p("b", label="\u27a2"))
+    assert _inner(div) == "<p>\u27a2 a</p><p>\u27a2 b</p>"
+    assert _same(div, text)
+
+
+def test_a_run_at_two_levels_keeps_the_guards_of_labels_written_as_text() -> None:
+    # A dash before a number reads as its sign: still list-label, at any level.
+    with pytest.raises(RefusedError) as refused:
+        _build(_p("Store:", label="\u2022"), _p("2 to 8 \u00b0C", label="-", level=1))
+    assert refused.value.code == "list-label"
+    # A bullet glyph as text in a cell, which the page leaves out: still list-label.
+    table = (_grid(1, [(0, 1, None)]),)
+    cell = (0, 0, 0)
+    with pytest.raises(RefusedError) as refused:
+        _build(
+            _p("a", label="\u2022", table=cell),
+            _p("b", label="o", level=1, table=cell),
+            tables=table,
+        )
+    assert refused.value.code == "list-label"
+    # A run at two levels in a cell of no bullet glyph: carried as text, as outside one.
+    inner = _two_levels(
+        _p("a", label="1.", table=cell), _p("b", label="o", level=1, table=cell), tables=table
+    )
+    assert inner == "<table><tr><td><p>1. a</p><p>o b</p></td></tr></table>"
+
+
+def test_a_level_whose_label_is_empty_is_no_list_paragraph() -> None:
+    nothing = Paragraph("b", None, Numbering(1, 1, "", "tab"), None)
+    div, text = _build(_p("a", label="\u2022"), nothing)
+    assert _inner(div) == "<ul><li>a</li></ul><p>b</p>"
+    assert _same(div, text)
+
+
+@pytest.mark.skipif(browser.find_chrome() is None, reason="Chrome is not installed")
+def test_chrome_draws_a_run_at_two_levels_as_its_labels_text() -> None:
+    """The drawing check reads every label of the run as the start of its line, never as a
+    marker; a run of one level beside it keeps its ``ul``, whose marker Chrome draws."""
+    paragraphs = (
+        # Section a: bullets over "o" over squares, across lists, and a ``ul`` run apart.
+        _p("one", label="\u2022"),
+        _p("two", label="\u2022"),
+        _p("between"),
+        _p("hepatic", label="\u2022", num=2),
+        _p("Child-Pugh C", label="o", level=1, num=3),
+        _p("deeper", label="\u25aa", level=2, num=3),
+        _p("renal", label="\u2022", num=2),
+        _p("dialysis", label="o", level=1, num=4),
+        # Section b: numbered over lettered, numbering run on across parents, and in a cell.
+        _p("first", label="1."),
+        _p("sub", label="a)", level=1),
+        _p("second", label="2."),
+        _p("more", label="b)", level=1),
+        _p("x", label="1.", table=(0, 0, 0), num=6),
+        _p("y", label="a)", level=1, table=(0, 0, 0), num=6),
+        # Section c: a dash under a bullet, starting deeper.
+        _p("tail", label="\u2013", level=1),
+        _p("head", label="\u2022"),
+    )
+    body = Body(paragraphs, CELL)
+    built = {
+        "sections": [
+            {
+                "key": key,
+                "refusal": None,
+                "narrative": _section(range(a, b), body)[0],
+                "paragraphs": [a, b],
+            }
+            for key, a, b in (("a", 0, 8), ("b", 8, 14), ("c", 14, 16))
+        ]
+    }
+    verdict = drawing.check(body, built)
+    assert verdict["sections"] == [
+        {"key": key, "agrees": True, "where": None} for key in ("a", "b", "c")
+    ]
+    # Held to the same drawing, a read whose sub-item's label differs, differs.
+    moved = Body(
+        (*paragraphs[:4], _p("Child-Pugh C", label="\u25e6", level=1), *paragraphs[5:]), CELL
+    )
+    assert not drawing.check(moved, built)["sections"][0]["agrees"]
+
+
 def test_a_label_run_into_its_text_is_refused() -> None:
     nothing = Paragraph("5 mg", None, Numbering(1, 0, "1.", "nothing"), None)
     with pytest.raises(RefusedError) as refused:
@@ -2343,6 +2629,27 @@ def test_the_verify_vectors_of_3_7_0_are_what_the_builder_writes() -> None:
     by_name = {vector["name"]: vector for vector in VECTORS["verify"]}
     passed = by_name["certified-word-pattern-grey"]["input"]
     failed = by_name["certified-word-pattern-grey-dropped"]["input"]
+    for vector in (passed, failed):
+        assert [p["text"] for p in vector["source"]["pages"]] == [page]
+    inner = passed["sections"][0]["div"].removeprefix('<div xmlns="http://www.w3.org/1999/xhtml">')
+    assert _inner(div) == inner.removesuffix("</div>")
+
+
+def test_the_verify_vectors_of_3_8_0_are_what_the_builder_writes() -> None:
+    """The page and the narrative of fidelity-norm/3.8.0's two certified Word vectors
+    (``test/fixtures/fidelity/cases.ts``) are what ``zone_a.word_epi`` writes for their read: a
+    list at three levels, bullets over "o" over an en dash, as its labels' text."""
+    div, page = _build(
+        _p("Do not take this medicine if you have:"),
+        _p("liver disease", label="\u2022"),
+        _p("severe (Child-Pugh C)", label="o", level=1, num=2),
+        _p("kidney disease", label="\u2022"),
+        _p("on dialysis", label="o", level=1, num=3),
+        _p("three times a week", label="\u2013", level=2, num=3),
+    )
+    by_name = {vector["name"]: vector for vector in VECTORS["verify"]}
+    passed = by_name["certified-word-two-levels-as-labels"]["input"]
+    failed = by_name["certified-word-two-levels-as-nested-list"]["input"]
     for vector in (passed, failed):
         assert [p["text"] for p in vector["source"]["pages"]] == [page]
     inner = passed["sections"][0]["div"].removeprefix('<div xmlns="http://www.w3.org/1999/xhtml">')

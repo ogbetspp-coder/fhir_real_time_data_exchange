@@ -22,9 +22,9 @@ Two outputs, written by separate code from the same read, so that the fidelity c
   bold, italic, superscript and subscript are ``strong``, ``em``, ``sup`` and ``sub``, and the QRD
   template's grey is a ``span`` styled ``background-color: silver;`` (the EMA ePI style guide's
   elements and its form for "not printed" text). A list an HTML list cannot draw as Word does
-  (labels other than "•", or "1.", "2.", ... from one) is written as Word draws it: each item a
-  ``p`` of its label, a space and its text (``text_labels``). The div must pass the fidelity
-  scanner (``zone_a.fidelity.xhtml``).
+  (labels other than "•", or "1.", "2.", ... from one, or a run at two levels) is written as Word
+  draws it: each item a ``p`` of its label, a space and its text (``text_labels``). The div must
+  pass the fidelity scanner (``zone_a.fidelity.xhtml``).
 - ``page`` (decision 2): the section's text as section 7 of the fidelity specification writes a
   page. It begins with a line break, as the scanner's text does, and each paragraph is a line:
   the list label Word draws and a space (in a table cell a bullet is left out), then the text,
@@ -64,9 +64,12 @@ else, with the code in parentheses:
   every ``ul`` with discs), except a section 3 step 4 bullet glyph in a table cell, which the page
   leaves out (``list-label``; owner decision 2026-10-06), and a label written as text that would
   join the number its item begins with (``joins``: "1" before "000 mg", "-" before "2 to 8 C";
-  ``list-label``). One list level in the section, since
-  nesting is not carried (``list-level``); no paragraph that draws a label and holds no text
-  (``empty-numbered``);
+  ``list-label``). Lists at two or more levels in the section (nesting, which no HTML list here
+  draws as Word does) only where every label is of a closed family (disc, circle, square, dash,
+  decimal, lower-case or upper-case letters), no family stands at two levels and no level holds
+  two families (``list_levels``, ADR 0006 decision 14), else ``list-level``: each run of list
+  paragraphs at two levels is then written as its labels' text, its level told by its label; no
+  paragraph that draws a label and holds no text (``empty-numbered``);
 - tables: one level, with Word's grid on record, no row of no cells that leaves grid columns
   out, and every vertically merged cell under a cell of the same columns that starts or continues
   the merge in the row above, with no text of its own (``table-grid``, ``table-shape``,
@@ -133,7 +136,7 @@ from zone_a.structure import line
 from zone_a.underline import underline_changes
 
 # The narrative builder's and the page serialiser's version: one, as they are one closed list.
-WORD_EPI_VERSION: Final = "word-epi/1.7.0"
+WORD_EPI_VERSION: Final = "word-epi/1.8.0"
 
 CARRIED: Final = {"bold": "strong", "italic": "em", "superscript": "sup", "subscript": "sub"}
 # Section 3 step 4's bullet glyphs: a list bullet in page text, removed at a line start.
@@ -682,24 +685,82 @@ def _list(labels: Sequence[str]) -> str | None:
 
 
 def _lists(indices: Sequence[int], body: Body) -> Iterator[list[int]]:
-    """The paragraphs in blocks: each one of no list alone, each list's items together."""
-    items: list[int] = []
-    for i in indices:
+    """The paragraphs in blocks: each one of no list alone, each list's items together.
+
+    A run of list paragraphs (no unlabelled one between them) at two or more levels is one block
+    whatever its lists (decision 14), written as its labels' text (``_tag``); any other run is
+    split where its list changes.
+    """
+    paragraphs = body.paragraphs
+    for labelled, group in itertools.groupby(indices, key=lambda i: bool(_label(paragraphs[i]))):
+        run = list(group)
+        if not labelled:
+            yield from ([i] for i in run)
+        elif len({paragraphs[i].numbering.level for i in run}) > 1:  # type: ignore[union-attr]
+            yield run
+        else:
+            for _, items in itertools.groupby(run, key=lambda i: paragraphs[i].numbering.num_id):  # type: ignore[union-attr]
+                yield list(items)
+
+
+def _tag(items: Sequence[int], body: Body) -> str | None:
+    """The start tag of the HTML list a block of list items is, or None to write labels as text.
+
+    None for a block at two or more levels (decision 14: an HTML list would draw its sub-items
+    indented, and its bullets as no Word label of theirs), else ``_list``'s.
+    """
+    paragraphs = [body.paragraphs[i] for i in items]
+    if len({p.numbering.level for p in paragraphs}) > 1:  # type: ignore[union-attr]
+        return None
+    return _list([_label(p) for p in paragraphs])
+
+
+# ADR 0006 decision 14's label families, a closed list judged as a reader sees a label, not by
+# code point: disc, circle (Word's default second-level bullet is the letter "o"), square, dash,
+# decimal, and lower-case and upper-case letters, alphabetic and Roman together ("i." is either).
+# A number or a letter stands alone or with "." or ")" after it, or in brackets; a letter alone is
+# no label of these ("o" is the circle).
+FAMILIES: Final = (
+    ("disc", re.compile("[\u2022\u25cf]")),
+    ("circle", re.compile("[o\u25e6\u25cb]")),
+    ("square", re.compile("[\u25aa\u25a0\u25ab\u25a1]")),
+    ("dash", re.compile("[\\-\u2010-\u2014\u2212]")),
+    ("decimal", re.compile(r"[0-9]+[.)]?|\([0-9]+\)")),
+    ("lower", re.compile(r"[a-z]+[.)]|\([a-z]+\)")),
+    ("upper", re.compile(r"[A-Z]+[.)]|\([A-Z]+\)")),
+)
+
+
+def family(label: str) -> str | None:
+    """The family of ``FAMILIES`` a list label belongs to, or None."""
+    return next((name for name, pattern in FAMILIES if pattern.fullmatch(label)), None)
+
+
+def list_levels(indices: Sequence[int], body: Body) -> None:
+    """Refuse a section whose list levels its labels' text cannot tell apart (``list-level``).
+
+    A section with list paragraphs at two or more Word levels is carried, written as its labels'
+    text (``_lists``), only where every label is of a family (``family``), no family stands at
+    two levels of the section (ADR 0006 decision 14) and no level holds two families: each item's
+    level is then told by its label alone, as Word's indentation tells it, which neither the
+    narrative nor the drawing check keeps ("•", "o", "-" with "o" and "-" both at level 1 would
+    read as three levels).
+    """
+    labelled = [i for i in indices if _label(body.paragraphs[i])]
+    if len({body.paragraphs[i].numbering.level for i in labelled}) < 2:  # type: ignore[union-attr]
+        return
+    levels: dict[str, int] = {}
+    families: dict[int, str] = {}
+    for i in labelled:
         numbering = body.paragraphs[i].numbering
-        if not _label(body.paragraphs[i]):
-            if items:
-                yield items
-                items = []
-            yield [i]
-            continue
-        previous = body.paragraphs[items[-1]].numbering if items else None
         assert numbering is not None  # noqa: S101 - a list item has a label
-        if previous is not None and previous.num_id != numbering.num_id:
-            yield items
-            items = []
-        items.append(i)
-    if items:
-        yield items
+        name = family(_label(body.paragraphs[i]))
+        if name is None:
+            raise RefusedError("list-level", i, "a label of no family, lists at two levels")
+        if levels.setdefault(name, numbering.level) != numbering.level:
+            raise RefusedError("list-level", i, "one label family at two levels")
+        if families.setdefault(numbering.level, name) != name:
+            raise RefusedError("list-level", i, "two label families at one level")
 
 
 def _blocks(indices: Sequence[int], body: Body) -> Iterator[list[int]]:
@@ -716,15 +777,14 @@ def _blocks(indices: Sequence[int], body: Body) -> Iterator[list[int]]:
 def text_labels(indices: Sequence[int], body: Body) -> frozenset[int]:
     """The paragraphs whose list label the narrative writes as text, as Word draws it.
 
-    Those of a list ``_list`` gives no tag: each is a ``p`` of its label, a space and its text.
+    Those of a block ``_tag`` gives no tag: each is a ``p`` of its label, a space and its text.
     The drawing check reads them so (``zone_a.drawing``). Of a section the builder carried.
     """
     return frozenset(
         i
         for block in _blocks(indices, body)
         for items in _lists(block, body)
-        if _label(body.paragraphs[items[0]])
-        and _list([_label(body.paragraphs[i]) for i in items]) is None
+        if _label(body.paragraphs[items[0]]) and _tag(items, body) is None
         for i in items
     )
 
@@ -741,7 +801,7 @@ def _flow(
         if not labels[0]:
             out.append(f"<p>{inline[0]}</p>")
             continue
-        tag = _list(labels)
+        tag = _tag(items, body)
         if tag is not None:
             out.append(tag + "".join(f"<li>{x}</li>" for x in inline) + tag.replace("<", "</"))
             continue
@@ -919,11 +979,7 @@ def _section(indices: range, body: Body) -> tuple[str | None, str]:
     for i in indices:
         _check(i, paragraphs[i], body.images)
         marks[i] = _marks(i, paragraphs[i])
-    # One list level in a section: a list inside a list would be drawn as one flat list.
-    levels = [(paragraphs[i].numbering.level, i) for i in indices if _label(paragraphs[i])]  # type: ignore[union-attr]
-    for level, i in levels:
-        if level != levels[0][0]:
-            raise RefusedError("list-level", i, "lists at two levels")
+    list_levels(indices, body)
     if all(blank(paragraphs[i]) for i in indices):
         return None, ""
     div = narrative(indices, body, marks)

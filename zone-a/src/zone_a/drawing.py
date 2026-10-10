@@ -20,8 +20,9 @@ other background, or a character drawn grey that Word does not shade, differs. A
 narrative writes as text (``zone_a.word_epi.text_labels``) is read as the start of its line, not
 as a marker.
 
-Not compared: a list's indentation and nesting (the builder refuses two levels in a section), and
-which line a bullet stands before (bullets are compared in order, and section 3 step 4 removes
+Not compared: a list's indentation and nesting (the builder carries two levels in a section only
+as its labels' text, each label telling its level: ADR 0006 decision 14), and which line a bullet
+stands before (bullets are compared in order, and section 3 step 4 removes
 them from both texts the fidelity check reads).
 
 ``check`` gives the verdicts; ``refuse`` turns a section that differs, or one Chrome did not draw,
@@ -66,7 +67,7 @@ from zone_a.canonical_json import CanonicalJsonError, canonical_json, sha256_utf
 from zone_a.certified import Body
 from zone_a.word_epi import CAPITALS, GREY, WHITESPACE, blank, text_labels, unchanged_by_capitals
 
-DRAWING_VERSION: Final = "word-drawing/1.2.6"
+DRAWING_VERSION: Final = "word-drawing/1.2.7"
 RECORD_VERSION: Final = "word-drawing-record/1.0.0"
 LEFT_OUT: Final = frozenset({"underline"})
 # The template's grey as Chrome reports the narrative's silver span (``label_docx.browser``).

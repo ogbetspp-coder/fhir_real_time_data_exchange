@@ -9,7 +9,10 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+from label_docx.reader import Numbering, Paragraph
+
 from zone_a.canonical_json import canonical_json
+from zone_a.certified import Body
 
 
 def _script() -> Any:
@@ -188,3 +191,34 @@ def test_the_regression_diff_lists_what_got_worse(tmp_path: Path) -> None:
     assert script.main(["regress", str(before), str(tmp_path)]) == 2
     (tmp_path / "after" / "sections.jsonl").write_text("{not json\n", encoding="utf-8")
     assert script.main(["regress", str(before), str(tmp_path / "after")]) == 2
+
+
+def test_the_blockers_mirror_the_builders_label_families() -> None:
+    """Decision 14's family rule, as the builder applies it: two families carried, one refused."""
+    script = _script()
+    heading = Paragraph("4.2\tPosology", None, None, None)
+
+    def found(*labels: tuple[str, int]) -> list[str]:
+        paragraphs = [Paragraph("x", None, Numbering(1, v, x, "tab"), None) for x, v in labels]
+        body = Body((heading, *paragraphs), ())
+        section = {
+            "heading": 0,
+            "paragraphs": [1, 1 + len(paragraphs)],
+            "refusal": {"code": "tab", "detail": "a tab"},
+        }
+        return [b for b in script.blockers(body, section) if b.startswith("list-level")]
+
+    assert found(("\u2022", 0), ("o", 1)) == []
+    assert found(("\u2022", 0), ("\u2022", 1)) == ["list-level: one label family at two levels"]
+    assert found(("\u27a2", 0), ("o", 1)) == [
+        "list-level: a label of no family, lists at two levels"
+    ]
+    assert found(("\u2022", 0), ("o", 1), ("-", 1)) == [
+        "list-level: two label families at one level"
+    ]
+    for detail in (
+        "one label family at two levels",
+        "a label of no family, lists at two levels",
+        "two label families at one level",
+    ):
+        assert script.public(f"list-level: {detail}") == f"list-level: {detail}"

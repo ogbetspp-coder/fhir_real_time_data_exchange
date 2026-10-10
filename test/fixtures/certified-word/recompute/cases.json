@@ -11,10 +11,10 @@
         "recompute": "recompute/1.2.0",
         "reader": "docx-reader/1.34.0",
         "format": "label-docx-json/1.20.0",
-        "structurer": "smpc-structure/1.3.4",
-        "registryVersion": "1.3.4",
+        "structurer": "smpc-structure/1.3.5",
+        "registryVersion": "1.3.5",
         "mappingVersion": "1.5.0",
-        "builder": "word-epi/1.7.0"
+        "builder": "word-epi/1.8.0"
       }
     },
     "documentId": "00000000-5979-4e74-8000-0000000000d0",
@@ -43,10 +43,10 @@
         "recompute": "recompute/1.2.0",
         "reader": "docx-reader/1.34.0",
         "format": "label-docx-json/1.20.0",
-        "structurer": "smpc-structure/1.3.4",
-        "registryVersion": "1.3.4",
+        "structurer": "smpc-structure/1.3.5",
+        "registryVersion": "1.3.5",
         "mappingVersion": "1.5.0",
-        "builder": "word-epi/1.7.0"
+        "builder": "word-epi/1.8.0"
       }
     },
     "documentId": "00000000-5979-4e74-8000-0000000000d1",
@@ -77,10 +77,10 @@
         "recompute": "recompute/1.2.0",
         "reader": "docx-reader/1.34.0",
         "format": "label-docx-json/1.20.0",
-        "structurer": "smpc-structure/1.3.4",
-        "registryVersion": "1.3.4",
+        "structurer": "smpc-structure/1.3.5",
+        "registryVersion": "1.3.5",
         "mappingVersion": "1.5.0",
-        "builder": "word-epi/1.7.0"
+        "builder": "word-epi/1.8.0"
       }
     },
     "documentId": "00000000-5979-4e74-8000-0000000000d2",
@@ -109,10 +109,10 @@
         "recompute": "recompute/1.2.0",
         "reader": "docx-reader/1.34.0",
         "format": "label-docx-json/1.20.0",
-        "structurer": "smpc-structure/1.3.4",
-        "registryVersion": "1.3.4",
+        "structurer": "smpc-structure/1.3.5",
+        "registryVersion": "1.3.5",
         "mappingVersion": "1.5.0",
-        "builder": "word-epi/1.7.0"
+        "builder": "word-epi/1.8.0"
       }
     },
     "documentId": "00000000-5979-4e74-8000-0000000000d3",
@@ -141,10 +141,10 @@
         "recompute": "recompute/1.2.0",
         "reader": "docx-reader/1.34.0",
         "format": "label-docx-json/1.20.0",
-        "structurer": "pl-structure/1.0.4",
-        "registryVersion": "1.3.4",
+        "structurer": "pl-structure/1.0.5",
+        "registryVersion": "1.3.5",
         "mappingVersion": "1.1.0",
-        "builder": "word-epi/1.7.0"
+        "builder": "word-epi/1.8.0"
       }
     },
     "documentId": "00000000-5979-4e74-8000-0000000000d4",

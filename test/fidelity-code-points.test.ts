@@ -34,6 +34,8 @@ const RELEASED_TABLES: Readonly<Record<string, string>> = {
   "fidelity-norm/3.6.0": "61927ab9e2345524a694ed2770de1fa29c25b7bfe0ac54d56ed258a1b1b5d8ae",
   // 3.7.0 widens section 7's certified Word rule (a pattern's grey) and changes no list.
   "fidelity-norm/3.7.0": "61927ab9e2345524a694ed2770de1fa29c25b7bfe0ac54d56ed258a1b1b5d8ae",
+  // 3.8.0 widens section 7's certified Word rule (lists at two levels) and changes no list.
+  "fidelity-norm/3.8.0": "61927ab9e2345524a694ed2770de1fa29c25b7bfe0ac54d56ed258a1b1b5d8ae",
 };
 
 describe("the code point vectors", () => {
